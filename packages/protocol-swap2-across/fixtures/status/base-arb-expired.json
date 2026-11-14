@@ -1,5 +1,5 @@
 {
-  "note": "A Base → Arbitrum deposit that was never filled: found by a scan of 253 Base → Arbitrum deposits whose fill deadline had passed, reading each one's fillStatuses on Arbitrum (3 were still 0). Read at the latest Arbitrum block, past its fill deadline. Recorded 2026-11-14 over public RPCs.",
+  "note": "A Base \u2192 Arbitrum deposit that was never filled: found by a scan of 253 Base \u2192 Arbitrum deposits whose fill deadline had passed, reading each one's fillStatuses on Arbitrum (3 were still 0). Read at the latest Arbitrum block, past its fill deadline. Recorded 2026-11-14 over public RPCs.",
   "source": {
     "chainId": 8453,
     "txHash": "0x85585b7e4b37806e7f24fb971f8683d246dbf668feb2544d5713ef8eb8919445",
@@ -32,6 +32,10 @@
           "logIndex": "0x12"
         }
       ]
+    },
+    "block": {
+      "number": "0x36bd59f",
+      "timestamp": "0x6af87e21"
     }
   },
   "relayHash": "0x20e175f31dba8d8fc1a362891ddbe1bc4c901703227e651825a1838cd1a496c9",

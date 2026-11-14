@@ -1,8 +1,8 @@
 import {describe, expect, it} from "vitest";
 import {encodeAcrossDeposit} from "../src/deposit.js";
-import {ACROSS_V5_MESSAGE_PREFIX, acrossChain, acrossRouteOf} from "../src/config.js";
+import {ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S, ACROSS_V5_MESSAGE_PREFIX, acrossChain, acrossRouteOf} from "../src/config.js";
 import {
-  ACROSS_DEFAULT_MAX_FEE_BPS, ACROSS_LANDING_WINDOW_S, ACROSS_MIN_FILL_WINDOW_S, ACROSS_MIN_OPEN_FILL_S, acrossRequestOf,
+  ACROSS_DEFAULT_MAX_FEE_BPS, ACROSS_LANDING_WINDOW_S, ACROSS_MAX_FILL_WINDOW_S, ACROSS_MIN_FILL_WINDOW_S, ACROSS_MIN_OPEN_FILL_S, acrossRequestOf,
   checkAcrossRequest, isAcrossSpeedUpTypedData, verifyAcrossDeposit,
 } from "../src/verify.js";
 import {
@@ -125,8 +125,8 @@ describe("verifyAcrossDeposit: a negative for every field", () => {
     verifyAcrossDeposit(usdcRequest({minAmountOut: undefined}), txOf({...ok, outputAmount: 25_000_000n - cap}));
     refused(() => verifyAcrossDeposit(usdcRequest({minAmountOut: undefined}), txOf({...ok, outputAmount: 25_000_000n - cap - 1n})), "tx-fee", "price_check_failed");
     refused(() => verifyAcrossDeposit(usdcRequest({minAmountOut: undefined, maxFeeBps: 1}), txOf(ok)), "tx-fee", "price_check_failed");
-    // A zero fee is not refused (a deposit nobody fills is refunded).
-    verifyAcrossDeposit(req, txOf({...ok, outputAmount: 25_000_000n}));
+    // A zero fee is: nobody fills it, and the funds wait for a refund.
+    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, outputAmount: 25_000_000n})), "tx-fee", "price_check_failed")).toMatch(/no fee/);
   });
 
   it("the message: empty only, the V5 witness prefix by name", () => {
@@ -140,33 +140,43 @@ describe("verifyAcrossDeposit: a negative for every field", () => {
   it("exclusivity", () => {
     refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: 0})), "tx-exclusivity", "policy_refused");
     refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusiveRelayer: ZERO})), "tx-exclusivity", "policy_refused");
-    // An offset of an hour passes, one beyond it does not.
-    verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: 3600}));
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: 3601})), "tx-exclusivity", "policy_refused");
+    // An offset of an hour passes (Across's two-hour fill window leaves room after the last landing), one beyond it does not.
+    verifyAcrossDeposit(req, txOf({...ok, fillDeadline: ok.quoteTimestamp + ACROSS_MAX_FILL_WINDOW_S, exclusivityParameter: 3600}));
+    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: 3601})), "tx-exclusivity", "policy_refused")).toMatch(/alone/);
     // A timestamp: past is no exclusivity; too close to the fill deadline is refused.
     verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: NOW_S - 600}));
-    verifyAcrossDeposit(req, txOf({...ok, fillDeadline: NOW_S + 3000, exclusivityParameter: NOW_S + 3000 - ACROSS_MIN_OPEN_FILL_S}));
-    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, fillDeadline: NOW_S + 3000, exclusivityParameter: NOW_S + 3000 - ACROSS_MIN_OPEN_FILL_S + 1})), "tx-exclusivity", "policy_refused")).toMatch(/before the fill deadline/);
+    const qt = NOW_S - 1200;
+    const fd = qt + ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S + ACROSS_MIN_FILL_WINDOW_S;
+    verifyAcrossDeposit(req, txOf({...ok, quoteTimestamp: qt, fillDeadline: fd, exclusivityParameter: fd - ACROSS_MIN_OPEN_FILL_S}));
+    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, quoteTimestamp: qt, fillDeadline: fd, exclusivityParameter: fd - ACROSS_MIN_OPEN_FILL_S + 1})), "tx-exclusivity", "policy_refused")).toMatch(/before the fill deadline/);
     // A timestamp more than an hour out.
     expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: NOW_S + 3600 + ACROSS_LANDING_WINDOW_S + 1})), "tx-exclusivity", "policy_refused")).toMatch(/alone/);
-    // An offset that would run into the fill deadline.
-    const fd = NOW_S + ACROSS_MIN_FILL_WINDOW_S;
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, fillDeadline: fd, exclusivityParameter: fd - NOW_S - ACROSS_MIN_OPEN_FILL_S - ACROSS_LANDING_WINDOW_S + 1})), "tx-exclusivity", "policy_refused");
+    // An offset that would run into the fill deadline for a deposit landing as late as the SpokePool takes it.
+    const lastLanding = ok.quoteTimestamp + ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S;
+    verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: ok.fillDeadline - ACROSS_MIN_OPEN_FILL_S - lastLanding}));
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: ok.fillDeadline - ACROSS_MIN_OPEN_FILL_S - lastLanding + 1})), "tx-exclusivity", "policy_refused");
   });
 
   it("quote time", () => {
-    verifyAcrossDeposit(req, txOf({...ok, quoteTimestamp: NOW_S + 120}));
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, quoteTimestamp: NOW_S + 121})), "tx-quote-time", "policy_refused");
-    verifyAcrossDeposit(req, txOf({...ok, quoteTimestamp: NOW_S - 3300}));
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, quoteTimestamp: NOW_S - 3301})), "tx-quote-time", "quote_expired");
+    const at = (qt: number) => txOf({...ok, quoteTimestamp: qt, fillDeadline: qt + 7200});
+    verifyAcrossDeposit(req, at(NOW_S + 120));
+    refused(() => verifyAcrossDeposit(req, at(NOW_S + 121)), "tx-quote-time", "policy_refused");
+    verifyAcrossDeposit(req, at(NOW_S - 3300));
+    refused(() => verifyAcrossDeposit(req, at(NOW_S - 3301)), "tx-quote-time", "quote_expired");
   });
 
   it("fill deadline", () => {
-    verifyAcrossDeposit(req, txOf({...ok, fillDeadline: NOW_S + ACROSS_MIN_FILL_WINDOW_S}));
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, fillDeadline: NOW_S + ACROSS_MIN_FILL_WINDOW_S - 1, exclusiveRelayer: ZERO, exclusivityParameter: 0})), "tx-fill-deadline", "quote_expired");
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, fillDeadline: NOW_S - 1, exclusiveRelayer: ZERO, exclusivityParameter: 0})), "tx-fill-deadline", "quote_expired");
-    verifyAcrossDeposit(req, txOf({...ok, fillDeadline: NOW_S + 21_600 - 120}));
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, fillDeadline: NOW_S + 21_600 - 119})), "tx-fill-deadline", "policy_refused");
+    const none = {exclusiveRelayer: ZERO, exclusivityParameter: 0};
+    // From now: already close is expired, past the SpokePool's buffer is refused.
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, ...none, fillDeadline: NOW_S + ACROSS_MIN_FILL_WINDOW_S - 1})), "tx-fill-deadline", "quote_expired");
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, ...none, fillDeadline: NOW_S - 1})), "tx-fill-deadline", "quote_expired");
+    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, fillDeadline: NOW_S + 21_600 - 119})), "tx-fill-deadline", "policy_refused")).toMatch(/SpokePool allows/);
+    // From the quote time: a relayer's window after the last landing, and no more than an Across quote gives.
+    const qt = ok.quoteTimestamp;
+    verifyAcrossDeposit(req, txOf({...ok, ...none, fillDeadline: qt + ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S + ACROSS_MIN_FILL_WINDOW_S}));
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, ...none, fillDeadline: qt + ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S + ACROSS_MIN_FILL_WINDOW_S - 1})), "tx-fill-deadline", "policy_refused");
+    verifyAcrossDeposit(req, txOf({...ok, fillDeadline: qt + ACROSS_MAX_FILL_WINDOW_S}));
+    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, fillDeadline: qt + ACROSS_MAX_FILL_WINDOW_S + 1})), "tx-fill-deadline", "policy_refused")).toMatch(/after the quote time/);
   });
 
   it("value and approval", () => {
@@ -220,10 +230,10 @@ describe("routes and requests", () => {
   });
 
   it("acrossRequestOf: symbols resolve through the catalog, a dry quote is priced with a placeholder, a live one needs addresses", () => {
-    const params = {sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: ARB_USDC, amountIn: "25000000", destAddress: USER, refundAddress: USER};
+    const params = {sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: ARB_USDC, amountIn: "25000000", destAddress: USER, refundAddress: USER, sender: USER};
     expect(acrossRequestOf(params)).toMatchObject({sourceToken: BASE_USDC, destToken: ARB_USDC, amount: 25_000_000n, depositor: USER, recipient: USER});
     expect(acrossRequestOf({...params, sourceToken: "ETH", destToken: ZERO}).sourceToken).toBe(ZERO);
-    const {refundAddress: _sender, ...noSender} = params;
+    const {refundAddress: _refund, sender: _sender, ...noSender} = params;
     expect(acrossRequestOf({...noSender, destAddress: ""}, {placeholder: OTHER})).toMatchObject({depositor: OTHER, recipient: OTHER});
     refused(() => acrossRequestOf({...params, destAddress: ""}), "request-invalid");
     refused(() => acrossRequestOf(noSender), "request-invalid");

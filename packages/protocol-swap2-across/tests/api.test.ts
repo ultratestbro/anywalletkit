@@ -52,6 +52,19 @@ describe("V5 error envelopes → CS-13", () => {
     expect(parseAcrossV5Error(400, {error: {code: "policy.amount_out_of_range", message: "fee exceeds maxFee"}}, null, NOW).info).toEqual({reason: "price_check_failed"});
   });
 
+  it("the fee cap's own wording is read before the direction words it carries", () => {
+    const reason = (message: string) => parseAcrossV5Error(400, {error: {code: "policy.amount_out_of_range", message}}, null, NOW).info?.reason;
+    // Across's documented case, "fee above maxFee", and its near variants: the cap, not the amount.
+    expect(reason("fee above maxFee")).toBe("price_check_failed");
+    expect(reason("Total fee is above the maximum fee")).toBe("price_check_failed");
+    expect(reason("Guaranteed output is below the minimum allowed by maxFee")).toBe("price_check_failed");
+    expect(reason("fee exceeds the max")).toBe("price_check_failed");
+    // An amount too small to cover the fees is the amount's direction (Across's V4 wording, 2026-11-14).
+    expect(reason("Sent amount is too low relative to fees")).toBe("amount_too_small");
+    expect(reason("Bridge amount 1000 is too low to cover bridge fees 6543")).toBe("amount_too_small");
+    expect(reason("Amount is higher than available liquidity. Max amount is 557591.83556 USDC.")).toBe("amount_too_large");
+  });
+
   it("409 conflict.submission_state_unknown: retry the same request, never re-quote", () => {
     const e = parseAcrossV5Error(409, {error: {code: "conflict.submission_state_unknown"}}, null, NOW);
     expect(e.retrySameRequest).toBe(true);

@@ -22,8 +22,12 @@ import {ACROSS_MAX_FEE_BPS_LIMIT, acrossRequestOf, checkAcrossQuote, checkAcross
  *    integrator fees are refused by name.
  *  - Quoting arrives with the Across API V5 layer (a key from dashboard.across.to, server-side only). Until then the
  *    provider is disabled: `enabled()` is false and `getQuote` refuses (`quote-unavailable`, `policy_refused`).
- *  - Status is read on chain (`status.ts`): the deposit from the source receipt, its relay hash, the destination's
- *    `fillStatuses` — with an RPC URL per chain in `rpcUrls`. Display only, nothing is signed on its word.
+ *  - Status is read on chain (`status.ts`): the intent's own deposit from the source receipt (the event whose fields
+ *    hash to the intent id's digest), its relay hash, the destination's `fillStatuses` — with an RPC URL per chain in
+ *    `rpcUrls`. Unfilled past its fill deadline it is `expired` (Across refunds it). Display only, nothing is signed on
+ *    its word.
+ *  - The depositor is the signing account (`QuoteParams.sender`, set by the engine), never a `refundAddress` the caller
+ *    names: an Across depositor can sign a speed-up that re-points the output, so a different refund address is refused.
  */
 
 const EVM_PLACEHOLDER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
@@ -145,7 +149,7 @@ export function acrossProvider(config: AcrossProviderConfig = {}): CrossChainPro
       if (!ref.sourceTxHash) return {state: "pending"};
       const sourceRpc = rpcFor(source.caip2);
       const destRpc = rpcFor(dest.caip2);
-      const t = await trackAcrossDeposit({sourceTxHash: ref.sourceTxHash, source, dest, ...(sourceRpc ? {sourceRpc} : {}), ...(destRpc ? {destRpc} : {})});
+      const t = await trackAcrossDeposit({sourceTxHash: ref.sourceTxHash, intentDigest: intent.digest, source, dest, ...(sourceRpc ? {sourceRpc} : {}), ...(destRpc ? {destRpc} : {})});
       return t.status;
     },
   };

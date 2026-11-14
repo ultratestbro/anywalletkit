@@ -342,6 +342,7 @@ function quoteParams(v: unknown, allowUnlisted = false): QuoteParams {
   const slippage = p.slippageBps === undefined ? undefined : num(p.slippageBps, "params.slippageBps", 0, 10_000);
   if (slippage !== undefined && !Number.isInteger(slippage)) bad("params.slippageBps", "expected an integer");
   const refundAddress = optStr(p.refundAddress, "params.refundAddress", 120);
+  const sender = optStr(p.sender, "params.sender", 120);
   const minAmountOut = p.minAmountOut === undefined ? undefined : digits(p.minAmountOut, "params.minAmountOut", 60);
   const dry = bool(p.dry, "params.dry");
   const flex = bool(p.flex, "params.flex");
@@ -354,6 +355,7 @@ function quoteParams(v: unknown, allowUnlisted = false): QuoteParams {
     amountIn: digits(p.amountIn, "params.amountIn", 40),
     destAddress: str(p.destAddress, "params.destAddress", 120),
     ...(refundAddress !== undefined ? {refundAddress} : {}),
+    ...(sender !== undefined ? {sender} : {}),
     ...(minAmountOut !== undefined ? {minAmountOut} : {}),
     ...(slippage !== undefined ? {slippageBps: slippage} : {}),
     ...(dry !== undefined ? {dry} : {}),

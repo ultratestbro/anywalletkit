@@ -118,6 +118,12 @@ export interface AcrossV5Error {
 
 const text = (v: unknown, max: number): string | undefined => (typeof v === "string" && v.length > 0 ? v.slice(0, max) : undefined);
 
+/**
+ * A refusal over the `maxFee` cap, in Across's wording or near it: the cap named (`maxFee`, "maximum fee", "fee cap"),
+ * or a fee said to be above something. "Amount too low to cover fees" is not one — that is the amount's own direction.
+ */
+const FEE_CAP = /\bmax[ _-]?fee\b|\bmaximum (?:total |transfer )?fee\b|\bfee (?:cap|limit)\b|\bfees? (?:is |are )?(?:above|exceeds?|over|greater than|more than)\b/;
+
 /** What an error code says on its own (Across's documented codes), before the HTTP status is consulted. */
 function reasonOfCode(code: string, message: string | undefined, status: number): Swap2RefusalInfo | undefined {
   switch (code) {
@@ -128,8 +134,10 @@ function reasonOfCode(code: string, message: string | undefined, status: number)
     case "permission.not_entitled":
       return {reason: "key_rejected", httpStatus: status};
     case "policy.amount_out_of_range": {
-      // "Amount the route cannot clear, or fee above maxFee": the direction, when the text gives it, decides.
+      // "Amount the route cannot clear, or fee above maxFee". The fee cap first — its wording carries direction words
+      // of its own ("fee above maxFee", "below the minimum allowed by maxFee") — then the amount's direction.
       const m = (message ?? "").toLowerCase();
+      if (FEE_CAP.test(m)) return {reason: "price_check_failed"};
       if (/\b(?:too low|too small|below|minimum|min)\b/.test(m)) return {reason: "amount_too_small"};
       if (/\b(?:too high|too large|above|maximum|max|liquidity)\b/.test(m)) return {reason: "amount_too_large"};
       return {reason: "price_check_failed"};

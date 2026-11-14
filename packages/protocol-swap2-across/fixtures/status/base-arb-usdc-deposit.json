@@ -1,5 +1,5 @@
 {
-  "note": "USDC Base → Arbitrum, deposit (0xad5425c6) sent straight to the Base SpokePool with calldata from Across's API (it ends in the API's 3-byte marker 73c0de). Found by a FundsDeposited log scan of the Base SpokePool; read at the latest Arbitrum block. Recorded 2026-11-14 over public RPCs.",
+  "note": "USDC Base \u2192 Arbitrum, deposit (0xad5425c6) sent straight to the Base SpokePool with calldata from Across's API (it ends in the API's 3-byte marker 73c0de). Found by a FundsDeposited log scan of the Base SpokePool; read at the latest Arbitrum block. Recorded 2026-11-14 over public RPCs.",
   "source": {
     "chainId": 8453,
     "txHash": "0x6ff89815c96a3a31094bf083f7b8ef77d33ab591b59da3632acb8c314d929dd4",
@@ -33,6 +33,10 @@
           "logIndex": "0x47"
         }
       ]
+    },
+    "block": {
+      "number": "0x36d6abe",
+      "timestamp": "0x6af8cf27"
     }
   },
   "relayHash": "0xc0dc5bf49d482612937bd161185320035d038ac0b542338013e0dc154f58cc51",

@@ -1187,7 +1187,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const recipient = blankToUndefined(snapshot.recipient) ?? selfAddress;
     const refundAddress = blankToUndefined(snapshot.refundAddress) ?? selfAddress;
     const executionOptions = await this.prepareOptions(snapshotOptions({...snapshot, recipient, refundAddress}));
-    const params = this.toParams(executionOptions, false);
+    // The signing account rides with the request: a provider whose deposit names its sender binds to it (QuoteParams.sender).
+    const params: QuoteParams = {...this.toParams(executionOptions, false), ...(typeof selfAddress === "string" && selfAddress ? {sender: selfAddress} : {})};
     const resolved = await this.resolveQuote(params);
     if (!resolved) throw this.noRouteError(params);
     const q = snapshotQuote(resolved);

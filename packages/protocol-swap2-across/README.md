@@ -44,13 +44,13 @@ Every check has a code; a refusal reads `across: <what was found> [<code>]`. Nex
 
 **Its arguments are the request**
 
-- `depositor` is the request's sender (`tx-depositor`) — `refundAddress`, which the engine sets to the signing account unless the caller names another refund address; it is the address refunded on the source chain and the only one whose signature can speed the deposit up (redirect its output), so a refund address the user does not control must never be named; `recipient` is the user's recipient (`tx-recipient`); `destinationChainId` the requested chain (`tx-destination`);
+- `depositor` is the signing account (`tx-depositor`) — `QuoteParams.sender`, which the engine sets to the account that signs; it is the address refunded on the source chain and the only one whose signature can speed the deposit up (redirect its output), so it is never a `refundAddress` the caller names: a live request without `sender` is refused, and so is one whose `refundAddress` is another account (`request-invalid`, `recipient_mismatch`); `recipient` is the user's recipient (`tx-recipient`); `destinationChainId` the requested chain (`tx-destination`);
 - `inputToken` is the pinned token, the wrapped native token for the native coin (`tx-input-token`); `inputAmount` exactly the requested amount (`tx-input-amount`);
-- `outputToken` is the same asset on the destination, the wrapped native token for the native coin (`tx-output-token`); `outputAmount` is above zero, at least the caller's floor, and not more than the input — a deposit asking relayers for more than it puts in is never filled (`tx-output-amount`); input − output is within `maxFeeBps` (`tx-fee`);
+- `outputToken` is the same asset on the destination, the wrapped native token for the native coin (`tx-output-token`); `outputAmount` is above zero, at least the caller's floor, and not more than the input — a deposit asking relayers for more than it puts in is never filled (`tx-output-amount`); input − output is at least 10 per million of the input (0.1 bps; zero is refused by name — relayers do not fill a deposit that pays them nothing, and its output, the whole input, would win any comparison of routes) and within `maxFeeBps` (`tx-fee`);
 - `message` is empty: a message starting with Across's V5 witness prefix (`keccak256("AcrossV5MessagePrefix.V1")`) is refused as `tx-message-v5`, any other as `tx-message`;
-- exclusivity: a relayer is named exactly when a window is; the window lasts at most an hour from now and ends at least 10 min before the fill deadline, so any relayer can still fill (`tx-exclusivity`);
+- exclusivity: a relayer is named exactly when a window is; the window lasts at most an hour, and ends at least 10 min before the fill deadline even for a deposit that lands as late as the SpokePool takes it (quote time + 3600 s; an offset counts from the block the deposit lands in), so any relayer can still fill (`tx-exclusivity`);
 - `quoteTimestamp` is at most 2 min ahead and at most 3600 − 300 s old — the SpokePool takes 3600 s, 300 s are kept for the deposit to land (`tx-quote-time`);
-- `fillDeadline` is at least 30 min ahead and within the SpokePool's 6 h buffer (`tx-fill-deadline`);
+- `fillDeadline` is at least 30 min ahead, within the SpokePool's 6 h buffer, at most 7800 s after the quote time (Across's API gives 7200 s; an unfilled deposit holds the funds until then, and its refund comes after), and at least 3600 + 1800 s after it — the SpokePool has no lower bound on the fill deadline and takes the deposit until the quote time is 3600 s old, so a deposit that waits to be mined could otherwise land already expired (`tx-fill-deadline`);
 - `value` is the input amount for the native coin and 0 otherwise (`tx-value`); an ERC-20 deposit approves the pinned SpokePool, a native one approves nothing (`tx-approval`).
 
 **Around it**
@@ -58,11 +58,12 @@ Every check has a code; a refusal reads `across: <what was found> [<code>]`. Nex
 - `buildAcrossDeposit(request, normalizedQuote)` encodes the call from the pins and the request and runs the verifier on its own result; `acrossQuoteOf` turns it into a swap2 `Quote` whose amounts are the deposit's (a relayer pays exactly `outputAmount`, so it is both the expected and the guaranteed output) and whose id names the calldata (`across:<from>:<to>:<digest>`).
 - `buildDeposit` and `preflightDeposit` run the verifier again on the exact transaction about to be signed; `preflightDeposit` refuses typed data, a memo or a serialized transaction (`tx-shape`), and an Across speed-up signature by name (`speed-up`). `isAcrossSpeedUpTypedData` is exported for a wallet's signing guard.
 - A quote priced without the user's addresses (a dry quote) is never built or signed.
-- `acrossPins` gives `remoteProvider` the same checks on the client of a swap2 server: `callTargets` / `spenders` are the SpokePool, `verifyQuote` and `verifyBuild` run the verifier against the user's own request, plus the gas limit band (`quote-gas`), a quote life of at most five minutes plus clock skew (`quote-expiry`) and an id that names the deposit (`quote-intent`; a server's `~<tag>` suffix is accepted).
+- `acrossPins` gives `remoteProvider` the same checks on the client of a swap2 server: `callTargets` / `spenders` are the SpokePool, `verifyQuote` and `verifyBuild` run the verifier against the user's own request, plus the gas limit band (`quote-gas`), a quote life of at most five minutes plus clock skew (`quote-expiry`) and an id that names the deposit (`quote-intent`; a server's `~<tag>` suffix is accepted). It holds remote quotes to the default fee cap (10 %); `acrossPinsWith({maxFeeBps})` gives the pins the app's own cap — a server's `acrossProvider({maxFeeBps})` is not known on the client.
+- The amounts a quote shows are the deposit's; the quote source's `expectedOutputAmount` is refused above `outputAmount` (`quote-normalized`), and `feeUsd` is the verified fee itself for USDC / USDT (one unit a dollar) and 0 for ETH and WBTC (no price here) — never the quote source's own USD figure. The fee in base units is in `fees`.
 
 **What a quote source can still do**
 
-It cannot get a deposit signed for another recipient, depositor, chain, token, amount in, message or SpokePool, nor for an output under the caller's floor or a fee over the cap. It chooses the numbers within those bounds: a worse (but capped) output, a fill deadline or exclusivity window inside the limits above. A deposit nobody fills is refunded to the sender on the source chain after its fill deadline — money is delayed by hours, not lost.
+It cannot get a deposit signed for another recipient, depositor, chain, token, amount in, message or SpokePool, nor for an output under the caller's floor, a fee over the cap or under the floor. It chooses the numbers within those bounds: a worse (but capped) output, a fill deadline or exclusivity window inside the limits above, or a fee just over the floor that no relayer takes. A deposit nobody fills is refunded to the signer on the source chain after its fill deadline (at most 7800 s after its quote time) — money is delayed by hours, not lost.
 
 ## What is refused by design
 
@@ -76,7 +77,7 @@ It cannot get a deposit signed for another recipient, depositor, chain, token, a
 
 `trackIntent` reads the chains, not Across (with `rpcUrls` for both chains):
 
-1. the source receipt: a reverted deposit is `failed`; the one `FundsDeposited` of the pinned SpokePool for this route is the deposit (a mined transaction without exactly one is `failed`: it is not this transfer);
+1. the source receipt: a reverted deposit is `failed`; the deposit is the one `FundsDeposited` of the pinned SpokePool whose fields make the intent's own calldata — the canonical `deposit` call they encode hashes to the intent id's digest (an offset exclusivity resolved against the source block's time) — so another deposit in the transaction, or another transaction's, is never taken for it; a mined transaction without exactly one stays `pending` (a node with partial logs is not a failure);
 2. the relay hash, computed as the destination SpokePool computes it (`keccak256(abi.encode(V3RelayData, destinationChainId))`);
 3. the destination's `fillStatuses(relayHash)` at the latest block, with that block's time:
 
@@ -86,9 +87,9 @@ It cannot get a deposit signed for another recipient, depositor, chain, token, a
 | deposit seen, no destination RPC | `pending` (deposit received) |
 | `fillStatuses` 0 or 1, block time ≤ fill deadline | `pending` (deposit received) |
 | `fillStatuses` 2 | `completed` |
-| `fillStatuses` 0 or 1, block time > fill deadline | `refund-pending` — expired: no fill can land any more; Across refunds the depositor on the source chain through its settlement bundles, in hours |
+| `fillStatuses` 0 or 1, block time > fill deadline | `expired` — no fill can land any more; Across refunds the depositor on the source chain through its settlement bundles, in hours |
 
-A node that does not answer leaves the status `pending`; nothing is signed on what tracking reads. `trackAcrossDeposit` returns the deposit, the relay hash, the fill state (`unfilled`, `slow-fill-requested`, `filled`, `expired`) and the destination block alongside. The refund itself is not detected yet: the status stays `refund-pending`.
+A node that does not answer leaves the status `pending`; nothing is signed on what tracking reads. `trackAcrossDeposit` returns the deposit, the relay hash, the fill state (`unfilled`, `slow-fill-requested`, `filled`, `expired`) and the destination block alongside. The refund itself is not detected, so an expired deposit is reported `expired` (terminal: a poller stops) rather than a `refund-pending` that would never move on. The fill status is read at the destination's `latest` block from the app's own RPC (`rpcUrls`): `safe` / `finalized` tags are not served alike on every pinned chain and would hold `completed` back by minutes to an hour.
 
 Activity: a `deposit` or `depositV3` call on a pinned SpokePool is recognised (`Bridged USDC`, `Across · Base`). Deposits made through another contract (the periphery, an aggregator, a Safe) and the fill (an ordinary transfer from a relayer) are not claimed.
 
@@ -125,7 +126,7 @@ Not pinned: Scroll (deposits paused on chain), BNB Chain (Across moves its 18-de
 - SpokePools are UUPS proxies the HubPool's owner (a 3-of-5 Safe) can upgrade or re-point; the pins hold the addresses, the watch job reports an upgrade or a re-pointed registry entry, and the decoder refuses any call it does not know.
 - A fill pays a contract recipient the wrapped native token instead of the native coin (only EOAs and EIP-7702 wallets are unwrapped to); the module cannot tell a contract recipient from here.
 - A refund of a native-coin deposit is expected in the wrapped native token: Across's settlement pays refunds as ERC-20 transfers and never unwraps (read from the contract, not yet observed).
-- The fee cap is the module's (`maxFeeBps`); what bounds the price beyond it is the caller's `minAmountOut` and the other quotes in the router.
+- The fee cap is the module's (`maxFeeBps`, and the app's `acrossPinsWith({maxFeeBps})` for a remote provider); what bounds the price beyond it is the caller's `minAmountOut` and the other quotes in the router. The fee floor (0.1 bps) only refuses deposits that pay relayers nothing: a quote source can still name a fee no relayer takes, which ends in a refund after the fill deadline.
 
 ## Checks
 

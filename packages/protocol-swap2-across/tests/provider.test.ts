@@ -15,7 +15,7 @@ function params(over: Loose<QuoteParams> = {}): QuoteParams & {reasons: [string,
   const reasons: [string, Swap2RefusalInfo | undefined][] = [];
   return merged<QuoteParams & {reasons: [string, Swap2RefusalInfo | undefined][]}>({
     sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: ARB_USDC, amountIn: "25000000",
-    destAddress: USER, refundAddress: USER, dry: false, onRefusal: (r, i) => reasons.push([r, i]), reasons,
+    destAddress: USER, refundAddress: USER, sender: USER, dry: false, onRefusal: (r, i) => reasons.push([r, i]), reasons,
   }, over);
 }
 
@@ -59,7 +59,7 @@ describe("getQuote", () => {
     const ps = params();
     expect(await p.getQuote(ps)).toBeNull();
     expect(ps.reasons).toEqual([["across: quoting arrives with the Across API V5 layer — this build has no quote source [quote-unavailable]", {reason: "policy_refused"}]]);
-    const dry = params({dry: true, destAddress: "", refundAddress: undefined});
+    const dry = params({dry: true, destAddress: "", refundAddress: undefined, sender: undefined});
     expect(await p.getQuote(dry)).toBeNull();
     expect(dry.reasons[0]![0]).toMatch(/\[quote-unavailable\]$/);
     expect(calls).toEqual([]);

@@ -107,7 +107,7 @@ describe("remote pins", () => {
   const q = acrossQuoteOf(usdcRequest(), usdcQuote());
   const params = (over: Partial<QuoteParams> = {}): QuoteParams => ({
     sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:42161", destToken: ARB_USDC, amountIn: "25000000",
-    minAmountOut: "24900000", destAddress: USER, refundAddress: USER, ...over,
+    minAmountOut: "24900000", destAddress: USER, refundAddress: USER, sender: USER, ...over,
   });
   const at = <T>(fn: () => T): T => {
     const real = Date.now;

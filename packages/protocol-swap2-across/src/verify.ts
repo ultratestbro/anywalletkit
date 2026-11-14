@@ -11,17 +11,22 @@
  * request and to the pins in `config.ts`, with nothing but the transaction about to be signed:
  *
  *  1. the call is `deposit` on the pinned SpokePool of the source chain, for that chain id, in its canonical encoding;
- *  2. `depositor` is the sender and `recipient` the user's recipient; the destination is the requested pinned chain;
+ *  2. `depositor` is the account that signs and `recipient` the user's recipient; the destination is the requested
+ *     pinned chain;
  *  3. the input is the pinned token for the request (the wrapped native token, with exactly the amount as value, for
  *     the native coin; value 0 and an approval of the SpokePool for an ERC-20), exactly the requested amount;
  *  4. the output is the same asset on the destination (the wrapped native token for the native coin, which the
- *     destination SpokePool unwraps for an EOA), at least the caller's floor, never more than the input, and the fee
- *     it leaves (input − output) within the cap;
+ *     destination SpokePool unwraps for an EOA), at least the caller's floor, and the fee it leaves (input − output)
+ *     between a floor relayers can be paid with and the cap — a deposit asking relayers for all of its input or more
+ *     is never filled;
  *  5. the message is empty — the Across V5 witness prefix refused by name — so the tokens land on the recipient and
  *     nothing runs;
- *  6. the deadlines are ones the SpokePool accepts and a relayer can still meet: a quote time no older than its
- *     on-chain buffer allows (with a margin to land), a fill deadline neither already close nor past the 6 h buffer,
- *     and an exclusivity window that ends well before the fill deadline.
+ *  6. the deadlines are ones the SpokePool accepts and a relayer can still meet, wherever the deposit lands: a quote
+ *     time no older than its on-chain buffer allows (with a margin to land); a fill deadline no further from the quote
+ *     time than an Across quote puts it (so an unfilled deposit holds the funds no longer than that before its
+ *     refund), and still a fill window away from the last moment the SpokePool takes the deposit (the quote time +
+ *     3600 s: nothing on chain refuses a deposit that lands after its own fill deadline); an exclusivity window that
+ *     ends well before the fill deadline even then.
  *
  * Every refusal is an {@link AcrossRefusal} with its own code. Nothing here is asynchronous and nothing reads the
  * network, so the same function runs when a quote is built, again right before signing, and on the client of a
@@ -49,8 +54,21 @@ export const ACROSS_CLOCK_SKEW_S = 120;
  * buffer (`depositQuoteTimeBuffer`, 3600 s), or the deposit reverts on the way.
  */
 export const ACROSS_LANDING_WINDOW_S = 300;
-/** The fill deadline must leave relayers at least this long (Across quotes give two hours from the quote time). */
+/** The fill deadline must leave relayers at least this long, counted from the last moment the deposit can land. */
 export const ACROSS_MIN_FILL_WINDOW_S = 1_800;
+/**
+ * The furthest a fill deadline may sit from the quote time: two hours, as Across's API puts it on every quote
+ * (`fillDeadline = quoteTimestamp + 7200` on every V4 quote and API deposit read 2026-11-14), and ten minutes of margin.
+ * An unfilled deposit holds the funds until then, and its refund comes after (Across's settlement bundles).
+ */
+export const ACROSS_MAX_FILL_WINDOW_S = 7_800;
+/**
+ * The smallest fee a deposit may leave relayers, in millionths of the input (10 = 0.1 bps). A relayer pays the output
+ * from its own funds and its gas, so a deposit that leaves nothing (or dust) is not filled and waits for a refund —
+ * while its output, the whole input, would win any comparison of routes. Across's own capital fee alone was 1 bps on
+ * every quote read 2026-11-14 (0.996 bps on WETH Ethereum → Base), ten times this floor.
+ */
+export const ACROSS_MIN_FEE_PPM = 10;
 /** Longest exclusivity accepted, counted from now: one relayer alone may fill for at most an hour. */
 export const ACROSS_MAX_EXCLUSIVITY_S = 3_600;
 /** Exclusivity must end at least this long before the fill deadline, so that any relayer can still fill. */
@@ -163,26 +181,38 @@ function checkTarget(tx: AcrossDepositTx, route: AcrossRoute): void {
   }
 }
 
-/** The exclusivity rules: a relayer named exactly when a window is, and a window that ends well before the fill deadline. */
+/**
+ * The exclusivity rules: a relayer named exactly when a window is, a window of at most an hour, and one that ends well
+ * before the fill deadline even for a deposit that lands as late as the SpokePool takes it.
+ */
 function checkExclusivity(a: AcrossDepositArgs, nowS: number): void {
   const named = !ZERO.test(a.exclusiveRelayer);
   if (named !== (a.exclusivityParameter !== 0)) {
     throw new AcrossRefusal("tx-exclusivity", named ? "the deposit names an exclusive relayer without an exclusivity window" : "the deposit sets an exclusivity window without a relayer (it reverts)", "policy_refused");
   }
   if (!named) return;
-  // An offset counts from the block the deposit lands in, which is at most the landing window away; a larger value
-  // is a timestamp (SpokePool `MAX_EXCLUSIVITY_PERIOD_SECONDS`).
+  // Up to `MAX_EXCLUSIVITY_PERIOD_SECONDS` the parameter is an offset from the block the deposit lands in; above it, a
+  // timestamp. An offset is that long alone wherever the deposit lands; a timestamp is counted from now, with the
+  // landing window.
   const p = a.exclusivityParameter;
-  const endsBy = p <= ACROSS_MAX_EXCLUSIVITY_PERIOD_S ? nowS + ACROSS_LANDING_WINDOW_S + p : p;
-  if (endsBy - nowS > ACROSS_MAX_EXCLUSIVITY_S + ACROSS_LANDING_WINDOW_S) {
-    throw new AcrossRefusal("tx-exclusivity", `the deposit gives one relayer ${endsBy - nowS} s alone, more than ${ACROSS_MAX_EXCLUSIVITY_S} s`, "policy_refused");
+  const offset = p <= ACROSS_MAX_EXCLUSIVITY_PERIOD_S;
+  const alone = offset ? p : p - nowS;
+  if (alone > ACROSS_MAX_EXCLUSIVITY_S + (offset ? 0 : ACROSS_LANDING_WINDOW_S)) {
+    throw new AcrossRefusal("tx-exclusivity", `the deposit gives one relayer ${alone} s alone, more than ${ACROSS_MAX_EXCLUSIVITY_S} s`, "policy_refused");
   }
+  // The latest an offset can end: the SpokePool takes the deposit until its quote time is `depositQuoteTimeBuffer` old
+  // (SpokePool.sol `_depositV3`), and the window runs from that block.
+  const lastLanding = Math.min(a.quoteTimestamp + ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S, a.fillDeadline);
+  const endsBy = offset ? lastLanding + p : p;
   if (endsBy > a.fillDeadline - ACROSS_MIN_OPEN_FILL_S) {
-    throw new AcrossRefusal("tx-exclusivity", `the exclusivity window ends ${a.fillDeadline - endsBy} s before the fill deadline, less than the ${ACROSS_MIN_OPEN_FILL_S} s any relayer needs`, "policy_refused");
+    throw new AcrossRefusal("tx-exclusivity", `the exclusivity window can end ${a.fillDeadline - endsBy} s before the fill deadline, less than the ${ACROSS_MIN_OPEN_FILL_S} s any relayer needs`, "policy_refused");
   }
 }
 
-/** The deadlines: what the SpokePool accepts, with room for the deposit to land and for a relayer to fill. */
+/**
+ * The deadlines: what the SpokePool accepts, with room for the deposit to land and for a relayer to fill wherever it
+ * lands, and no longer a hold on the funds than an Across quote sets.
+ */
 function checkDeadlines(a: AcrossDepositArgs, nowS: number): void {
   const age = nowS - a.quoteTimestamp;
   if (age < -ACROSS_CLOCK_SKEW_S) throw new AcrossRefusal("tx-quote-time", `the quote time is ${-age} s in the future (the deposit reverts)`, "policy_refused");
@@ -193,8 +223,17 @@ function checkDeadlines(a: AcrossDepositArgs, nowS: number): void {
   if (left > ACROSS_FILL_DEADLINE_BUFFER_S - ACROSS_CLOCK_SKEW_S) {
     throw new AcrossRefusal("tx-fill-deadline", `the fill deadline is ${left} s away, past the ${ACROSS_FILL_DEADLINE_BUFFER_S} s the SpokePool allows`, "policy_refused");
   }
+  const window = a.fillDeadline - a.quoteTimestamp;
+  if (window > ACROSS_MAX_FILL_WINDOW_S) {
+    throw new AcrossRefusal("tx-fill-deadline", `the fill deadline is ${window} s after the quote time, more than the ${ACROSS_MAX_FILL_WINDOW_S} s an Across quote gives — unfilled, the deposit would hold the funds that long before its refund`, "policy_refused");
+  }
   if (left < ACROSS_MIN_FILL_WINDOW_S) {
     throw new AcrossRefusal("tx-fill-deadline", `the fill deadline is ${left} s away, under the ${ACROSS_MIN_FILL_WINDOW_S} s a relayer is given — the deposit would expire into a refund`, "quote_expired");
+  }
+  // `_depositV3` has no lower bound on the fill deadline: a deposit that waits to be mined lands, expired, as late as
+  // its quote time + `depositQuoteTimeBuffer`. The deadline must leave a relayer its window even then.
+  if (window < ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S + ACROSS_MIN_FILL_WINDOW_S) {
+    throw new AcrossRefusal("tx-fill-deadline", `the fill deadline is ${window} s after the quote time: a deposit landing as late as the SpokePool takes it (${ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S} s) would leave a relayer under ${ACROSS_MIN_FILL_WINDOW_S} s`, "policy_refused");
   }
 }
 
@@ -209,9 +248,9 @@ export function verifyAcrossDeposit(request: AcrossRequest, tx: AcrossDepositTx)
   const src = route.input.chain;
   const dst = route.output.chain;
 
-  // Who: the deposit is credited (and refunded) to the sender and pays the recipient.
+  // Who: the deposit is credited (and refunded) to the account that signs, and pays the recipient.
   if (a.depositor !== lower(request.depositor)) {
-    throw new AcrossRefusal("tx-depositor", `the deposit is credited to ${a.depositor}, not to the sender ${lower(request.depositor)} — the depositor is refunded and can redirect the output`, "recipient_mismatch");
+    throw new AcrossRefusal("tx-depositor", `the deposit is credited to ${a.depositor}, not to the signing account ${lower(request.depositor)} — the depositor is refunded and can redirect the output`, "recipient_mismatch");
   }
   if (a.recipient !== lower(request.recipient)) throw new AcrossRefusal("tx-recipient", `the deposit pays ${a.recipient}, not the recipient ${lower(request.recipient)}`, "recipient_mismatch");
   if (a.destinationChainId !== BigInt(dst.chainId)) {
@@ -222,7 +261,7 @@ export function verifyAcrossDeposit(request: AcrossRequest, tx: AcrossDepositTx)
   if (a.inputToken !== route.input.token) throw new AcrossRefusal("tx-input-token", `the deposit takes ${a.inputToken}, the request sends ${route.input.token}${route.input.native ? " (the wrapped native token, for the native coin)" : ""}`, "policy_refused");
   if (a.inputAmount !== request.amount) throw new AcrossRefusal("tx-input-amount", `the deposit takes ${a.inputAmount}, the request sends ${request.amount}`, "policy_refused");
 
-  // What comes out: the same asset, at least the floor, and not more than went in.
+  // What comes out: the same asset, at least the floor, and less than went in by a fee relayers can be paid with.
   if (a.outputToken !== route.output.token) throw new AcrossRefusal("tx-output-token", `the deposit pays ${a.outputToken} on ${dst.name}, the request is for ${route.output.token}${route.output.native ? " (the wrapped native token, paid out as the native coin)" : ""}`, "price_check_failed");
   if (a.outputAmount <= 0n) throw new AcrossRefusal("tx-output-amount", "the deposit's output is zero", "price_check_failed");
   if (request.minAmountOut !== undefined && a.outputAmount < request.minAmountOut) {
@@ -232,6 +271,12 @@ export function verifyAcrossDeposit(request: AcrossRequest, tx: AcrossDepositTx)
     throw new AcrossRefusal("tx-output-amount", `the deposit asks relayers for ${a.outputAmount}, more than its ${a.inputAmount} input — nobody fills it, and the funds wait for a refund`, "price_check_failed");
   }
   const fee = a.inputAmount - a.outputAmount;
+  if (fee === 0n) {
+    throw new AcrossRefusal("tx-fee", "the deposit leaves relayers no fee — nobody fills it, and the funds wait for a refund", "price_check_failed");
+  }
+  if (fee * 1_000_000n < a.inputAmount * BigInt(ACROSS_MIN_FEE_PPM)) {
+    throw new AcrossRefusal("tx-fee", `the deposit leaves relayers ${fee} of ${a.inputAmount}, under the ${ACROSS_MIN_FEE_PPM}-per-million floor — nobody fills it, and the funds wait for a refund`, "price_check_failed");
+  }
   if (fee * 10_000n > a.inputAmount * BigInt(maxFeeBps)) {
     throw new AcrossRefusal("tx-fee", `the deposit leaves ${fee} of ${a.inputAmount} as fees, over the ${maxFeeBps} bps cap`, "price_check_failed");
   }
@@ -319,8 +364,14 @@ export function acrossRefusalReason(err: unknown): string {
 }
 
 /**
- * The request a `QuoteParams` describes, for the verifier. `dry` fills a missing address with `placeholder` (pricing
- * only). The sender is `refundAddress` — the engine sets it to the account that signs.
+ * The request a `QuoteParams` describes, for the verifier. `placeholder` (a dry quote: pricing only) fills a missing
+ * address.
+ *
+ * The depositor is `sender`, the account that signs — set by the engine on every execution quote. Across refunds the
+ * depositor, and the depositor alone can sign a speed-up that a relayer fills to another recipient or for less
+ * (SpokePool.sol `fillRelayWithUpdatedDeposit`, an EIP-712 or EIP-1271 signature of `relayData.depositor`): a refund
+ * address the caller names is never made the depositor, and one other than the signer is refused. A live request
+ * without `sender` is refused; a dry one is priced for `refundAddress` (or the placeholder).
  */
 export function acrossRequestOf(params: QuoteParams, opts: {placeholder?: string; nowMs?: number; maxFeeBps?: number} = {}): AcrossRequest {
   const invalid = (what: string, reason?: Swap2RefusalReason): never => { throw new AcrossRefusal("request-invalid", what, reason); };
@@ -345,9 +396,16 @@ export function acrossRequestOf(params: QuoteParams, opts: {placeholder?: string
   const recipient = params.destAddress || opts.placeholder || "";
   if (!recipient) invalid("a live quote needs a recipient");
   if (!ADDRESS.test(recipient)) invalid("the recipient must be an EVM address");
-  const depositor = params.refundAddress || opts.placeholder || "";
-  if (!depositor) invalid("a live quote needs the sender's address (refundAddress)");
-  if (!ADDRESS.test(depositor)) invalid("the sender's address must be an EVM address");
+  const sender = params.sender || "";
+  const refund = params.refundAddress || "";
+  if (sender && !ADDRESS.test(sender)) invalid("the signing account (sender) must be an EVM address");
+  if (refund && !ADDRESS.test(refund)) invalid("the refund address must be an EVM address");
+  if (sender && refund && lower(sender) !== lower(refund)) {
+    throw new AcrossRefusal("request-invalid", `an Across deposit refunds its depositor, the signing account ${lower(sender)}: refund address ${lower(refund)} is another account, and as the depositor it could also sign a speed-up that re-points the output`, "recipient_mismatch");
+  }
+  const depositor = sender || (opts.placeholder ? refund || opts.placeholder : "");
+  if (!depositor) invalid("a live quote needs the signing account (sender)");
+  if (!ADDRESS.test(depositor)) invalid("the depositor must be an EVM address");
   return {
     sourceChain: params.sourceChain,
     destChain: params.destChain,
@@ -411,38 +469,64 @@ function notedReason(err: unknown): string {
   return info ? pinNotes.note(text, info) : text;
 }
 
-/** `RemotePins.verifyQuote`: the reason a remote Across quote fails against the user's own request, or null. */
-export function acrossVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+/** What the pins hold a remote quote to beyond the user's request: the app's own fee cap. */
+export interface AcrossPinsOptions {
+  /** Fee cap in bps of the input (default {@link ACROSS_DEFAULT_MAX_FEE_BPS}, at most {@link ACROSS_MAX_FEE_BPS_LIMIT}) — the app's, never the server's. */
+  maxFeeBps?: number;
+}
+
+function verifyQuoteWith(params: QuoteParams, quote: Quote, cap: {maxFeeBps?: number}): string | null {
   try {
-    checkAcrossQuote(acrossRequestOf(params), quote);
+    checkAcrossQuote(acrossRequestOf(params, cap), quote);
     return null;
   } catch (err) {
     return notedReason(err);
   }
 }
 
-/** `RemotePins.verifyBuild`: a remote build must be the quote's own (verified) transaction, and is verified again. */
-export function acrossVerifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null {
+function verifyBuildWith(quote: Quote, tx: UnsignedTx, params: QuoteParams | undefined, cap: {maxFeeBps?: number}): string | null {
   try {
     if (!params) throw new AcrossRefusal("request-invalid", "the request this quote answered is not known on this side — quote again", "policy_refused");
     if (tx.chain !== params.sourceChain) throw new AcrossRefusal("tx-chain", `the build is for ${tx.chain}, not ${params.sourceChain}`, "vault_mismatch");
     checkAcrossTxShape(tx);
-    checkAcrossQuote(acrossRequestOf(params), quote, tx);
+    checkAcrossQuote(acrossRequestOf(params, cap), quote, tx);
     return null;
   } catch (err) {
     return notedReason(err);
   }
 }
 
+/** `RemotePins.verifyQuote` with the default fee cap: the reason a remote Across quote fails against the user's own request, or null. */
+export function acrossVerifyQuote(params: QuoteParams, quote: Quote): string | null {
+  return verifyQuoteWith(params, quote, {});
+}
+
+/** `RemotePins.verifyBuild` with the default fee cap: a remote build must be the quote's own (verified) transaction, and is verified again. */
+export function acrossVerifyBuild(quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null {
+  return verifyBuildWith(quote, tx, params, {});
+}
+
 /**
- * The app's pins for a remote Across provider (`remoteProvider({name: "across", ...acrossPins})`): the only contract a
- * build may call or approve is the chain's SpokePool, and every quote and build is verified on the client against the
- * user's own request. `reasonOf` classifies a text `verifyQuote` / `verifyBuild` returned.
+ * The app's pins for a remote Across provider (`remoteProvider({name: "across", ...acrossPinsWith({maxFeeBps})})`): the
+ * only contract a build may call or approve is the chain's SpokePool, and every quote and build is verified on the
+ * client against the user's own request and the app's fee cap — a server's own cap (`acrossProvider({maxFeeBps})`) is
+ * not known on this side, so the app states the one it holds remote quotes to. `reasonOf` classifies a text
+ * `verifyQuote` / `verifyBuild` returned. Throws a plain `Error` for a cap out of range.
  */
-export const acrossPins: RemotePins = Object.freeze({
-  callTargets: (chain: string): readonly string[] => { const c = acrossChain(chain); return c ? [c.spokePool] : []; },
-  spenders: (chain: string): readonly string[] => { const c = acrossChain(chain); return c ? [c.spokePool] : []; },
-  verifyQuote: acrossVerifyQuote,
-  verifyBuild: acrossVerifyBuild,
-  reasonOf: pinNotes.reasonOf,
-});
+export function acrossPinsWith(opts: AcrossPinsOptions = {}): RemotePins {
+  const maxFeeBps = opts.maxFeeBps;
+  if (maxFeeBps !== undefined && (!Number.isInteger(maxFeeBps) || maxFeeBps < 0 || maxFeeBps > ACROSS_MAX_FEE_BPS_LIMIT)) {
+    throw new Error(`across: maxFeeBps must be an integer between 0 and ${ACROSS_MAX_FEE_BPS_LIMIT}`);
+  }
+  const cap = Object.freeze(maxFeeBps !== undefined ? {maxFeeBps} : {});
+  return Object.freeze({
+    callTargets: (chain: string): readonly string[] => { const c = acrossChain(chain); return c ? [c.spokePool] : []; },
+    spenders: (chain: string): readonly string[] => { const c = acrossChain(chain); return c ? [c.spokePool] : []; },
+    verifyQuote: (params: QuoteParams, quote: Quote): string | null => verifyQuoteWith(params, quote, cap),
+    verifyBuild: (quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null => verifyBuildWith(quote, tx, params, cap),
+    reasonOf: pinNotes.reasonOf,
+  });
+}
+
+/** {@link acrossPinsWith} with the default fee cap (10 %): `remoteProvider({name: "across", ...acrossPins})`. */
+export const acrossPins: RemotePins = acrossPinsWith();

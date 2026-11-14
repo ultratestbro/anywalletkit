@@ -8,6 +8,7 @@
  * {@link verifyAcrossDeposit} on its own result before handing it out, so a deposit leaves this file only in the shape
  * the verifier signs.
  */
+import {bigintToUnits} from "@anywalletkit/core";
 import type {Quote} from "@anywalletkit/protocol-swap2-core/types";
 import {ACROSS_NATIVE} from "./config.js";
 import {encodeAcrossDeposit} from "./deposit.js";
@@ -35,7 +36,7 @@ export interface NormalizedAcrossQuote {
    * it is both the expected and the guaranteed output of the transfer.
    */
   outputAmount: string;
-  /** The quote source's own estimate of what arrives, when it gives one (display only, never above what is signed for). */
+  /** The quote source's own estimate of what arrives, when it gives one (display only; above `outputAmount` it is refused). */
   expectedOutputAmount?: string;
   /** The deposit's `quoteTimestamp` (unix seconds). The SpokePool accepts it for 3600 s. */
   quoteTimestamp: number;
@@ -65,7 +66,7 @@ export interface AcrossFeeBreakdown {
   destinationGas?: string;
   /** LP fee, when itemized. */
   lp?: string;
-  /** The total in USD, when the quote source prices it (display only). */
+  /** The total in USD, when the quote source prices it. Checked as a number and never shown: `feeUsd` is the verified fee's own. */
   totalUsd?: number;
 }
 
@@ -90,6 +91,10 @@ function checkNormalized(request: AcrossRequest, q: NormalizedAcrossQuote, sourc
   }
   if (BigInt(q.inputAmount) !== request.amount) throw new AcrossRefusal("quote-normalized", `the quote sends ${q.inputAmount}, the request ${request.amount}`, "policy_refused");
   if (q.expectedOutputAmount !== undefined && (typeof q.expectedOutputAmount !== "string" || !UINT.test(q.expectedOutputAmount))) bad("states an expected output that is not a base-unit integer");
+  // A relayer pays exactly the output amount: an estimate above it is a number nothing pays.
+  if (q.expectedOutputAmount !== undefined && BigInt(q.expectedOutputAmount) > BigInt(q.outputAmount)) {
+    throw new AcrossRefusal("quote-normalized", `the quote expects ${q.expectedOutputAmount} to arrive, more than the ${q.outputAmount} the deposit asks relayers for`, "price_check_failed");
+  }
   for (const [k, v] of [["quote time", q.quoteTimestamp], ["fill deadline", q.fillDeadline], ["exclusivity", q.exclusivityParameter]] as const) {
     if (!Number.isInteger(v) || v < 0 || v > U32_MAX) bad(`states a ${k} that is not a uint32`);
   }
@@ -153,7 +158,8 @@ export interface AcrossQuoteOptions {
 /**
  * A swap2 `Quote` for a request and a quote source's numbers: the deposit is built here (and verified), the amounts it
  * shows are the deposit's, and `providerData` seals the request and the numbers so the same deposit can be rebuilt and
- * checked again before a build and a signature.
+ * checked again before a build and a signature. `feeUsd` is the verified fee itself for a dollar stablecoin (USDC,
+ * USDT, one unit a dollar) and 0 for an asset this module has no price for — never the quote source's own figure.
  */
 export function acrossQuoteOf(request: AcrossRequest, quote: NormalizedAcrossQuote, opts: AcrossQuoteOptions = {}): Quote {
   const v = buildAcrossDeposit(request, quote);
@@ -165,6 +171,7 @@ export function acrossQuoteOf(request: AcrossRequest, quote: NormalizedAcrossQuo
   const nativeIn = v.route.input.native;
   const feeToken = nativeIn ? ACROSS_NATIVE : v.route.input.token;
   const fee = v.fee.toString(10);
+  const usd = v.route.asset === "USDC" || v.route.asset === "USDT";
   return {
     provider: "across",
     intentId: acrossIntentId(v.route.input.chain.chainId, v.route.output.chain.chainId, v.deposit.data),
@@ -181,7 +188,7 @@ export function acrossQuoteOf(request: AcrossRequest, quote: NormalizedAcrossQuo
     destAmount: v.args.outputAmount.toString(10),
     minDestAmount: v.args.outputAmount.toString(10),
     destDecimals: v.route.output.decimals,
-    feeUsd: quote.fees?.totalUsd ?? 0,
+    feeUsd: usd ? bigintToUnits(v.fee, v.route.input.decimals) : 0,
     fees: v.fee > 0n ? [{type: "protocol", amount: fee, token: feeToken, included: true, description: "Across relayer and LP fee"}] : [],
     etaSeconds: Math.min(Math.max(Math.ceil(quote.expectedFillTimeSec), 1), 86_400),
     reliability: Number.isFinite(reliability) && reliability >= 0 && reliability <= 1 ? reliability : 0.97,

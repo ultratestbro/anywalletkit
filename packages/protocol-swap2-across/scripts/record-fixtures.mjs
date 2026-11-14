@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Records the test fixtures from public RPCs, read-only (nothing is signed or sent, no Across API is called):
 //
-//  - fixtures/status/*.json — real deposits on Base to Arbitrum: the source receipt (trimmed to what `status.ts` reads),
-//    the destination SpokePool's `fillStatuses(relayHash)` at the blocks named below with those blocks' number and
-//    time, and the calldata the deposit was sent with. The relay hash is computed by this package (`dist/status.js`);
+//  - fixtures/status/*.json — real deposits on Base to Arbitrum: the source receipt (trimmed to what `status.ts` reads)
+//    and its block's number and time (an exclusivity offset resolves against it), the destination SpokePool's
+//    `fillStatuses(relayHash)` at the blocks named below with those blocks' number and time, and the calldata the
+//    deposit was sent with. The relay hash is computed by this package (`dist/status.js`);
 //    a filled deposit reading 2 at its fill block and 0 one block before is what proves the hash right.
 //  - fixtures/activity/*.json — the same transactions (and a native-coin one) mapped to ChainTx exactly as
 //    history-evm's RPC path does (Transfer logs from the receipt); the expectation is what the module answers,
@@ -91,6 +92,7 @@ mkdirSync(join(OUT, "activity"), {recursive: true});
 for (const c of STATUS) {
   const tx = await rpc(8453, "eth_getTransactionByHash", [c.hash]);
   const receipt = await rpc(8453, "eth_getTransactionReceipt", [c.hash]);
+  const sourceBlock = await rpc(8453, "eth_getBlockByNumber", [receipt.blockNumber, false]);
   const [deposit] = acrossDepositsInReceipt(receipt, base);
   const relayHash = acrossRelayHash(deposit);
   const reads = c.fillBlock
@@ -98,7 +100,7 @@ for (const c of STATUS) {
     : [await readAt(arb, "latest", relayHash)];
   const fixture = {
     note: `${c.note} Recorded ${new Date().toISOString().slice(0, 10)} over public RPCs.`,
-    source: {chainId: 8453, txHash: c.hash, input: tx.input, receipt: trimReceipt(receipt)},
+    source: {chainId: 8453, txHash: c.hash, input: tx.input, receipt: trimReceipt(receipt), block: {number: sourceBlock.number, timestamp: sourceBlock.timestamp}},
     relayHash,
     ...(c.acrossIndexerRelayHash ? {acrossIndexerRelayHash: c.acrossIndexerRelayHash} : {}),
     dest: {chainId: 42161, spokePool: arb.spokePool, reads},

@@ -1,12 +1,11 @@
 import {describe, expect, it} from "vitest";
 import {acrossProvider} from "../src/provider.js";
 import {
-  ACROSS_FILL_STATUS, acrossDepositsInReceipt, acrossFillState, acrossFillStatusCall, acrossRelayHash, acrossRpc, parseAcrossFillStatus,
-  trackAcrossDeposit, type AcrossRpc,
+  ACROSS_FILL_STATUS, acrossDepositIsIntent, acrossDepositsInReceipt, acrossFillState, acrossFillStatusCall, acrossRelayHash, acrossRpc,
+  parseAcrossFillStatus, trackAcrossDeposit, type AcrossRpc,
 } from "../src/status.js";
 import {decodeAcrossDeposit} from "../src/deposit.js";
-import {acrossIntentId} from "../src/verify.js";
-import {ARB, BASE, rpcFrom, statusFixture, type StatusFixture} from "./fixtures.js";
+import {ARB, BASE, recordedIntentId, rpcFrom, statusFixture, type StatusFixture} from "./fixtures.js";
 
 const WETH_DEPOSIT = statusFixture("base-arb-weth-depositv3");
 const USDC_DEPOSIT = statusFixture("base-arb-usdc-deposit");
@@ -16,7 +15,12 @@ const EXPIRED = statusFixture("base-arb-expired");
 function rpcOf(f: StatusFixture, readIndex: number, log: string[] = []): {source: AcrossRpc; dest: AcrossRpc} {
   const read = f.dest.reads[readIndex]!;
   return {
-    source: async (method, params) => { log.push(`source ${method} ${JSON.stringify(params)}`); return method === "eth_getTransactionReceipt" ? f.source.receipt : null; },
+    source: async (method, params) => {
+      log.push(`source ${method} ${JSON.stringify(params)}`);
+      if (method === "eth_getTransactionReceipt") return f.source.receipt;
+      if (method === "eth_getBlockByNumber" && params[0] === f.source.block.number) return f.source.block;
+      return null;
+    },
     dest: async (method, params) => {
       log.push(`dest ${method} ${JSON.stringify(params)}`);
       if (method === "eth_getBlockByNumber") return read.block;
@@ -117,10 +121,35 @@ describe("the relay hash", () => {
   });
 });
 
+/** The intent id's digest of a recorded deposit (from the calldata it was sent with). */
+const digestOf = (f: StatusFixture): string => recordedIntentId(f).split(":")[3]!;
+
+describe("the intent's own deposit", () => {
+  it("an event is recognized by the digest of the calldata that made it — an offset exclusivity with the source block's time", () => {
+    const [weth] = acrossDepositsInReceipt(WETH_DEPOSIT.source.receipt, BASE);
+    const [usdc] = acrossDepositsInReceipt(USDC_DEPOSIT.source.receipt, BASE);
+    const [expired] = acrossDepositsInReceipt(EXPIRED.source.receipt, BASE);
+    const time = (f: StatusFixture) => parseInt(f.source.block.timestamp, 16);
+    expect(acrossDepositIsIntent(weth!, digestOf(WETH_DEPOSIT), time(WETH_DEPOSIT))).toBe(true);
+    expect(acrossDepositIsIntent(usdc!, digestOf(USDC_DEPOSIT), time(USDC_DEPOSIT))).toBe(true);
+    // No exclusivity: no block time needed.
+    expect(acrossDepositIsIntent(expired!, digestOf(EXPIRED))).toBe(true);
+    // An offset is not recognized without it, nor with another block's time; another intent's digest never matches.
+    expect(acrossDepositIsIntent(usdc!, digestOf(USDC_DEPOSIT))).toBe(false);
+    expect(acrossDepositIsIntent(usdc!, digestOf(USDC_DEPOSIT), time(USDC_DEPOSIT) - 1)).toBe(false);
+    expect(acrossDepositIsIntent(usdc!, digestOf(WETH_DEPOSIT), time(USDC_DEPOSIT))).toBe(false);
+    expect(acrossDepositIsIntent({...usdc!, outputAmount: usdc!.outputAmount - 1n}, digestOf(USDC_DEPOSIT), time(USDC_DEPOSIT))).toBe(false);
+    expect(acrossDepositIsIntent(usdc!, "not-a-digest", time(USDC_DEPOSIT))).toBe(false);
+  });
+});
+
 describe("trackAcrossDeposit on recorded chains", () => {
+  const track = (f: StatusFixture, r: {source?: AcrossRpc; dest?: AcrossRpc}) =>
+    trackAcrossDeposit({sourceTxHash: f.source.txHash, intentDigest: digestOf(f), source: BASE, dest: ARB, ...(r.source ? {sourceRpc: r.source} : {}), ...(r.dest ? {destRpc: r.dest} : {})});
+
   it("filled → completed", async () => {
     const r = rpcOf(WETH_DEPOSIT, 1);
-    const t = await trackAcrossDeposit({sourceTxHash: WETH_DEPOSIT.source.txHash, source: BASE, dest: ARB, sourceRpc: r.source, destRpc: r.dest});
+    const t = await track(WETH_DEPOSIT, r);
     expect(t.status).toEqual({state: "completed", depositReceived: true});
     expect(t.fill).toBe("filled");
     expect(t.relayHash).toBe(WETH_DEPOSIT.acrossIndexerRelayHash);
@@ -129,50 +158,61 @@ describe("trackAcrossDeposit on recorded chains", () => {
   it("unfilled before the deadline → pending, the deposit seen; the fill status is read at the block whose time is used", async () => {
     const log: string[] = [];
     const r = rpcOf(WETH_DEPOSIT, 0, log);
-    const t = await trackAcrossDeposit({sourceTxHash: WETH_DEPOSIT.source.txHash, source: BASE, dest: ARB, sourceRpc: r.source, destRpc: r.dest});
+    const t = await track(WETH_DEPOSIT, r);
     expect(t.status).toEqual({state: "pending", depositReceived: true});
     expect(t.fill).toBe("unfilled");
-    expect(log[2]).toContain(`"${WETH_DEPOSIT.dest.reads[0]!.block.number}"`);
-    expect(log[2]).toContain(ARB.spokePool);
+    // The receipt, the source block (the offset exclusivity), then the destination's latest block and its fill status.
+    expect(log[1]).toContain(`source eth_getBlockByNumber ["${WETH_DEPOSIT.source.block.number}",false]`);
+    expect(log[3]).toContain(`"${WETH_DEPOSIT.dest.reads[0]!.block.number}"`);
+    expect(log[3]).toContain(ARB.spokePool);
   });
 
-  it("unfilled past the deadline (a real expired deposit) → refund-pending", async () => {
+  it("unfilled past the deadline (a real expired deposit) → expired, a terminal state", async () => {
     const r = rpcOf(EXPIRED, 0);
-    const t = await trackAcrossDeposit({sourceTxHash: EXPIRED.source.txHash, source: BASE, dest: ARB, sourceRpc: r.source, destRpc: r.dest});
+    const t = await track(EXPIRED, r);
     expect(parseInt(EXPIRED.dest.reads[0]!.block.timestamp, 16)).toBeGreaterThan(t.deposit!.fillDeadline);
-    expect(t.status).toEqual({state: "refund-pending", depositReceived: true});
+    expect(t.status).toEqual({state: "expired", depositReceived: true});
     expect(t.fill).toBe("expired");
   });
 
   it("without RPCs: pending, then deposit seen", async () => {
     const r = rpcOf(USDC_DEPOSIT, 0);
-    expect((await trackAcrossDeposit({sourceTxHash: USDC_DEPOSIT.source.txHash, source: BASE, dest: ARB})).status).toEqual({state: "pending"});
-    expect((await trackAcrossDeposit({sourceTxHash: USDC_DEPOSIT.source.txHash, source: BASE, dest: ARB, sourceRpc: r.source})).status).toEqual({state: "pending", depositReceived: true});
+    expect((await track(USDC_DEPOSIT, {})).status).toEqual({state: "pending"});
+    expect((await track(USDC_DEPOSIT, {source: r.source})).status).toEqual({state: "pending", depositReceived: true});
   });
 
-  it("a reverted deposit fails; a mined transaction that is not one deposit of this route fails", async () => {
+  it("a reverted deposit fails; a mined transaction without the intent's deposit is not known to be anything (pending)", async () => {
     const reverted: AcrossRpc = async () => ({...USDC_DEPOSIT.source.receipt, status: "0x0"});
-    expect((await trackAcrossDeposit({sourceTxHash: USDC_DEPOSIT.source.txHash, source: BASE, dest: ARB, sourceRpc: reverted})).status).toEqual({state: "failed"});
+    expect((await track(USDC_DEPOSIT, {source: reverted})).status).toEqual({state: "failed"});
     const empty: AcrossRpc = async () => ({...USDC_DEPOSIT.source.receipt, logs: []});
-    expect((await trackAcrossDeposit({sourceTxHash: USDC_DEPOSIT.source.txHash, source: BASE, dest: ARB, sourceRpc: empty})).status).toEqual({state: "failed"});
+    expect((await track(USDC_DEPOSIT, {source: empty})).status).toEqual({state: "pending"});
     const r = rpcOf(USDC_DEPOSIT, 0);
-    // The same receipt tracked for another destination is not this transfer.
-    expect((await trackAcrossDeposit({sourceTxHash: USDC_DEPOSIT.source.txHash, source: BASE, dest: {...ARB, chainId: 10}, sourceRpc: r.source})).status).toEqual({state: "failed"});
+    // The same receipt tracked for another destination, or for another intent, is not this transfer.
+    expect((await trackAcrossDeposit({sourceTxHash: USDC_DEPOSIT.source.txHash, intentDigest: digestOf(USDC_DEPOSIT), source: BASE, dest: {...ARB, chainId: 10}, sourceRpc: r.source})).status).toEqual({state: "pending"});
+    expect((await trackAcrossDeposit({sourceTxHash: USDC_DEPOSIT.source.txHash, intentDigest: digestOf(WETH_DEPOSIT), source: BASE, dest: ARB, sourceRpc: r.source})).status).toEqual({state: "pending"});
+    // A receipt for another transaction is no answer.
+    const otherTx: AcrossRpc = async (m, ps) => (m === "eth_getTransactionReceipt" ? {...USDC_DEPOSIT.source.receipt, transactionHash: WETH_DEPOSIT.source.txHash} : r.source(m, ps));
+    expect((await track(USDC_DEPOSIT, {source: otherTx})).status).toEqual({state: "pending"});
   });
 
   it("nothing made up when a node fails or answers junk", async () => {
     const r = rpcOf(USDC_DEPOSIT, 0);
-    const hash = USDC_DEPOSIT.source.txHash;
     const boom: AcrossRpc = async () => { throw new Error("down"); };
-    expect((await trackAcrossDeposit({sourceTxHash: hash, source: BASE, dest: ARB, sourceRpc: boom})).status).toEqual({state: "pending"});
-    expect((await trackAcrossDeposit({sourceTxHash: hash, source: BASE, dest: ARB, sourceRpc: async () => null})).status).toEqual({state: "pending"});
-    expect((await trackAcrossDeposit({sourceTxHash: hash, source: BASE, dest: ARB, sourceRpc: async () => ({status: "0x2"})})).status).toEqual({state: "pending"});
-    expect((await trackAcrossDeposit({sourceTxHash: hash, source: BASE, dest: ARB, sourceRpc: r.source, destRpc: boom})).status).toEqual({state: "pending", depositReceived: true});
+    expect((await track(USDC_DEPOSIT, {source: boom})).status).toEqual({state: "pending"});
+    expect((await track(USDC_DEPOSIT, {source: async () => null})).status).toEqual({state: "pending"});
+    expect((await track(USDC_DEPOSIT, {source: async () => ({status: "0x2"})})).status).toEqual({state: "pending"});
+    expect((await track(USDC_DEPOSIT, {source: r.source, dest: boom})).status).toEqual({state: "pending", depositReceived: true});
+    // The source block that resolves an offset: not answered, or another block → pending.
+    const noBlock: AcrossRpc = async (m, ps) => (m === "eth_getBlockByNumber" ? null : r.source(m, ps));
+    expect((await track(USDC_DEPOSIT, {source: noBlock})).status).toEqual({state: "pending"});
+    const wrongBlock: AcrossRpc = async (m, ps) => (m === "eth_getBlockByNumber" ? {...USDC_DEPOSIT.source.block, number: "0x1"} : r.source(m, ps));
+    expect((await track(USDC_DEPOSIT, {source: wrongBlock})).status).toEqual({state: "pending"});
     const junkBlock: AcrossRpc = async (m) => (m === "eth_getBlockByNumber" ? {number: "latest"} : `0x${"0".repeat(63)}2`);
-    expect((await trackAcrossDeposit({sourceTxHash: hash, source: BASE, dest: ARB, sourceRpc: r.source, destRpc: junkBlock})).status).toEqual({state: "pending", depositReceived: true});
+    expect((await track(USDC_DEPOSIT, {source: r.source, dest: junkBlock})).status).toEqual({state: "pending", depositReceived: true});
     const junkStatus: AcrossRpc = async (m) => (m === "eth_getBlockByNumber" ? USDC_DEPOSIT.dest.reads[0]!.block : "0x07");
-    expect((await trackAcrossDeposit({sourceTxHash: hash, source: BASE, dest: ARB, sourceRpc: r.source, destRpc: junkStatus})).status).toEqual({state: "pending", depositReceived: true});
-    expect((await trackAcrossDeposit({sourceTxHash: "0x12", source: BASE, dest: ARB, sourceRpc: r.source})).status).toEqual({state: "pending"});
+    expect((await track(USDC_DEPOSIT, {source: r.source, dest: junkStatus})).status).toEqual({state: "pending", depositReceived: true});
+    expect((await trackAcrossDeposit({sourceTxHash: "0x12", intentDigest: digestOf(USDC_DEPOSIT), source: BASE, dest: ARB, sourceRpc: r.source})).status).toEqual({state: "pending"});
+    expect((await trackAcrossDeposit({sourceTxHash: USDC_DEPOSIT.source.txHash, intentDigest: "zz", source: BASE, dest: ARB, sourceRpc: r.source})).status).toEqual({state: "pending"});
   });
 });
 
@@ -197,15 +237,19 @@ describe("acrossRpc", () => {
 });
 
 describe("provider.trackIntent", () => {
-  const intent = (f: StatusFixture) => acrossIntentId(8453, 42161, f.source.input.slice(0, -6) as `0x${string}`);
+  const intent = (f: StatusFixture) => recordedIntentId(f);
 
   it("reads both chains through rpcUrls", async () => {
     const calls: {url: string; method: string; params: unknown[]}[] = [];
     const p = acrossProvider({rpcUrls: {"eip155:8453": "https://base.example", "eip155:42161": "https://arb.example"}, fetchImpl: rpcFrom(WETH_DEPOSIT, 1, calls)});
-    expect(await p.trackIntent({intentId: intent(USDC_DEPOSIT), sourceTxHash: WETH_DEPOSIT.source.txHash})).toEqual({state: "completed", depositReceived: true});
-    expect(calls.map((c) => `${c.url} ${c.method}`)).toEqual(["https://base.example eth_getTransactionReceipt", "https://arb.example eth_getBlockByNumber", "https://arb.example eth_call"]);
+    expect(await p.trackIntent({intentId: intent(WETH_DEPOSIT), sourceTxHash: WETH_DEPOSIT.source.txHash})).toEqual({state: "completed", depositReceived: true});
+    expect(calls.map((c) => `${c.url} ${c.method}`)).toEqual([
+      "https://base.example eth_getTransactionReceipt", "https://base.example eth_getBlockByNumber", "https://arb.example eth_getBlockByNumber", "https://arb.example eth_call",
+    ]);
+    // A server's intent token after the id is tolerated.
+    expect(await p.trackIntent({intentId: `${intent(WETH_DEPOSIT)}~${"ab".repeat(16)}`, sourceTxHash: WETH_DEPOSIT.source.txHash})).toEqual({state: "completed", depositReceived: true});
     const expired = acrossProvider({rpcUrls: {"eip155:8453": "https://base.example", "eip155:42161": "https://arb.example"}, fetchImpl: rpcFrom(EXPIRED, 0)});
-    expect(await expired.trackIntent({intentId: intent(USDC_DEPOSIT), sourceTxHash: EXPIRED.source.txHash})).toEqual({state: "refund-pending", depositReceived: true});
+    expect(await expired.trackIntent({intentId: intent(EXPIRED), sourceTxHash: EXPIRED.source.txHash})).toEqual({state: "expired", depositReceived: true});
   });
 
   it("before a deposit, without RPCs, and for ids that are not its own", async () => {

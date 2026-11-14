@@ -1,5 +1,5 @@
 {
-  "note": "WETH Base → Arbitrum, depositV3 sent straight to the Base SpokePool (depositId 6457809, recipient other than the depositor). Across's own indexer (GET app.across.to/api/deposit?depositTxnRef=…, read 2026-11-14) gave relayHash 0xe9e40248…4df6 and the fill 0x41c78309…5f40 at Arbitrum block 524261356. Recorded 2026-11-14 over public RPCs.",
+  "note": "WETH Base \u2192 Arbitrum, depositV3 sent straight to the Base SpokePool (depositId 6457809, recipient other than the depositor). Across's own indexer (GET app.across.to/api/deposit?depositTxnRef=\u2026, read 2026-11-14) gave relayHash 0xe9e40248\u20264df6 and the fill 0x41c78309\u20265f40 at Arbitrum block 524261356. Recorded 2026-11-14 over public RPCs.",
   "source": {
     "chainId": 8453,
     "txHash": "0x85c343b85b3510a16cd6b90ff596e4ab57735902448d1ec946243d9242953dd6",
@@ -33,6 +33,10 @@
           "logIndex": "0x1a"
         }
       ]
+    },
+    "block": {
+      "number": "0x36d4ba5",
+      "timestamp": "0x6af8c8ef"
     }
   },
   "relayHash": "0xe9e40248968303d9c85c0eb4082b2b1d70e7e637fc22aa605654f24084734df6",
