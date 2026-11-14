@@ -1,0 +1,214 @@
+{
+ "note": "SpokePool reads over public RPCs on 2026-11-15 (eth_chainId, chainId(), EIP-1967 implementation slot, crossDomainAdmin(), wrappedNativeToken(), fillDeadlineBuffer(), depositQuoteTimeBuffer(), pausedDeposits(), and whether the implementation's bytecode carries the deposit selector as PUSH4 \u2014 not applicable on zkSync's EraVM, see config.ts).",
+ "chains": {
+  "1": {
+   "chainIdRpc": 1,
+   "spokeChainId": 1,
+   "impl": "0x456ac26e5ec083ee9889eba0d1a0a582502b8e84",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "10": {
+   "chainIdRpc": 10,
+   "spokeChainId": 10,
+   "impl": "0x60674c53a4cc4ed350659c95fb8020b5ac61ca1d",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x4200000000000000000000000000000000000006",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "130": {
+   "chainIdRpc": 130,
+   "spokeChainId": 130,
+   "impl": "0xe619bd2ed532b87e353142b73ab8e70cb764ff64",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x4200000000000000000000000000000000000006",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "137": {
+   "chainIdRpc": 137,
+   "spokeChainId": 137,
+   "impl": "0x304bed95daecd3e680073eab385193da711d59d4",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "143": {
+   "chainIdRpc": 143,
+   "spokeChainId": 143,
+   "impl": "0x3266a6de0f3533b042ffdb1a8183168422be7349",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "324": {
+   "chainIdRpc": 324,
+   "spokeChainId": 324,
+   "impl": "0xb3123f569d960b5518a0de1c373f049e74e3eab5",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x5aea5775959fbc2557cc8789bc1bf90a239d9a91",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": false
+  },
+  "480": {
+   "chainIdRpc": 480,
+   "spokeChainId": 480,
+   "impl": "0xee0f1abff95aea1c95306f745c7d6a5689161674",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x4200000000000000000000000000000000000006",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "999": {
+   "chainIdRpc": 999,
+   "spokeChainId": 999,
+   "impl": "0x648131c0dc2dac4516dd9a931ea004fff6124847",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x5555555555555555555555555555555555555555",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "4326": {
+   "chainIdRpc": 4326,
+   "spokeChainId": 4326,
+   "impl": "0x858c099a5f3a07a7d237584526cc8f2c8e2bfe38",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x4200000000000000000000000000000000000006",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "4663": {
+   "chainIdRpc": 4663,
+   "spokeChainId": 4663,
+   "impl": "0x1771c470d41b8c39338450c380bf2c080a2cedd8",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "5042": {
+   "chainIdRpc": 5042,
+   "spokeChainId": 5042,
+   "impl": "0x011a76d5ca7f537b4877d0fb6475065a90638478",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x0000000000000000000000000000000000000000",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "8453": {
+   "chainIdRpc": 8453,
+   "spokeChainId": 8453,
+   "impl": "0xf23c6c04a2b88e8651fe99bbdccbb5c9d306e6b0",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x4200000000000000000000000000000000000006",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "9745": {
+   "chainIdRpc": 9745,
+   "spokeChainId": 9745,
+   "impl": "0xaf10c33de0aee6df661b9bfb25e829871ab87a41",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x6100e367285b01f48d07953803a2d8dca5d19873",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "42161": {
+   "chainIdRpc": 42161,
+   "spokeChainId": 42161,
+   "impl": "0xcfcda84333431bcc9155f2368b8362f0d1dff8c9",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "43114": {
+   "chainIdRpc": 43114,
+   "spokeChainId": 43114,
+   "impl": "0x7a6122b88da543b5b62ef3453070d1929b035146",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "57073": {
+   "chainIdRpc": 57073,
+   "spokeChainId": 57073,
+   "impl": "0x4093dc528c8a8371647e4e960c8bb7bc5e90e7c9",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x4200000000000000000000000000000000000006",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "59144": {
+   "chainIdRpc": 59144,
+   "spokeChainId": 59144,
+   "impl": "0x263c0e973fd0ca9de57bb22a91c57fc367a81915",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0xe5d7c2a44ffddf6b295a15c148167daaaf5cf34f",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "56": {
+   "chainIdRpc": 56,
+   "spokeChainId": 56,
+   "impl": "0xc7b7029373f504949553106c9eb2dafdd48ef086",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 0,
+   "depositSelectorPush4": true
+  },
+  "534352": {
+   "chainIdRpc": 534352,
+   "spokeChainId": 534352,
+   "impl": "0xe0b48589c05523290419fa0850556beca766ac38",
+   "crossDomainAdmin": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "wrappedNativeToken": "0x5300000000000000000000000000000000000004",
+   "fillDeadlineBuffer": 21600,
+   "depositQuoteTimeBuffer": 3600,
+   "pausedDeposits": 1,
+   "depositSelectorPush4": true
+  }
+ }
+}

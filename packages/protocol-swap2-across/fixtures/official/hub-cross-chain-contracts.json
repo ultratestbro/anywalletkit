@@ -1,0 +1,82 @@
+{
+ "note": "HubPool(0xc186\u2026bEda).crossChainContracts(chainId) on Ethereum, eth_call at block 26415696 over https://ethereum-rpc.publicnode.com (read 2026-11-15; eth.drpc.org one block later agreed on every row), trimmed to the chains this module pins or names as excluded.",
+ "block": 26415696,
+ "rows": {
+  "1": {
+   "adapter": "0x527e872a5c3f0c7c24fe33f2593cfb890a285084",
+   "spokePool": "0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5"
+  },
+  "10": {
+   "adapter": "0x3562e309c6c79626e5f0cf746fb5bf4f6b8eebe5",
+   "spokePool": "0x6f26bf09b1c792e3228e5467807a900a503c0281"
+  },
+  "137": {
+   "adapter": "0x537abe038c223066b50312474409924487d2e655",
+   "spokePool": "0x9295ee1d8c5b022be115a2ad3c30c72e34e7f096"
+  },
+  "324": {
+   "adapter": "0xa374585e6062517ee367ee5044946a6fbe17724f",
+   "spokePool": "0xe0b015e54d54fc84a6cb9b666099c46ade9335ff"
+  },
+  "8453": {
+   "adapter": "0x799bdc55d91864b14b2ed63a34def5d502aa897f",
+   "spokePool": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64"
+  },
+  "42161": {
+   "adapter": "0xc0b6d2f794cc787c71f2ca5cecd57102c32379b3",
+   "spokePool": "0xe35e9842fceaca96570b734083f4a58e8f7c5f2a"
+  },
+  "59144": {
+   "adapter": "0x5a44a32c13e2c43416bfde5ddf5dcb3880c42787",
+   "spokePool": "0x7e63a5f1a8f0b4d0934b2f2327daed3f6bb2ee75"
+  },
+  "534352": {
+   "adapter": "0x2da799c2223c6ffb595e578903ae6b95839160d8",
+   "spokePool": "0x3bad7ad0728f9917d1bf08af5782dcbd516cdd96"
+  },
+  "480": {
+   "adapter": "0x8bbdd67102d743b8533c1277a4ffda04dea158d1",
+   "spokePool": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64"
+  },
+  "57073": {
+   "adapter": "0x545e43b6ec2f9a44caa531298699ff05958670b5",
+   "spokePool": "0xef684c38f94f48775959ecf2012d7e864ffb9dd4"
+  },
+  "130": {
+   "adapter": "0x8956efa31572e1d7ed5c8e36772f214a57dfa0d1",
+   "spokePool": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64"
+  },
+  "999": {
+   "adapter": "0x0ec70777ac388774041dd5a1778cdf3af3134d2b",
+   "spokePool": "0x35e63ea3eb0fb7a3bc543c71fb66412e1f6b0e04"
+  },
+  "9745": {
+   "adapter": "0xb47fd69fe25878f4e43aaf2f9ad7d0a3a0b22363",
+   "spokePool": "0x50039faefebef707cfd94d6d462fe6d10b39207a"
+  },
+  "56": {
+   "adapter": "0x6f1c9d3bcdf51316e7b515a62c02f601500b084b",
+   "spokePool": "0x4e8e101924ede233c13e2d8622dc8aed2872d505"
+  },
+  "143": {
+   "adapter": "0xc29a3ba0fbf477f16fd53d2c438eade024fd8452",
+   "spokePool": "0xd2ecb3afe598b746f8123cae365a598da831a449"
+  },
+  "4326": {
+   "adapter": "0xe1f04404b74f996a311f13ae291849fc153578ac",
+   "spokePool": "0x3db06da8f0a24a525f314eec954fc5c6a973d40e"
+  },
+  "4663": {
+   "adapter": "0xbc5e82035e2c8d4b335ccb751d6bf47e44dec678",
+   "spokePool": "0xd29c85f15df544ba632c9e25829fd29d767d7978"
+  },
+  "5042": {
+   "adapter": "0xca5f9960022078f3585a188e06f910eec29c7ebd",
+   "spokePool": "0x9b4a302a548c7e313c2b74c461db7b84d3074a84"
+  },
+  "43114": {
+   "adapter": "0x1af659333172dc502bd71cf5b889521c97751838",
+   "spokePool": "0xfe9d541c92e4e90437c7152a00244886de37a658"
+  }
+ }
+}

@@ -1,0 +1,5 @@
+---
+"@anywalletkit/protocol-swap2-across": minor
+---
+
+New package: Across Protocol as a swap2 provider whose SpokePool deposit is built and verified on the device. EVM to EVM, the same asset on both sides (USDC, USDT / USDT0, ETH / WETH, WBTC) through `deposit` on the SpokePools of 17 pinned chains, each checked against Across's deployment file and the HubPool's on-chain registry. A quote source only supplies numbers; the call is encoded locally, and depositor, recipient, tokens, amounts, destination chain, fee cap, empty message (the Across V5 witness prefix refused by name), quote time, fill deadline and exclusivity are held to the request at build time and right before signing, by one synchronous verifier that also backs `acrossPins` for a remote provider. Status is read on chain: the deposit from the source receipt, its relay hash, and the destination's `fillStatuses`, with an unfilled deposit past its deadline reported as refund-pending. Quoting arrives with the Across API V5 layer; until then the provider is disabled and refuses quotes with a classified reason.
