@@ -18,6 +18,7 @@ import {
   withReason,
   type Swap2Refusal,
 } from "../src/errors.js";
+import {PERMIT2_ADDRESS, appendPermit2Signature, readPermit2Transfer} from "../src/permit2.js";
 import {remoteProvider} from "../src/remote.js";
 import {createSwap2Handler, Swap2HandlerError} from "../src/server.js";
 import {SingleProviderSwap2} from "../src/swap2/single.js";
@@ -532,5 +533,48 @@ describe("review round", () => {
     const status: number | undefined = undefined;
     expect(refusalOf(withReason(new Error("y"), {reason: "upstream_unavailable", httpStatus: status}))).toEqual({reason: "upstream_unavailable"});
     expect(new Swap2QuoteError("z", {reason: undefined, retryAfterMs: undefined}).reason).toBeUndefined();
+  });
+});
+
+describe("Permit2 signature transfer", () => {
+  const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+  const SETTLER = "0x1035029091415555555555555555555555550001";
+  const at = Math.floor(Date.now() / 1000);
+  const json = (edit: (t: {domain: Record<string, unknown>; message: Record<string, unknown> & {permitted: Record<string, unknown>}}) => void = () => {}) => {
+    const t = {
+      domain: {name: "Permit2", chainId: 8453, verifyingContract: PERMIT2_ADDRESS},
+      types: {
+        PermitTransferFrom: [{name: "permitted", type: "TokenPermissions"}, {name: "spender", type: "address"}, {name: "nonce", type: "uint256"}, {name: "deadline", type: "uint256"}],
+        TokenPermissions: [{name: "token", type: "address"}, {name: "amount", type: "uint256"}],
+      },
+      primaryType: "PermitTransferFrom",
+      message: {permitted: {token: USDC, amount: "1000000"}, spender: SETTLER, nonce: "1", deadline: String(at + 300)},
+    };
+    edit(t);
+    return JSON.stringify(t);
+  };
+  const expected = {chainId: 8453, token: USDC, amount: 1_000_000n, spender: SETTLER};
+  const caught = (f: () => unknown): unknown => { try { f(); } catch (e) { return e; } return null; };
+
+  it("the reader classifies what the payload names: contract or domain → vault_mismatch, token or amount → price_check_failed, deadline → quote_expired, shape → policy_refused", () => {
+    for (const [edit, text, reason] of [
+      [(t) => { t.message.spender = "0x9999999999999999999999999999999999999999"; }, "swap2: Permit2 transfer refused — the spender is not the contract the swap calls", "vault_mismatch"],
+      [(t) => { t.domain.verifyingContract = SETTLER; }, "swap2: Permit2 transfer refused — the verifying contract is not Permit2", "vault_mismatch"],
+      [(t) => { t.message.permitted.amount = "1000001"; }, "swap2: Permit2 transfer refused — the permitted amount is not the swap's 1000000", "price_check_failed"],
+      [(t) => { t.message.deadline = String(at - 1); }, "swap2: Permit2 transfer refused — the deadline has passed or is not a uint256", "quote_expired"],
+      [(t) => { t.message.deadline = String(at + 7200); }, "swap2: Permit2 transfer refused — the deadline is more than 3600 s away", "policy_refused"],
+      [(t) => { t.message.nonce = "x"; }, "swap2: Permit2 transfer refused — the nonce is not a uint256", "policy_refused"],
+    ] as [Parameters<typeof json>[0], string, string][]) {
+      const err = caught(() => readPermit2Transfer(json(edit), expected));
+      expect((err as Error).message).toBe(text);
+      expect(refusalOf(err)?.reason).toBe(reason);
+    }
+  });
+
+  it("the caller's own malformed expectation and the account's unusable signature stay unclassified", () => {
+    expect(refusalOf(caught(() => readPermit2Transfer(json(), {...expected, chainId: 0})))).toBeUndefined();
+    expect(refusalOf(caught(() => readPermit2Transfer(json(), {...expected, amount: 0n})))).toBeUndefined();
+    expect(refusalOf(caught(() => appendPermit2Signature("0x1fff991f", "0x00")))).toBeUndefined();
+    expect(refusalOf(caught(() => appendPermit2Signature("0x1f", `0x${"ab".repeat(65)}`)))?.reason).toBe("policy_refused");
   });
 });

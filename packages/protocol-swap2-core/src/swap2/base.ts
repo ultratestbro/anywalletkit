@@ -56,6 +56,7 @@ import {
   combinedRefusal,
   refusal,
   type Swap2Refusal,
+  type Swap2RefusalReason,
 } from "../errors.js";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -1233,7 +1234,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // A Permit2 signature transfer rides in the calldata of a quoted EVM call and nowhere else.
     if (unsigned.permit2Transfer !== undefined && (!q.txRequest || !unsigned.data || serialized || unsigned.memo !== undefined ||
       unsigned.typedData !== undefined || unsigned.bodyBoc !== undefined || !this.fromChain.startsWith("eip155:"))) {
-      throw new Error("swap2: provider returned ambiguous execution payloads");
+      throw refusal("policy_refused", "swap2: provider returned ambiguous execution payloads");
     }
     // A remote stub's build that pays an address its backend named — a deposit address, a plain value send — skips
     // every pin below; it runs only on a stub the app opened to such routes (scan 2026-10-28, F9).
@@ -1419,18 +1420,18 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // provider's to check, and for a remote stub the app's own (`verifyQuote` / `verifyBuild`, enforced below).
     let permit2: Permit2Transfer | undefined;
     if (unsigned.permit2Transfer !== undefined) {
-      const refuse = (why: string): never => { throw new Swap2ValidationError(`swap2: Permit2 transfer refused — ${why}`); };
-      if (!source.contract) refuse("a native-coin input has nothing to permit");
-      if (!unsigned.approvalAddress || unsigned.approvalAddress.toLowerCase() !== PERMIT2_ADDRESS.toLowerCase()) refuse("the allowance it needs is not Permit2's");
+      const refuse = (why: string, reason: Swap2RefusalReason): never => { throw new Swap2ValidationError(`swap2: Permit2 transfer refused — ${why}`, {reason}); };
+      if (!source.contract) refuse("a native-coin input has nothing to permit", "policy_refused");
+      if (!unsigned.approvalAddress || unsigned.approvalAddress.toLowerCase() !== PERMIT2_ADDRESS.toLowerCase()) refuse("the allowance it needs is not Permit2's", "vault_mismatch");
       permit2 = readPermit2Transfer(unsigned.permit2Transfer, {
         chainId: Number(this.fromChain.slice("eip155:".length)),
         token: source.contract!,
         amount: BigInt(q.sourceAmount),
         spender: unsigned.to,
       });
-      if (unsigned.to.toLowerCase() === selfAddress.toLowerCase()) refuse("the spender is this account");
+      if (unsigned.to.toLowerCase() === selfAddress.toLowerCase()) refuse("the spender is this account", "vault_mismatch");
       // The quote may not outlive the signature it carries.
-      if (q.validUntilMs > Number(permit2.deadline.toString()) * 1000) refuse("the quote is valid for longer than its signature deadline");
+      if (q.validUntilMs > Number(permit2.deadline.toString()) * 1000) refuse("the quote is valid for longer than its signature deadline", "policy_refused");
     }
     if (unsigned.data !== undefined && this.fromChain.startsWith("eip155:")) {
       const call = decodeCall({to: unsigned.to, data: unsigned.data, value: executionValue});
@@ -1510,7 +1511,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         }
       }
       // Permit2 is a standing spender many apps share: an allowance already covering the input is the user's own and
-      // is left as it is (lowering it to the exact amount would cost a transaction and break those apps).
+      // is left as it is (lowering it to the exact amount would cost a transaction and break those apps). A smaller
+      // one, or one that cannot be read, is set to exactly the input like any other approval — and, like any approval
+      // this engine sends, taken back to 0 when the swap does not go out (the earlier, smaller value is not restored).
       approvalAmounts = current === approvalAmount || (permit2 && current !== undefined && current >= approvalAmount)
         ? [] : [...(usdtMainnet && current !== 0n ? [0n] : []), approvalAmount];
     }
@@ -1551,7 +1554,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
                   ...(unsigned.data ? {data: unsigned.data} : {}),
                   value: BigInt(unsigned.value),
                   ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
-                  ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+                  ...(unsigned.gasLimit && !permit2 ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
                   ...(unsigned.memo ? {memo: unsigned.memo, ...(unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
                   ...(cellBody !== undefined ? {cellBody: true, ...(tonBody ? {cellBodyDecoded: tonBody} : {})} : {}),
                   ...(permit2 ? {permit2Transfer: JSON.stringify({domain: permit2.domain, types: permit2.types, primaryType: permit2.primaryType, message: permit2.message})} : {}),
@@ -1580,6 +1583,23 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // Re-quote pass: the allowance is adopted here, nobody else revokes it.
       if (carried) await revokeApproval?.().catch(() => {});
       throw error;
+    }
+
+    // Permit2 signature transfer: the locally rebuilt typed data is signed (never a raw hash) and the signature
+    // appended where the calldata expects it BEFORE any approval goes out — a signature needs no allowance, so an
+    // account that cannot or will not sign (no signTypedData, a declined prompt, a policy that refuses the spender)
+    // costs no approve-and-revoke. The signature stays in memory: the signed call is dry-run, after the approvals,
+    // right before its broadcast, and is never sent anywhere else.
+    let signedData: string | undefined;
+    if (permit2) {
+      this.emitPhase("signing");
+      try {
+        signedData = await this.signPermit2Transfer(signer, unsigned, permit2);
+      } catch (error) {
+        // Only a re-quote pass holds an allowance here (the one it adopted): nobody else revokes it.
+        await revokeApproval?.().catch(() => {});
+        throw error;
+      }
     }
 
     if (approvalAmounts.length) {
@@ -1697,13 +1717,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // to sendTransaction would be ignored and send native SOL/TON/TRX instead.
     let sent: {hash?: string};
     this.emitPhase("signing");
-    // Permit2 signature transfer: sign the locally rebuilt typed data (never a raw hash), append the signature
-    // where the calldata expects it, and dry-run the exact signed call. Nothing is broadcast yet, so a failure
-    // here is a clean one: the allowance this swap created is revoked.
-    let signedData: string | undefined;
-    if (permit2) {
+    // Permit2 signature transfer: dry-run the exact signed call now that the allowance is in place. Nothing is
+    // broadcast yet, so a failure here is a clean one: the allowance this swap created is revoked.
+    if (permit2 && signedData !== undefined) {
       try {
-        signedData = await this.signPermit2Transfer(signer, unsigned, permit2);
+        await this.simulatePermit2Call(signer, unsigned, permit2, signedData);
       } catch (error) {
         await revokeApproval?.().catch(() => {});
         throw error;
@@ -1741,7 +1759,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           ...(data ? {data} : {}),
           value: BigInt(unsigned.value),
           ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
-          ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+          // A Permit2 call goes out with the account's own estimate of the exact signed call, never the quoted gas
+          // limit: a limit below what the call needs would pass the dry run (which estimates) and then revert on-chain
+          // out of gas, publishing an unspent signature and leaving the allowance behind.
+          ...(unsigned.gasLimit && !permit2 ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
           ...(cellBody !== undefined
             ? {body: cellBody}
             : unsigned.memo
@@ -1783,24 +1804,29 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
   }
 
   /**
-   * Permit2 signature transfer: the account signs the rebuilt `PermitTransferFrom` as EIP-712 typed data, the
-   * signature is appended to the calldata, and the exact signed call is estimated from this account before it is
-   * broadcast (no gas limit passed, so the account simulates it): a signature the router would not accept, a spent
-   * nonce or a price past the minimum stops here, with nothing sent.
+   * Permit2 signature transfer: the account signs the rebuilt `PermitTransferFrom` as EIP-712 typed data and the
+   * signature is appended to the calldata. Runs before the approvals; nothing leaves the device here.
    */
   private async signPermit2Transfer(signer: Swap2Signer, unsigned: UnsignedTx, permit2: Permit2Transfer): Promise<string> {
     if (!signer.signTypedData) throw new Swap2ExecutionError("swap2: a Permit2 swap needs an account with signTypedData");
-    if (permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError("swap2: the Permit2 signature deadline passed before signing — nothing was sent");
+    if (permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError("swap2: the Permit2 signature deadline passed before signing — nothing was sent", {reason: "quote_expired"});
     const signature = await signer.signTypedData({domain: permit2.domain, types: permit2.types, primaryType: permit2.primaryType, message: permit2.message});
-    const data = appendPermit2Signature(unsigned.data!, signature);
-    if (typeof signer.quoteSendTransaction === "function") {
-      try {
-        await signer.quoteSendTransaction({to: unsigned.to, data, value: BigInt(unsigned.value), ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {})});
-      } catch (error) {
-        throw new Swap2ExecutionError(`swap2: the signed swap does not simulate from this account (${error instanceof Error ? error.message.slice(0, 160) : String(error).slice(0, 160)}) — nothing was sent`, {cause: error});
-      }
+    return appendPermit2Signature(unsigned.data!, signature);
+  }
+
+  /**
+   * The exact signed call, estimated from this account before it is broadcast (no gas limit passed, so the account
+   * simulates it): a signature the router would not accept, a spent nonce or a price past the minimum stops here,
+   * with nothing sent. The broadcast then uses the account's own estimate, not the quoted limit.
+   */
+  private async simulatePermit2Call(signer: Swap2Signer, unsigned: UnsignedTx, permit2: Permit2Transfer, data: string): Promise<void> {
+    if (permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError("swap2: the Permit2 signature deadline passed before signing — nothing was sent", {reason: "quote_expired"});
+    if (typeof signer.quoteSendTransaction !== "function") return;
+    try {
+      await signer.quoteSendTransaction({to: unsigned.to, data, value: BigInt(unsigned.value), ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {})});
+    } catch (error) {
+      throw new Swap2ExecutionError(`swap2: the signed swap does not simulate from this account (${error instanceof Error ? error.message.slice(0, 160) : String(error).slice(0, 160)}) — nothing was sent`, {cause: error, reason: "simulation_failed"});
     }
-    return data;
   }
 
   /**
