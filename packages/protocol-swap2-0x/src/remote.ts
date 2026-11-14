@@ -155,8 +155,9 @@ export interface ZeroExPinsConfig {
  * made — use {@link zeroExRemoteProvider}, which reads before every live quote and build), `spenders` is canonical
  * Permit2 and nothing else. `reasonOf` classifies every text the verifiers return.
  *
- * `resolver.known(chainId)` is also what a signing policy should list as known Permit2 spenders (wallet-evm
- * `describeTypedData({knownSpenders})`): the Settler rotates, so no static table can hold it.
+ * For a signing policy's known Permit2 spenders (wallet-evm `describeTypedData({knownSpenders})`, a kit allowlist)
+ * use {@link zeroExKnownSpenders} with the provider the app swaps through: the Settler rotates, so no static table can
+ * hold it, and a fresh `zeroExPins()` has a resolver of its own that has read nothing yet.
  */
 export function zeroExPins(config: ZeroExPinsConfig = {}): RemotePins & {resolver: SettlerResolver; chains: Readonly<Record<number, ZeroExChain>>} {
   const chains = zeroExChains(config.chains);
@@ -175,14 +176,35 @@ export function zeroExPins(config: ZeroExPinsConfig = {}): RemotePins & {resolve
 
 export interface ZeroExRemoteOptions extends ZeroExPinsConfig, Pick<RemoteProviderOptions, "baseUrl" | "enabled" | "fetchImpl" | "headers" | "timeoutMs" | "allowInsecureBaseUrl"> {}
 
+/** What {@link zeroExRemoteProvider} returns: a remote swap2 provider, plus the Settler resolver it reads through. */
+export type ZeroExRemoteProvider = CrossChainProvider & {readonly ownGasEstimate: true; readonly settlerResolver: SettlerResolver};
+
+/** How long a live quote's Settler set stays a call target after the quote, at most (its own `validUntilMs` first). */
+const QUOTED_SET_MAX_MS = 120_000;
+
 /**
  * 0x through your backend: `remoteProvider` with {@link zeroExPins}, plus the registry read the pins need — the
  * Settler is resolved through the app's RPC before a live quote is asked for (and once more, fresh, if the backend
- * quotes a Settler the app has not seen yet). Indicative quotes need no RPC.
+ * quotes a Settler the app has not seen yet), and the quote is held to exactly that set, however long the backend
+ * takes to answer. Indicative quotes need no RPC. `settlerResolver` is the resolver it reads through (signing
+ * policies: {@link zeroExKnownSpenders}).
  */
-export function zeroExRemoteProvider(options: ZeroExRemoteOptions): CrossChainProvider {
+export function zeroExRemoteProvider(options: ZeroExRemoteOptions): ZeroExRemoteProvider {
   const pins = zeroExPins(options);
   const served = (caip2: string): boolean => !!zeroExChain(pins.chains, zeroExChainId(caip2));
+  // The Settlers each live quote request was resolved against, by request: the verifier holds the backend's answer to
+  // that set, not to whatever the resolver's cache holds once the backend answered (its max age may pass meanwhile).
+  const checkedAgainst = new WeakMap<QuoteParams, readonly string[]>();
+  // …and, per chain, while that quote may still be used: the router's pin check (callTargets) runs after the answer too.
+  const quoted = new Map<number, {settlers: readonly string[]; untilMs: number}>();
+  const callTargets = (chain: string): readonly string[] => {
+    const chainId = zeroExChainId(chain);
+    const known = pins.callTargets(chain);
+    const held = quoted.get(chainId);
+    if (!held || held.untilMs < Date.now() || !zeroExChain(pins.chains, chainId)) return known;
+    return [...known, ...held.settlers.filter((s) => !known.some((k) => same(k, s)))];
+  };
+  const verifyCtx: ZeroExVerifyContext = {chains: pins.chains, settlers: (chainId) => pins.resolver.known(chainId), defaultSlippageBps: options.defaultSlippageBps};
   const inner = remoteProvider({
     name: ZEROEX_PROVIDER,
     baseUrl: options.baseUrl,
@@ -190,9 +212,12 @@ export function zeroExRemoteProvider(options: ZeroExRemoteOptions): CrossChainPr
     supportsChain: served,
     supportsChainPair: (from, to) => from === to && served(from),
     supportsRoute: (from, to) => from.chain === to.chain && served(from.chain),
-    callTargets: pins.callTargets,
+    callTargets,
     spenders: pins.spenders,
-    verifyQuote: pins.verifyQuote!,
+    verifyQuote: (params, quote) => {
+      const set = checkedAgainst.get(params);
+      return zeroExVerifyQuote(params, quote, set ? {...verifyCtx, settlers: () => set} : verifyCtx);
+    },
     verifyBuild: pins.verifyBuild!,
     reasonOf: pins.reasonOf!,
     ...(options.enabled ? {enabled: options.enabled} : {}),
@@ -204,19 +229,49 @@ export function zeroExRemoteProvider(options: ZeroExRemoteOptions): CrossChainPr
   return {
     ...inner,
     describeActivity: describeZeroExActivity,
+    // The quoted gas limit is the backend's word: every call goes out with the account's own estimate.
+    ownGasEstimate: true,
+    settlerResolver: pins.resolver,
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
       if (params.dry !== false) return inner.getQuote(params, signal);
       const chainId = zeroExChainId(params.sourceChain);
+      const ask = async (settlers: readonly string[]): Promise<Quote | null> => {
+        checkedAgainst.set(params, settlers);
+        const q = await inner.getQuote(params, signal);
+        if (q) quoted.set(chainId, {settlers, untilMs: Math.min(Number.isFinite(q.validUntilMs) ? q.validUntilMs : 0, Date.now() + QUOTED_SET_MAX_MS)});
+        return q;
+      };
       const before = await pins.resolver.resolve(chainId);
       try {
-        return await inner.getQuote(params, signal);
+        return await ask(before);
       } catch (e) {
         // A Settler the app has not seen: read the registry again and, only if it changed, ask once more.
         if (!(e instanceof Error) || !/is not a 0x Settler from the on-chain registry/.test(e.message)) throw e;
         const after = await pins.resolver.resolve(chainId, {fresh: true});
         if (after.length === before.length && after.every((s, i) => same(s, before[i]!))) throw e;
-        return inner.getQuote(params, signal);
+        return ask(after);
       }
     },
   };
+}
+
+/**
+ * The 0x Settlers a signing policy should know as Permit2 spenders on `chainId`, labelled — the `knownSpenders` of
+ * wallet-evm's `describeTypedData`, and the addresses a kit allowlist needs next to Permit2 and the token. Pass the
+ * provider the app swaps through (`zeroExRemoteProvider` / `zeroExProvider`, or its `settlerResolver`): the set is the
+ * one that resolver read from the registry, cached for its max age and read again after it. Empty when the registry
+ * cannot be read: the permit is then described as a grant to an unknown spender, never silently trusted.
+ *
+ * ```ts
+ * const zeroex = zeroExRemoteProvider({baseUrl, rpcUrls});
+ * describeTypedData(typed, {chainId: 8453, account, knownSpenders: await zeroExKnownSpenders(zeroex, 8453)});
+ * ```
+ */
+export async function zeroExKnownSpenders(source: SettlerResolver | {readonly settlerResolver: SettlerResolver}, chainId: number, label = "0x Settler"): Promise<Record<string, string>> {
+  const resolver = "settlerResolver" in source ? source.settlerResolver : source;
+  try {
+    return Object.fromEntries((await resolver.resolve(chainId)).map((settler) => [settler, label]));
+  } catch {
+    return {};
+  }
 }

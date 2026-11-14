@@ -2,12 +2,12 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {encodeAbiParameters, parseAbiParameters, toFunctionSelector} from "viem";
-import {ZEROEX_CHAINS, ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_REGISTRY, zeroExChain, zeroExChainId, zeroExChains} from "../src/chains.js";
+import {ZEROEX_CHAINS, ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_MAX_NONCE, ZEROEX_SETTLER_REGISTRY, zeroExChain, zeroExChainId, zeroExChains} from "../src/chains.js";
 import {
-  REGISTRY_OWNER_OF_SELECTOR, REGISTRY_PREV_SELECTOR, SETTLER_EXECUTE_SELECTOR, SETTLER_NATIVE_CHECK_SELECTOR, SETTLER_PERMIT_ACTIONS, ZEROEX_SETTLER_MAX_NONCE,
+  REGISTRY_OWNER_OF_SELECTOR, REGISTRY_PREV_SELECTOR, SETTLER_EXECUTE_SELECTOR, SETTLER_NATIVE_CHECK_SELECTOR, SETTLER_PERMIT_ACTIONS,
   ZeroExTransactionError, checkZeroExTransaction, createSettlerResolver, decodeSettlerExecute, zeroExSettlerAddress, zeroExSettlerNonce,
 } from "../src/settler.js";
-import {ME, NEW_SETTLER, NONCE, PREV_SETTLER, RPC, SETTLER, USDC, WETH, executeData, opaqueAction, stub, transferFromAction, word} from "./fixtures.js";
+import {ME, NONCE, OLDER_SETTLER, PREV_SETTLER, RPC, SETTLER, USDC, WETH, executeData, opaqueAction, stub, transferFromAction, word} from "./fixtures.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -53,13 +53,13 @@ describe("chain table", () => {
     }
   });
   it("is config: an entry adds or replaces a chain, null removes one, a bad entry throws", () => {
-    const t = zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY}, 56: null});
+    const t = zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 4}, 56: null});
     expect(zeroExChain(t, 130)?.name).toBe("Unichain");
     expect(zeroExChain(t, 56)).toBeUndefined();
     expect(zeroExChain(t, 8453)?.name).toBe("Base");
-    expect(() => zeroExChains({130: {name: "Unichain", registry: "0x1234"}})).toThrow(/names no Settler registry address/);
-    expect(() => zeroExChains({130: {name: "", registry: ZEROEX_SETTLER_REGISTRY}})).toThrow(/has no name/);
-    expect(() => zeroExChains({130: {name: "U", registry: ZEROEX_SETTLER_REGISTRY, wrappedNative: "weth"}})).toThrow(/wrapped native is not an address/);
+    expect(() => zeroExChains({130: {name: "Unichain", registry: "0x1234", maxSettlerNonce: 4}})).toThrow(/names no Settler registry address/);
+    expect(() => zeroExChains({130: {name: "", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 4}})).toThrow(/has no name/);
+    expect(() => zeroExChains({130: {name: "U", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 4, wrappedNative: "weth"}})).toThrow(/wrapped native is not an address/);
   });
   it("reads only eip155 chain ids, and only own table entries", () => {
     expect(zeroExChainId("eip155:8453")).toBe(8453);
@@ -104,14 +104,17 @@ describe("createSettlerResolver", () => {
     return {calls, r: createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: RPC, ...config})};
   };
 
-  it("reads ownerOf(2) and prev(2) on the pinned registry, and answers current first", async () => {
+  it("reads ownerOf(2) and prev(2) on the pinned registry, checks code at each Settler, and answers current first", async () => {
     const {r, calls} = resolver();
     expect(r.known(8453)).toEqual([]);
     expect(await r.resolve(8453)).toEqual([SETTLER, PREV_SETTLER]);
     expect(calls.map((c) => (c.body as {params: [{to: string; data: string}]}).params[0])).toEqual([
       {to: ZEROEX_SETTLER_REGISTRY, data: `${REGISTRY_OWNER_OF_SELECTOR}${word(2)}`},
+      SETTLER,
       {to: ZEROEX_SETTLER_REGISTRY, data: `${REGISTRY_PREV_SELECTOR}${word(2)}`},
+      PREV_SETTLER,
     ]);
+    expect(calls.map((c) => (c.body as {method: string}).method)).toEqual(["eth_call", "eth_getCode", "eth_call", "eth_getCode"]);
     expect(r.known(8453)).toEqual([SETTLER, PREV_SETTLER]);
   });
 
@@ -120,19 +123,20 @@ describe("createSettlerResolver", () => {
     const {r, calls} = resolver({}, {now: () => now, maxAgeMs: 60_000});
     await r.resolve(8453);
     await r.resolve(8453);
-    expect(calls).toHaveLength(2);
-    await r.resolve(8453, {fresh: true});
     expect(calls).toHaveLength(4);
+    // a fresh read asks the registry again; the code of a Settler already seen is not read twice
+    await r.resolve(8453, {fresh: true});
+    expect(calls).toHaveLength(6);
     now += 60_001;
     expect(r.known(8453)).toEqual([]);
     await r.resolve(8453);
-    expect(calls).toHaveLength(6);
+    expect(calls).toHaveLength(8);
   });
 
   it("shares one read between concurrent callers", async () => {
     const {r, calls} = resolver();
     await Promise.all([r.resolve(8453), r.resolve(8453), r.resolve(8453)]);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(4);
   });
 
   it("a registry without a previous instance answers the current Settler alone", async () => {
@@ -141,9 +145,9 @@ describe("createSettlerResolver", () => {
   });
 
   it("follows a rotation on the next fresh read", async () => {
-    const {r} = resolver({onRegistryRead: (n) => (n === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: NEW_SETTLER, prev: SETTLER})});
-    expect(await r.resolve(8453)).toEqual([SETTLER, PREV_SETTLER]);
-    expect(await r.resolve(8453, {fresh: true})).toEqual([NEW_SETTLER, SETTLER]);
+    const {r} = resolver({onRegistryRead: (n) => (n === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
+    expect(await r.resolve(8453)).toEqual([PREV_SETTLER, OLDER_SETTLER]);
+    expect(await r.resolve(8453, {fresh: true})).toEqual([SETTLER, PREV_SETTLER]);
   });
 
   it("refuses a paused feature, a non-address answer, a silent RPC, a missing RPC and an unknown chain", async () => {

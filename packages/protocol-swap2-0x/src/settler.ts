@@ -3,7 +3,8 @@
  *
  *  - {@link createSettlerResolver}: the Settler in force is read from the pinned on-chain registry
  *    (`ownerOf(2)`, and `prev(2)` for 0x's dwell time after a new deployment) — never taken from a
- *    quote. A paused or removed feature reverts there and the swap is refused.
+ *    quote — and held to a CREATE3 deployment of that registry no newer than the chain's pinned
+ *    ceiling, with code. A paused or removed feature reverts there and the swap is refused.
  *  - {@link decodeSettlerExecute}: a word-level reader of `Settler.execute(slippage, actions, zid)`.
  *  - {@link checkZeroExTransaction}: the transaction a quote carries, held to the request — target,
  *    value, chain, method, the recipient / buy token / minimum of Settler's own slippage check, and,
@@ -28,7 +29,7 @@
 import {getAddress, getContractAddress, numberToHex, pad} from "viem";
 import {refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {readPermit2Transfer, type Permit2Transfer} from "@anywalletkit/protocol-swap2-core/util";
-import {ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_REGISTRY, ZEROEX_TAKER_FEATURE, zeroExChain, type ZeroExChain} from "./chains.js";
+import {ZEROEX_CHAINS, ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_MAX_NONCE, ZEROEX_SETTLER_REGISTRY, ZEROEX_TAKER_FEATURE, zeroExChain, type ZeroExChain} from "./chains.js";
 import {isRevert, rpcRequest, rpcUrlsFor, type RpcUrls} from "./rpc.js";
 
 /** `execute((address recipient, address buyToken, uint256 minAmountOut), bytes[] actions, bytes32 zidAndAffiliate)`. */
@@ -86,8 +87,11 @@ export const isZeroExNative = (token: string): boolean => ZERO_ADDRESS.test(toke
  * CREATE2s the shim with salt `feature << 128 | chainId << 64 | nonce`, and the shim CREATEs the Settler (nonce 1).
  */
 export const ZEROEX_SETTLER_SHIM_INIT_HASH = "0x3bf3f97f0be1e2c00023033eefeb4fc062ac552ff36778b17060d90b6764902f";
-/** Deployments of the taker feature searched per chain (nonce 1…N). 0x is at about 23 after two years. */
-export const ZEROEX_SETTLER_MAX_NONCE = 1024;
+/**
+ * How far past a chain's pinned {@link ZeroExChain.maxSettlerNonce} the resolver still derives, only to tell "0x
+ * deployed a newer Settler than this module accepts" (refused until the pin is raised) from "not a 0x Settler at all".
+ */
+export const ZEROEX_SETTLER_LOOKAHEAD = 16;
 
 /** The address the registry deploys taker-feature Settler number `nonce` to on `chainId` — computed, no network. */
 export function zeroExSettlerAddress(chainId: number, nonce: number, registry: string = ZEROEX_SETTLER_REGISTRY): string {
@@ -100,18 +104,22 @@ export function zeroExSettlerAddress(chainId: number, nonce: number, registry: s
 const derived = new Map<string, string[]>();
 /**
  * Which deployment of the registry's taker feature `address` is on `chainId` (its nonce), or null when it is none of
- * the first {@link ZEROEX_SETTLER_MAX_NONCE}. An RPC (or an API) can therefore only ever name a contract 0x's own
- * registry deployed as a Settler — never an arbitrary contract or account. Memoized per chain.
+ * deployments 1…`maxNonce` — by default the chain's pinned {@link ZeroExChain.maxSettlerNonce} in the default table
+ * (a chain outside it has none: null). An RPC (or an API) can therefore only ever name a contract 0x's own registry
+ * deployed as a Settler — never an arbitrary contract or account. Bounded by the pin, an address that is no Settler
+ * costs a few dozen derivations, not a thousand. Memoized per chain.
  */
-export function zeroExSettlerNonce(chainId: number, address: string, registry: string = ZEROEX_SETTLER_REGISTRY): number | null {
+export function zeroExSettlerNonce(chainId: number, address: string, registry: string = ZEROEX_SETTLER_REGISTRY, maxNonce?: number): number | null {
   if (typeof address !== "string" || !ADDRESS.test(address) || !Number.isSafeInteger(chainId) || chainId <= 0 || !ADDRESS.test(registry)) return null;
+  const bound = Math.min(maxNonce ?? zeroExChain(ZEROEX_CHAINS, chainId)?.maxSettlerNonce ?? 0, ZEROEX_SETTLER_MAX_NONCE + ZEROEX_SETTLER_LOOKAHEAD);
+  if (!Number.isSafeInteger(bound) || bound < 1) return null;
   const key = `${registry.toLowerCase()}:${chainId}`;
   let list = derived.get(key);
   if (!list) derived.set(key, (list = []));
   const want = address.toLowerCase();
   const hit = list.indexOf(want);
-  if (hit >= 0) return hit + 1;
-  while (list.length < ZEROEX_SETTLER_MAX_NONCE) {
+  if (hit >= 0) return hit < bound ? hit + 1 : null;
+  while (list.length < bound) {
     const next = zeroExSettlerAddress(chainId, list.length + 1, registry).toLowerCase();
     list.push(next);
     if (next === want) return list.length;
@@ -151,7 +159,9 @@ function addressWord(result: unknown): string | null {
 /**
  * Reads the Settler in force from the registry and caches it per chain. The registry address comes from the chain
  * table; the answer comes from the integrator's own RPC — that RPC is what this module trusts for "which contract
- * is 0x's Settler right now".
+ * is 0x's Settler right now", within hard bounds it cannot move: the answer must be a CREATE3 deployment of that
+ * registry, no newer than the chain's pinned {@link ZeroExChain.maxSettlerNonce}, with code at the address (read
+ * through the same RPC).
  */
 export function createSettlerResolver(config: SettlerResolverConfig): SettlerResolver {
   const maxAge = config.maxAgeMs !== undefined && Number.isFinite(config.maxAgeMs) && config.maxAgeMs >= 0 ? config.maxAgeMs : DEFAULT_SETTLER_MAX_AGE_MS;
@@ -173,6 +183,20 @@ export function createSettlerResolver(config: SettlerResolverConfig): SettlerRes
     return {result: answer.result};
   }
 
+  /** Addresses already seen holding code (per chain): a deployed Settler's code does not go away, so it is read once. */
+  const withCode = new Set<string>();
+  /** Whether `address` holds contract code, read over the same RPC as the registry. Throws when nothing answered. */
+  async function hasCode(chainId: number, address: string): Promise<boolean> {
+    const key = `${chainId}:${address.toLowerCase()}`;
+    if (withCode.has(key)) return true;
+    const answer = await rpcRequest(config.rpcUrls, chainId, "eth_getCode", [address, "latest"]);
+    if (!answer) throw refuse(`no RPC answered on chain ${chainId} — the 0x Settler's code cannot be read`, "upstream_unavailable");
+    if ("error" in answer || typeof answer.result !== "string" || !/^0x(?:[0-9a-fA-F]{2})*$/.test(answer.result)) throw refuse(`the RPC on chain ${chainId} could not read the 0x Settler's code`, "upstream_unavailable");
+    if (answer.result.length <= 2) return false;
+    withCode.add(key);
+    return true;
+  }
+
   async function read(chainId: number): Promise<readonly string[]> {
     const entry = zeroExChain(config.chains, chainId);
     if (!entry) throw refuse(`chain ${chainId} is not in the 0x chain table`, "unsupported_pair");
@@ -181,14 +205,27 @@ export function createSettlerResolver(config: SettlerResolverConfig): SettlerRes
     if ("reverted" in current) throw refuse(`the 0x Settler registry on chain ${chainId} reports no taker Settler in force (paused or removed)`, "chain_halted");
     const settler = addressWord(current.result);
     if (!settler) throw refuse(`the 0x Settler registry on chain ${chainId} answered something that is not an address`, "vault_mismatch");
-    // The answer comes from one RPC: it must also be an address the registry itself deploys Settlers to.
-    if (zeroExSettlerNonce(chainId, settler, entry.registry) === null) throw refuse(`the RPC on chain ${chainId} names ${settler} as the 0x Settler, which is not an address the 0x registry deploys Settlers to`, "vault_mismatch");
+    // The answer comes from one RPC: it must be a deployment the registry itself made, no newer than the one this
+    // module pins for the chain, and a contract. A newer deployment is 0x moving on: refused, with what to do, until
+    // the pin is raised (the watch job reports it the day it happens).
+    const ceiling = entry.maxSettlerNonce;
+    const nonce = zeroExSettlerNonce(chainId, settler, entry.registry, ceiling);
+    if (nonce === null) {
+      const newer = zeroExSettlerNonce(chainId, settler, entry.registry, ceiling + ZEROEX_SETTLER_LOOKAHEAD);
+      if (newer !== null) {
+        throw refuse(`the 0x registry on chain ${chainId} names Settler deployment ${newer} (${settler}), newer than the newest this module accepts there (${ceiling}) — update @anywalletkit/protocol-swap2-0x, or raise the chain's maxSettlerNonce once that deployment is checked`, "vault_mismatch");
+      }
+      throw refuse(`the RPC on chain ${chainId} names ${settler} as the 0x Settler, which is not an address the 0x registry deploys Settlers to`, "vault_mismatch");
+    }
+    // A deployment that does not exist yet (inside the margin past the newest live one) has no code: value or tokens
+    // sent there would be stranded until 0x deploys it.
+    if (!(await hasCode(chainId, settler))) throw refuse(`the RPC on chain ${chainId} names ${settler} (Settler deployment ${nonce}) as the 0x Settler, but no contract is deployed there`, "vault_mismatch");
     const settlers = [settler];
     // The instance it replaced: 0x keeps quoting it for a while after a new deployment. No previous instance reverts.
     try {
       const previous = await call(chainId, entry.registry, `${REGISTRY_PREV_SELECTOR}${feature}`);
       const prev = "result" in previous ? addressWord(previous.result) : null;
-      if (prev && !same(prev, settler) && zeroExSettlerNonce(chainId, prev, entry.registry) !== null) settlers.push(prev);
+      if (prev && !same(prev, settler) && zeroExSettlerNonce(chainId, prev, entry.registry, ceiling) !== null && (await hasCode(chainId, prev))) settlers.push(prev);
     } catch {
       // The current Settler alone is a valid (stricter) answer.
     }

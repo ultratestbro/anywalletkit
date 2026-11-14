@@ -1,15 +1,17 @@
 // Every address this module pins has a source in watch.json on every chain of the table — a new chain in chains.ts
 // without a watch entry fails here. The Settler registry is the trust root (whatever it names is the accepted Settler)
 // and an ERC-1967 proxy: it is watched as a proxy (implementation slot and code) with its owner(), not by the code of
-// its forwarder alone, which an upgrade or an ownership change would leave unchanged. Permit2 and the wrapped natives
-// are watched by their code.
+// its forwarder alone, which an upgrade or an ownership change would leave unchanged. What it names — ownerOf(2), the
+// Settler in force — is watched too: a new 0x deployment shows up in the digest the day it happens, before it can
+// pass the chain's pinned maxSettlerNonce (and verify:live on the canary fails once it is past the pinned newest).
+// Permit2 and the wrapped natives are watched by their code.
 import {describe, expect, it} from "vitest";
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {ZEROEX_CHAINS, ZEROEX_PERMIT2} from "../src/chains.js";
 import {zeroExProvider} from "../src/provider.js";
 
-interface Source {id: string; type: string; chainId?: number; address?: string; to?: string; signature?: string; decode?: string; repo?: string; label?: string}
+interface Source {id: string; type: string; chainId?: number; address?: string; to?: string; signature?: string; args?: unknown[]; decode?: string; repo?: string; label?: string}
 const read = (file: string) => JSON.parse(readFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), "utf8"));
 const manifest = read("watch.json") as {module: string; sources: Source[]};
 const of = (type: string, key: "address" | "to" = "address") => new Set(manifest.sources.filter((s) => s.type === type).map((s) => `${s.chainId} ${s[key]!.toLowerCase()}`));
@@ -30,9 +32,17 @@ describe("watch.json coverage", () => {
     const proxies = of("evm-proxy");
     expect(registries.filter((r) => !proxies.has(r))).toEqual([]);
     expect(proxies.size).toBe(7);
-    const owners = manifest.sources.filter((s) => s.type === "evm-call");
-    expect(owners.every((s) => s.signature === "owner()" && s.decode === "address")).toBe(true);
+    const calls = manifest.sources.filter((s) => s.type === "evm-call");
+    const owners = calls.filter((s) => s.signature === "owner()");
+    expect(owners.every((s) => s.decode === "address" && s.args === undefined)).toBe(true);
     expect(new Set(owners.map((s) => `${s.chainId} ${s.to!.toLowerCase()}`))).toEqual(new Set(registries));
+    expect(owners).toHaveLength(7);
+    // the Settler in force on every chain: a new deployment is a diff
+    const inForce = calls.filter((s) => s.signature === "ownerOf(uint256)");
+    expect(inForce.every((s) => s.decode === "address" && JSON.stringify(s.args) === "[2]" && /maxSettlerNonce/.test(s.label!))).toBe(true);
+    expect(new Set(inForce.map((s) => `${s.chainId} ${s.to!.toLowerCase()}`))).toEqual(new Set(registries));
+    expect(inForce).toHaveLength(7);
+    expect(calls).toHaveLength(14);
     // the forwarder's code alone is not a watch on the trust root
     for (const r of registries) expect(watched.has(r), r).toBe(false);
   });

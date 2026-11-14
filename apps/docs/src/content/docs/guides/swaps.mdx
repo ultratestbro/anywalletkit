@@ -121,9 +121,9 @@ const relay = relayProvider() // or { baseUrl: 'https://your-backend.example/rel
 ### 0x
 
 `@anywalletkit/protocol-swap2-0x` quotes 0x's Swap API v2 through the Permit2 flow: same chain,
-exact input. The API needs a key on every request, so the provider runs on your server and the app
-uses the remote provider, which checks everything that comes back on the device before the engine
-signs.
+exact input. The API needs a key on every request, so the provider with the key runs on your
+server only (under React Native it refuses a key outright) and the app uses the remote provider,
+which checks everything that comes back on the device before the engine signs.
 
 ```ts
 // your server: the key stays here (a getter, or a string from your env)
@@ -137,8 +137,11 @@ const zeroexInApp = zeroExRemoteProvider({ baseUrl: 'https://your-backend.exampl
 ```
 
 - **The Settler comes from the chain.** The call target must be the Settler 0x's registry names
-  now (or the one before it), read over the app's own RPC, and it must be an address the registry
-  deploys Settlers to (CREATE3, computed on the device): an RPC cannot name another contract.
+  now (or the one before it), read over the app's own RPC. It must be an address the registry
+  deploys Settlers to (CREATE3, computed on the device), no newer than the deployment the chain
+  table pins (`maxSettlerNonce`: the newest live one plus two), and a contract (`eth_getCode`):
+  an RPC can name only a deployed 0x Settler. A newer deployment is refused, with what to do,
+  until the pin is raised; the watch job reports each one the day it happens.
 - **What the account signs.** A token sale is paid with a Permit2 signature transfer: exactly the
   input, of the token sold, usable only by that Settler, valid for at most ten minutes. The engine
   rebuilds the EIP-712 payload itself, asks the account to sign it (the account needs
@@ -149,10 +152,13 @@ const zeroexInApp = zeroExRemoteProvider({ baseUrl: 'https://your-backend.exampl
   check; the first action must spend exactly that permit (a native sale's must be `NATIVE_CHECK`).
   The guarantee is the minimum: 0x keeps any surplus above the quoted amount (visible in the
   calldata), and a buy token with a transfer tax 0x does not flag can arrive short of it.
-- **Gas.** The signed call goes out with the account's own estimate, not the quoted limit.
-- **Signing policies.** A kit allowlist must list Permit2, the token and the Settler, which rotates:
-  pass `zeroExPins().resolver.known(chainId)` (or your resolver's) as `knownSpenders` to
-  `describeTypedData`, rather than a fixed address.
+- **Gas.** Every call — the signed one and a native sale — is dry-run from the account and goes out
+  with the account's own estimate, not the quoted limit.
+- **Signing policies.** A kit allowlist must list Permit2, the token and the Settler, which rotates.
+  `zeroExKnownSpenders(provider, chainId)` gives the Settlers the provider's own resolver read, as
+  `{ [settler]: "0x Settler" }`: pass it as `knownSpenders` to `describeTypedData`
+  (`describeTypedData(typed, { chainId, account, knownSpenders: await zeroExKnownSpenders(zeroexInApp, 8453) })`)
+  and spread its keys into the allowlist, rather than a fixed address.
 - **Flags.** The SDK reads no environment; by convention the app and the backend use
   `ZEROEX_ENABLED` (dark unless set) and `ZEROEX_API_KEY`.
 

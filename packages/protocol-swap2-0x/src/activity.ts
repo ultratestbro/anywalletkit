@@ -22,7 +22,8 @@ export function describeZeroExActivity(tx: ChainTx, ctx: DescribeActivityContext
   if (!chain) return null;
   if (callSelector(tx) !== SETTLER_EXECUTE_SELECTOR) return null;
   const target = tx.call?.to ?? tx.to;
-  if (typeof target !== "string" || zeroExSettlerNonce(chainId, target, chain.registry) === null) return null;
+  // Bounded by the chain's pinned newest deployment: an address that is no Settler costs a few dozen derivations.
+  if (typeof target !== "string" || zeroExSettlerNonce(chainId, target, chain.registry, chain.maxSettlerNonce) === null) return null;
   const data = tx.call?.data;
   if (typeof data === "string" && data.length > 10) {
     try {

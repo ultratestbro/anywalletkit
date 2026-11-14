@@ -288,7 +288,8 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
 - Errors: `Swap2MaybeSentError` (may be on chain — never retry, track `e.id`/`e.hash`), `Swap2InFlightError`
   (double tap), `Swap2InsufficientGasError`, `Swap2FeeLimitError`, `Swap2QuoteError` (no route; message says why).
 - Keys: LI.FI `apiKey` (rate limit), 1Click `jwt` (no fee). Fynd needs an `apiKey`. 0x needs an `apiKey` (a getter
-  or a string): keep it on a server, the app runs `zeroExRemoteProvider` (with its own `rpcUrls`). Chainflip, Uniswap,
+  or a string) on a server only — under React Native a provider with a key throws; the app runs
+  `zeroExRemoteProvider` (with its own `rpcUrls`). Chainflip, Uniswap,
   Balancer, Curve, Wrap, CCTP, USDT0 need no key; on-chain venues need `rpcUrls`.
 - Curve (`curveProvider({ rpcUrls: { 1: [url] } })`, chain ids as keys): same-chain Router NG over a pool allowlist
   pinned in the package (1–2 pools; between them only catalog tokens); no gas limit in the quote (the wallet
@@ -306,11 +307,13 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
 - 0x (`zeroExProvider({ apiKey, rpcUrls })` on your server, `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app;
   conventional env names `ZEROEX_ENABLED` / `ZEROEX_API_KEY`): same-chain exact-input swaps on Ethereum, Base,
   Arbitrum, Optimism, Polygon, Avalanche and BNB Smart Chain through the Permit2 flow. The Settler is read from 0x's
-  registry over the app's own RPC (and must be a CREATE3 deployment of that registry); the Permit2 payload is rebuilt
+  registry over the app's own RPC (and must be a CREATE3 deployment of that registry, no newer than the chain's pinned
+  `maxSettlerNonce`, with code — raise the pin in `chains.ts` when the watch reports a new deployment); the Permit2 payload is rebuilt
   on the device and signed as EIP-712 typed data (the account needs `signTypedData`; the engine signs it before the
   exact approval to Permit2 and appends it to the calldata); recipient, buy token and minimum are read from the
-  Settler call. A review screen shows `plan.source.permit2Transfer` — what the account signs. Every refusal is
-  classified (`onRefusal(text, info)`, `zeroExPins.reasonOf`).
+  Settler call. Every call goes out with the account's own gas estimate (`ownGasEstimate`). A review screen shows
+  `plan.source.permit2Transfer` — what the account signs; signing policies get the Settlers as `knownSpenders` from
+  `await zeroExKnownSpenders(provider, chainId)`. Every refusal is classified (`onRefusal(text, info)`, `zeroExPins.reasonOf`).
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.
 

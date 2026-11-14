@@ -20,7 +20,13 @@ Not breaking for apps that do not use the new provider: every existing text and 
   called contract as the only spender, a deadline at most an hour away, no witness), rebuilds it from local
   constants and signs that — typed data only, before the exact approval to Permit2 goes out. The signature is
   appended to the calldata, the signed call is estimated once the allowance is in place, and it is broadcast with
-  the account's own gas estimate, never the quoted limit. Its refusals are classified like the others.
+  the account's own gas estimate, never the quoted limit. A dry run that reverts is `simulation_failed`; one the
+  account's RPC does not answer is retried once, then `upstream_unavailable`. A permit never rides with native value
+  (`policy_refused`). Its refusals are classified like the others.
+- **Custom providers (`CrossChainProvider.ownGasEstimate`):** a provider may declare that its EVM calls (a native-coin
+  sale included) go out like a Permit2 call — dry-run from the account right before the broadcast and sent with the
+  account's own gas estimate, the quoted limit neither sent nor shown in the plan. 0x does. A custom router or a
+  wrapper that copies a provider's members must copy this flag too (protocol-swap2-router does).
 - **A custom review screen (`reviewExecution`):** a `call` source may now carry `permit2Transfer`, the JSON typed
   data the account signs right before the call (whose calldata then ends with `uint256(length)` and the signature).
   Show it; `extension-kit`'s `swapApprovalPayload` does (`source.permit2Transfer`). Apps with their own gate that
@@ -32,11 +38,14 @@ Not breaking for apps that do not use the new provider: every existing text and 
   `permit2Transfer` through the seal, `build` and `preflight` only from this release; a client facing an older
   server refuses the build fail-closed.
 - **Signing policies (kit `allowlist`, `knownSpenders`):** the engine's permit is described as a Permit2 transfer to
-  the 0x Settler, which rotates. List Permit2, the token and the Settlers your resolver currently knows
-  (`zeroExPins().resolver.known(chainId)`), not a fixed address.
-- **New package `@anywalletkit/protocol-swap2-0x`:** `zeroExProvider({ apiKey, rpcUrls })` on your server,
-  `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app (see [0x](/guides/swaps/#0x)). Conventional flags:
-  `ZEROEX_ENABLED` (dark unless set) and `ZEROEX_API_KEY`.
+  the 0x Settler, which rotates. `await zeroExKnownSpenders(zeroex, chainId)` gives `{ [settler]: "0x Settler" }`
+  from the resolver your 0x provider reads through: pass it as `knownSpenders` to `describeTypedData` and list its
+  keys in the allowlist next to Permit2 and the token, not a fixed address.
+- **New package `@anywalletkit/protocol-swap2-0x`:** `zeroExProvider({ apiKey, rpcUrls })` on your server only (under
+  React Native it refuses a key), `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app (see
+  [0x](/guides/swaps/#0x)). Conventional flags: `ZEROEX_ENABLED` (dark unless set) and `ZEROEX_API_KEY`. The chain
+  table pins the newest Settler deployment accepted per chain (`maxSettlerNonce`); a custom `chains` entry must
+  name one.
 - **extension-kit (minor), conformance (minor):** the Permit2 swap is one sheet and three pre-approved operations;
   the behaviour suite runs Permit2 swaps (`createMockAccount({ signTypedData: true })`).
 

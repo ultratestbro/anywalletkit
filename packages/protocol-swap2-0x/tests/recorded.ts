@@ -68,9 +68,9 @@ export function recordedQuery(f: RecordedQuote): Record<string, string> {
 export interface Seen {url: string; method: string}
 /**
  * One `fetch` for both sides of a recording: the 0x API (GET) answers the recorded body, the chain's JSON-RPC (POST)
- * answers the recorded registry. `body` replaces the response (a tampered copy); `status`/`headers` an HTTP refusal.
+ * answers the recorded registry (and code at the recorded Settlers). `body` replaces the response (a tampered copy); `status`/`headers` an HTTP refusal.
  */
-export function recordedFetch(f: RecordedQuote, o: {seen?: Seen[]; body?: unknown; status?: number; headers?: Record<string, string>; registry?: {current?: string | null; prev?: string | null}} = {}): typeof fetch {
+export function recordedFetch(f: RecordedQuote, o: {seen?: Seen[]; body?: unknown; status?: number; headers?: Record<string, string>; registry?: {current?: string | null; prev?: string | null}; code?: (address: string) => boolean} = {}): typeof fetch {
   const word = (a: string) => `0x${a.slice(2).toLowerCase().padStart(64, "0")}`;
   const rpc = (result: unknown) => new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result}));
   const revert = () => new Response(JSON.stringify({jsonrpc: "2.0", id: 1, error: {code: 3, message: "execution reverted"}}));
@@ -81,6 +81,12 @@ export function recordedFetch(f: RecordedQuote, o: {seen?: Seen[]; body?: unknow
     if (method === "POST") {
       const call = JSON.parse(init!.body!) as {method: string; params: [{to?: string; data?: string}]};
       if (call.method === "eth_getTransactionReceipt") return rpc({status: "0x1"});
+      // The recorded Settlers (current and previous) held code when recorded; `code` overrides.
+      if (call.method === "eth_getCode") {
+        const address = String((call.params as unknown as [string])[0]).toLowerCase();
+        const recorded = [f.registry.current, f.registry.prev].some((a) => !!a && a.toLowerCase() === address);
+        return rpc((o.code ? o.code(address) : recorded) ? "0x6080604052" : "0x");
+      }
       if (call.method !== "eth_call" || call.params[0].to?.toLowerCase() !== ZEROEX_SETTLER_REGISTRY.toLowerCase()) return rpc("0x");
       const registry = {...f.registry, ...o.registry};
       if (call.params[0].data?.startsWith(REGISTRY_OWNER_OF_SELECTOR)) return registry.current ? rpc(word(registry.current)) : revert();

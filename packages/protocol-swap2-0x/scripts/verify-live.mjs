@@ -4,6 +4,9 @@
 //  1. Always, keyless, on all seven chains over a public RPC: the chain id; the Settler registry is an ERC-1967 proxy
 //     with an implementation that has code and an owner(); ownerOf(2) (and prev(2) when there is one) name contracts
 //     with code that are CREATE3 deployments of the registry (zeroExSettlerNonce); Permit2 and the wrapped native have code.
+//     The pin: the deployment in force must be no newer than the newest one pinned in src/chains.ts (maxSettlerNonce
+//     minus ZEROEX_SETTLER_NONCE_MARGIN). A newer one is 0x deploying: the device still accepts it inside the margin,
+//     but this run fails ("NEW") until the pin is raised — past the margin the device refuses it ("PIN").
 //  2. Only with ZEROEX_API_KEY: live quotes for the corridors below through the provider — the Settler call and the
 //     Permit2 payload checked on the way — then held to the request by zeroExVerifyQuote, built, checked by
 //     zeroExVerifyBuild and preflighted; and once through the real server handler and zeroExRemoteProvider (remote mode).
@@ -12,7 +15,7 @@
 //   node scripts/verify-live.mjs [--no-chain] [--no-quotes] [--only REGEX]
 // ZEROEX_API_KEY is read from the environment only and sent only as the 0x-api-key header; it is never printed.
 // RPC_<chainId>=url overrides a public endpoint.
-import {ZEROEX_CHAINS, ZEROEX_PERMIT2, createSettlerResolver, zeroExProvider, zeroExRemoteProvider, zeroExSettlerNonce, zeroExVerifyBuild, zeroExVerifyQuote} from "../dist/index.js";
+import {ZEROEX_CHAINS, ZEROEX_PERMIT2, ZEROEX_SETTLER_LOOKAHEAD, ZEROEX_SETTLER_NONCE_MARGIN, createSettlerResolver, zeroExProvider, zeroExRemoteProvider, zeroExSettlerNonce, zeroExVerifyBuild, zeroExVerifyQuote} from "../dist/index.js";
 import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
 
 const args = process.argv.slice(2);
@@ -56,19 +59,28 @@ if (!args.includes("--no-chain")) {
         const prevAnswer = await call(url, "eth_call", [{to: chain.registry, data: `0xe2603dc2${word2}`}, "latest"]);
         const prev = addressOf(prevAnswer.result);
         const codeOf = async (a) => (a ? ((await call(url, "eth_getCode", [a, "latest"])).result ?? "0x").length > 2 : false);
+        // Derived past the pin too, so a newer 0x deployment is named rather than called "not a Settler".
+        const nonceOf = (a) => (a ? zeroExSettlerNonce(Number(id), a, chain.registry, chain.maxSettlerNonce + ZEROEX_SETTLER_LOOKAHEAD) : null);
+        const nonce = nonceOf(current);
+        const pinnedNewest = chain.maxSettlerNonce - ZEROEX_SETTLER_NONCE_MARGIN;
         const checks = {
           chain: BigInt(chainId.result) === BigInt(id),
           registryIsProxy: proxyCode.length > 2 && !!impl && implCode.length > 2,
           owner: !!owner,
-          settler: !!current && zeroExSettlerNonce(Number(id), current, chain.registry) !== null && (await codeOf(current)),
-          previous: prevAnswer.reverted || (!!prev && zeroExSettlerNonce(Number(id), prev, chain.registry) !== null && (await codeOf(prev))),
+          settler: nonce !== null && (await codeOf(current)),
+          previous: prevAnswer.reverted || (nonceOf(prev) !== null && (await codeOf(prev))),
           permit2: await codeOf(ZEROEX_PERMIT2),
           wrappedNative: await codeOf(chain.wrappedNative),
+          // the device refuses a deployment past maxSettlerNonce; one past the pinned newest means the pin is stale
+          withinPin: nonce !== null && nonce <= chain.maxSettlerNonce,
+          pinCurrent: nonce !== null && nonce <= pinnedNewest,
         };
         const ok = Object.values(checks).every(Boolean);
         if (!ok) bad++;
-        const nonce = current ? zeroExSettlerNonce(Number(id), current, chain.registry) : null;
-        console.log(`${ok ? "ok " : "BAD"} chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} Settler ${current ?? "—"} (deployment ${nonce ?? "?"})${prev ? `, previous ${prev}` : ""} · registry impl ${impl ?? "—"} owner ${owner ?? "—"}`, ok ? "" : checks);
+        const tag = ok ? "ok " : nonce !== null && checks.settler && !checks.withinPin ? "PIN" : nonce !== null && checks.settler && checks.withinPin && !checks.pinCurrent ? "NEW" : "BAD";
+        const pin = `pinned newest ${pinnedNewest}, accepted up to ${chain.maxSettlerNonce}`;
+        const advice = tag === "NEW" ? ` — 0x deployed Settler ${nonce}: check it, then raise maxSettlerNonce for chain ${id} in src/chains.ts` : tag === "PIN" ? ` — the device refuses Settler ${nonce} until maxSettlerNonce for chain ${id} is raised in src/chains.ts` : "";
+        console.log(`${tag} chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} Settler ${current ?? "—"} (deployment ${nonce ?? "?"}; ${pin})${prev ? `, previous ${prev}` : ""} · registry impl ${impl ?? "—"} owner ${owner ?? "—"}${advice}`, ok || tag !== "BAD" ? "" : checks);
         return;
       } catch { /* second try */ }
     }

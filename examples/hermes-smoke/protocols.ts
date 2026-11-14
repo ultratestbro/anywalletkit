@@ -37,8 +37,8 @@ import { FyndSwap2Protocol } from '@anywalletkit/protocol-swap2-fynd/protocol'
 import { FYND_CHAINS, TYCHO_ROUTER_ABI, checkFyndTransaction } from '@anywalletkit/protocol-swap2-fynd/router'
 import { zeroExProvider } from '@anywalletkit/protocol-swap2-0x/provider'
 import { ZeroExSwap2Protocol } from '@anywalletkit/protocol-swap2-0x/protocol'
-import { SETTLER_NATIVE_CHECK_SELECTOR, checkZeroExTransaction, decodeSettlerExecute, zeroExSettlerNonce } from '@anywalletkit/protocol-swap2-0x/settler'
-import { zeroExPins, zeroExVerifyQuote } from '@anywalletkit/protocol-swap2-0x/remote'
+import { SETTLER_NATIVE_CHECK_SELECTOR, checkZeroExTransaction, decodeSettlerExecute, zeroExSettlerAddress, zeroExSettlerNonce } from '@anywalletkit/protocol-swap2-0x/settler'
+import { zeroExPins, zeroExRemoteProvider, zeroExVerifyQuote } from '@anywalletkit/protocol-swap2-0x/remote'
 import { ZEROEX_CHAINS } from '@anywalletkit/protocol-swap2-0x/chains'
 import zeroExTokenLive from '../../packages/protocol-swap2-0x/fixtures/quotes/base-usdc-eth.json'
 import zeroExNativeLive from '../../packages/protocol-swap2-0x/fixtures/quotes/base-eth-usdc.json'
@@ -442,8 +442,11 @@ export async function smokeProtocols(check: Check): Promise<void> {
     const dead = '0x000000000000000000000000000000000000dEaD'
     const settler = '0x1035029091415555555555555555555555550001'
     const usdc = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
-    const zeroex = zeroExProvider({ apiKey: () => 'smoke' })
-    check('zeroex: same-chain routes only, and none without a key', zeroex.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:8453', token: 'ETH' }) && !zeroex.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:1', token: 'USDC' }) && !zeroExProvider({}).supportsChain('eip155:8453'))
+    // Under Hermes the key is refused outright (it belongs on a server); the app runs the remote provider.
+    let keyRefused = false
+    try { zeroExProvider({ apiKey: () => 'smoke' }) } catch (e) { keyRefused = /belongs on a server/.test(e instanceof Error ? e.message : '') }
+    const zeroexApp = zeroExRemoteProvider({ baseUrl: 'https://backend.invalid/api/swap2', rpcUrls: {} })
+    check('zeroex: a key is refused under Hermes; the remote provider serves same-chain routes only; none without a key', keyRefused && zeroexApp.ownGasEstimate === true && zeroexApp.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:8453', token: 'ETH' }) && !zeroexApp.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:1', token: 'USDC' }) && !zeroExProvider({}).supportsChain('eip155:8453'))
     const executeAbi = [{ type: 'function', name: 'execute', stateMutability: 'payable', inputs: [{ name: 'slippage', type: 'tuple', components: [{ name: 'recipient', type: 'address' }, { name: 'buyToken', type: 'address' }, { name: 'minAmountOut', type: 'uint256' }] }, { name: 'actions', type: 'bytes[]' }, { name: 'zidAndAffiliate', type: 'bytes32' }], outputs: [{ type: 'bool' }] }] as const
     const data = encodeFunctionData({ abi: executeAbi, functionName: 'execute', args: [{ recipient: dead, buyToken: usdc, minAmountOut: 2_487_500n }, [`${SETTLER_NATIVE_CHECK_SELECTOR}${'00'.repeat(64)}`], `0x${'00'.repeat(32)}`] })
     const decoded = decodeSettlerExecute(data)
@@ -475,6 +478,8 @@ export async function smokeProtocols(check: Check): Promise<void> {
     const sig = `0x${'ab'.repeat(65)}`
     check('zeroex: appends uint256(65) and the signature to the real calldata', appendPermit2Signature(tok.response.transaction.data, sig) === `${tok.response.transaction.data}${'0'.repeat(62)}41${'ab'.repeat(65)}`)
     check('zeroex: the recorded Settlers are CREATE3 deployments of the registry; another address is not', zeroExSettlerNonce(8453, tok.registry.current) === 22 && zeroExSettlerNonce(8453, tok.registry.prev) === 21 && zeroExSettlerNonce(8453, '0x1111111111111111111111111111111111111111') === null)
+    const started = Date.now()
+    check('zeroex: a deployment past the pinned maxSettlerNonce is not accepted, and a miss stays cheap under Hermes', zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 25)) === null && zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 24)) === 24 && zeroExSettlerNonce(1, '0x2222222222222222222222222222222222222222') === null && Date.now() - started < 1_000, `${Date.now() - started} ms`)
     const txOf = (r: typeof tok, permit2Transfer?: string) => ({ to: r.response.transaction.to, data: r.response.transaction.data, value: r.response.transaction.value, chainId: 8453, ...(permit2Transfer ? { approvalAddress: '0x000000000022D473030F116dDEE9F6B43aC78BA3', permit2Transfer } : {}) })
     const expectOf = (r: typeof tok) => ({ chainId: 8453, settlers: [r.registry.current, r.registry.prev], sellToken: r.request.sourceToken, buyToken: r.request.destToken, sellAmount: BigInt(r.request.amountIn), recipient: r.request.destAddress, minBuyAmount: BigInt(r.response.minBuyAmount), nowMs: r.request.nowMs })
     let tokenChecked: ReturnType<typeof checkZeroExTransaction> | null = null

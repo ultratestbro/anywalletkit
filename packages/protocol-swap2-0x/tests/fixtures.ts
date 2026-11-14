@@ -15,12 +15,18 @@ export const WETH = "0x4200000000000000000000000000000000000006";
 export const ME = "0x4444444444444444444444444444444444444444";
 export const OTHER = "0x9999999999999999999999999999999999999999";
 /**
- * What the registry answers on Base: deployments 22 (in force on 2026-11-15), 21 (the one it replaced) and 23 (the next
- * one). Real Settlers rotate and none is pinned, but every one is an address the registry deploys to.
+ * What the registry answers on Base: deployment 22 (in force on 2026-11-15) and 21 (the one it replaced); 20 is the one
+ * before. All three are real deployments with code. A rotation in these tests is the one that really happened: from
+ * {21, 20} to {22, 21}. Real Settlers rotate and none is pinned, but every one is an address the registry deploys to,
+ * no newer than the chain's pinned `maxSettlerNonce`, with code.
  */
 export const SETTLER = zeroExSettlerAddress(8453, 22);
 export const PREV_SETTLER = zeroExSettlerAddress(8453, 21);
-export const NEW_SETTLER = zeroExSettlerAddress(8453, 23);
+export const OLDER_SETTLER = zeroExSettlerAddress(8453, 20);
+/** Every taker Settler deployed on Base on 2026-11-15 (deployments 1–22): the stub chain has code at these and nowhere else. */
+export const DEPLOYED_ON_BASE: readonly string[] = Array.from({length: 22}, (_, i) => zeroExSettlerAddress(8453, i + 1));
+/** Contract code, as far as the checks care: any non-empty bytes. */
+export const SOME_CODE = "0x6080604052";
 export const RPC = {8453: ["https://rpc.test"]};
 /** A placeholder, not a key. */
 export const KEY = "placeholder-key-for-tests";
@@ -127,6 +133,8 @@ export interface ApiStub {
   receipt?: unknown;
   calls?: {url: string; method: string; headers: Record<string, string>; body?: unknown}[];
   rpcDown?: boolean;
+  /** Which addresses hold code on the stub chain (`eth_getCode`); default: the deployed Base Settlers. `null` = the call fails. */
+  code?: ((address: string) => boolean) | null;
 }
 
 /** The body 0x would answer for this request, in the documented shape. */
@@ -197,6 +205,12 @@ export function stub(o: ApiStub = {}): typeof fetch {
           return prev === null ? revert() : rpcAnswer(`0x${word(prev)}`);
         }
         return rpcAnswer("0x");
+      }
+      if (body.method === "eth_getCode") {
+        if (o.code === null) return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, error: {code: -32000, message: "header not found"}}));
+        const address = String((body.params as unknown as [string])[0]);
+        const deployed = o.code ?? ((a: string) => DEPLOYED_ON_BASE.some((d) => d.toLowerCase() === a.toLowerCase()));
+        return rpcAnswer(deployed(address) ? SOME_CODE : "0x");
       }
       if (body.method === "eth_getTransactionReceipt") return rpcAnswer(o.receipt === undefined ? {status: "0x1"} : o.receipt);
       return new Response("{}", {status: 404});

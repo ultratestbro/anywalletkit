@@ -18,9 +18,9 @@ On npm: [@anywalletkit/protocol-swap2-0x](https://www.npmjs.com/package/@anywall
 0x wants a key on every request. A key cannot ship inside a mobile app or an extension, so the module has two modes:
 
 - **Remote (apps).** Your backend runs `zeroExProvider` with the key behind the swap2 handler. The app uses `zeroExRemoteProvider`, which holds no key and re-checks every quote and every transaction on the device, as described below. A backend that is wrong or compromised cannot move the swap anywhere else.
-- **Local (servers, scripts, integrators with their own key).** `zeroExProvider({ apiKey: () => … })` or `ZeroExSwap2Protocol` talk to 0x directly.
+- **Local, with a key: servers only** (a backend, scripts, an integrator's own service). `zeroExProvider({ apiKey: () => … })` or `ZeroExSwap2Protocol` talk to 0x directly. Under React Native (Hermes or JSC) building either with a key throws, pointing to the remote mode: the key would ship in the app bundle, and React Native's fetch follows redirects with the key header whatever `redirect` says.
 
-The key is best passed as a getter, read at request time (a string is accepted too), and is sent only in the `0x-api-key` header, to an `https://` origin, with redirects refused so the header cannot follow one. It is never put in a URL, a quote, an error or a log line.
+The key is best passed as a getter, read at request time (a string is accepted too), and is sent only in the `0x-api-key` header, to an `https://` origin. Redirects are refused (`redirect: "error"`), and an answer that came through one anyway, or from another origin than `baseUrl`, is not used (`policy_refused`). It is never put in a URL, a quote, an error or a log line.
 
 The SDK reads no environment. By convention apps and backends name the switch and the key `ZEROEX_ENABLED` (dark unless set) and `ZEROEX_API_KEY`, as the routes canary and `verify:live` here do.
 
@@ -31,11 +31,16 @@ The SDK reads no environment. By convention apps and backends name the switch an
 3. If the token's allowance to Permit2 is below the input, the engine approves **Permit2** for exactly the input (USDT is reset first on mainnet; the approval is revoked if the swap does not go out). A standing allowance that covers the input is left as it is; a smaller one is replaced and, if the swap does not go out, set to 0. No allowance is ever given to a 0x contract.
 4. The signature is appended to the calldata as 0x specifies (`data ++ uint256(length) ++ signature`), the signed call is estimated from the account, and then sent to the Settler with the account's own gas estimate (the quoted gas limit is not used).
 
-Selling the native coin needs no approval and no signature: the call carries the amount as value.
+Selling the native coin needs no approval and no signature: the call carries the amount as value. It too is dry-run from the account right before the broadcast and sent with the account's own gas estimate, never the quoted limit (the provider declares `ownGasEstimate`). A dry run that reverts refuses the swap (`simulation_failed`); one the account's RPC does not answer is asked once more and then refused as `upstream_unavailable`.
 
 ## What is checked before anything is signed
 
-**The Settler comes from the chain, not from the API.** 0x replaces its Settler contracts regularly. The module reads the Settler in force (`ownerOf(2)`) and the one it replaced (`prev(2)`) from 0x's on-chain registry `0x00000000000004533Fe15556B1E086BB1A72cEae` through your RPC, and accepts a transaction only when its target is one of the two. The answer must also be an address the registry deploys Settlers to — `CREATE3(registry, feature 2, this chain, nonce)`, computed on the device (`zeroExSettlerNonce`) — so an RPC cannot name an arbitrary contract or account as the Settler. A live quote therefore needs `rpcUrls` for its chain. The read is cached for five minutes (`settlerMaxAgeMs`) and repeated before execution.
+**The Settler comes from the chain, not from the API.** 0x replaces its Settler contracts regularly. The module reads the Settler in force (`ownerOf(2)`) and the one it replaced (`prev(2)`) from 0x's on-chain registry `0x00000000000004533Fe15556B1E086BB1A72cEae` through your RPC, and accepts a transaction only when its target is one of the two. The answer is held to bounds the RPC cannot move:
+- it must be an address the registry deploys Settlers to — `CREATE3(registry, feature 2, this chain, nonce)`, computed on the device (`zeroExSettlerNonce`) — so an RPC cannot name an arbitrary contract or account;
+- that deployment must be no newer than the chain's pinned `maxSettlerNonce`: the newest deployment live when the table was pinned plus a margin of two (`ZEROEX_SETTLER_NONCE_MARGIN`; Base: 22 + 2 on 2026-11-15). A newer one is refused with what to do (update the package, or raise the pin once the deployment is checked). The watch job reports every new deployment (`ownerOf(2)` per chain in `watch.json`) and `verify:live` fails once the live one is past the pinned newest, so the pin is raised before the margin runs out;
+- there must be a contract at that address (`eth_getCode`, through the same RPC): a deployment that does not exist yet would strand what is sent to it.
+
+A live quote therefore needs `rpcUrls` for its chain. The read is cached for five minutes (`settlerMaxAgeMs`), repeated before execution, and a live quote in remote mode is held to exactly the set its own request read, however long the backend takes.
 
 **The Permit2 payload is rebuilt locally.** The API's typed data is read strictly and compared with the request; what the account signs is rebuilt from local constants:
 - domain: `Permit2`, the chain of the swap, the canonical Permit2 address;
@@ -62,11 +67,20 @@ One exception to "at least the minimum": the Settler measures its own balance of
 - The route and the price above the minimum. A better fill than the minimum is not guaranteed by any check here: 0x's routes end in a `POSITIVE_SLIPPAGE` action that keeps the surplus above the quoted amount for 0x (it is in the calldata), and a route could set that line at the minimum.
 - The fee amounts and the gas estimate it reports.
 - The actions after the first one (the route itself), the recipient argument inside the first action (where the Settler sends the pulled tokens on its way through the route) and `zidAndAffiliate`. These decide how the swap is filled, not what the recipient must receive.
-- The device trusts its own RPC for the registry read.
+- The device trusts its own RPC for the registry read, within the bounds above: the RPC can name only a genuine 0x deployment no newer than the pin, and within the margin it is trusted to say truthfully whether a contract is there.
 
-In remote mode the same checks run on the device (`zeroExPins` → `verifyQuote`, `verifyBuild`, pinned call targets and spender), so the list above is what the app trusts in its backend and in 0x together. Keep the app's `rpcUrls` out of the backend's hands where you can: the registry read is what the device trusts for "which contract is the Settler", and the CREATE3 check bounds it to genuine 0x deployments.
+In remote mode the same checks run on the device (`zeroExPins` → `verifyQuote`, `verifyBuild`, pinned call targets and spender), so the list above is what the app trusts in its backend and in 0x together. Keep the app's `rpcUrls` out of the backend's hands where you can: the registry read is what the device trusts for "which contract is the Settler", and the CREATE3, pin and code checks bound it to deployed 0x Settlers.
 
-**Signing policies.** The engine's permit names the Settler as spender, and the Settler rotates. A kit allowlist must list Permit2, the token and the Settlers in force; pass `zeroExPins().resolver.known(chainId)` (or your resolver's) as `knownSpenders` to wallet-evm's `describeTypedData` rather than a fixed address. `extension-kit` shows the permit on the swap sheet and pre-approves exactly it and the signed call.
+**Signing policies.** The engine's permit names the Settler as spender, and the Settler rotates. A kit allowlist must list Permit2, the token and the Settlers in force, and wallet-evm's `describeTypedData` should know them as `knownSpenders` rather than a fixed address. `zeroExKnownSpenders(provider, chainId)` gives that map (`{ [settler]: "0x Settler" }`) from the resolver the provider itself reads through (`provider.settlerResolver`):
+
+```ts
+const zeroex = zeroExRemoteProvider({ baseUrl, rpcUrls })
+const knownSpenders = await zeroExKnownSpenders(zeroex, 8453)
+describeTypedData(typed, { chainId: 8453, account, knownSpenders })
+// kit allowlist: [PERMIT2_ADDRESS, token, ...Object.keys(knownSpenders)]
+```
+
+It is empty when the registry cannot be read, so the permit is then described as a grant to an unknown spender. `extension-kit` shows the permit on the swap sheet and pre-approves exactly it and the signed call.
 
 ## Fees
 
@@ -86,7 +100,7 @@ In remote mode the same checks run on the device (`zeroExPins` → `verifyQuote`
 ```ts
 import { zeroExProvider } from '@anywalletkit/protocol-swap2-0x'
 
-// on your server (or anywhere the key may live)
+// on your server only: under React Native a provider with a key throws
 const zeroex = zeroExProvider({
   apiKey: () => process.env.ZEROEX_API_KEY,
   rpcUrls: { 8453: ['https://base.example/rpc'] },   // needed for live quotes: the Settler registry is read here
@@ -106,10 +120,10 @@ const zeroex = zeroExRemoteProvider({
 | Option | Default | Meaning |
 |---|---|---|
 | `enabled` | `true` | `false` takes the provider out of the auction (wire it to `ZEROEX_ENABLED`). |
-| `apiKey` | none | The 0x key (local mode): a getter (preferred) or a string. Without one the provider serves no route. |
+| `apiKey` | none | The 0x key (local mode, servers only — refused under React Native): a getter (preferred) or a string. Without one the provider serves no route. |
 | `baseUrl` | `https://api.0x.org` | API origin (local mode), or your swap2 backend (remote mode). `https` only. |
 | `rpcUrls` | none | `{ chainId: [url…] }` — registry reads and receipts. Required for live quotes. |
-| `chains` | the seven chains above | Chain table: `{ chainId: { name, registry, wrappedNative } }` merged over the defaults; `null` removes a chain. |
+| `chains` | the seven chains above | Chain table: `{ chainId: { name, registry, maxSettlerNonce, wrappedNative } }` merged over the defaults; `null` removes a chain. `maxSettlerNonce` (required) is the newest Settler deployment accepted on the chain. |
 | `defaultSlippageBps` | `50` | Used when the caller passes none. Keep it the same on the backend and in the app. |
 | `quoteTtlMs` | `45000` | How long a quote is offered; never past the Permit2 deadline. |
 | `timeoutMs` | `10000` | Per API request. |
@@ -127,14 +141,14 @@ const zeroex = zeroExRemoteProvider({
 
 ## Refusals
 
-Every refusal reads `zeroex: <what was found>` and reaches `onRefusal(text, info)` with a `Swap2RefusalReason` in `info` (thrown errors carry it for `refusalOf`; `zeroExPins().reasonOf` classifies the remote verifiers' texts): HTTP 429 → `rate_limited` (with `retryAfterMs` from Retry-After), 401 / 403 → `key_rejected`, 5xx and an unreachable or malformed API → `upstream_unavailable`, no liquidity → `insufficient_liquidity`, 0x's own error names → the closest reason (`TOKEN_NOT_SUPPORTED` → `unsupported_pair`, `INPUT_INVALID` → `no_route`, …), a chain or pair 0x does not serve → `unsupported_pair`, a paused registry → `chain_halted`, another Settler, spender or domain → `vault_mismatch`, another recipient → `recipient_mismatch`, another token, amount or minimum → `price_check_failed`, a passed deadline → `quote_expired`, anything else the checks refuse → `policy_refused`. A malformed request and the caller's own abort stay unclassified.
+Every refusal reads `zeroex: <what was found>` and reaches `onRefusal(text, info)` with a `Swap2RefusalReason` in `info` (thrown errors carry it for `refusalOf`; `zeroExPins().reasonOf` classifies the remote verifiers' texts): HTTP 429 → `rate_limited` (with `retryAfterMs` from Retry-After), 401 / 403 → `key_rejected`, 5xx and an unreachable or malformed API → `upstream_unavailable`, no liquidity → `insufficient_liquidity`, 0x's own error names → the closest reason (`TOKEN_NOT_SUPPORTED` → `unsupported_pair`, `INPUT_INVALID` → `no_route`, …), a chain or pair 0x does not serve → `unsupported_pair`, a paused registry → `chain_halted`, another Settler, spender or domain, a Settler past the pinned `maxSettlerNonce` or without code → `vault_mismatch`, an answer that came through a redirect → `policy_refused`, another recipient → `recipient_mismatch`, another token, amount or minimum → `price_check_failed`, a passed deadline → `quote_expired`, anything else the checks refuse → `policy_refused`. A malformed request and the caller's own abort stay unclassified.
 
 ## Checks
 
 ```sh
 pnpm test                                   # unit, probes, and every recorded real 0x answer (fixtures/quotes)
 ZEROEX_LIVE=1 ZEROEX_API_KEY=… pnpm test    # also live quotes from api.0x.org (read-only)
-pnpm verify:live                            # registry, Settlers, Permit2 on all seven chains; with ZEROEX_API_KEY also live corridors
+pnpm verify:live                            # registry, Settlers (code, pinned maxSettlerNonce), Permit2 on all seven chains; with ZEROEX_API_KEY also live corridors
 ```
 
 ## License

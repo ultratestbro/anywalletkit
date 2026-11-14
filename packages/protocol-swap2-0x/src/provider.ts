@@ -13,11 +13,14 @@ import {checkZeroExTransaction, createSettlerResolver, isZeroExNative, type Sett
  * 0x Swap API v2 (docs.0x.org) as a same-chain swap2 provider, Permit2 flow: `/swap/permit2/price` for
  * indicative quotes, `/swap/permit2/quote` for the swap that is executed.
  *
- * The API needs a key on every request, so it normally runs on your server (`zeroExProvider` there,
- * `zeroExRemoteProvider` in the app). Whichever side quotes, nothing the API returns is signed as it
+ * The API needs a key on every request, so `zeroExProvider` with a key runs on your server only, and
+ * `zeroExRemoteProvider` in the app: under React Native (Hermes or JSC) it refuses to be built with a
+ * key at all — an app bundle keeps no secret, and React Native's fetch follows redirects with the key
+ * header whatever `redirect` says. Whichever side quotes, nothing the API returns is signed as it
  * is: the Settler is read from the on-chain registry, the transaction is held to the request and the
  * Permit2 payload is rebuilt locally (see `settler.ts`); the engine then signs it as EIP-712 typed
- * data, appends the signature and estimates the signed call before broadcast.
+ * data, appends the signature and estimates the signed call before broadcast. Every call goes out
+ * with the account's own gas estimate (`ownGasEstimate`), never the quoted limit.
  *
  * Every refusal carries a `Swap2RefusalReason` next to its unchanged text (CS-13): HTTP 429 →
  * `rate_limited` (with Retry-After), 401/403 → `key_rejected`, 5xx or an unreachable / malformed
@@ -40,10 +43,12 @@ const MAX_RESPONSE_CHARS = 600_000;
 export interface ZeroExProviderConfig {
   enabled?: boolean | undefined;
   /**
-   * The 0x API key. Best as a getter, read on every request, so the key lives where you keep secrets (server env, a
-   * vault) and never in this config object; a string is accepted too (an env value read once). It is sent only as
-   * the `0x-api-key` header to `baseUrl`; it is never put in a URL, a refusal, an error or a quote. Without a key
-   * (or with one that is not printable ASCII without spaces) the provider serves no route.
+   * The 0x API key — server only. Best as a getter, read on every request, so the key lives where you keep secrets
+   * (server env, a vault) and never in this config object; a string is accepted too (an env value read once). It is
+   * sent only as the `0x-api-key` header to `baseUrl`; it is never put in a URL, a refusal, an error or a quote, and an
+   * answer that came through a redirect is refused. Without a key (or with one that is not printable ASCII without
+   * spaces) the provider serves no route. Under React Native a key is refused outright (the constructor throws): use
+   * `zeroExRemoteProvider` in the app.
    */
   apiKey?: string | (() => string | undefined) | undefined;
   /** API origin. Default {@link ZEROEX_DEFAULT_BASE_URL}. Must be https (http only for localhost), or the key would travel in clear. */
@@ -103,6 +108,18 @@ function readKey(source: ZeroExProviderConfig["apiKey"]): string | undefined {
   }
   return typeof key === "string" && /^[\x21-\x7e]{1,200}$/.test(key) ? key : undefined;
 }
+
+/**
+ * React Native (Hermes or JSC): an app bundle keeps no secret, and its fetch (OkHttp / NSURLSession) follows redirects
+ * — carrying the key header along — whatever `redirect` says.
+ */
+function onReactNative(): boolean {
+  const g = globalThis as {HermesInternal?: unknown; navigator?: {product?: unknown}};
+  return g.HermesInternal !== undefined || g.navigator?.product === "ReactNative";
+}
+
+/** `scheme://host[:port]` of a URL, lowercase; "" when it has none. No URL class: React Native's lacks `origin`. */
+const originOf = (url: string): string => (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i.exec(url)?.[0] ?? "").toLowerCase();
 
 /** The API origin, refused unless https (or http on this machine): the key rides on every request to it. */
 function apiOrigin(baseUrl: string | undefined): string {
@@ -193,8 +210,15 @@ function taxBps(v: unknown): number | null | undefined {
 
 let sequence = 0;
 
-export function zeroExProvider(config: ZeroExProviderConfig): CrossChainProvider {
+/** What {@link zeroExProvider} returns: a swap2 provider, plus the Settler resolver it reads through (for signing policies, `zeroExKnownSpenders`). */
+export type ZeroExProvider = CrossChainProvider & {readonly ownGasEstimate: true; readonly settlerResolver: SettlerResolver};
+
+export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
+  if (config.apiKey !== undefined && onReactNative()) {
+    throw new Error("zeroex: the 0x API key belongs on a server — in a React Native app it would ship in the bundle, and React Native's fetch follows redirects with the key attached. Run zeroExProvider({apiKey}) on your backend (createSwap2Handler) and zeroExRemoteProvider({baseUrl, rpcUrls}) in the app.");
+  }
   const baseUrl = apiOrigin(config.baseUrl);
+  const apiOriginOnly = originOf(baseUrl);
   const chains = zeroExChains(config.chains);
   const slippageDefault = config.defaultSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
   const ttl = config.quoteTtlMs ?? DEFAULT_TTL_MS;
@@ -216,6 +240,9 @@ export function zeroExProvider(config: ZeroExProviderConfig): CrossChainProvider
     name: ZEROEX_PROVIDER,
     describeActivity: describeZeroExActivity,
     supportsSameChain: true,
+    // The quoted gas limit is the API's word: a native sale (like a Permit2 call) goes out with the account's own estimate.
+    ownGasEstimate: true,
+    settlerResolver: resolver,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,
     supportsChainPair: (from: string, to: string) => from === to && chainIdOf(from) !== null,
@@ -306,6 +333,11 @@ export function zeroExProvider(config: ZeroExProviderConfig): CrossChainProvider
         const timeout = timeoutSignal(timeoutMs);
         // The key rides in a header: a redirect (a misconfigured baseUrl, a compromised edge) must not carry it on.
         const res = await fetch(url, {method: "GET", redirect: "error", headers: {accept: "application/json", "0x-api-key": key, "0x-version": "v2"}, signal: signal ? anySignal([signal, timeout]) : timeout});
+        // A fetch that ignores `redirect: "error"` (React Native's does): an answer that came through a redirect, or
+        // from another origin than the configured one, is not used.
+        if (res.redirected === true || (typeof res.url === "string" && res.url !== "" && originOf(res.url) !== apiOriginOnly)) {
+          return refuse("the API answer came through a redirect or from another origin — refused (the key must not follow one)", "policy_refused");
+        }
         status = res.status;
         retryAfter = res.headers?.get?.("retry-after") ?? null;
         text = await res.text();

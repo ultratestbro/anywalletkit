@@ -1256,6 +1256,9 @@ importers:
       '@anywalletkit/protocol-swap2-router':
         specifier: workspace:*
         version: link:../protocol-swap2-router
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../wallet-evm
       '@types/node':
         specifier: ^22
         version: 22.20.5

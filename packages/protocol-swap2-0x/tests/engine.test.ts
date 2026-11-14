@@ -16,7 +16,7 @@ import {zeroExProvider} from "../src/provider.js";
 import {ZeroExSwap2Protocol} from "../src/protocol.js";
 import {zeroExPins, zeroExRemoteProvider, zeroExVerifyBuild, zeroExVerifyQuote} from "../src/remote.js";
 import {decodeSettlerExecute} from "../src/settler.js";
-import {AMOUNT, KEY, NEW_SETTLER, OTHER, PREV_SETTLER, RPC, SETTLER, USDC, ZERO, getKey, stub, type ApiStub} from "./fixtures.js";
+import {AMOUNT, KEY, OLDER_SETTLER, OTHER, PREV_SETTLER, RPC, SETTLER, USDC, ZERO, getKey, stub, type ApiStub} from "./fixtures.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -154,8 +154,8 @@ describe("ZeroExSwap2Protocol — local mode", () => {
   });
 
   it("a Settler that left the registry between quote and execution: no swap sent, the permit never leaves the device, the allowance taken back", async () => {
-    // read 1 = the live quote; read 2 = preflight, where the registry has moved on
-    world({onRegistryRead: (n) => (n === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: NEW_SETTLER, prev: PREV_SETTLER})});
+    // read 1 = the live quote; read 2 = preflight, where the registry no longer names the quoted Settler (paused, rolled back)
+    world({onRegistryRead: (n) => (n === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: PREV_SETTLER, prev: OLDER_SETTLER})});
     const log = fresh();
     await expect(local(account(log)).swap2(options)).rejects.toThrow(/the quoted 0x Settler is no longer in the on-chain registry/);
     // the engine signs the permit before the approval, runs the provider's preflight after it, and never sends the signed call
@@ -280,10 +280,11 @@ describe("zeroExRemoteProvider — the key on a backend, the checks on the devic
   it("when the backend quotes a Settler newer than the device's read, the device reads the registry again — and only then accepts", async () => {
     // The backend (first reader) and the device share the stubbed chain: read 1 → old pair (device cache), later reads → rotated.
     let reads = 0;
-    const calls = world({settler: NEW_SETTLER, onRegistryRead: () => (++reads === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: NEW_SETTLER, prev: SETTLER})});
+    // The rotation that really happened on Base: {21, 20} → {22, 21}; 0x already quotes 22.
+    const calls = world({onRegistryRead: () => (++reads === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
     const provider = zeroExRemoteProvider({baseUrl: "https://backend.example/api", fetchImpl: backend().fetchImpl, rpcUrls: RPC});
     const q = await provider.getQuote({sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:8453", destToken: ZERO, amountIn: AMOUNT.toString(), destAddress: ME, refundAddress: ME, slippageBps: 50, dry: false} as never);
-    expect(q!.txRequest!.to).toBe(NEW_SETTLER);
+    expect(q!.txRequest!.to).toBe(SETTLER);
     expect(calls.length).toBeGreaterThan(4);
     // a Settler no registry read ever named stays refused after the second look
     world({settler: OTHER});
@@ -332,7 +333,7 @@ describe("zeroExVerifyQuote / zeroExVerifyBuild", () => {
       ["a native fee riding along", live, {...q, txRequest: {...q.txRequest!, nativeFee: "1"}}, ctx(), /more than a Settler call/],
       ["no recipient", {...live, destAddress: "someone"}, q, ctx(), /needs the recipient/],
       ["no Settler resolved on the device", live, q, ctx([]), /the 0x Settler for chain 8453 is not resolved/],
-      ["a Settler the device does not know", live, q, ctx([NEW_SETTLER]), /is not a 0x Settler from the on-chain registry/],
+      ["a Settler the device does not know", live, q, ctx([OLDER_SETTLER]), /is not a 0x Settler from the on-chain registry/],
       ["a quote that outlives its Permit2 deadline", live, {...q, validUntilMs: Date.now() + 2 * 3600_000}, ctx(), /outlives its Permit2 deadline/],
       ["another recipient than the app's", {...live, destAddress: OTHER}, q, ctx(), /not the recipient of this swap/],
       ["another buy token than the app asked for", {...live, destToken: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb"}, q, ctx(), /not the token asked for/],
@@ -358,7 +359,7 @@ describe("zeroExVerifyQuote / zeroExVerifyBuild", () => {
     const {txRequest: _, ...bare} = q;
     expect(await check(built, PARAMS, bare)).toMatch(/quote carries no transaction/);
     // the registry moved on since the quote
-    world({registry: {current: NEW_SETTLER, prev: null}});
+    world({registry: {current: OLDER_SETTLER, prev: null}});
     expect(await check()).toMatch(/is not a 0x Settler from the on-chain registry/);
     world({registry: {current: null}});
     expect(await check()).toMatch(/reports no taker Settler in force/);
@@ -368,19 +369,20 @@ describe("zeroExVerifyQuote / zeroExVerifyBuild", () => {
 describe("router registration", () => {
   const METHODS = ["enabled", "supportsRoute", "getQuote", "buildDeposit", "trackIntent", "preflightDeposit", "supportsChain", "supportsChainPair", "describeActivity"];
 
-  it("every member of the local provider is one the router's snapshot carries", () => {
+  it("every member of the local provider is one the router's snapshot carries (settlerResolver is the app's own handle)", () => {
     const p = zeroExProvider({apiKey: getKey, rpcUrls: RPC});
-    expect(Object.keys(p).sort()).toEqual(["name", "supportsSameChain", ...METHODS].sort());
+    expect(Object.keys(p).sort()).toEqual(["name", "supportsSameChain", "ownGasEstimate", "settlerResolver", ...METHODS].sort());
     const snap = new CrossChainRouter([p]).getProvider("zeroex")! as unknown as Record<string, unknown>;
     for (const m of METHODS) expect(typeof snap[m], m).toBe("function");
     expect(snap.supportsSameChain).toBe(true);
+    expect(snap.ownGasEstimate).toBe(true);
     expect(snap.name).toBe("zeroex");
   });
 
   it("the remote provider keeps its marker, pins and checks through the snapshot", () => {
     const p = zeroExRemoteProvider({baseUrl: "https://backend.example/api", rpcUrls: RPC});
     const snap = new CrossChainRouter([p]).getProvider("zeroex")! as unknown as Record<string, unknown>;
-    expect(snap).toMatchObject({remote: true, verifiesQuotes: true, verifiesBuilds: true, supportsSameChain: true});
+    expect(snap).toMatchObject({remote: true, verifiesQuotes: true, verifiesBuilds: true, supportsSameChain: true, ownGasEstimate: true});
     for (const m of ["callTargets", "spenders", "preflightDeposit", "describeActivity", "supportsChain", "supportsChainPair"]) expect(typeof snap[m], m).toBe("function");
     expect((snap.spenders as (c: string) => string[])("eip155:8453")).toEqual([ZEROEX_PERMIT2]);
   });

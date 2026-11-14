@@ -3,7 +3,7 @@ import {readPermit2Transfer, type Quote, type UnsignedTx} from "@anywalletkit/pr
 import {ZEROEX_CHAINS, ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_REGISTRY} from "../src/chains.js";
 import {ZEROEX_DEFAULT_BASE_URL, zeroExFees, zeroExProvider, type ZeroExProviderConfig} from "../src/provider.js";
 import {decodeSettlerExecute} from "../src/settler.js";
-import {AMOUNT, DAI, KEY, ME, NEW_SETTLER, OTHER, OUT, PREV_SETTLER, RPC, SETTLER, USDC, WETH, ZERO, getKey, stub, type ApiStub} from "./fixtures.js";
+import {AMOUNT, DAI, KEY, ME, OLDER_SETTLER, OTHER, OUT, PREV_SETTLER, RPC, SETTLER, USDC, WETH, ZERO, getKey, stub, type ApiStub} from "./fixtures.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -55,7 +55,7 @@ describe("zeroExProvider — routes", () => {
   });
 
   it("the chain table is config", () => {
-    const p = zeroExProvider({apiKey: getKey, chains: {130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY}, 56: null}});
+    const p = zeroExProvider({apiKey: getKey, chains: {130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 4}, 56: null}});
     expect(p.supportsChain!("eip155:130")).toBe(true);
     expect(p.supportsChain!("eip155:56")).toBe(false);
   });
@@ -92,10 +92,10 @@ describe("zeroExProvider — request", () => {
     expect(new URL(s.api()[0]!.url).searchParams.has("taker")).toBe(false);
   });
 
-  it("a live quote reads the registry first, then asks /swap/permit2/quote", async () => {
+  it("a live quote reads the registry (and the Settlers' code) first, then asks /swap/permit2/quote", async () => {
     const s = setup();
     expect(await s.quote(live)).not.toBeNull();
-    expect(s.calls.map((c) => c.method)).toEqual(["POST", "POST", "GET"]);
+    expect(s.calls.map((c) => (c.method === "POST" ? (c.body as {method: string}).method : c.method))).toEqual(["eth_call", "eth_getCode", "eth_call", "eth_getCode", "GET"]);
     const url = new URL(s.api()[0]!.url);
     expect(url.pathname).toBe("/swap/permit2/quote");
     expect(url.searchParams.get("taker")).toBe(ME);
@@ -348,10 +348,12 @@ describe("zeroExProvider — live quote (what will be signed)", () => {
   });
 
   it("when 0x quotes a Settler newer than the cached read, reads the registry once more and accepts it", async () => {
-    const s = setup({settler: NEW_SETTLER, onRegistryRead: (n) => (n === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: NEW_SETTLER, prev: SETTLER})});
+    // The rotation that really happened on Base: {21, 20} → {22, 21}; 0x already quotes 22.
+    const s = setup({onRegistryRead: (n) => (n === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
     const q = (await s.quote(live))!;
-    expect(q.txRequest!.to).toBe(NEW_SETTLER);
-    expect(s.rpc()).toHaveLength(4);
+    expect(q.txRequest!.to).toBe(SETTLER);
+    // read 1: ownerOf → 21, its code, prev → 20, its code; read 2: ownerOf → 22, its code, prev → 21 (code already seen)
+    expect(s.rpc()).toHaveLength(7);
   });
 
   const cases: [string, ApiStub, string | RegExp, Record<string, unknown>?][] = [
@@ -446,7 +448,7 @@ describe("zeroExProvider — build, preflight, tracking", () => {
   });
 
   it("preflight refuses when the Settler left the registry after the quote", async () => {
-    const {provider, quote} = await liveQuote({onRegistryRead: (n) => (n === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: NEW_SETTLER, prev: PREV_SETTLER})});
+    const {provider, quote} = await liveQuote({onRegistryRead: (n) => (n === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: PREV_SETTLER, prev: OLDER_SETTLER})});
     const tx = await provider.buildDeposit(quote);
     await expect(provider.preflightDeposit!(quote, tx)).rejects.toThrow("zeroex: the quoted 0x Settler is no longer in the on-chain registry. Nothing was sent; refresh the quote.");
   });

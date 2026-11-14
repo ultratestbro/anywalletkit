@@ -82,7 +82,8 @@
     "vitest": "^5.1.0",
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/core": "workspace:*",
-    "@anywalletkit/protocol-swap2-router": "workspace:*"
+    "@anywalletkit/protocol-swap2-router": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*"
   },
   "keywords": [
     "swap2",
