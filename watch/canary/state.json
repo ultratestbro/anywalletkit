@@ -2,271 +2,271 @@
  "lido": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "ssv": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "jito": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "tonstakers": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:1:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:1:lido": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "mellow:lido-earn-eth": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:1:etherfi": {
   "status": "warn",
   "note": "quoteSupply → AaveError weETH: supply cap reached (0 base units left).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:10:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:56:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError Cake: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:100:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:137:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "mellow:lido-earn-usd": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:146:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:1868:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:324:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError USDC: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:1088:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError m.DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:5000:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:8453:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:9745:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:42161:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:42220:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:43114:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI.e: supply cap reached (0 base units left).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:57073:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:534352:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "aave:59144:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:10": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:137": {
   "status": "warn",
   "note": " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached or the receiver is gated).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:130": {
   "status": "warn",
   "note": " quoteSupply → MorphoError Gauntlet WETH: deposits are closed right now (caps reached or the receiver is gated).",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:4663": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:999": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:143": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "morpho:747474": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "approvals:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "approvals:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "approvals:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "kamino": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "native-stake": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "native-monad": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "curve:10": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "curve:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "curve:100": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "curve:196": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "curve:9745": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "curve:143": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "scrvusd": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "curve:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "curve:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "liquid-near": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "native-near": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  },
  "relay": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-13T14:35:07.086Z"
+  "at": "2026-11-14T13:31:45.389Z"
  }
 }

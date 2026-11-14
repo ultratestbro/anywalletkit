@@ -64,7 +64,7 @@
      "eNLm5e5KVDX2vEcCkt75PpZ2GMfXcZES3QrFshgpVzp"
     ]
    },
-   "seenAt": "2026-11-13T14:33:26.855Z",
+   "seenAt": "2026-11-14T13:29:29.405Z",
    "changedAt": "2026-11-13T14:33:26.855Z"
   },
   "vaults": {
@@ -274,7 +274,7 @@
      "qoCFKVrNfFCJKxEaLBbXrWNpeMT2xyfUEjFqMyddheA"
     ]
    },
-   "seenAt": "2026-11-13T14:33:26.967Z",
+   "seenAt": "2026-11-14T13:29:29.742Z",
    "changedAt": "2026-11-13T14:33:26.967Z"
   },
   "farms-program": {
@@ -288,7 +288,7 @@
     "slot": 444035168,
     "authority": "CivjSDKgTpmkRNL4zYcmv9D9QqPJg6yTxBVxMGcXvMuY"
    },
-   "seenAt": "2026-11-13T14:33:26.761Z",
+   "seenAt": "2026-11-14T13:29:29.014Z",
    "changedAt": "2026-10-14T15:11:05.541Z"
   },
   "klend-program": {
@@ -302,7 +302,7 @@
     "slot": 461744249,
     "authority": "GzFgdRJXmawPhGeBsyRCDLx4jAKPsvbUqoqitzppkzkW"
    },
-   "seenAt": "2026-11-13T14:33:26.830Z",
+   "seenAt": "2026-11-14T13:29:29.112Z",
    "changedAt": "2026-11-04T09:35:50.957Z"
   },
   "docs-api": {
@@ -310,13 +310,13 @@
    "target": {
     "url": "https://docs.kamino.finance/developers/api"
    },
-   "value": "4cce91712c0544a978ef8eb5f31607bd009a5c7dbd977ef8dd2f8c97991f5de8",
+   "value": "ba5cff2729f2a364000b5e6689017ee549a66e0ca8e02bb70d5fc204ca7ac1c9",
    "meta": {
-    "hash": "4cce91712c0544a9",
-    "chars": 3759
+    "hash": "ba5cff2729f2a364",
+    "chars": 3733
    },
-   "seenAt": "2026-11-13T14:33:27.412Z",
-   "changedAt": "2026-11-11T14:17:50.965Z"
+   "seenAt": "2026-11-14T13:29:30.190Z",
+   "changedAt": "2026-11-14T13:29:30.190Z"
   },
   "kvault-program": {
    "type": "solana-program",
@@ -329,7 +329,7 @@
     "slot": 461660004,
     "authority": "GzFgdRJXmawPhGeBsyRCDLx4jAKPsvbUqoqitzppkzkW"
    },
-   "seenAt": "2026-11-13T14:33:26.791Z",
+   "seenAt": "2026-11-14T13:29:28.978Z",
    "changedAt": "2026-11-04T09:35:50.921Z"
   },
   "klend": {
@@ -345,7 +345,7 @@
     "url": "https://github.com/Kamino-Finance/klend/releases/tag/release/v1.28.0",
     "prerelease": true
    },
-   "seenAt": "2026-11-13T14:33:26.831Z",
+   "seenAt": "2026-11-14T13:29:28.761Z",
    "changedAt": "2026-11-07T12:58:01.345Z"
   },
   "klend-sdk": {
@@ -360,7 +360,7 @@
     "url": "https://github.com/Kamino-Finance/klend-sdk/commit/6a26d6f1b5afb29953ffd139ee8c0c4ca5f26ce6",
     "note": "default branch: Update klend-sdk"
    },
-   "seenAt": "2026-11-13T14:33:27.317Z",
+   "seenAt": "2026-11-14T13:29:29.287Z",
    "changedAt": "2026-10-20T10:24:16.203Z"
   }
  }

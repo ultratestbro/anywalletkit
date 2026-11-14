@@ -12,7 +12,7 @@
     "codeHash": "cdafbbe45c78393e",
     "bytes": 45
    },
-   "seenAt": "2026-11-13T14:33:26.362Z",
+   "seenAt": "2026-11-14T13:29:27.713Z",
    "changedAt": "2026-11-07T12:58:00.546Z"
   },
   "scrvusd-implementation-ethereum": {
@@ -26,7 +26,7 @@
     "codeHash": "ccaff188f029d5de",
     "bytes": 23754
    },
-   "seenAt": "2026-11-13T14:33:26.370Z",
+   "seenAt": "2026-11-14T13:29:27.734Z",
    "changedAt": "2026-11-07T12:58:00.556Z"
   },
   "scrvusd-api-version": {
@@ -42,7 +42,7 @@
     "call": "apiVersion()",
     "result": "3.0.4"
    },
-   "seenAt": "2026-11-13T14:33:26.364Z",
+   "seenAt": "2026-11-14T13:29:27.715Z",
    "changedAt": "2026-11-07T12:58:00.566Z"
   },
   "scrvusd-is-shutdown": {
@@ -58,7 +58,7 @@
     "call": "isShutdown()",
     "result": false
    },
-   "seenAt": "2026-11-13T14:33:26.368Z",
+   "seenAt": "2026-11-14T13:29:27.718Z",
    "changedAt": "2026-11-07T12:58:00.569Z"
   },
   "scrvusd-profit-max-unlock-time": {
@@ -74,7 +74,7 @@
     "call": "profitMaxUnlockTime()",
     "result": "604800"
    },
-   "seenAt": "2026-11-13T14:33:26.369Z",
+   "seenAt": "2026-11-14T13:29:27.714Z",
    "changedAt": "2026-11-07T12:58:00.572Z"
   },
   "scrvusd-role-manager": {
@@ -90,7 +90,7 @@
     "call": "role_manager()",
     "result": "0x40907540d8a6c65c637785e8f8b742ae6b0b9968"
    },
-   "seenAt": "2026-11-13T14:33:26.364Z",
+   "seenAt": "2026-11-14T13:29:27.718Z",
    "changedAt": "2026-11-07T12:58:00.574Z"
   },
   "scrvusd-asset": {
@@ -106,7 +106,7 @@
     "call": "asset()",
     "result": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e"
    },
-   "seenAt": "2026-11-13T14:33:26.378Z",
+   "seenAt": "2026-11-14T13:29:27.766Z",
    "changedAt": "2026-11-07T12:58:00.607Z"
   },
   "scrvusd-total-debt": {
@@ -122,7 +122,7 @@
     "call": "totalDebt()",
     "result": "0"
    },
-   "seenAt": "2026-11-13T14:33:26.371Z",
+   "seenAt": "2026-11-14T13:29:27.765Z",
    "changedAt": "2026-11-07T12:58:00.724Z"
   },
   "api-savings-statistics-schema": {
@@ -135,7 +135,7 @@
    "meta": {
     "hash": "b226813b3334cbe3"
    },
-   "seenAt": "2026-11-13T14:33:26.542Z",
+   "seenAt": "2026-11-14T13:29:28.434Z",
    "changedAt": "2026-11-07T12:58:00.876Z"
   },
   "deployments-json": {
@@ -166,7 +166,7 @@
     ],
     "problems": []
    },
-   "seenAt": "2026-11-13T14:33:26.509Z",
+   "seenAt": "2026-11-14T13:29:28.482Z",
    "changedAt": "2026-11-07T12:58:00.996Z"
   },
   "docs-scrvusd-overview": {
@@ -179,7 +179,7 @@
     "hash": "9ff8ae6b79ae58c7",
     "chars": 4728
    },
-   "seenAt": "2026-11-13T14:33:26.514Z",
+   "seenAt": "2026-11-14T13:29:28.372Z",
    "changedAt": "2026-11-07T12:58:01.085Z"
   }
  }
