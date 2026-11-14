@@ -237,7 +237,7 @@ export const ACROSS_MAX_EXCLUSIVITY_PERIOD_S = 31_536_000;
 /** The native coin in a request (and in Across's own token lists): twenty zero bytes. */
 export const ACROSS_NATIVE = "0x0000000000000000000000000000000000000000";
 
-/** Across API V5. Quoting through it needs a key from dashboard.across.to and is not part of this build. */
+/** Across API V5: the price source (`api.ts`), with a key from dashboard.across.to kept on a server. */
 export const ACROSS_API = "https://api.across.to";
 
 const ZERO = /^0x0{40}$/;

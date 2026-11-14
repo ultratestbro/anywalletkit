@@ -7,7 +7,8 @@ export interface AcrossSwap2Config extends Swap2EngineConfig, AcrossProviderConf
 
 /**
  * Standalone Across swap2: EVM → EVM through the source chain's SpokePool, every deposit built and verified on the
- * device. Quoting arrives with the Across API V5 layer; until then the provider is disabled and quotes are refused.
+ * device. Quoting needs the Across API V5 key, so this class quotes only on a server (`apiKey`); an app uses
+ * `acrossRemoteProvider` in a router instead.
  */
 export class AcrossSwap2Protocol extends SingleProviderSwap2 {
   protected readonly provider;

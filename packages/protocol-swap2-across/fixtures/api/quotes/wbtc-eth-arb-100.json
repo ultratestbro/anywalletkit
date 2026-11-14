@@ -1,0 +1,377 @@
+{
+ "note": "WBTC Ethereum → Arbitrum, ~$100. Recorded 2026-11-14T23:30:14.975Z through acrossProvider (dist), the subject a public address; nothing signed or sent.",
+ "nowMs": 1794699014975,
+ "params": {
+  "sourceChain": "eip155:1",
+  "sourceToken": "WBTC",
+  "destChain": "eip155:42161",
+  "destToken": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+  "amountIn": "156000",
+  "destAddress": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "refundAddress": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "sender": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "dry": false
+ },
+ "floor": false,
+ "calls": [
+  {
+   "kind": "suggested-fees",
+   "url": "https://app.across.to/api/suggested-fees?inputToken=0x2260fac5e5542a773aa44fbcfedf7c193bc2c599&outputToken=0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f&originChainId=1&destinationChainId=42161&amount=156000&recipient=0xf977814e90da44bfa03b6295a0616a897441acec",
+   "method": "GET",
+   "status": 200,
+   "response": {
+    "estimatedFillTimeSec": 2,
+    "capitalFeePct": "300171600000000",
+    "capitalFeeTotal": "46",
+    "relayGasFeePct": "57692307692307",
+    "relayGasFeeTotal": "8",
+    "relayFeePct": "357863907692307",
+    "relayFeeTotal": "54",
+    "lpFeePct": "0",
+    "timestamp": "1794698771",
+    "isAmountTooLow": false,
+    "quoteBlock": "26416500",
+    "exclusiveRelayer": "0x0000000000000000000000000000000000000000",
+    "exclusivityDeadline": 0,
+    "spokePoolAddress": "0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5",
+    "destinationSpokePoolAddress": "0xe35e9842fceaCA96570B734083f4a58e8F7C5f2A",
+    "totalRelayFee": {
+     "pct": "357863907692307",
+     "total": "54"
+    },
+    "relayerCapitalFee": {
+     "pct": "300171600000000",
+     "total": "46"
+    },
+    "relayerGasFee": {
+     "pct": "57692307692307",
+     "total": "8"
+    },
+    "lpFee": {
+     "pct": "0",
+     "total": "0"
+    },
+    "internalizedSwapFee": {
+     "pct": "0",
+     "total": "0"
+    },
+    "limits": {
+     "minDeposit": "784",
+     "maxDeposit": "565285422",
+     "maxDepositInstant": "145523709",
+     "maxDepositShortDelay": "565285422",
+     "recommendedDepositInstant": "145523709"
+    },
+    "fillDeadline": "1794705971",
+    "outputAmount": "155946",
+    "inputToken": {
+     "address": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+     "symbol": "WBTC",
+     "decimals": 8,
+     "chainId": 1
+    },
+    "outputToken": {
+     "address": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
+     "symbol": "WBTC",
+     "decimals": 8,
+     "chainId": 42161
+    },
+    "id": "4t8j6-1794699014714-84c728b3c464"
+   }
+  },
+  {
+   "kind": "v5",
+   "url": "https://api.across.to/v1/quotes",
+   "method": "POST",
+   "request": {
+    "origin": {
+     "token": {
+      "chainId": 1,
+      "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+     },
+     "depositor": "0xf977814e90da44bfa03b6295a0616a897441acec",
+     "amount": "156000"
+    },
+    "destination": {
+     "token": {
+      "chainId": 42161,
+      "address": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+     },
+     "recipient": "0xf977814e90da44bfa03b6295a0616a897441acec"
+    },
+    "amountType": "exact_input",
+    "capabilities": {
+     "operations": [
+      {
+       "kind": "approve_token",
+       "ecosystem": "evm"
+      },
+      {
+       "kind": "send_transaction",
+       "ecosystem": "evm"
+      }
+     ]
+    },
+    "authorizationPolicy": {
+     "allowedTypes": [
+      "approval"
+     ],
+     "approvalAmount": "exact"
+    },
+    "maxFee": {
+     "bps": 5000
+    }
+   },
+   "status": 200,
+   "response": {
+    "expiresAt": "2026-11-15T00:10:14.809Z",
+    "originValidUntil": "2026-11-15T00:20:07.000Z",
+    "expectedFillTimeMs": 14072,
+    "origin": {
+     "token": {
+      "kind": "token",
+      "chainId": 1,
+      "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "symbol": "WBTC",
+      "name": "Wrapped Bitcoin",
+      "decimals": 8,
+      "priceUsd": 63681,
+      "priceUsdAt": "2026-11-14T23:30:01.205Z"
+     },
+     "amount": "156000",
+     "amountUsd": "99.342359999999999332",
+     "maxAmount": "156000",
+     "maxAmountUsd": "99.342359999999999332",
+     "depositor": {
+      "address": "0xf977814e90da44bfa03b6295a0616a897441acec"
+     }
+    },
+    "destination": {
+     "token": {
+      "kind": "token",
+      "chainId": 42161,
+      "address": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "symbol": "WBTC",
+      "name": "Wrapped Bitcoin",
+      "decimals": 8,
+      "priceUsd": 63681,
+      "priceUsdAt": "2026-11-14T23:30:01.866Z"
+     },
+     "grossAmount": "156000",
+     "amount": "155455",
+     "amountUsd": "98.995298550000001114",
+     "recipient": {
+      "address": "0xf977814e90da44bfa03b6295a0616a897441acec"
+     },
+     "minAmount": "155175",
+     "minAmountUsd": "98.816991749999999683"
+    },
+    "fee": {
+     "totalFee": {
+      "amount": "545",
+      "token": {
+       "kind": "token",
+       "chainId": 42161,
+       "address": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+       "symbol": "WBTC",
+       "name": "Wrapped Bitcoin",
+       "decimals": 8,
+       "priceUsd": 63681,
+       "priceUsdAt": "2026-11-14T23:30:01.866Z"
+      },
+      "amountUsd": "0.347061450000000049"
+     },
+     "transferFee": {
+      "amount": "545",
+      "token": {
+       "kind": "token",
+       "chainId": 42161,
+       "address": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+       "symbol": "WBTC",
+       "name": "Wrapped Bitcoin",
+       "decimals": 8,
+       "priceUsd": 63681,
+       "priceUsdAt": "2026-11-14T23:30:01.866Z"
+      },
+      "amountUsd": "0.347061450000000049"
+     },
+     "appFee": {
+      "amount": "0",
+      "token": {
+       "kind": "token",
+       "chainId": 42161,
+       "address": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+       "symbol": "WBTC",
+       "name": "Wrapped Bitcoin",
+       "decimals": 8,
+       "priceUsd": 63681,
+       "priceUsdAt": "2026-11-14T23:30:01.866Z"
+      },
+      "amountUsd": "0.000000000000000000"
+     },
+     "maxTransferFee": {
+      "amount": "825",
+      "token": {
+       "kind": "token",
+       "chainId": 42161,
+       "address": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+       "symbol": "WBTC",
+       "name": "Wrapped Bitcoin",
+       "decimals": 8,
+       "priceUsd": 63681,
+       "priceUsdAt": "2026-11-14T23:30:01.866Z"
+      },
+      "amountUsd": "0.525368250000000092"
+     },
+     "maxTotalFee": {
+      "amount": "825",
+      "token": {
+       "kind": "token",
+       "chainId": 42161,
+       "address": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+       "symbol": "WBTC",
+       "name": "Wrapped Bitcoin",
+       "decimals": 8,
+       "priceUsd": 63681,
+       "priceUsdAt": "2026-11-14T23:30:01.866Z"
+      },
+      "amountUsd": "0.525368250000000092"
+     }
+    },
+    "gasEstimates": [
+     {
+      "leg": "origin",
+      "effect": "included_in_transfer_fee",
+      "amount": "164870784828750",
+      "token": {
+       "kind": "native",
+       "chainId": 1,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.288776399800000028",
+      "gasUnits": "325000"
+     },
+     {
+      "leg": "destination",
+      "effect": "included_in_transfer_fee",
+      "amount": "4836787160100",
+      "token": {
+       "kind": "native",
+       "chainId": 42161,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.008470447439999999",
+      "gasUnits": "229703"
+     },
+     {
+      "leg": "origin",
+      "effect": "paid_by_wallet",
+      "actionId": "approval",
+      "gasUnits": "70000",
+      "amount": "33819648170000",
+      "token": {
+       "kind": "native",
+       "chainId": 1,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.059236466555681801"
+     },
+     {
+      "leg": "origin",
+      "effect": "paid_by_wallet",
+      "actionId": "prefunded-store",
+      "gasUnits": "100000",
+      "amount": "48313783100000",
+      "token": {
+       "kind": "native",
+       "chainId": 1,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.084623523650974003"
+     }
+    ],
+    "nextActions": [
+     {
+      "kind": "approve_token",
+      "id": "approval",
+      "chainId": 1,
+      "spender": "0x794dbdbdbfd3f8a3b887f4513bf5ff29edd04a94",
+      "amount": "156000",
+      "estimatedOriginGas": {
+       "gasUnits": "70000",
+       "amount": "33819648170000",
+       "decimals": 18,
+       "token": {
+        "chainId": 1,
+        "address": "0x0000000000000000000000000000000000000000"
+       },
+       "amountUsd": "0.059236466555681801"
+      },
+      "tokenAddress": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "ecosystem": "evm",
+      "authorization": {
+       "type": "approval",
+       "scope": {
+        "token": {
+         "chainId": 1,
+         "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+        },
+        "amount": "156000",
+        "spender": "0x794dbdbdbfd3f8a3b887f4513bf5ff29edd04a94"
+       }
+      }
+     },
+     {
+      "kind": "send_transaction",
+      "id": "prefunded-store",
+      "chainId": 1,
+      "to": "0x794dbdbdbfd3f8a3b887f4513bf5ff29edd04a94",
+      "data": "0x1e04ce08b4ca98d441068d9bdda56cf70b9fa71cff816aad91ab8cfde760e1e733e9d4060000000000000000000000002260fac5e5542a773aa44fbcfedf7c193bc2c5990000000000000000000000000000000000000000000000000000000000026160",
+      "value": "0",
+      "estimatedOriginGas": {
+       "gasUnits": "100000",
+       "amount": "48313783100000",
+       "decimals": 18,
+       "token": {
+        "chainId": 1,
+        "address": "0x0000000000000000000000000000000000000000"
+       },
+       "amountUsd": "0.084623523650974003"
+      },
+      "ecosystem": "evm"
+     }
+    ],
+    "orderId": "0xb4ca98d441068d9bdda56cf70b9fa71cff816aad91ab8cfde760e1e733e9d406",
+    "amountType": "exact_input",
+    "refundPolicy": {
+     "supported": false,
+     "reason": "irreversible_rail",
+     "message": "This route does not guarantee an automatic refund. If this transfer is never executed, the input held in escrow can still be returned to you; once execution begins, a refund cannot be guaranteed if the transfer then fails to complete. Unfilled Across deposits remain eligible for an origin-chain refund after their SpokePool expiry and refund-bundle settlement."
+    }
+   }
+  }
+ ],
+ "result": {
+  "outputAmount": "155908",
+  "fee": "92",
+  "priceSource": "suggested-fees",
+  "v5Fee": "92",
+  "relayerFee": "54",
+  "quoteTimestamp": 1794698771,
+  "fillDeadline": 1794705971,
+  "etaSeconds": 2,
+  "placeholder": false
+ }
+}

@@ -27,6 +27,6 @@
   "conformance": "0.x",
   "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-across",
-  "description": "Across Protocol with the SpokePool deposit built and verified on the device: EVM-to-EVM bridges of the same asset (USDC, USDT / USDT0, ETH / WETH, WBTC) between 17 chains. The deposit is encoded here from pinned SpokePools and the user's request, and every argument — depositor, recipient, tokens, amounts, destination, empty message, deadlines, exclusivity — is held to that request before signing; status is read on chain. Quoting arrives with the Across API V5 layer; until then the provider is disabled.",
+  "description": "Across Protocol with the SpokePool deposit built and verified on the device: EVM-to-EVM bridges of the same asset (USDC, USDT / USDT0, ETH / WETH, WBTC) between 17 chains. A plain deposit is encoded here from pinned SpokePools and the user's request, and every argument — depositor, recipient, tokens, amounts, destination, empty message, deadlines, a per-asset fee floor — is held to that request before signing; priced from Across API V5 against Across's relayer fee, V5's own execution steps never run; the API key stays on a server (acrossRemoteProvider in the app); status is read on chain.",
   "addedAt": "2026-11-15"
 }

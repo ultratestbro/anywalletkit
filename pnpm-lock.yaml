@@ -269,6 +269,9 @@ importers:
       '@anywalletkit/protocol-swap2-0x':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-0x
+      '@anywalletkit/protocol-swap2-across':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-across
       '@anywalletkit/protocol-swap2-cctp':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-cctp

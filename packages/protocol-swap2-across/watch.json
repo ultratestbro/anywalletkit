@@ -27,7 +27,7 @@
    "type": "github-file",
    "repo": "across-protocol/skills",
    "path": "skills/quote-and-execute/SKILL.md",
-   "label": "Across API V5 · quote and execute (the API layer this module will speak)"
+   "label": "Across API V5 · quote and execute (the API this module reads its price from)"
   },
   {
    "id": "hub-pool",

@@ -26,7 +26,7 @@ describe("a deposit nobody fills is not signed, and an unfilled one is not held 
   });
 
   it("a dust fee under the floor is refused; the floor itself passes", () => {
-    const floor = (25_000_000n * BigInt(ACROSS_MIN_FEE_PPM)) / 1_000_000n;
+    const floor = (25_000_000n * BigInt(ACROSS_MIN_FEE_PPM.stable)) / 1_000_000n;
     const req = usdcRequest({minAmountOut: undefined});
     verifyAcrossDeposit(req, txOf(usdcArgs({outputAmount: 25_000_000n - floor})));
     expect(refused(() => verifyAcrossDeposit(req, txOf(usdcArgs({outputAmount: 25_000_000n - floor + 1n}))), "tx-fee", "price_check_failed")).toMatch(/floor/);
@@ -139,12 +139,12 @@ describe("display numbers are the deposit's, not the quote source's", () => {
     expect(acrossQuoteOf(usdcRequest(), usdcQuote({fees})).feeUsd).toBeCloseTo(0.009033, 9);
     expect(acrossQuoteOf(usdcRequest(), usdcQuote({fees: {total: "9033", totalUsd: 500}})).feeUsd).toBeCloseTo(0.009033, 9);
     const eth = acrossQuoteOf(ethRequest(), {
-      sourceChainId: 8453, destinationChainId: 42161, inputToken: ZERO, outputToken: ZERO, inputAmount: "10000000000000000", outputAmount: "9997000000000000",
+      sourceChainId: 8453, destinationChainId: 42161, inputToken: ZERO, outputToken: ZERO, inputAmount: "10000000000000000", outputAmount: "9994000000000000",
       quoteTimestamp: NOW_S - 60, fillDeadline: NOW_S - 60 + 7200, exclusiveRelayer: ZERO, exclusivityParameter: 0, expectedFillTimeSec: 2,
-      fees: {total: "3000000000000", totalUsd: 123},
+      fees: {total: "6000000000000", totalUsd: 123},
     });
     expect(eth.feeUsd).toBe(0);
-    expect(eth.fees).toEqual([{type: "protocol", amount: "3000000000000", token: ZERO, included: true, description: "Across relayer and LP fee"}]);
+    expect(eth.fees).toEqual([{type: "protocol", amount: "6000000000000", token: ZERO, included: true, description: "Across relayer and LP fee"}]);
   });
 });
 

@@ -1,0 +1,337 @@
+{
+ "note": "ETH Arbitrum → Base, ~$2 000 (V5's auction price is under what plain deposits are filled at: the relayer fee prices it). Recorded 2026-11-14T23:30:04.655Z through acrossProvider (dist), the subject a public address; nothing signed or sent.",
+ "nowMs": 1794699004655,
+ "params": {
+  "sourceChain": "eip155:42161",
+  "sourceToken": "ETH",
+  "destChain": "eip155:8453",
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amountIn": "1134000000000000000",
+  "destAddress": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "refundAddress": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "sender": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "dry": false
+ },
+ "floor": false,
+ "calls": [
+  {
+   "kind": "suggested-fees",
+   "url": "https://app.across.to/api/suggested-fees?inputToken=0x82af49447d8a07e3bd95bd0d56f35241523fbab1&outputToken=0x4200000000000000000000000000000000000006&originChainId=42161&destinationChainId=8453&amount=1134000000000000000&recipient=0xf977814e90da44bfa03b6295a0616a897441acec",
+   "method": "GET",
+   "status": 200,
+   "response": {
+    "estimatedFillTimeSec": 1,
+    "capitalFeePct": "356700000000000",
+    "capitalFeeTotal": "404497800000000",
+    "relayGasFeePct": "1654396998340",
+    "relayGasFeeTotal": "1876086196117",
+    "relayFeePct": "535632738308339",
+    "relayFeeTotal": "607407525241655",
+    "lpFeePct": "0",
+    "timestamp": "1794698771",
+    "isAmountTooLow": false,
+    "quoteBlock": "26416500",
+    "exclusiveRelayer": "0xFD03AbCAdaF3F930fA4E37Eb2f6ea3A44a41b7F0",
+    "exclusivityDeadline": 3,
+    "spokePoolAddress": "0xe35e9842fceaCA96570B734083f4a58e8F7C5f2A",
+    "destinationSpokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+    "totalRelayFee": {
+     "pct": "535632738308339",
+     "total": "607407525241655"
+    },
+    "relayerCapitalFee": {
+     "pct": "356700000000000",
+     "total": "404497800000000"
+    },
+    "relayerGasFee": {
+     "pct": "1654396998340",
+     "total": "1876086196117"
+    },
+    "lpFee": {
+     "pct": "177278341309999",
+     "total": "201033639045538"
+    },
+    "internalizedSwapFee": {
+     "pct": "0",
+     "total": "0"
+    },
+    "limits": {
+     "minDeposit": "286267190344780",
+     "maxDeposit": "681962661881707220383",
+     "maxDepositInstant": "177085233589789231165",
+     "maxDepositShortDelay": "681962661881707220383",
+     "recommendedDepositInstant": "177085233589789231165"
+    },
+    "fillDeadline": "1794705971",
+    "outputAmount": "1133392592474758345",
+    "inputToken": {
+     "address": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+     "symbol": "WETH",
+     "decimals": 18,
+     "chainId": 42161
+    },
+    "outputToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "symbol": "WETH",
+     "decimals": 18,
+     "chainId": 8453
+    },
+    "id": "nl8fs-1794699004274-8c0c5a5feacb"
+   }
+  },
+  {
+   "kind": "v5",
+   "url": "https://api.across.to/v1/quotes",
+   "method": "POST",
+   "request": {
+    "origin": {
+     "token": {
+      "chainId": 42161,
+      "address": "0x0000000000000000000000000000000000000000"
+     },
+     "depositor": "0xf977814e90da44bfa03b6295a0616a897441acec",
+     "amount": "1134000000000000000"
+    },
+    "destination": {
+     "token": {
+      "chainId": 8453,
+      "address": "0x0000000000000000000000000000000000000000"
+     },
+     "recipient": "0xf977814e90da44bfa03b6295a0616a897441acec"
+    },
+    "amountType": "exact_input",
+    "capabilities": {
+     "operations": [
+      {
+       "kind": "approve_token",
+       "ecosystem": "evm"
+      },
+      {
+       "kind": "send_transaction",
+       "ecosystem": "evm"
+      }
+     ]
+    },
+    "authorizationPolicy": {
+     "allowedTypes": [
+      "approval"
+     ],
+     "approvalAmount": "exact"
+    },
+    "maxFee": {
+     "bps": 5000
+    }
+   },
+   "status": 200,
+   "response": {
+    "expiresAt": "2026-11-15T00:10:04.707Z",
+    "originValidUntil": "2026-11-15T00:19:56.000Z",
+    "expectedFillTimeMs": 1252,
+    "origin": {
+     "token": {
+      "kind": "native",
+      "chainId": 42161,
+      "address": "0x0000000000000000000000000000000000000000",
+      "symbol": "ETH",
+      "name": "ETH",
+      "decimals": 18,
+      "priceUsd": 1751.54,
+      "priceUsdAt": "2026-11-14T23:28:01.164Z"
+     },
+     "amount": "1134000000000000000",
+     "amountUsd": "1986.246359999999867796",
+     "maxAmount": "1134000000000000000",
+     "maxAmountUsd": "1986.246359999999867796",
+     "depositor": {
+      "address": "0xf977814e90da44bfa03b6295a0616a897441acec"
+     }
+    },
+    "destination": {
+     "token": {
+      "kind": "native",
+      "chainId": 8453,
+      "address": "0x0000000000000000000000000000000000000000",
+      "symbol": "ETH",
+      "name": "ETH",
+      "decimals": 18,
+      "priceUsd": 1751.54,
+      "priceUsdAt": "2026-11-14T23:28:02.802Z"
+     },
+     "grossAmount": "1134000000000000000",
+     "amount": "1133689444837826243",
+     "amountUsd": "1985.702410211246160543",
+     "recipient": {
+      "address": "0xf977814e90da44bfa03b6295a0616a897441acec"
+     },
+     "minAmount": "1133656911530005696",
+     "minAmountUsd": "1985.645426821266028128"
+    },
+    "fee": {
+     "totalFee": {
+      "amount": "310555162173757",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18,
+       "priceUsd": 1751.54,
+       "priceUsdAt": "2026-11-14T23:28:02.802Z"
+      },
+      "amountUsd": "0.543949788753822383"
+     },
+     "transferFee": {
+      "amount": "310555162173757",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18,
+       "priceUsd": 1751.54,
+       "priceUsdAt": "2026-11-14T23:28:02.802Z"
+      },
+      "amountUsd": "0.543949788753822383"
+     },
+     "appFee": {
+      "amount": "0",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18,
+       "priceUsd": 1751.54,
+       "priceUsdAt": "2026-11-14T23:28:02.802Z"
+      },
+      "amountUsd": "0.000000000000000000"
+     },
+     "maxTransferFee": {
+      "amount": "343088469994304",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18,
+       "priceUsd": 1751.54,
+       "priceUsdAt": "2026-11-14T23:28:02.802Z"
+      },
+      "amountUsd": "0.600933178733823237"
+     },
+     "maxTotalFee": {
+      "amount": "343088469994304",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18,
+       "priceUsd": 1751.54,
+       "priceUsdAt": "2026-11-14T23:28:02.802Z"
+      },
+      "amountUsd": "0.600933178733823237"
+     }
+    },
+    "gasEstimates": [
+     {
+      "leg": "origin",
+      "effect": "included_in_transfer_fee",
+      "amount": "7897050000000",
+      "token": {
+       "kind": "native",
+       "chainId": 42161,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.013831911380000001",
+      "gasUnits": "375000"
+     },
+     {
+      "leg": "destination",
+      "effect": "included_in_transfer_fee",
+      "amount": "1406230653076",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.002462665240000000",
+      "gasUnits": "221560"
+     },
+     {
+      "leg": "origin",
+      "effect": "paid_by_wallet",
+      "actionId": "prefunded-store",
+      "gasUnits": "23663",
+      "amount": "474537802000",
+      "token": {
+       "kind": "native",
+       "chainId": 42161,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.000831171941715080"
+     }
+    ],
+    "nextActions": [
+     {
+      "kind": "send_transaction",
+      "id": "prefunded-store",
+      "chainId": 42161,
+      "to": "0x794dbdbdbfd3f8a3b887f4513bf5ff29edd04a94",
+      "data": "0x1e04ce08943139fe715f9c9313416b76377c762ae87c883c243f03e97a06a112146853ce00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "value": "1134000000000000000",
+      "estimatedOriginGas": {
+       "gasUnits": "23663",
+       "amount": "474537802000",
+       "decimals": 18,
+       "token": {
+        "chainId": 42161,
+        "address": "0x0000000000000000000000000000000000000000"
+       },
+       "amountUsd": "0.000831171941715080"
+      },
+      "ecosystem": "evm"
+     }
+    ],
+    "orderId": "0x943139fe715f9c9313416b76377c762ae87c883c243f03e97a06a112146853ce",
+    "amountType": "exact_input",
+    "refundPolicy": {
+     "supported": true,
+     "token": {
+      "chainId": 42161,
+      "address": "0x0000000000000000000000000000000000000000"
+     },
+     "refundAddress": {
+      "address": "0xf977814e90da44bfa03b6295a0616a897441acec"
+     },
+     "expectedRefundTimeMs": 1800000
+    }
+   }
+  }
+ ],
+ "result": {
+  "outputAmount": "1133392592474758345",
+  "fee": "607407525241655",
+  "priceSource": "suggested-fees",
+  "v5Fee": "302658112173757",
+  "relayerFee": "607407525241655",
+  "quoteTimestamp": 1794698771,
+  "fillDeadline": 1794705971,
+  "etaSeconds": 1,
+  "placeholder": false
+ }
+}

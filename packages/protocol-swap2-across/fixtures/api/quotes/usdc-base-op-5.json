@@ -1,0 +1,377 @@
+{
+ "note": "USDC Base → Optimism, 5 USDC. Recorded 2026-11-14T23:29:58.218Z through acrossProvider (dist), the subject a public address; nothing signed or sent.",
+ "nowMs": 1794698998218,
+ "params": {
+  "sourceChain": "eip155:8453",
+  "sourceToken": "USDC",
+  "destChain": "eip155:10",
+  "destToken": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+  "amountIn": "5000000",
+  "destAddress": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "refundAddress": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "sender": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "dry": false
+ },
+ "floor": false,
+ "calls": [
+  {
+   "kind": "v5",
+   "url": "https://api.across.to/v1/quotes",
+   "method": "POST",
+   "request": {
+    "origin": {
+     "token": {
+      "chainId": 8453,
+      "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+     },
+     "depositor": "0xf977814e90da44bfa03b6295a0616a897441acec",
+     "amount": "5000000"
+    },
+    "destination": {
+     "token": {
+      "chainId": 10,
+      "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85"
+     },
+     "recipient": "0xf977814e90da44bfa03b6295a0616a897441acec"
+    },
+    "amountType": "exact_input",
+    "capabilities": {
+     "operations": [
+      {
+       "kind": "approve_token",
+       "ecosystem": "evm"
+      },
+      {
+       "kind": "send_transaction",
+       "ecosystem": "evm"
+      }
+     ]
+    },
+    "authorizationPolicy": {
+     "allowedTypes": [
+      "approval"
+     ],
+     "approvalAmount": "exact"
+    },
+    "maxFee": {
+     "bps": 5000
+    }
+   },
+   "status": 200,
+   "response": {
+    "expiresAt": "2026-11-15T00:09:53.825Z",
+    "originValidUntil": "2026-11-15T00:19:52.000Z",
+    "expectedFillTimeMs": 3000,
+    "origin": {
+     "token": {
+      "kind": "token",
+      "chainId": 8453,
+      "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "decimals": 6,
+      "priceUsd": 0.99969,
+      "priceUsdAt": "2026-11-14T23:28:01.164Z"
+     },
+     "amount": "5000000",
+     "amountUsd": "4.998450000000000060",
+     "maxAmount": "5000000",
+     "maxAmountUsd": "4.998450000000000060",
+     "depositor": {
+      "address": "0xf977814e90da44bfa03b6295a0616a897441acec"
+     }
+    },
+    "destination": {
+     "token": {
+      "kind": "token",
+      "chainId": 10,
+      "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "decimals": 6,
+      "priceUsd": 0.99969,
+      "priceUsdAt": "2026-11-14T23:28:01.149Z"
+     },
+     "grossAmount": "5000000",
+     "amount": "4975787",
+     "amountUsd": "4.974244506030000679",
+     "recipient": {
+      "address": "0xf977814e90da44bfa03b6295a0616a897441acec"
+     },
+     "minAmount": "4854878",
+     "minAmountUsd": "4.853372987820000262"
+    },
+    "fee": {
+     "totalFee": {
+      "amount": "24213",
+      "token": {
+       "kind": "token",
+       "chainId": 10,
+       "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "priceUsd": 0.99969,
+       "priceUsdAt": "2026-11-14T23:28:01.149Z"
+      },
+      "amountUsd": "0.024205493969999999"
+     },
+     "transferFee": {
+      "amount": "24213",
+      "token": {
+       "kind": "token",
+       "chainId": 10,
+       "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "priceUsd": 0.99969,
+       "priceUsdAt": "2026-11-14T23:28:01.149Z"
+      },
+      "amountUsd": "0.024205493969999999"
+     },
+     "appFee": {
+      "amount": "0",
+      "token": {
+       "kind": "token",
+       "chainId": 10,
+       "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "priceUsd": 0.99969,
+       "priceUsdAt": "2026-11-14T23:28:01.149Z"
+      },
+      "amountUsd": "0.000000000000000000"
+     },
+     "maxTransferFee": {
+      "amount": "145122",
+      "token": {
+       "kind": "token",
+       "chainId": 10,
+       "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "priceUsd": 0.99969,
+       "priceUsdAt": "2026-11-14T23:28:01.149Z"
+      },
+      "amountUsd": "0.145077012179999992"
+     },
+     "maxTotalFee": {
+      "amount": "145122",
+      "token": {
+       "kind": "token",
+       "chainId": 10,
+       "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "priceUsd": 0.99969,
+       "priceUsdAt": "2026-11-14T23:28:01.149Z"
+      },
+      "amountUsd": "0.145077012179999992"
+     }
+    },
+    "gasEstimates": [
+     {
+      "leg": "origin",
+      "effect": "included_in_transfer_fee",
+      "amount": "2058405157131",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.003604669320000000",
+      "gasUnits": "325000"
+     },
+     {
+      "leg": "destination",
+      "effect": "included_in_transfer_fee",
+      "amount": "57108556616",
+      "token": {
+       "kind": "native",
+       "chainId": 10,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.000099837780000000",
+      "gasUnits": "221568"
+     },
+     {
+      "leg": "origin",
+      "effect": "paid_by_wallet",
+      "actionId": "approval",
+      "gasUnits": "70000",
+      "amount": "420000000000",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.000735646800000000"
+     },
+     {
+      "leg": "origin",
+      "effect": "paid_by_wallet",
+      "actionId": "prefunded-store",
+      "gasUnits": "100000",
+      "amount": "600000000000",
+      "token": {
+       "kind": "native",
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "ETH",
+       "decimals": 18
+      },
+      "amountUsd": "0.001050924000000000"
+     }
+    ],
+    "nextActions": [
+     {
+      "kind": "approve_token",
+      "id": "approval",
+      "chainId": 8453,
+      "spender": "0x794dbdbdbfd3f8a3b887f4513bf5ff29edd04a94",
+      "amount": "5000000",
+      "estimatedOriginGas": {
+       "gasUnits": "70000",
+       "amount": "420000000000",
+       "decimals": 18,
+       "token": {
+        "chainId": 8453,
+        "address": "0x0000000000000000000000000000000000000000"
+       },
+       "amountUsd": "0.000735646800000000"
+      },
+      "tokenAddress": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "ecosystem": "evm",
+      "authorization": {
+       "type": "approval",
+       "scope": {
+        "token": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+        },
+        "amount": "5000000",
+        "spender": "0x794dbdbdbfd3f8a3b887f4513bf5ff29edd04a94"
+       }
+      }
+     },
+     {
+      "kind": "send_transaction",
+      "id": "prefunded-store",
+      "chainId": 8453,
+      "to": "0x794dbdbdbfd3f8a3b887f4513bf5ff29edd04a94",
+      "data": "0x1e04ce08712d313d50eba8781c2a60c659dbd5453ebde42fa0f5116e79238fda6f52ce47000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda0291300000000000000000000000000000000000000000000000000000000004c4b40",
+      "value": "0",
+      "estimatedOriginGas": {
+       "gasUnits": "100000",
+       "amount": "600000000000",
+       "decimals": 18,
+       "token": {
+        "chainId": 8453,
+        "address": "0x0000000000000000000000000000000000000000"
+       },
+       "amountUsd": "0.001050924000000000"
+      },
+      "ecosystem": "evm"
+     }
+    ],
+    "orderId": "0x712d313d50eba8781c2a60c659dbd5453ebde42fa0f5116e79238fda6f52ce47",
+    "amountType": "exact_input",
+    "refundPolicy": {
+     "supported": false,
+     "reason": "irreversible_rail",
+     "message": "This route does not guarantee an automatic refund. If this transfer is never executed, the input held in escrow can still be returned to you; once execution begins, a refund cannot be guaranteed if the transfer then fails to complete. Unfilled Across deposits remain eligible for an origin-chain refund after their SpokePool expiry and refund-bundle settlement."
+    }
+   }
+  },
+  {
+   "kind": "suggested-fees",
+   "url": "https://app.across.to/api/suggested-fees?inputToken=0x833589fcd6edb6e08f4c7c32d4f71b54bda02913&outputToken=0x0b2c639c533813f4aa9d7837caf62653d097ff85&originChainId=8453&destinationChainId=10&amount=5000000&recipient=0xf977814e90da44bfa03b6295a0616a897441acec",
+   "method": "GET",
+   "status": 200,
+   "response": {
+    "estimatedFillTimeSec": 2,
+    "capitalFeePct": "100000000000000",
+    "capitalFeeTotal": "500",
+    "relayGasFeePct": "59200000000000",
+    "relayGasFeeTotal": "296",
+    "relayFeePct": "159200000000000",
+    "relayFeeTotal": "796",
+    "lpFeePct": "0",
+    "timestamp": "1794698771",
+    "isAmountTooLow": false,
+    "quoteBlock": "26416500",
+    "exclusiveRelayer": "0x394311A6Aaa0D8E3411D8b62DE4578D41322d1bD",
+    "exclusivityDeadline": 3,
+    "spokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+    "destinationSpokePoolAddress": "0x6f26Bf09B1C792e3228e5467807a900A503c0281",
+    "totalRelayFee": {
+     "pct": "159200000000000",
+     "total": "796"
+    },
+    "relayerCapitalFee": {
+     "pct": "100000000000000",
+     "total": "500"
+    },
+    "relayerGasFee": {
+     "pct": "59200000000000",
+     "total": "296"
+    },
+    "lpFee": {
+     "pct": "0",
+     "total": "0"
+    },
+    "internalizedSwapFee": {
+     "pct": "0",
+     "total": "0"
+    },
+    "limits": {
+     "minDeposit": "500156",
+     "maxDeposit": "532330798073",
+     "maxDepositInstant": "21615755637",
+     "maxDepositShortDelay": "532330798073",
+     "recommendedDepositInstant": "21615755637"
+    },
+    "fillDeadline": "1794705971",
+    "outputAmount": "4999204",
+    "inputToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "symbol": "USDC",
+     "decimals": 6,
+     "chainId": 8453
+    },
+    "outputToken": {
+     "address": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+     "symbol": "USDC",
+     "decimals": 6,
+     "chainId": 10
+    },
+    "id": "ljzs6-1794698993730-4cb5154f12da"
+   }
+  }
+ ],
+ "result": {
+  "outputAmount": "4979392",
+  "fee": "20608",
+  "priceSource": "suggested-fees",
+  "v5Fee": "20608",
+  "relayerFee": "796",
+  "quoteTimestamp": 1794698771,
+  "fillDeadline": 1794705971,
+  "etaSeconds": 2,
+  "placeholder": false
+ }
+}

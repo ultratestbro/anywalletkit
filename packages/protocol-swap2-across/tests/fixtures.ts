@@ -81,7 +81,7 @@ export function txOf(args: AcrossDepositArgs, over: Partial<AcrossDepositTx> = {
 
 /** The native-coin deposit for {@link ethRequest}. */
 export function ethArgs(over: Partial<AcrossDepositArgs> = {}): AcrossDepositArgs {
-  return usdcArgs({inputToken: WETH_OP, outputToken: ARB_WETH, inputAmount: 10_000_000_000_000_000n, outputAmount: 9_997_000_000_000_000n, ...over});
+  return usdcArgs({inputToken: WETH_OP, outputToken: ARB_WETH, inputAmount: 10_000_000_000_000_000n, outputAmount: 9_994_000_000_000_000n, ...over});
 }
 export function ethTxOf(args: AcrossDepositArgs, over: Partial<AcrossDepositTx> = {}): AcrossDepositTx {
   return {to: BASE.spokePool, data: encodeAcrossDeposit(args), value: args.inputAmount.toString(10), chainId: 8453, ...over};

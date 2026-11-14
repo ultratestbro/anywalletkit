@@ -8,6 +8,7 @@ export type AcrossRefusalCode =
   | "pair-unsupported"
   | "native-unsupported"
   | "wrapped-native-destination"
+  | "route-unpriced"
   | "quote-unavailable"
   | "quote-normalized"
   | "tx-shape"
@@ -36,7 +37,9 @@ export type AcrossRefusalCode =
   | "quote-expiry"
   | "quote-gas"
   | "quote-intent"
-  | "api-error";
+  | "api-error"
+  | "api-answer"
+  | "relayer-price";
 
 /**
  * `code` names the check; `reason` (a `Swap2RefusalReason` from `@anywalletkit/protocol-swap2-core`) is the stable

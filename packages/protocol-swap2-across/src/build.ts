@@ -1,7 +1,7 @@
 /**
  * The deposit, built on the device.
  *
- * A quote source (the Across API V5 adapter, still to come) only supplies NUMBERS: how much the deposit asks relayers
+ * A quote source (`provider.ts`, priced by `pricing.ts` from the Across APIs) only supplies NUMBERS: how much the deposit asks relayers
  * to pay, the quote time, the fill deadline and the exclusivity terms. Everything that decides where the money goes —
  * the SpokePool, the depositor, the recipient, the tokens, the destination chain, the message — comes from the user's
  * request and the pins in `config.ts`. {@link buildAcrossDeposit} encodes the call from those and runs

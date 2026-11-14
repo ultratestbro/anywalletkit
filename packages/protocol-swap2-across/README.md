@@ -2,29 +2,60 @@
 
 [Across Protocol](https://across.to) for the swap2 engine, with **the SpokePool deposit built on the device and every argument verified before anything is signed**.
 
-> **Status: quoting is not in this build.** Quotes will come from the Across API V5 (`https://api.across.to/v1`, a key from dashboard.across.to, kept server-side). Until that layer ships, the provider reports itself disabled — `enabled()` is `false` and `getQuote` refuses with `quote-unavailable` (`policy_refused`) — so no router or engine will route through it. What is here already: the pins, the deposit codec, the verifier, the builder, on-chain status, activity recognition and the remote pins.
+An Across deposit is one call, `deposit(...)` on the source chain's SpokePool. Its arguments say everything — who is refunded, who is paid, in which token and how much, on which chain, by when, and what runs on arrival — and the SpokePool checks almost none of it: there is no route list on chain, no token pairing, and the `depositor` (refunds, speed-ups) is not bound to the sender. So this module never signs a transaction a quote source hands over. The quote source supplies only **numbers** (the output amount, the quote time); the call is encoded here from the pinned SpokePool and the user's own request, and checked again right before signing.
 
-An Across deposit is one call, `deposit(...)` on the source chain's SpokePool. Its arguments say everything — who is refunded, who is paid, in which token and how much, on which chain, by when, and what runs on arrival — and the SpokePool checks almost none of it: there is no route list on chain, no token pairing, and the `depositor` (refunds, speed-ups) is not bound to the sender. So this module never signs a transaction a quote source hands over. A quote source supplies only **numbers** (the output amount, the quote time, the fill deadline, the exclusivity terms); the call is encoded here from the pinned SpokePool and the user's own request, and checked again right before signing.
-
-- EVM → EVM, exact input, the same asset on both sides: USDC, USDT / USDT0, ETH / WETH, WBTC, on 17 chains (below).
-- One source transaction: `deposit` on the source SpokePool. An ERC-20 input is approved for exactly the input amount, to the pinned SpokePool; the native coin is sent as `value` and wrapped by the SpokePool.
+- EVM → EVM, exact input, the same asset on both sides: USDC, USDT / USDT0, ETH / WETH, WBTC, on 17 chains (below). Ethereum as the destination is not priced yet (refused, `route-unpriced`).
+- One source transaction: `deposit` on the source SpokePool — a **direct deposit**, empty message, no exclusive relayer, a fill deadline two hours after the quote time. An ERC-20 input is approved for exactly the input amount, to the pinned SpokePool; the native coin is sent as `value` and wrapped by the SpokePool.
+- Priced from **Across API V5** against **Across's relayer fee** (below). V5's own execution steps (`nextActions`) are never run.
 - No provider SDK: `viem` for the ABI and hashing.
 
-```ts
-import {acrossProvider} from "@anywalletkit/protocol-swap2-across";
-import {CrossChainRouter} from "@anywalletkit/protocol-swap2-router";
+The V5 key belongs on a server. Run the provider there, behind `createSwap2Handler`, and the remote provider in the app — it re-runs every check below on the device:
 
-const across = acrossProvider({rpcUrls: {"eip155:8453": "https://…", "eip155:42161": "https://…"}}); // status only
-const router = new CrossChainRouter([across /*, …other providers */]); // sits out until quoting ships
+```ts
+// server
+import {acrossProvider} from "@anywalletkit/protocol-swap2-across";
+import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
+const across = acrossProvider({apiKey: () => process.env.ACROSS_API_KEY, rpcUrls});
+const handle = createSwap2Handler({providers: [across, /* … */], sealSecret, guard, subject});
+
+// app
+import {acrossRemoteProvider} from "@anywalletkit/protocol-swap2-across";
+import {CrossChainRouter} from "@anywalletkit/protocol-swap2-router";
+const router = new CrossChainRouter([acrossRemoteProvider({baseUrl: "https://api.example.com/swap2", rpcUrls}) /*, … */]);
 ```
 
-Standalone: `new AcrossSwap2Protocol(account, {fromChain: "eip155:8453"})`.
+Standalone (server): `new AcrossSwap2Protocol(account, {fromChain: "eip155:8453", apiKey})`. Conventional env names: `ACROSS_ENABLED`, `ACROSS_API_KEY` (the V5 key from dashboard.across.to). Across's integrator id and its V4 key are not used.
 
-| option | |
+| `acrossProvider` option | |
 |---|---|
-| `rpcUrls` | JSON-RPC URL per CAIP-2 chain, for status: the source chain's to read the deposit, the destination's to read its fill. |
+| `apiKey` | The Across API V5 key, a getter (read on every request) or a string. Sent only as `Authorization: Bearer` to `baseUrl`; an answer that came through a redirect is refused. Without one the provider is disabled (it still builds, verifies and tracks). **Under React Native it throws**: an app bundle keeps no secret. |
+| `enabled` | Dark flag (default true). |
+| `baseUrl` | V5 origin, default `https://api.across.to` (https only; http only for localhost). |
+| `suggestedFeesUrl` | Across's keyless relayer-fee quote, default `https://app.across.to/api/suggested-fees`; `null` prices every quote from the pinned floor. |
+| `rpcUrls` | JSON-RPC URL per CAIP-2 chain: status (the source chain's to read the deposit, the destination's to read its fill), and the quote time when `/suggested-fees` does not answer (Ethereum's and the source chain's latest block). |
 | `maxFeeBps` | The most a deposit may leave to relayers (input − output), in bps of the input. Default 1000, at most 5000. |
-| `fetchImpl` | Your own `fetch`. |
+| `quoteTtlMs`, `timeoutMs`, `fetchImpl` | Local quote life (default 60 s, at most 5 min), per-request timeout (default 10 s), your own `fetch`. |
+
+`acrossRemoteProvider({baseUrl, maxFeeBps?, rpcUrls?, headers?, timeoutMs?, fetchImpl?})`: the app's fee cap (the server's is not known on this side), and with `rpcUrls` for both chains the deposit's status is read on the device instead of asked of the backend.
+
+## Pricing
+
+The one number a quote source decides is how much the deposit leaves to relayers. Too much asked of relayers (output too high) and nobody fills: the funds wait for the two-hour fill deadline and then Across's refund bundles. Too little and the user overpays. A V5 quote prices **V5's own route**, not a direct deposit: an execution step on the origin chain (Across's Gateway, its gas charged inside the fee — over $1 on Ethereum origins), sometimes another rail (USDT Ethereum → Arbitrum went to a ~20-minute rail), and an auction whose relayers take large ETH L2 → L2 transfers at ~1 bp, well below what direct deposits are filled at. So the provider (on the server) prices:
+
+```
+F5    = V5 fee.totalFee − Σ V5 gasEstimates[origin, included_in_transfer_fee]   (wei on ETH routes; else USD at the token's price, rounded down)
+Fneed = /suggested-fees totalRelayFee.total                                       while Across answers it
+      = floor(asset, origin, size) + 1.5 × V5's destination gas                  otherwise
+fee   = max(F5, Fneed);   outputAmount = input − fee
+quoteTimestamp = /suggested-fees `timestamp` (its LP fee was priced there), else min(Ethereum's latest block − 60 s, the source chain's)
+fillDeadline   = quoteTimestamp + 7200;   exclusiveRelayer = 0
+```
+
+- Never more than V5 charges for the same transfer (net of the step a direct deposit does not have; the user's wallet pays the deposit's own gas), never less than direct deposits are filled at. Study of 2026-11-14 (27 V5 / `/suggested-fees` pairs, 8 272 deposits over 24 h on Ethereum, Optimism, Base, Arbitrum): 1 369 of 1 369 organic plain deposits to Base, Arbitrum and Optimism priced at or above the relayer fee were filled — p50 2 s, p90 13 s, p99 76 s.
+- V5 is asked with `maxFee.bps = 5000`: that bounds only V5's own guaranteed minimum (never used); at 1000 it refused Ethereum-origin transfers under ~$17 because of its own origin gas. The user's cap is held on the deposit.
+- The floor without `/suggested-fees` (read off 24 h of fills): stablecoins 1.00 bp, WBTC 3.10 bps, ETH from Ethereum 1.00 bp, ETH from an L2 4.77 bps at $0 → 5.4 at $2 000 → 9.2 at $36 000 (linear), refused above $36 000. It covers Ethereum, Optimism, Base and Arbitrum to Optimism, Base and Arbitrum; other routes are refused without `/suggested-fees` (`relayer-price`) rather than priced on a guess. Across calls `/suggested-fees` legacy: the floor is a snapshot of today's market, and the watch's canary reports when it answers no more.
+- `/suggested-fees` refusing the deposit (`AMOUNT_TOO_LOW`, `AMOUNT_TOO_HIGH`, `ROUTE_NOT_ENABLED`, `isAmountTooLow`, outside its `limits`) refuses the quote; naming another SpokePool than the pinned one refuses it too (`vault_mismatch`: the pins need a review). Any other failure falls back to the floor.
+- `providerData` shows how the number was reached: `priceSource` (`suggested-fees` or `floor`), `v5Fee` (F5) and `relayerFee` (Fneed), base units.
 
 ## What is checked
 
@@ -46,7 +77,7 @@ Every check has a code; a refusal reads `across: <what was found> [<code>]`. Nex
 
 - `depositor` is the signing account (`tx-depositor`) — `QuoteParams.sender`, which the engine sets to the account that signs; it is the address refunded on the source chain and the only one whose signature can speed the deposit up (redirect its output), so it is never a `refundAddress` the caller names: a live request without `sender` is refused, and so is one whose `refundAddress` is another account (`request-invalid`, `recipient_mismatch`); `recipient` is the user's recipient (`tx-recipient`); `destinationChainId` the requested chain (`tx-destination`);
 - `inputToken` is the pinned token, the wrapped native token for the native coin (`tx-input-token`); `inputAmount` exactly the requested amount (`tx-input-amount`);
-- `outputToken` is the same asset on the destination, the wrapped native token for the native coin (`tx-output-token`); `outputAmount` is above zero, at least the caller's floor, and not more than the input — a deposit asking relayers for more than it puts in is never filled (`tx-output-amount`); input − output is at least 10 per million of the input (0.1 bps; zero is refused by name — relayers do not fill a deposit that pays them nothing, and its output, the whole input, would win any comparison of routes) and within `maxFeeBps` (`tx-fee`);
+- `outputToken` is the same asset on the destination, the wrapped native token for the native coin (`tx-output-token`); `outputAmount` is above zero, at least the caller's floor, and not more than the input — a deposit asking relayers for more than it puts in is never filled (`tx-output-amount`); input − output is at least what relayers take on that asset — stablecoins 1.0 bp, ETH from Ethereum 0.7 bp, ETH from an L2 4.5 bps, WBTC 2.5 bps, at or under the lowest fees direct deposits were filled at (zero is refused by name: a deposit relayers do not fill waits hours for its refund, while its output would win any comparison of routes) — and within `maxFeeBps` (`tx-fee`);
 - `message` is empty: a message starting with Across's V5 witness prefix (`keccak256("AcrossV5MessagePrefix.V1")`) is refused as `tx-message-v5`, any other as `tx-message`;
 - exclusivity: a relayer is named exactly when a window is; the window lasts at most an hour, and ends at least 10 min before the fill deadline even for a deposit that lands as late as the SpokePool takes it (quote time + 3600 s; an offset counts from the block the deposit lands in), so any relayer can still fill (`tx-exclusivity`);
 - `quoteTimestamp` is at most 2 min ahead and at most 3600 − 300 s old — the SpokePool takes 3600 s, 300 s are kept for the deposit to land (`tx-quote-time`);
@@ -57,13 +88,13 @@ Every check has a code; a refusal reads `across: <what was found> [<code>]`. Nex
 
 - `buildAcrossDeposit(request, normalizedQuote)` encodes the call from the pins and the request and runs the verifier on its own result; `acrossQuoteOf` turns it into a swap2 `Quote` whose amounts are the deposit's (a relayer pays exactly `outputAmount`, so it is both the expected and the guaranteed output) and whose id names the calldata (`across:<from>:<to>:<digest>`).
 - `buildDeposit` and `preflightDeposit` run the verifier again on the exact transaction about to be signed; `preflightDeposit` refuses typed data, a memo or a serialized transaction (`tx-shape`), and an Across speed-up signature by name (`speed-up`). `isAcrossSpeedUpTypedData` is exported for a wallet's signing guard.
-- A quote priced without the user's addresses (a dry quote) is never built or signed.
+- A dry quote (pricing only, priced for the caller's addresses or a placeholder) is never built or signed; a remote client derives the same request from the same parameters to verify it.
 - `acrossPins` gives `remoteProvider` the same checks on the client of a swap2 server: `callTargets` / `spenders` are the SpokePool, `verifyQuote` and `verifyBuild` run the verifier against the user's own request, plus the gas limit band (`quote-gas`), a quote life of at most five minutes plus clock skew (`quote-expiry`) and an id that names the deposit (`quote-intent`; a server's `~<tag>` suffix is accepted). It holds remote quotes to the default fee cap (10 %); `acrossPinsWith({maxFeeBps})` gives the pins the app's own cap — a server's `acrossProvider({maxFeeBps})` is not known on the client.
 - The amounts a quote shows are the deposit's; the quote source's `expectedOutputAmount` is refused above `outputAmount` (`quote-normalized`), and `feeUsd` is the verified fee itself for USDC / USDT (one unit a dollar) and 0 for ETH and WBTC (no price here) — never the quote source's own USD figure. The fee in base units is in `fees`.
 
 **What a quote source can still do**
 
-It cannot get a deposit signed for another recipient, depositor, chain, token, amount in, message or SpokePool, nor for an output under the caller's floor, a fee over the cap or under the floor. It chooses the numbers within those bounds: a worse (but capped) output, a fill deadline or exclusivity window inside the limits above, or a fee just over the floor that no relayer takes. A deposit nobody fills is refunded to the signer on the source chain after its fill deadline (at most 7800 s after its quote time) — money is delayed by hours, not lost.
+It cannot get a deposit signed for another recipient, depositor, chain, token, amount in, message or SpokePool, nor for an output under the caller's floor, a fee over the cap or under what relayers take on that asset. It chooses the numbers within those bounds: a worse (but capped) output, a fill deadline or exclusivity window inside the limits above (this provider sets two hours and none), or a fee just over the floor when relayers' prices have risen past it. A deposit nobody fills is refunded to the signer on the source chain after its fill deadline (at most 7800 s after its quote time) — money is delayed by hours, not lost.
 
 ## What is refused by design
 
@@ -126,14 +157,19 @@ Not pinned: Scroll (deposits paused on chain), BNB Chain (Across moves its 18-de
 - SpokePools are UUPS proxies the HubPool's owner (a 3-of-5 Safe) can upgrade or re-point; the pins hold the addresses, the watch job reports an upgrade or a re-pointed registry entry, and the decoder refuses any call it does not know.
 - A fill pays a contract recipient the wrapped native token instead of the native coin (only EOAs and EIP-7702 wallets are unwrapped to); the module cannot tell a contract recipient from here.
 - A refund of a native-coin deposit is expected in the wrapped native token: Across's settlement pays refunds as ERC-20 transfers and never unwraps (read from the contract, not yet observed).
-- The fee cap is the module's (`maxFeeBps`, and the app's `acrossPinsWith({maxFeeBps})` for a remote provider); what bounds the price beyond it is the caller's `minAmountOut` and the other quotes in the router. The fee floor (0.1 bps) only refuses deposits that pay relayers nothing: a quote source can still name a fee no relayer takes, which ends in a refund after the fill deadline.
+- The device bounds the price, it cannot verify it: the fee cap (`maxFeeBps`, and the app's `acrossPinsWith({maxFeeBps})`) and the per-asset floor. The floors are today's relayer market (2026-11-14); if relayers' prices rise past them a server could still name a fee no relayer takes, which ends in a refund after the fill deadline.
+- Stablecoin transfers cost a few cents more than the relayer market (V5's own fixed overhead stands in F5); large ETH L2 → L2 transfers cost ~2.7 bps more than V5's own route, whose auction relayers take less than direct deposits are filled at. A funded test of a direct ETH deposit at V5's price would show whether that gap can close.
+- `/suggested-fees` is Across's legacy relayer-fee quote; without it the pinned floor prices only the studied chains.
 
 ## Checks
 
 ```
 pnpm test        # codec on real calldata, pins against Across's files and the HubPool, a negative for every check,
-                 # status on recorded receipts and fill statuses (filled, unfilled, expired), activity, refusal reasons
+                 # status on recorded receipts and fill statuses (filled, unfilled, expired), activity, refusal reasons,
+                 # real V5 and /suggested-fees answers through the pricing rule, the engine and createSwap2Handler
+ACROSS_LIVE=1 ACROSS_API_KEY=… pnpm test tests/live.test.ts   # live quotes, verified, built, preflighted (read-only)
+pnpm verify:live # keyless: every pin on chain and /suggested-fees on nine corridors; with ACROSS_API_KEY: live quotes
+                 # through the provider, acrossPins and the server handler (read-only)
 node scripts/record-fixtures.mjs   # re-record the status and activity fixtures (read-only, public RPCs)
+ACROSS_API_KEY=… node scripts/record-quotes.mjs   # re-record fixtures/api/quotes through the real provider (read-only)
 ```
-
-Pending with the API layer: the V5 adapter (`api.ts` holds the request shape and the error mapping), live quotes, a live-verification script and the routes canary.

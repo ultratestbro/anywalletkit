@@ -1,0 +1,91 @@
+{
+ "note": "USDC Base → Arbitrum, 0.0001 USDC: V5 and Across both refuse. Recorded 2026-11-14T23:30:25.613Z through acrossProvider (dist), the subject a public address; nothing signed or sent.",
+ "nowMs": 1794699025613,
+ "params": {
+  "sourceChain": "eip155:8453",
+  "sourceToken": "USDC",
+  "destChain": "eip155:42161",
+  "destToken": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+  "amountIn": "100",
+  "destAddress": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "refundAddress": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "sender": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+  "dry": false
+ },
+ "floor": false,
+ "calls": [
+  {
+   "kind": "suggested-fees",
+   "url": "https://app.across.to/api/suggested-fees?inputToken=0x833589fcd6edb6e08f4c7c32d4f71b54bda02913&outputToken=0xaf88d065e77c8cc2239327c5edb3a432268e5831&originChainId=8453&destinationChainId=42161&amount=100&recipient=0xf977814e90da44bfa03b6295a0616a897441acec",
+   "method": "GET",
+   "status": 400,
+   "response": {
+    "type": "AcrossApiError",
+    "code": "AMOUNT_TOO_LOW",
+    "status": 400,
+    "message": "Sent amount is too low relative to fees",
+    "id": "hq7hd-1794699025200-944f2c5cbada"
+   }
+  },
+  {
+   "kind": "v5",
+   "url": "https://api.across.to/v1/quotes",
+   "method": "POST",
+   "request": {
+    "origin": {
+     "token": {
+      "chainId": 8453,
+      "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+     },
+     "depositor": "0xf977814e90da44bfa03b6295a0616a897441acec",
+     "amount": "100"
+    },
+    "destination": {
+     "token": {
+      "chainId": 42161,
+      "address": "0xaf88d065e77c8cc2239327c5edb3a432268e5831"
+     },
+     "recipient": "0xf977814e90da44bfa03b6295a0616a897441acec"
+    },
+    "amountType": "exact_input",
+    "capabilities": {
+     "operations": [
+      {
+       "kind": "approve_token",
+       "ecosystem": "evm"
+      },
+      {
+       "kind": "send_transaction",
+       "ecosystem": "evm"
+      }
+     ]
+    },
+    "authorizationPolicy": {
+     "allowedTypes": [
+      "approval"
+     ],
+     "approvalAmount": "exact"
+    },
+    "maxFee": {
+     "bps": 5000
+    }
+   },
+   "status": 400,
+   "response": {
+    "error": {
+     "type": "policy",
+     "code": "policy.amount_out_of_range",
+     "message": "worst-case relayer costs exceed the minimum output; increase the amount or try again when gas is lower",
+     "param": "origin.amount",
+     "requestId": "jgvp9hqg1crdd9oocov4jkuvbg"
+    }
+   }
+  }
+ ],
+ "result": {
+  "refusal": {
+   "text": "across: Across API V5 answered HTTP 400 policy.amount_out_of_range [api-error]",
+   "reason": "amount_too_small"
+  }
+ }
+}

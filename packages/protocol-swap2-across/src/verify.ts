@@ -41,6 +41,7 @@ import {
   ACROSS_SPEED_UP_DOMAIN, ACROSS_SPEED_UP_TYPE, ACROSS_V5_MESSAGE_PREFIX, acrossChain, acrossRouteOf, type AcrossRoute,
 } from "./config.js";
 import {decodeAcrossDeposit, type AcrossDepositArgs} from "./deposit.js";
+import {acrossRouteUnpriced} from "./pricing.js";
 import {AcrossRefusal} from "./refusal.js";
 
 /** The fee cap when the caller names none: input − output at most 10 % of the input. */
@@ -63,12 +64,23 @@ export const ACROSS_MIN_FILL_WINDOW_S = 1_800;
  */
 export const ACROSS_MAX_FILL_WINDOW_S = 7_800;
 /**
- * The smallest fee a deposit may leave relayers, in millionths of the input (10 = 0.1 bps). A relayer pays the output
- * from its own funds and its gas, so a deposit that leaves nothing (or dust) is not filled and waits for a refund —
- * while its output, the whole input, would win any comparison of routes. Across's own capital fee alone was 1 bps on
- * every quote read 2026-11-14 (0.996 bps on WETH Ethereum → Base), ten times this floor.
+ * The smallest fee a deposit may leave relayers, in millionths of the input, by what is bridged and from where. A
+ * relayer pays the output from its own funds and its gas, so a deposit that leaves less than relayers take is not
+ * filled and waits two hours for its deadline and then for a refund — while its output, nearly the whole input, would
+ * win any comparison of routes. The floors sit at or under the lowest fees plain deposits were filled at over 24 h
+ * (2026-11-14, Ethereum, Optimism, Base and Arbitrum): stablecoins 1.0 bp (Across's capital fee, every fill paid it),
+ * ETH from Ethereum 0.7 bp (fills at 0.74–0.84), ETH from an L2 4.5 bps (capital 3.0+ and LP 1.77: fills at 5.0 and
+ * up), WBTC 2.5 bps (fills at 3.1; one at 1.03). A server that names less — a bug, or a hostile one — is refused here,
+ * on the device.
  */
-export const ACROSS_MIN_FEE_PPM = 10;
+export const ACROSS_MIN_FEE_PPM = Object.freeze({stable: 100, ethFromEthereum: 70, ethFromL2: 450, wbtc: 250});
+
+/** The device's fee floor for a route, millionths of the input ({@link ACROSS_MIN_FEE_PPM}). */
+export function acrossMinFeePpm(route: AcrossRoute): number {
+  if (route.asset === "ETH") return route.input.chain.chainId === 1 ? ACROSS_MIN_FEE_PPM.ethFromEthereum : ACROSS_MIN_FEE_PPM.ethFromL2;
+  if (route.asset === "WBTC") return ACROSS_MIN_FEE_PPM.wbtc;
+  return ACROSS_MIN_FEE_PPM.stable;
+}
 /** Longest exclusivity accepted, counted from now: one relayer alone may fill for at most an hour. */
 export const ACROSS_MAX_EXCLUSIVITY_S = 3_600;
 /** Exclusivity must end at least this long before the fill deadline, so that any relayer can still fill. */
@@ -79,6 +91,12 @@ export const ACROSS_GAS_FLOOR = 90_000n;
 export const ACROSS_GAS_CAP = 60_000_000n;
 /** The longest a quote may claim to live: five minutes plus the clock difference. */
 export const ACROSS_MAX_QUOTE_LIFE_MS = 300_000 + ACROSS_CLOCK_SKEW_S * 1000;
+
+/**
+ * The address a dry quote (pricing only) is asked for when the caller names none. A quote priced with it is never
+ * built or signed; the server and a remote client derive the same request from the same parameters with it.
+ */
+export const ACROSS_PLACEHOLDER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const ZERO = /^0x0{40}$/;
@@ -274,8 +292,9 @@ export function verifyAcrossDeposit(request: AcrossRequest, tx: AcrossDepositTx)
   if (fee === 0n) {
     throw new AcrossRefusal("tx-fee", "the deposit leaves relayers no fee — nobody fills it, and the funds wait for a refund", "price_check_failed");
   }
-  if (fee * 1_000_000n < a.inputAmount * BigInt(ACROSS_MIN_FEE_PPM)) {
-    throw new AcrossRefusal("tx-fee", `the deposit leaves relayers ${fee} of ${a.inputAmount}, under the ${ACROSS_MIN_FEE_PPM}-per-million floor — nobody fills it, and the funds wait for a refund`, "price_check_failed");
+  const minPpm = acrossMinFeePpm(route);
+  if (fee * 1_000_000n < a.inputAmount * BigInt(minPpm)) {
+    throw new AcrossRefusal("tx-fee", `the deposit leaves relayers ${fee} of ${a.inputAmount}, under the ${minPpm}-per-million floor for ${route.asset} from ${src.name} — relayers do not fill it, and the funds wait for a refund`, "price_check_failed");
   }
   if (fee * 10_000n > a.inputAmount * BigInt(maxFeeBps)) {
     throw new AcrossRefusal("tx-fee", `the deposit leaves ${fee} of ${a.inputAmount} as fees, over the ${maxFeeBps} bps cap`, "price_check_failed");
@@ -391,6 +410,8 @@ export function acrossRequestOf(params: QuoteParams, opts: {placeholder?: string
   if (typeof params.destToken !== "string" || !ADDRESS.test(params.destToken)) invalid("the destination token must be an EVM address (zero for the native coin)", "unsupported_pair");
   const route = acrossRouteOf(params.sourceChain, sourceToken, params.destChain, params.destToken);
   if ("code" in route) throw new AcrossRefusal(route.code, route.detail, "unsupported_pair");
+  const unpriced = acrossRouteUnpriced(route);
+  if (unpriced) throw new AcrossRefusal("route-unpriced", unpriced, "unsupported_pair");
   if (typeof params.amountIn !== "string" || !/^[1-9]\d{0,77}$/.test(params.amountIn)) invalid("amount must be a positive base-unit integer");
   if (params.minAmountOut !== undefined && !UINT.test(params.minAmountOut)) invalid("the output floor must be a base-unit integer");
   const recipient = params.destAddress || opts.placeholder || "";
@@ -475,9 +496,12 @@ export interface AcrossPinsOptions {
   maxFeeBps?: number;
 }
 
+/** The request a remote quote is held to: the server's own derivation — a dry quote priced for the placeholder where the caller named no address. */
+const pinsRequestOf = (params: QuoteParams, cap: {maxFeeBps?: number}): AcrossRequest => acrossRequestOf(params, params.dry !== false ? {...cap, placeholder: ACROSS_PLACEHOLDER} : cap);
+
 function verifyQuoteWith(params: QuoteParams, quote: Quote, cap: {maxFeeBps?: number}): string | null {
   try {
-    checkAcrossQuote(acrossRequestOf(params, cap), quote);
+    checkAcrossQuote(pinsRequestOf(params, cap), quote);
     return null;
   } catch (err) {
     return notedReason(err);
