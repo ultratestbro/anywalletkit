@@ -75,6 +75,26 @@ export function evmCallMatcher(expected: { caip2: string; to: string; data?: str
     op.value === expected.value
 }
 
+/**
+ * Matcher for a Permit2 signature-transfer swap call (`Swap2ExecutionPlan.source.permit2Transfer`): the engine sends
+ * the reviewed calldata followed by `uint256(n)` and exactly `n` signature bytes (64 to 2048: an EOA's 64/65, a
+ * contract account's longer one). Same chain, `to` and value; the calldata must be exactly that structure — never a
+ * bare prefix, and the unsigned calldata alone does not pass.
+ */
+export function evmSignedCallMatcher(expected: { caip2: string; to: string; data: string; value: bigint }): GateMatcher {
+  const base = lc(expected.data)
+  return (op) => {
+    if (op.kind !== 'evm-tx' || op.caip2 !== expected.caip2 || lc(op.to) !== lc(expected.to) || op.value !== expected.value || !op.data) return false
+    const data = lc(op.data)
+    if (!data.startsWith(base)) return false
+    const tail = data.slice(base.length)
+    const word = /^0{60}([0-9a-f]{4})/.exec(tail)
+    if (!word || !/^[0-9a-f]*$/.test(tail)) return false
+    const n = parseInt(word[1]!, 16)
+    return n >= 64 && n <= 2048 && tail.length === 64 + 2 * n
+  }
+}
+
 /** Matcher for one EIP-712 payload on one chain, by the digest the account signs (`typedDataHash` from `@anywalletkit/wallet-evm`). */
 export function typedDataMatcher(expected: { caip2: string; typedDataHash: string }): GateMatcher {
   const hash = lc(expected.typedDataHash)
