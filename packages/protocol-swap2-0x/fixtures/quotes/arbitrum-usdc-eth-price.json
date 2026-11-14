@@ -1,0 +1,90 @@
+{
+ "note": "Real 0x Swap API v2 answer (/swap/permit2/price), Arbitrum USDC->ETH, recorded 2026-11-15 from api.0x.org with a throwaway taker that holds nothing. Response body as 0x sent it; request rebuilt from the recorded query (no headers, no key). registry = what ownerOf(2) / prev(2) answered on that chain.",
+ "request": {
+  "endpoint": "/swap/permit2/price",
+  "sourceChain": "eip155:42161",
+  "sourceToken": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+  "sourceDecimals": 6,
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amountIn": "25000000",
+  "slippageBps": 50,
+  "destAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "refundAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "dry": true,
+  "nowMs": 1794690369000
+ },
+ "registry": {
+  "current": "0xf41429fc96ff446B8118359Ba16854e07c393591",
+  "prev": "0x93Ea5E32E9c2bE78a279be03F86b74917537dF51"
+ },
+ "response": {
+  "allowanceTarget": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  "blockNumber": "524265610",
+  "buyAmount": "14037671375000000",
+  "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "fees": {
+   "integratorFee": null,
+   "integratorFees": null,
+   "zeroExFee": {
+    "amount": "37500",
+    "token": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+    "type": "volume"
+   },
+   "gasFee": null
+  },
+  "issues": {
+   "allowance": {
+    "actual": "0",
+    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
+   "balance": {
+    "token": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+    "actual": "0",
+    "expected": "25000000"
+   },
+   "simulationIncomplete": false,
+   "invalidSourcesPassed": []
+  },
+  "liquidityAvailable": true,
+  "minBuyAmount": "13967483018125000",
+  "mode": "exact-in",
+  "route": {
+   "fills": [
+    {
+     "from": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+     "to": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+     "source": "Fluid",
+     "proportionBps": "10000"
+    }
+   ],
+   "tokens": [
+    {
+     "address": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+     "symbol": "USDC"
+    },
+    {
+     "address": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+     "symbol": "WETH"
+    }
+   ]
+  },
+  "sellAmount": "25000000",
+  "sellToken": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+  "tokenMetadata": {
+   "buyToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   },
+   "sellToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   }
+  },
+  "totalNetworkFee": "8668470802500",
+  "zid": "0x730e42e5198e51a835a407aa",
+  "gas": "383158",
+  "gasPrice": "22623750"
+ }
+}

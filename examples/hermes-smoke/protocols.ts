@@ -35,6 +35,13 @@ import { assembleTransaction as jupAssemble } from '@anywalletkit/protocol-swap2
 import { fyndProvider } from '@anywalletkit/protocol-swap2-fynd/provider'
 import { FyndSwap2Protocol } from '@anywalletkit/protocol-swap2-fynd/protocol'
 import { FYND_CHAINS, TYCHO_ROUTER_ABI, checkFyndTransaction } from '@anywalletkit/protocol-swap2-fynd/router'
+import { zeroExProvider } from '@anywalletkit/protocol-swap2-0x/provider'
+import { ZeroExSwap2Protocol } from '@anywalletkit/protocol-swap2-0x/protocol'
+import { SETTLER_NATIVE_CHECK_SELECTOR, checkZeroExTransaction, decodeSettlerExecute, zeroExSettlerNonce } from '@anywalletkit/protocol-swap2-0x/settler'
+import { zeroExPins, zeroExVerifyQuote } from '@anywalletkit/protocol-swap2-0x/remote'
+import { ZEROEX_CHAINS } from '@anywalletkit/protocol-swap2-0x/chains'
+import zeroExTokenLive from '../../packages/protocol-swap2-0x/fixtures/quotes/base-usdc-eth.json'
+import zeroExNativeLive from '../../packages/protocol-swap2-0x/fixtures/quotes/base-eth-usdc.json'
 import { curveProvider } from '@anywalletkit/protocol-swap2-curve/provider'
 import { CurveSwap2Protocol } from '@anywalletkit/protocol-swap2-curve/protocol'
 import { CURVE_DEPLOYMENTS, CURVE_POOLS, EXCHANGE_SELECTOR, curveVerifyQuote, decodeExchange, encodeExchange, findRoutes, routeArgs } from '@anywalletkit/protocol-swap2-curve'
@@ -76,7 +83,7 @@ import {
   decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
 } from '@anywalletkit/protocol-lending-kamino-solana'
 import { unexpectedInstruction } from '@anywalletkit/wallet-solana'
-import { redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS } from '@anywalletkit/protocol-swap2-core'
+import { redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS, appendPermit2Signature, permit2TransferJson, readPermit2Transfer } from '@anywalletkit/protocol-swap2-core'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -105,7 +112,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
   // TON is a hand-suspended 1Click corridor (HOT bridge dark since 2026-10-16) and LI.FI has no Bitcoin, so
   // Bitcoin can only have come from the near-intents provider.
   check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('bitcoin:mainnet'), chains.join(','))
-  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['symbiosis', SymbiosisSwap2Protocol], ['jupiter', JupiterSwap2Protocol], ['fynd', FyndSwap2Protocol]] as const) {
+  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['symbiosis', SymbiosisSwap2Protocol], ['jupiter', JupiterSwap2Protocol], ['fynd', FyndSwap2Protocol], ['zeroex', ZeroExSwap2Protocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
@@ -430,6 +437,62 @@ export async function smokeProtocols(check: Check): Promise<void> {
   let fyndRefused = false
   try { checkFyndTransaction({ to: FYND_CHAINS[8453]!.router, value: 0n, data: fyndData }, { ...fyndExpected, receiver: '0x1111111111111111111111111111111111111111' }) } catch { fyndRefused = true }
   check('fynd: refuses calldata paying someone else', fyndRefused)
+  {
+    // 0x Settler: the word-level execute decoder and the pre-signing check run under Hermes (bigint words, checksums).
+    const dead = '0x000000000000000000000000000000000000dEaD'
+    const settler = '0x1035029091415555555555555555555555550001'
+    const usdc = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+    const zeroex = zeroExProvider({ apiKey: () => 'smoke' })
+    check('zeroex: same-chain routes only, and none without a key', zeroex.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:8453', token: 'ETH' }) && !zeroex.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:1', token: 'USDC' }) && !zeroExProvider({}).supportsChain('eip155:8453'))
+    const executeAbi = [{ type: 'function', name: 'execute', stateMutability: 'payable', inputs: [{ name: 'slippage', type: 'tuple', components: [{ name: 'recipient', type: 'address' }, { name: 'buyToken', type: 'address' }, { name: 'minAmountOut', type: 'uint256' }] }, { name: 'actions', type: 'bytes[]' }, { name: 'zidAndAffiliate', type: 'bytes32' }], outputs: [{ type: 'bool' }] }] as const
+    const data = encodeFunctionData({ abi: executeAbi, functionName: 'execute', args: [{ recipient: dead, buyToken: usdc, minAmountOut: 2_487_500n }, [`${SETTLER_NATIVE_CHECK_SELECTOR}${'00'.repeat(64)}`], `0x${'00'.repeat(32)}`] })
+    const decoded = decodeSettlerExecute(data)
+    check('zeroex: decodes the Settler slippage check', decoded.recipient === dead && decoded.buyToken === usdc && decoded.minAmountOut === 2_487_500n && decoded.actions.length === 1)
+    const expected = { chainId: 8453, settlers: [settler], sellToken: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE', buyToken: usdc, sellAmount: 10n ** 15n, recipient: dead, minBuyAmount: 2_487_500n }
+    let accepted = false
+    try { checkZeroExTransaction({ to: settler, data, value: '1000000000000000', chainId: 8453 }, expected); accepted = true } catch { /* reported below */ }
+    check('zeroex: accepts a native sale that pays the recipient the minimum', accepted)
+    const refuses = (tx: Parameters<typeof checkZeroExTransaction>[0], e: Parameters<typeof checkZeroExTransaction>[1]): boolean => { try { checkZeroExTransaction(tx, e); return false } catch { return true } }
+    check('zeroex: refuses another recipient, a lower minimum, a foreign target', refuses({ to: settler, data, value: '1000000000000000', chainId: 8453 }, { ...expected, recipient: '0x1111111111111111111111111111111111111111' }) && refuses({ to: settler, data, value: '1000000000000000', chainId: 8453 }, { ...expected, minBuyAmount: 2_487_501n }) && refuses({ to: dead, data, value: '1000000000000000', chainId: 8453 }, expected))
+    const notNativeCheck = encodeFunctionData({ abi: executeAbi, functionName: 'execute', args: [{ recipient: dead, buyToken: usdc, minAmountOut: 2_487_500n }, [`0x38c9c147${'00'.repeat(160)}`], `0x${'00'.repeat(32)}`] })
+    check('zeroex: refuses a native sale whose first action is not NATIVE_CHECK', refuses({ to: settler, data: notNativeCheck, value: '1000000000000000', chainId: 8453 }, expected))
+  }
+  {
+    // 0x on REAL recorded answers (fixtures/quotes, 2026-11-15): the Permit2 reader and rebuild, the signature appended,
+    // the Settler as a CREATE3 deployment of the registry (keccak under Hermes), the device check and the remote verifier
+    // with the server's intent tag — each at the recording's own clock.
+    const tok = zeroExTokenLive as unknown as { request: { nowMs: number; sourceToken: string; destAddress: string; amountIn: string; destToken: string; refundAddress: string; sourceDecimals: number }; registry: { current: string; prev: string }; response: { minBuyAmount: string; buyAmount: string; transaction: { to: string; data: string; value: string }; permit2: { hash: string; eip712: { domain: unknown; types: unknown; primaryType: string; message: Record<string, unknown> & { permitted: Record<string, unknown> } } } } }
+    const nat = zeroExNativeLive as unknown as typeof tok
+    const nowMs = tok.request.nowMs
+    const typedJson = (edit: (t: Record<string, any>) => void = () => {}) => { const t = JSON.parse(JSON.stringify(tok.response.permit2.eip712)) as Record<string, any>; edit(t); return JSON.stringify({ domain: t.domain, types: t.types, primaryType: t.primaryType, message: t.message }) }
+    const want = { chainId: 8453, token: tok.request.sourceToken, amount: BigInt(tok.request.amountIn), spender: tok.response.transaction.to, nowMs }
+    let permit: ReturnType<typeof readPermit2Transfer> | null = null
+    try { permit = readPermit2Transfer(typedJson(), want) } catch { /* reported below */ }
+    check('zeroex: reads and rebuilds a real 0x Permit2 payload', !!permit && permit.message.spender === tok.response.transaction.to.toLowerCase() && permit.message.permitted.amount === tok.request.amountIn && JSON.parse(permit2TransferJson(permit)).domain.chainId === 8453)
+    const reads = (json: string): string | undefined => { try { readPermit2Transfer(json, want); return undefined } catch (e) { return refusalOf(e)?.reason ?? 'unclassified' } }
+    check('zeroex: refuses that payload for another spender, amount or domain (classified)', reads(typedJson((t) => { t.message.spender = '0x1111111111111111111111111111111111111111' })) === 'vault_mismatch'
+      && reads(typedJson((t) => { t.message.permitted.amount = '25000001' })) === 'price_check_failed' && reads(typedJson((t) => { t.domain.chainId = 1 })) === 'vault_mismatch')
+    const sig = `0x${'ab'.repeat(65)}`
+    check('zeroex: appends uint256(65) and the signature to the real calldata', appendPermit2Signature(tok.response.transaction.data, sig) === `${tok.response.transaction.data}${'0'.repeat(62)}41${'ab'.repeat(65)}`)
+    check('zeroex: the recorded Settlers are CREATE3 deployments of the registry; another address is not', zeroExSettlerNonce(8453, tok.registry.current) === 22 && zeroExSettlerNonce(8453, tok.registry.prev) === 21 && zeroExSettlerNonce(8453, '0x1111111111111111111111111111111111111111') === null)
+    const txOf = (r: typeof tok, permit2Transfer?: string) => ({ to: r.response.transaction.to, data: r.response.transaction.data, value: r.response.transaction.value, chainId: 8453, ...(permit2Transfer ? { approvalAddress: '0x000000000022D473030F116dDEE9F6B43aC78BA3', permit2Transfer } : {}) })
+    const expectOf = (r: typeof tok) => ({ chainId: 8453, settlers: [r.registry.current, r.registry.prev], sellToken: r.request.sourceToken, buyToken: r.request.destToken, sellAmount: BigInt(r.request.amountIn), recipient: r.request.destAddress, minBuyAmount: BigInt(r.response.minBuyAmount), nowMs: r.request.nowMs })
+    let tokenChecked: ReturnType<typeof checkZeroExTransaction> | null = null
+    try { tokenChecked = checkZeroExTransaction(txOf(tok, permit ? permit2TransferJson(permit) : undefined), expectOf(tok)) } catch { /* reported below */ }
+    check('zeroex: the device check accepts the real token sale (TRANSFER_FROM of exactly the input, signature slot at the end)', tokenChecked?.permitAction === 'TRANSFER_FROM')
+    let nativeOk = false
+    try { nativeOk = !checkZeroExTransaction(txOf(nat), expectOf(nat)).permit2 } catch { /* reported below */ }
+    check('zeroex: the device check accepts the real native sale (NATIVE_CHECK first)', nativeOk)
+    const quote = {
+      provider: 'zeroex', intentId: `zeroex:8453:smoke~${'a'.repeat(32)}`, depositAddress: '', depositMemo: null, sourceAmount: tok.request.amountIn, destAmount: tok.response.buyAmount, minDestAmount: tok.response.minBuyAmount,
+      feeUsd: 0, etaSeconds: 15, reliability: 0.96, validUntilMs: nowMs + 45_000, txRequest: { ...txOf(tok, permit ? permit2TransferJson(permit) : undefined) },
+    }
+    const params = { sourceChain: 'eip155:8453', destChain: 'eip155:8453', sourceToken: tok.request.sourceToken, sourceDecimals: tok.request.sourceDecimals, destToken: tok.request.destToken, amountIn: tok.request.amountIn, slippageBps: 50, destAddress: tok.request.destAddress, refundAddress: tok.request.refundAddress, dry: false }
+    const ctx = { chains: ZEROEX_CHAINS, settlers: () => [tok.registry.current, tok.registry.prev], nowMs }
+    check('zeroex: zeroExVerifyQuote passes the real quote with the server tag', zeroExVerifyQuote(params, quote, ctx) === null)
+    const foreign = zeroExVerifyQuote({ ...params, destAddress: '0x1111111111111111111111111111111111111111' }, quote, ctx)
+    check('zeroex: and refuses it for another recipient, classified through reasonOf', typeof foreign === 'string' && zeroExPins().reasonOf!(foreign)?.reason === 'recipient_mismatch')
+  }
   {
     // Curve Router NG: both ABI families encode and decode the explicit-receiver exchange; recorded live quotes pass the
     // client check (shipped deployments + allowlist, catalog-only hops between pools) and fail once they pay someone else.
