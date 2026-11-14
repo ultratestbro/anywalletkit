@@ -78,6 +78,10 @@ if (want("fynd") && env.FYND_API_KEY) providers.fynd = (await dist("protocol-swa
 // 0x needs a key on every request: without ZEROEX_API_KEY the provider is not built, so its corridors are not probed and
 // nothing transitions (a dry /price quote needs no RPC). The key travels only in the request header.
 if (want("zeroex") && env.ZEROEX_API_KEY) providers.zeroex = (await dist("protocol-swap2-0x", "provider.js")).zeroExProvider({enabled: true, apiKey: () => env.ZEROEX_API_KEY});
+// Across prices from its API V5, which needs a key on every request: without ACROSS_API_KEY the provider is not built,
+// so its corridors are not probed and nothing transitions. The key travels only in the request header; /suggested-fees
+// (the relayer price) is keyless, and a dry quote needs no RPC while it answers.
+if (want("across") && env.ACROSS_API_KEY) providers.across = (await dist("protocol-swap2-across", "provider.js")).acrossProvider({enabled: true, apiKey: () => env.ACROSS_API_KEY, rpcUrls: ownRpc});
 
 // ── one dry quote per corridor ───────────────────────────────────────────────
 const parse = (s) => { const i = s.lastIndexOf(":"); return {chain: s.slice(0, i), symbol: s.slice(i + 1)}; };

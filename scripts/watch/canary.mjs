@@ -90,6 +90,10 @@ if (existsSync(pkg("protocol-swap2-relay"))) jobs.push({id: "relay", module: "re
 // natives on all seven chains — keyless, always. Live quotes (local and through createSwap2Handler) only with
 // ZEROEX_API_KEY; without it the script says so in a neutral line and exits 0.
 if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], timeoutS: 300});
+// Across: every pin on chain (SpokePool proxy, chainId, admin = HubPool, wrapped native, buffers, not paused, token
+// decimals, the HubPool's registry) and /suggested-fees on nine corridors on the pinned SpokePools — keyless, always.
+// Live quotes (local and through createSwap2Handler) only with ACROSS_API_KEY; without it a neutral line, exit 0.
+if (existsSync(pkg("protocol-swap2-across"))) jobs.push({id: "across", module: "across", script: pkg("protocol-swap2-across"), args: [], timeoutS: 300});
 
 const selected = jobs.filter((j) => !ONLY || ONLY.has(j.module) || ONLY.has(j.id));
 const SOFT_FAIL = /(^|\s)(→|->)\s*\w*Error\b|\bFAILED\b|\bError:|not found|revert/i;

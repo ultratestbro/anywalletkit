@@ -21,7 +21,7 @@ npm install @anywalletkit/protocol-swap2-router \
   @anywalletkit/protocol-swap2-cctp \
   @anywalletkit/protocol-swap2-usdt0 \
   @anywalletkit/protocol-swap2-uniswap @anywalletkit/protocol-swap2-wrap \
-  @anywalletkit/protocol-swap2-jupiter @anywalletkit/protocol-swap2-0x
+  @anywalletkit/protocol-swap2-jupiter @anywalletkit/protocol-swap2-0x @anywalletkit/protocol-swap2-across
 ```
 
 The router bundles no provider. Only the providers you install and pass in end up in your
@@ -50,6 +50,7 @@ app, and each provider also works on its own without the router.
 | `fynd` | EVM aggregator (Propeller Heads) | Same-chain swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain through the Tycho router; key or your own Fynd server. Its outputs are under the [Fynd License](https://github.com/propeller-heads/fynd/blob/main/LICENSE.md): read it before you ship |
 | `relay` | Intents (Relay depository) | EVM → EVM bridging and cross-chain swaps on 29 chains, native coin and ERC-20; the order is verified on the device and the deposit built locally; no key ([below](#relay)) |
 | `zeroex` | EVM aggregator (0x Swap API v2) | Same-chain swaps on Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche and BNB Smart Chain through Permit2 and the 0x Settler; needs a 0x API key on your backend, and an RPC for the chain ([below](#0x)) |
+| `across` | Intents (Across SpokePool) | EVM → EVM bridging of the same asset (USDC, USDT / USDT0, ETH, WBTC) between 17 chains, filled by Across relayers in seconds; a plain deposit built and verified on the device; API key on your server ([below](#across)) |
 
 ### Curve
 
@@ -165,6 +166,51 @@ const zeroexInApp = zeroExRemoteProvider({ baseUrl: 'https://your-backend.exampl
   and spread its keys into the allowlist, rather than a fixed address.
 - **Flags.** The SDK reads no environment; by convention the app and the backend use
   `ZEROEX_ENABLED` (dark unless set) and `ZEROEX_API_KEY`.
+
+### Across
+
+`@anywalletkit/protocol-swap2-across` bridges the same asset between 17 EVM chains (USDC, USDT /
+USDT0, ETH / WETH, WBTC; Ethereum, Optimism, Base, Arbitrum, Polygon, Unichain, Linea, zkSync Era,
+World Chain, Ink, Avalanche, Monad, HyperEVM, MegaETH, Robinhood Chain, Arc, Plasma) with one
+transaction: a **direct deposit** — `deposit(...)` on the source chain's SpokePool. A relayer pays
+the recipient on the destination from its own funds, usually within seconds, and is repaid from
+the deposit.
+
+```ts
+// On your server (the Across API V5 key never ships in an app):
+import { acrossProvider } from '@anywalletkit/protocol-swap2-across'
+const across = acrossProvider({ apiKey: () => process.env.ACROSS_API_KEY, rpcUrls }) // behind createSwap2Handler
+
+// In the app:
+import { acrossRemoteProvider } from '@anywalletkit/protocol-swap2-across'
+const across = acrossRemoteProvider({ baseUrl: 'https://your-backend.example/swap2', rpcUrls })
+```
+
+- **What is verified.** The deposit is encoded on the device from the SpokePool pinned in the
+  package and the user's own request, and checked again right before signing: the depositor is the
+  signing account (an Across depositor can redirect the output, so a refund address the caller names
+  is refused), the recipient, both tokens, the exact input, the destination chain, an empty message
+  (nothing runs on arrival), a fill deadline two hours after the quote time, no exclusive relayer,
+  the fee within your cap (`maxFeeBps`, default 10 %) and at least what relayers take on that asset
+  (stablecoins 1 bp, ETH from Ethereum 0.7 bp, ETH from an L2 4.5 bps, WBTC 2.5 bps). An ERC-20 is
+  approved for exactly the input, to the SpokePool. A backend can choose only the output amount
+  inside those bounds.
+- **Where the price comes from.** Across API V5 quotes its own route (an execution step on the
+  origin chain, sometimes another rail), which a direct deposit does not take: its `nextActions`
+  are never run. The module asks V5 for the price and Across's relayer fee quote
+  (`/suggested-fees`, keyless) for what a relayer needs, and leaves relayers the larger of V5's fee
+  net of its origin step and that relayer fee. If `/suggested-fees` stops answering, a floor pinned
+  from the fills of plain deposits stands in on Ethereum, Optimism, Base and Arbitrum (the server
+  then needs `rpcUrls` for Ethereum and the source chain, for the quote time); other routes are
+  refused rather than priced on a guess. Ethereum as a destination is not priced yet.
+- **Refunds and timing.** A deposit nobody fills can no longer be filled after its fill deadline
+  (two hours after the quote time); Across then refunds the input to the depositor on the source
+  chain through its settlement bundles, which takes hours more. Status reads the chains themselves
+  (the deposit's event on the source chain, `fillStatuses` on the destination): `pending`, then
+  `completed`, or `expired` once the deadline has passed unfilled. With `rpcUrls` for both chains
+  the app reads it without the backend.
+- **Named refusals.** `across: <what was found> [<code>]`, each with a reason (`route-unpriced`,
+  `relayer-price`, `api-error`, `tx-fee`, …).
 
 ## 2. Create the router
 
