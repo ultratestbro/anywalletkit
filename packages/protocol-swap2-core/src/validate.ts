@@ -69,6 +69,9 @@ export function quoteRejection(q: Quote, params: QuoteParams, provider: string):
       if (tx.gasLimit !== undefined && !/^[0-9]+$/.test(tx.gasLimit)) return MALFORMED;
       if (tx.chainId !== undefined && (!Number.isSafeInteger(tx.chainId) || tx.chainId <= 0)) return MALFORMED;
       if ([tx.to, tx.data, tx.approvalAddress, tx.serializedTx, tx.permit2Transfer].some((value) => value !== undefined && typeof value !== "string")) return MALFORMED;
+      // A Permit2 signature transfer pays with the token it permits and nothing else: native value or a native fee
+      // riding along is never part of it.
+      if (tx.permit2Transfer !== undefined && ((tx.value !== undefined && BigInt(tx.value) !== 0n) || (tx.nativeFee !== undefined && BigInt(tx.nativeFee) !== 0n))) return OTHER_QUOTE;
     }
     // Execution is always re-quoted. An unknown/zero expiry cannot prove that
     // the transaction is still safe to sign, so contribution packages reject it.

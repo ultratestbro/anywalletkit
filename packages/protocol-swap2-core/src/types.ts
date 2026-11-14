@@ -312,6 +312,15 @@ export interface CrossChainProvider {
    * its backend names. Without it the engine refuses a remote stub's deposit-address and plain-value builds.
    */
   readonly depositAddressRoutes?: boolean;
+  /**
+   * The engine sends this provider's EVM calls (a native-coin sale, a token sale's call) with the account's own gas
+   * estimate of exactly that call, dry-run from the account right before broadcast — never with the quoted gas limit,
+   * which is the venue's (or a backend's) word: a limit below what the call needs would pass a fee check and then
+   * revert on-chain out of gas, after the account paid for it. A dry run that reverts refuses the swap
+   * (`simulation_failed`); an RPC that does not answer it is asked once more, then refuses it (`upstream_unavailable`).
+   * A Permit2 signature transfer always goes out this way. Set by the 0x provider; the router's snapshot carries it.
+   */
+  readonly ownGasEstimate?: boolean;
   /** Remote stubs: the contracts this provider's EVM swaps may call on `chain` (the app's list, e.g. `lifiPins`). */
   callTargets?(chain: string): readonly string[];
   /** Remote stubs: the spenders this provider's EVM swaps may be approved for on `chain` (the app's list). */

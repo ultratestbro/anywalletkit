@@ -105,6 +105,28 @@ function maybeSent(error: unknown): {hash?: string} | null {
   return texts.some((t) => LOST_ANSWER.test(t)) ? {} : null;
 }
 
+/** A node saying the call itself fails: the revert error viem names, its "execution reverted" text, JSON-RPC code 3. */
+const REVERTED = /execution reverted|\breverted\b|ExecutionReverted|ContractFunctionReverted/i;
+/** The endpoint not answering at all, beyond {@link LOST_ANSWER}: an HTTP failure or a rate limit. */
+const UNANSWERED = /HttpRequestError|WebSocketRequestError|SocketClosedError|LimitExceededRpcError|ResourceUnavailableRpcError|too many requests|rate.?limit|\b429\b|took too long to respond/i;
+/** How long the dry run waits before asking an RPC that did not answer once more. */
+const DRY_RUN_RETRY_MS = 500;
+
+/**
+ * Why a dry run (the account's `quoteSendTransaction` of the exact call) failed: a revert anywhere in the cause chain
+ * is the call's own failure; a transport failure (`fetch failed`, a timeout, an HTTP error status, a 429) with no
+ * revert behind it says nothing about the call. Anything else is taken as the call failing, as before.
+ */
+function dryRunFailure(error: unknown): "revert" | "transport" | "other" {
+  const chain: Array<{message?: unknown; shortMessage?: unknown; details?: unknown; code?: unknown; name?: unknown; status?: unknown}> = [];
+  for (let e = error as {cause?: unknown} | undefined, i = 0; e && typeof e === "object" && i < 8; e = e.cause as typeof e, i++) chain.push(e as never);
+  const text = (e: (typeof chain)[number]) => [e.message, e.shortMessage, e.details, e.code, e.name].filter((x) => typeof x === "string").join(" ");
+  if (chain.some((e) => e.code === 3 || REVERTED.test(text(e)))) return "revert";
+  const status = (s: unknown) => typeof s === "number" && (s === 429 || (s >= 500 && s <= 599));
+  if (chain.some((e) => status(e.status) || e.code === -32005 || LOST_ANSWER.test(text(e)) || UNANSWERED.test(text(e)))) return "transport";
+  return "other";
+}
+
 /** Our config adds the account's source chain (CAIP-2) the base type omits. */
 /**
  * Where an execution is, for progress UIs. A source leg can spend a minute
@@ -1422,6 +1444,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (unsigned.permit2Transfer !== undefined) {
       const refuse = (why: string, reason: Swap2RefusalReason): never => { throw new Swap2ValidationError(`swap2: Permit2 transfer refused — ${why}`, {reason}); };
       if (!source.contract) refuse("a native-coin input has nothing to permit", "policy_refused");
+      // The permitted token is the whole payment: no native value (a declared native fee included) rides along.
+      if (executionValue !== 0n || (q.txRequest?.nativeFee !== undefined && q.txRequest.nativeFee !== "0")) refuse("it sends native coin along with the token sale", "policy_refused");
       if (!unsigned.approvalAddress || unsigned.approvalAddress.toLowerCase() !== PERMIT2_ADDRESS.toLowerCase()) refuse("the allowance it needs is not Permit2's", "vault_mismatch");
       permit2 = readPermit2Transfer(unsigned.permit2Transfer, {
         chainId: Number(this.fromChain.slice("eip155:".length)),
@@ -1433,6 +1457,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // The quote may not outlive the signature it carries.
       if (q.validUntilMs > Number(permit2.deadline.toString()) * 1000) refuse("the quote is valid for longer than its signature deadline", "policy_refused");
     }
+    // The account's own gas estimate of the exact call, dry-run right before the broadcast: always for a Permit2 call,
+    // and for every EVM call of a provider that declares `ownGasEstimate` (0x's native sales). The quoted gas limit is
+    // the venue's — or a backend's — word, and is then neither shown as the limit nor sent.
+    const ownGas = !!permit2 || (provider.ownGasEstimate === true && this.fromChain.startsWith("eip155:") && !serialized && !tokenId &&
+      cellBody === undefined && unsigned.typedData === undefined && unsigned.memo === undefined);
     if (unsigned.data !== undefined && this.fromChain.startsWith("eip155:")) {
       const call = decodeCall({to: unsigned.to, data: unsigned.data, value: executionValue});
       // Calldata that is not hex bytes cannot be judged: refused, not passed as a plain call (scan 2026-10-27 modules F3).
@@ -1554,7 +1583,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
                   ...(unsigned.data ? {data: unsigned.data} : {}),
                   value: BigInt(unsigned.value),
                   ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
-                  ...(unsigned.gasLimit && !permit2 ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+                  ...(unsigned.gasLimit && !ownGas ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
                   ...(unsigned.memo ? {memo: unsigned.memo, ...(unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
                   ...(cellBody !== undefined ? {cellBody: true, ...(tonBody ? {cellBodyDecoded: tonBody} : {})} : {}),
                   ...(permit2 ? {permit2Transfer: JSON.stringify({domain: permit2.domain, types: permit2.types, primaryType: permit2.primaryType, message: permit2.message})} : {}),
@@ -1717,11 +1746,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // to sendTransaction would be ignored and send native SOL/TON/TRX instead.
     let sent: {hash?: string};
     this.emitPhase("signing");
-    // Permit2 signature transfer: dry-run the exact signed call now that the allowance is in place. Nothing is
+    // Dry-run the exact call (a Permit2 call with its signature, now that the allowance is in place). Nothing is
     // broadcast yet, so a failure here is a clean one: the allowance this swap created is revoked.
-    if (permit2 && signedData !== undefined) {
+    if (ownGas) {
       try {
-        await this.simulatePermit2Call(signer, unsigned, permit2, signedData);
+        await this.dryRunCall(signer, unsigned, signedData ?? unsigned.data, permit2);
       } catch (error) {
         await revokeApproval?.().catch(() => {});
         throw error;
@@ -1759,10 +1788,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           ...(data ? {data} : {}),
           value: BigInt(unsigned.value),
           ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
-          // A Permit2 call goes out with the account's own estimate of the exact signed call, never the quoted gas
-          // limit: a limit below what the call needs would pass the dry run (which estimates) and then revert on-chain
-          // out of gas, publishing an unspent signature and leaving the allowance behind.
-          ...(unsigned.gasLimit && !permit2 ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+          // A Permit2 call (and any call of an `ownGasEstimate` provider) goes out with the account's own estimate of the
+          // exact call, never the quoted gas limit: a limit below what the call needs would pass the dry run (which
+          // estimates) and then revert on-chain out of gas — paid for, and for a Permit2 call publishing an unspent
+          // signature and leaving the allowance behind.
+          ...(unsigned.gasLimit && !ownGas ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
           ...(cellBody !== undefined
             ? {body: cellBody}
             : unsigned.memo
@@ -1815,17 +1845,32 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
   }
 
   /**
-   * The exact signed call, estimated from this account before it is broadcast (no gas limit passed, so the account
-   * simulates it): a signature the router would not accept, a spent nonce or a price past the minimum stops here,
-   * with nothing sent. The broadcast then uses the account's own estimate, not the quoted limit.
+   * The exact call — a Permit2 call with its signature appended — estimated from this account before it is broadcast
+   * (no gas limit passed, so the account simulates it): a signature the router would not accept, a spent nonce or a
+   * price past the minimum stops here, with nothing sent (`simulation_failed`). The broadcast then uses the account's
+   * own estimate, not the quoted limit. An RPC that does not answer (a dead endpoint, a timeout, a 429) proves nothing
+   * about the call: it is asked once more, and then the swap is refused as `upstream_unavailable`, not as a revert.
    */
-  private async simulatePermit2Call(signer: Swap2Signer, unsigned: UnsignedTx, permit2: Permit2Transfer, data: string): Promise<void> {
-    if (permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError("swap2: the Permit2 signature deadline passed before signing — nothing was sent", {reason: "quote_expired"});
+  private async dryRunCall(signer: Swap2Signer, unsigned: UnsignedTx, data: string | undefined, permit2: Permit2Transfer | undefined): Promise<void> {
+    if (permit2 && permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError("swap2: the Permit2 signature deadline passed before signing — nothing was sent", {reason: "quote_expired"});
     if (typeof signer.quoteSendTransaction !== "function") return;
-    try {
-      await signer.quoteSendTransaction({to: unsigned.to, data, value: BigInt(unsigned.value), ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {})});
-    } catch (error) {
-      throw new Swap2ExecutionError(`swap2: the signed swap does not simulate from this account (${error instanceof Error ? error.message.slice(0, 160) : String(error).slice(0, 160)}) — nothing was sent`, {cause: error, reason: "simulation_failed"});
+    const call = {to: unsigned.to, ...(data ? {data} : {}), value: BigInt(unsigned.value), ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {})};
+    const what = permit2 ? "signed swap" : "swap";
+    const why = (error: unknown) => (error instanceof Error ? error.message : String(error)).slice(0, 160);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await signer.quoteSendTransaction(call);
+        return;
+      } catch (error) {
+        if (dryRunFailure(error) === "transport") {
+          if (attempt === 0) {
+            await new Promise((resolve) => setTimeout(resolve, DRY_RUN_RETRY_MS));
+            continue;
+          }
+          throw new Swap2ExecutionError(`swap2: the ${what} could not be dry-run: the account's RPC did not answer (${why(error)}) — nothing was sent`, {cause: error, reason: "upstream_unavailable"});
+        }
+        throw new Swap2ExecutionError(`swap2: the ${what} does not simulate from this account (${why(error)}) — nothing was sent`, {cause: error, reason: "simulation_failed"});
+      }
     }
   }
 

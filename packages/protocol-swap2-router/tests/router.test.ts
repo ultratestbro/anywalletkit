@@ -197,6 +197,12 @@ describe("router dispatch snapshot", () => {
     void got.buildClaim!({intentId: "x"});
     expect(calls).toEqual(["claim"]);
   });
+
+  it("keeps ownGasEstimate (review 2026-11-15): dropped, the engine would broadcast the venue's quoted gas limit", () => {
+    const r = new CrossChainRouter([provider("own", {ownGasEstimate: true}), provider("quoted")]);
+    expect(r.getProvider("own")!.ownGasEstimate).toBe(true);
+    expect(r.getProvider("quoted")!.ownGasEstimate).toBeUndefined();
+  });
 });
 
 describe("ranking, route picker, progressive quotes", () => {

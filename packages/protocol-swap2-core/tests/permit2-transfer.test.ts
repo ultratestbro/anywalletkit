@@ -285,8 +285,10 @@ describe("Permit2 signature-transfer execution", () => {
 
   it("refuses a native-coin input, a typed order next to it, and a build that changes the permit", async () => {
     const log = fresh();
+    // A permit riding with native value is refused with the quote itself (policy_refused), before the engine's own
+    // "nothing to permit" check could see it.
     const native = await protocol(provider(tx({value: AMOUNT.toString()})), account(log)).swap2({...options, fromToken: "ETH", toToken: USDC}).catch((e: unknown) => e);
-    expect((native as Error).message).toMatch(/native-coin input has nothing to permit/);
+    expect((native as Error).message).toMatch(/permit2: rejected by validation/);
     expect(refusalOf(native)?.reason).toBe("policy_refused");
     const ambiguous = await protocol(provider(tx(), {buildDeposit: async (q) => ({chain: "", to: SETTLER, value: "0", data: DATA, chainId: 8453, gasLimit: "400000", approvalAddress: PERMIT2_ADDRESS, permit2Transfer: q.txRequest!.permit2Transfer!, typedData: "{}"})}), account(log)).swap2(options).catch((e: unknown) => e);
     expect((ambiguous as Error).message).toBe("swap2: provider returned ambiguous execution payloads");
