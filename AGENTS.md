@@ -34,7 +34,7 @@ into the app; never install from GitHub.
 | Seed on the phone (Face ID / passcode) | `secure-storage-react-native` (Expo module: dev build, not Expo Go) |
 | Encrypted backup file / iCloud backup | `seed-vault`, `backup-cloud` |
 | Hermes polyfills | `runtime-hermes` |
-| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,curve,wrap,jupiter,omniston,fynd,relay,symbiosis}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
+| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,curve,wrap,jupiter,omniston,fynd,relay,symbiosis,0x}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
 | Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad,native-near,liquid-near}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
 | Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | dApp connection | `walletconnect-ton` (WalletConnect for TON dApps); `extension-kit` (browser extension) |
@@ -287,7 +287,8 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   other. Anything else or a throw refuses the swap. Quotes and `quoteSwap2Routes` do not apply the cap.
 - Errors: `Swap2MaybeSentError` (may be on chain — never retry, track `e.id`/`e.hash`), `Swap2InFlightError`
   (double tap), `Swap2InsufficientGasError`, `Swap2FeeLimitError`, `Swap2QuoteError` (no route; message says why).
-- Keys: LI.FI `apiKey` (rate limit), 1Click `jwt` (no fee). Fynd needs an `apiKey`. Chainflip, Uniswap,
+- Keys: LI.FI `apiKey` (rate limit), 1Click `jwt` (no fee). Fynd needs an `apiKey`. 0x needs an `apiKey` (a getter
+  or a string): keep it on a server, the app runs `zeroExRemoteProvider` (with its own `rpcUrls`). Chainflip, Uniswap,
   Balancer, Curve, Wrap, CCTP, USDT0 need no key; on-chain venues need `rpcUrls`.
 - Curve (`curveProvider({ rpcUrls: { 1: [url] } })`, chain ids as keys): same-chain Router NG over a pool allowlist
   pinned in the package (1–2 pools; between them only catalog tokens); no gas limit in the quote (the wallet
@@ -302,6 +303,14 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   always named to Relay (the caller's, else 2 %); one deposit per order (`clearedStore` to survive restarts). Routes that
   swap on the source chain first, order fees, app fees, gas top-ups, destination calls and non-EVM chains are refused. Behind a backend:
   `remoteProvider({ name: 'relay', baseUrl, ...relayPins })`.
+- 0x (`zeroExProvider({ apiKey, rpcUrls })` on your server, `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app;
+  conventional env names `ZEROEX_ENABLED` / `ZEROEX_API_KEY`): same-chain exact-input swaps on Ethereum, Base,
+  Arbitrum, Optimism, Polygon, Avalanche and BNB Smart Chain through the Permit2 flow. The Settler is read from 0x's
+  registry over the app's own RPC (and must be a CREATE3 deployment of that registry); the Permit2 payload is rebuilt
+  on the device and signed as EIP-712 typed data (the account needs `signTypedData`; the engine signs it before the
+  exact approval to Permit2 and appends it to the calldata); recipient, buy token and minimum are read from the
+  Settler call. A review screen shows `plan.source.permit2Transfer` — what the account signs. Every refusal is
+  classified (`onRefusal(text, info)`, `zeroExPins.reasonOf`).
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.
 

@@ -10,7 +10,37 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: refusal reasons
+## Next release: Permit2 signature transfers, and 0x
+
+Not breaking for apps that do not use the new provider: every existing text and check is unchanged.
+
+- **protocol-swap2-core (minor):** the engine can pay a swap with a Permit2 signature transfer
+  (`txRequest.permit2Transfer`, used by the new 0x provider). It reads the provider's EIP-712 `PermitTransferFrom`
+  strictly, holds it to the swap (Permit2's domain on the source chain, the source token, exactly the input, the
+  called contract as the only spender, a deadline at most an hour away, no witness), rebuilds it from local
+  constants and signs that — typed data only, before the exact approval to Permit2 goes out. The signature is
+  appended to the calldata, the signed call is estimated once the allowance is in place, and it is broadcast with
+  the account's own gas estimate, never the quoted limit. Its refusals are classified like the others.
+- **A custom review screen (`reviewExecution`):** a `call` source may now carry `permit2Transfer`, the JSON typed
+  data the account signs right before the call (whose calldata then ends with `uint256(length)` and the signature).
+  Show it; `extension-kit`'s `swapApprovalPayload` does (`source.permit2Transfer`). Apps with their own gate that
+  pre-approves the reviewed operations must match the permit by its EIP-712 digest and the call by its signed
+  structure, not by the unsigned calldata (`extension-kit` `planMatchers` / `evmSignedCallMatcher` do).
+- **Accounts:** a Permit2 swap needs an account with `signTypedData`. One without it is refused before anything is
+  approved.
+- **A swap2 server and its clients:** bump them together before enabling 0x. `createSwap2Handler` keeps
+  `permit2Transfer` through the seal, `build` and `preflight` only from this release; a client facing an older
+  server refuses the build fail-closed.
+- **Signing policies (kit `allowlist`, `knownSpenders`):** the engine's permit is described as a Permit2 transfer to
+  the 0x Settler, which rotates. List Permit2, the token and the Settlers your resolver currently knows
+  (`zeroExPins().resolver.known(chainId)`), not a fixed address.
+- **New package `@anywalletkit/protocol-swap2-0x`:** `zeroExProvider({ apiKey, rpcUrls })` on your server,
+  `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app (see [0x](/guides/swaps/#0x)). Conventional flags:
+  `ZEROEX_ENABLED` (dark unless set) and `ZEROEX_API_KEY`.
+- **extension-kit (minor), conformance (minor):** the Permit2 swap is one sheet and three pre-approved operations;
+  the behaviour suite runs Permit2 swaps (`createMockAccount({ signTypedData: true })`).
+
+## 2026-11-13: refusal reasons
 
 Not breaking: every refusal text is unchanged. A classified refusal now also carries `reason`, one of the 17
 `Swap2RefusalReason` values (see [Refusal reasons](/guides/swaps/#refusal-reasons)).

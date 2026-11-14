@@ -86,6 +86,10 @@ jobs.push({id: "scrvusd", module: "scrvusd", script: pkg("protocol-lending-curve
 // Relay: every pin against /chains and on chain (depository code, allocator, owner, selectors), then live quotes verified,
 // built and preflighted through the provider and the router. Keyless; RELAY_API_KEY is passed through when set.
 if (existsSync(pkg("protocol-swap2-relay"))) jobs.push({id: "relay", module: "relay", script: pkg("protocol-swap2-relay"), args: [], timeoutS: 300});
+// 0x: the registry (ERC-1967 proxy, owner, the Settlers it names are CREATE3 deployments with code), Permit2 and the wrapped
+// natives on all seven chains — keyless, always. Live quotes (local and through createSwap2Handler) only with
+// ZEROEX_API_KEY; without it the script says so in a neutral line and exits 0.
+if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], timeoutS: 300});
 
 const selected = jobs.filter((j) => !ONLY || ONLY.has(j.module) || ONLY.has(j.id));
 const SOFT_FAIL = /(^|\s)(→|->)\s*\w*Error\b|\bFAILED\b|\bError:|not found|revert/i;
