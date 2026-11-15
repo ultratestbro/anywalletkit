@@ -386,7 +386,9 @@ A refusal without `reason` is not classified. `refusalOf` reads only reasons the
 
 `maxNetworkFeeBps` and `maxProtocolFeeBps` (basis points of the input) refuse routes whose
 **itemized** fees are above the cap. The check is fail-closed: a route whose provider does
-not itemize its fees is refused whenever a cap is set. With caps on, the USDC example above
+not itemize its fees is refused whenever a cap is set, and so is one whose capped fees are not in the
+input token. For a native-coin input, the native coin counts under the names providers give it:
+`native`, and on EVM chains the zero address or `0xEeee…EEeE`. With caps on, the USDC example above
 keeps only the CCTP route. To protect the user without losing routes, compare the
 guaranteed output (`toTokenAmountMin`) instead.
 

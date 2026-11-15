@@ -66,7 +66,7 @@ export interface RelayClearedStore {
 interface RelayStep {id?: unknown; requestId?: unknown; items?: unknown}
 interface RelayQuoteBody {
   steps?: unknown;
-  fees?: {relayer?: {currency?: {address?: unknown}; amount?: unknown; amountUsd?: unknown}; app?: {amount?: unknown}};
+  fees?: {relayer?: {currency?: {address?: unknown; chainId?: unknown}; amount?: unknown; amountUsd?: unknown}; app?: {amount?: unknown}};
   details?: {timeEstimate?: unknown; currencyGasTopup?: {amount?: unknown}};
   protocol?: {v2?: unknown};
   message?: unknown;
@@ -290,7 +290,10 @@ export function relayProvider(config: RelayProviderConfig = {}): CrossChainProvi
         const relayer = body.fees?.relayer;
         const usd = typeof relayer?.amountUsd === "string" && /^\d{1,12}(?:\.\d{1,18})?$/.test(relayer.amountUsd) ? parseFloat(relayer.amountUsd) : 0;
         const feeToken = relayer?.currency?.address;
-        const fees = typeof relayer?.amount === "string" && /^[1-9]\d{0,77}$/.test(relayer.amount) && typeof feeToken === "string" && /^0x[0-9a-fA-F]{40}$/.test(feeToken)
+        // Itemized only in a currency of the source chain: a fee token carries no chain, and the zero address names the
+        // native coin of every EVM chain, so a fee priced on another chain must not be counted against the input.
+        const sameChain = relayer?.currency?.chainId === v.deposit.chainId;
+        const fees = sameChain && typeof relayer?.amount === "string" && /^[1-9]\d{0,77}$/.test(relayer.amount) && typeof feeToken === "string" && /^0x[0-9a-fA-F]{40}$/.test(feeToken)
           ? [{type: "protocol" as const, amount: relayer.amount, token: feeToken.toLowerCase(), included: true, description: "Relay fee"}]
           : [];
         const eta = body.details?.timeEstimate;

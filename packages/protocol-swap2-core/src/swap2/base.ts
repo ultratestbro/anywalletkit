@@ -293,6 +293,20 @@ function declaredNativeFee(q: {txRequest?: {nativeFee?: string}}, chain: string,
   return fee;
 }
 
+/**
+ * How providers name a chain's native coin in a fee's `token`, lowercase: "native" (0x, Jupiter) on any chain, and on
+ * EVM chains the zero address (Relay, Across) or 0xEeee…EEeE. The engine keys a native source by its catalog asset id,
+ * so the fee caps take these as the source only when the source is the native coin (SDK-318): for an ERC-20 source
+ * they stay another token.
+ */
+const NATIVE_FEE_TOKENS: ReadonlySet<string> = new Set(["native"]);
+const EVM_NATIVE_FEE_TOKENS: ReadonlySet<string> = new Set([ZERO, "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"]);
+
+/** Whether a fee's `token` (lowercased) names `chain`'s native coin. */
+function isNativeFeeToken(chain: string, token: string): boolean {
+  return NATIVE_FEE_TOKENS.has(token) || (chain.startsWith("eip155:") && EVM_NATIVE_FEE_TOKENS.has(token));
+}
+
 export type Swap2ExecutionPhase = "approving" | "requoting" | "preflight" | "signing" | "broadcast";
 export interface Swap2ExecutionPhaseDetail {
   /** approving: which approval of how many (USDT on Ethereum needs two). */
@@ -1051,11 +1065,17 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
   }
 
+  /**
+   * Hold itemized fees to `maxNetworkFeeBps` / `maxProtocolFeeBps` of the input. Every fee of a capped type must be in
+   * the source token (`sourceToken`, compared case-insensitively); with `sourceNative` (the source is the chain's native
+   * coin) a fee in a provider's native spelling — "native", the zero address, 0xEeee…EEeE — counts as the source too.
+   */
   protected assertFeeCaps(
     fees: readonly Swap2Fee[] | undefined,
     sourceAmount: bigint,
     sourceToken: string,
     config?: Swap2ProtocolConfig,
+    sourceNative = false,
   ): void {
     this.assertFeeConfig(config);
     const configured = {...(this._config as Swap2ProtocolConfig), ...(config ?? {})};
@@ -1066,10 +1086,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (!caps.some(([, cap]) => cap !== undefined)) return;
     if (!fees) throw new Swap2FeeLimitError("swap2: fee caps require an itemized provider fee breakdown", {reason: "policy_refused"});
     const normalizedSource = sourceToken.toLowerCase();
+    const inSource = (token: string): boolean => {
+      const normalized = token.toLowerCase();
+      return normalized === normalizedSource || (sourceNative && isNativeFeeToken(this.fromChain, normalized));
+    };
     for (const [type, cap] of caps) {
       if (cap === undefined) continue;
       const matching = fees.filter((fee) => fee.type === type);
-      if (matching.some((fee) => fee.token.toLowerCase() !== normalizedSource)) {
+      if (matching.some((fee) => !inSource(fee.token))) {
         throw new Swap2FeeLimitError(`swap2: cannot apply ${type} fee cap across different fee tokens`, {reason: "policy_refused"});
       }
       const total = matching.reduce((sum, fee) => sum + fee.amount, 0n);
@@ -1085,7 +1109,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (!source) throw new Error(`swap2: unknown source token '${options.fromToken}' on ${this.fromChain}`);
     const token = source.contract ?? source.assetId;
     const fees = q.fees?.map((fee) => ({...fee, amount: BigInt(fee.amount)} as Swap2Fee));
-    this.assertFeeCaps(fees, BigInt(q.sourceAmount), token, config);
+    // No contract is the catalog's native coin (an unlisted token always has one).
+    this.assertFeeCaps(fees, BigInt(q.sourceAmount), token, config, !source.contract);
   }
 
   protected toQuote(q: Quote, options: Swap2Options): Swap2Quote {

@@ -73,6 +73,17 @@ describe("getQuote", () => {
     // The minimum shown is the order's minimum, never its expected amount.
     expect(BigInt(quote!.minDestAmount!) < BigInt(quote!.destAmount)).toBe(true);
   });
+  it("itemizes Relay's fee only in a currency of the source chain (a fee token carries no chain; the zero address is every EVM chain's coin)", async () => {
+    const name = "user.arb-usdc_base-usdc";
+    const fee = (f: QuoteFixture) => (f.response as unknown as {fees: {relayer: {currency: Record<string, unknown>}}}).fees.relayer.currency;
+    const elsewhere = await quoted(name, {}, (f) => { fee(f).chainId = 8453; });
+    expect(elsewhere.quote).not.toBeNull();
+    expect(elsewhere.quote!.fees).toEqual([]);
+    const unnamed = await quoted(name, {}, (f) => { delete fee(f).chainId; });
+    expect(unnamed.quote!.fees).toEqual([]);
+    const source = await quoted(name);
+    expect(source.quote!.fees).toHaveLength(1);
+  });
   it("a native deposit carries the amount as value and no approval", async () => {
     const {f, quote} = await quoted(ETH);
     expect(quote!.txRequest).toMatchObject({value: f.request.amount, chainId: 10});

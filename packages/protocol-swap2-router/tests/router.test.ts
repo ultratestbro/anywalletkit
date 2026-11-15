@@ -452,3 +452,38 @@ describe("nativeFeeCeiling through the router (USDT0 Legacy Mesh into Tron, 2026
     }
   });
 });
+
+describe("fee caps on a native-coin input through the router (SDK-318)", () => {
+  const SPOKE = "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64";
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const ONE_ETH = 10n ** 18n;
+  /** Across-shaped: one included protocol fee (input − output) in the input token, the zero address for the native coin. */
+  const acrossLike = (name: string, fee: bigint, token = ZERO_ADDRESS) => provider(name, {
+    getQuote: async (params) => {
+      const native = params.sourceToken === "ETH";
+      const out = (BigInt(params.amountIn) - fee).toString();
+      return {
+        provider: name, intentId: `${name}-intent`, depositAddress: "", depositMemo: null,
+        txRequest: {to: SPOKE, data: "0xad5425c6", value: native ? params.amountIn : "0", chainId: 8453, gasLimit: "200000", ...(native ? {} : {approvalAddress: SPOKE})},
+        sourceAmount: params.amountIn, destAmount: out, minDestAmount: out,
+        feeUsd: 0, etaSeconds: 2, reliability: 1, validUntilMs: Date.now() + 60_000,
+        fees: [{type: "protocol" as const, amount: fee.toString(), token, included: true, description: "Across relayer and LP fee"}],
+      };
+    },
+  });
+  const options = {fromToken: "ETH", toToken: "ETH", toChain: "eip155:42161", fromTokenAmount: ONE_ETH, recipient: "0x3333333333333333333333333333333333333333"};
+
+  it("the route list keeps a native route under maxProtocolFeeBps and drops the one over it", async () => {
+    const swap2 = new RouterSwap2Protocol(undefined, {fromChain: "eip155:8453", maxProtocolFeeBps: 10, providers: [acrossLike("under", ONE_ETH / 1000n), acrossLike("over", ONE_ETH / 1000n + 1n)]});
+    expect((await swap2.quoteSwap2Routes(options)).map((r) => r.provider)).toEqual(["under"]);
+    expect((await swap2.using("under").quoteSwap2(options)).fees).toEqual([{type: "protocol", amount: ONE_ETH / 1000n, token: ZERO_ADDRESS, included: true, description: "Across relayer and LP fee"}]);
+    await expect(swap2.using("over").quoteSwap2(options)).rejects.toThrow("swap2: protocol fee exceeds configured cap");
+  });
+
+  it("an ERC-20 input with its fee itemized as the zero address stays out of the list", async () => {
+    const swap2 = new RouterSwap2Protocol(undefined, {fromChain: "eip155:8453", maxProtocolFeeBps: 10, providers: [acrossLike("zero", 1n)]});
+    const usdc = {...options, fromToken: "USDC", toToken: "USDC", fromTokenAmount: 100_000_000n};
+    expect(await swap2.quoteSwap2Routes(usdc)).toEqual([]);
+    await expect(swap2.quoteSwap2(usdc)).rejects.toThrow("swap2: cannot apply protocol fee cap across different fee tokens");
+  });
+});
