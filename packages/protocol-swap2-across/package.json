@@ -1,0 +1,54 @@
+{
+  "name": "@anywalletkit/protocol-swap2-across",
+  "version": "0.0.0",
+  "description": "Across Protocol for the swap2 engine, with the SpokePool deposit built and verified on the device: a plain deposit encoded here from pinned SpokePools and the user's request, every argument held to that request (depositor, recipient, tokens, amounts, destination, empty message, deadlines, a per-asset fee floor) at build time and right before signing; priced from Across API V5 against Across's relayer fee (V5's own execution steps never run), the key kept on a server; status read on chain. EVM to EVM, the same asset on both sides.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/protocol-swap2-across" },
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./config": { "types": "./dist/config.d.ts", "import": "./dist/config.js", "require": "./dist/config.cjs" },
+    "./deposit": { "types": "./dist/deposit.d.ts", "import": "./dist/deposit.js", "require": "./dist/deposit.cjs" },
+    "./verify": { "types": "./dist/verify.d.ts", "import": "./dist/verify.js", "require": "./dist/verify.cjs" },
+    "./build": { "types": "./dist/build.d.ts", "import": "./dist/build.js", "require": "./dist/build.cjs" },
+    "./status": { "types": "./dist/status.d.ts", "import": "./dist/status.js", "require": "./dist/status.cjs" },
+    "./api": { "types": "./dist/api.d.ts", "import": "./dist/api.js", "require": "./dist/api.cjs" },
+    "./pricing": { "types": "./dist/pricing.d.ts", "import": "./dist/pricing.js", "require": "./dist/pricing.cjs" },
+    "./provider": { "types": "./dist/provider.d.ts", "import": "./dist/provider.js", "require": "./dist/provider.cjs" },
+    "./remote": { "types": "./dist/remote.d.ts", "import": "./dist/remote.js", "require": "./dist/remote.cjs" },
+    "./protocol": { "types": "./dist/protocol.d.ts", "import": "./dist/protocol.js", "require": "./dist/protocol.cjs" },
+    "./activity": { "types": "./dist/activity.d.ts", "import": "./dist/activity.js", "require": "./dist/activity.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "module.json"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
+  },
+  "dependencies": {
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*",
+    "viem": "^2.57.2"
+  },
+  "peerDependencies": { "@anywalletkit/core": "workspace:*" },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.1.0",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/history-evm": "workspace:*",
+    "@anywalletkit/protocol-swap2-router": "workspace:*",
+    "@anywalletkit/core": "workspace:*"
+  },
+  "keywords": ["swap2", "bridge", "across", "across-protocol", "spokepool", "intents", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
+}

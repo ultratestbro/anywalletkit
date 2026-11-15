@@ -1,0 +1,82 @@
+{
+ "note": "github.com/across-protocol/contracts @ d652689f67cd9835b9c1ab0acc2f99236902e299, broadcast/deployed-addresses.json (read 2026-11-15), trimmed to the SpokePools of the chains this module pins or names as excluded, and the HubPool.",
+ "chains": {
+  "1": {
+   "chain_name": "Mainnet",
+   "SpokePool": "0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5",
+   "HubPool": "0xc186fA914353c44b2E33eBE05f21846F1048bEda"
+  },
+  "10": {
+   "chain_name": "Optimism",
+   "SpokePool": "0x6f26Bf09B1C792e3228e5467807a900A503c0281"
+  },
+  "130": {
+   "chain_name": "Unichain",
+   "SpokePool": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64"
+  },
+  "137": {
+   "chain_name": "Polygon",
+   "SpokePool": "0x9295ee1d8C5b022Be115A2AD3c30C72E34e7F096"
+  },
+  "143": {
+   "chain_name": "Monad",
+   "SpokePool": "0xd2ecb3afe598b746F8123CaE365a598DA831A449"
+  },
+  "324": {
+   "chain_name": "zkSync",
+   "SpokePool": "0xE0B015E54d54fc84a6cB9B666099c46adE9335FF"
+  },
+  "480": {
+   "chain_name": "World Chain",
+   "SpokePool": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64"
+  },
+  "999": {
+   "chain_name": "HyperEVM",
+   "SpokePool": "0x35E63eA3eb0fb7A3bc543C71FB66412e1F6B0E04"
+  },
+  "4326": {
+   "chain_name": "MegaETH",
+   "SpokePool": "0x3Db06DA8F0a24A525f314eeC954fC5c6a973d40E"
+  },
+  "4663": {
+   "chain_name": "Robinhood",
+   "SpokePool": "0xD29C85F15DF544bA632C9E25829fd29d767d7978"
+  },
+  "5042": {
+   "chain_name": "ARC",
+   "SpokePool": "0x9b4A302A548c7e313c2b74C461db7b84d3074A84"
+  },
+  "8453": {
+   "chain_name": "Base",
+   "SpokePool": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64"
+  },
+  "9745": {
+   "chain_name": "Plasma",
+   "SpokePool": "0x50039fAEfebef707cFD94D6d462fE6D10B39207a"
+  },
+  "42161": {
+   "chain_name": "Arbitrum One",
+   "SpokePool": "0xe35e9842fceaCA96570B734083f4a58e8F7C5f2A"
+  },
+  "43114": {
+   "chain_name": "Avalanche",
+   "SpokePool": "0xFE9D541c92E4e90437C7152A00244886dE37a658"
+  },
+  "57073": {
+   "chain_name": "Ink",
+   "SpokePool": "0xeF684C38F94F48775959ECf2012D7E864ffb9dd4"
+  },
+  "59144": {
+   "chain_name": "Linea",
+   "SpokePool": "0x7E63A5f1a8F0B4d0934B2f2327DAED3F6bb2ee75"
+  },
+  "56": {
+   "chain_name": "BNB Smart Chain",
+   "SpokePool": "0x4e8E101924eDE233C13e2D8622DC8aED2872d505"
+  },
+  "534352": {
+   "chain_name": "Scroll",
+   "SpokePool": "0x3baD7AD0728f9917d1Bf08af5782dCbD516cDd96"
+  }
+ }
+}

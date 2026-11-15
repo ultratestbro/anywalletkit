@@ -1,0 +1,525 @@
+{
+ "module": "@anywalletkit/protocol-swap2-across",
+ "sources": [
+  {
+   "id": "deployed-addresses",
+   "type": "github-file",
+   "repo": "across-protocol/contracts",
+   "path": "broadcast/deployed-addresses.json",
+   "label": "Across deployed-addresses.json (the SpokePool and HubPool addresses config.ts pins)"
+  },
+  {
+   "id": "spokepool-source",
+   "type": "github-file",
+   "repo": "across-protocol/contracts",
+   "path": "contracts/spoke-pools/SpokePool.sol",
+   "label": "SpokePool.sol (deposit, its checks, the relay hash, fill statuses, the V5 message prefix)"
+  },
+  {
+   "id": "spokepool-interface",
+   "type": "github-file",
+   "repo": "across-protocol/contracts",
+   "path": "contracts/interfaces/V3SpokePoolInterface.sol",
+   "label": "V3SpokePoolInterface.sol (FundsDeposited, V3RelayData, FillStatus)"
+  },
+  {
+   "id": "api-v5-quote-and-execute",
+   "type": "github-file",
+   "repo": "across-protocol/skills",
+   "path": "skills/quote-and-execute/SKILL.md",
+   "label": "Across API V5 · quote and execute (the API this module reads its price from)"
+  },
+  {
+   "id": "hub-pool",
+   "type": "evm-code",
+   "chainId": 1,
+   "address": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "label": "Across HubPool · Ethereum"
+  },
+  {
+   "id": "hub-pool-owner",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "owner()",
+   "decode": "address",
+   "label": "Across HubPool owner() · Ethereum (can re-point the registry and upgrade every SpokePool)"
+  },
+  {
+   "id": "spokepool-ethereum",
+   "type": "evm-proxy",
+   "chainId": 1,
+   "address": "0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5",
+   "label": "Across SpokePool · Ethereum"
+  },
+  {
+   "id": "hub-registry-ethereum",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    1
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(1) · Ethereum (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-ethereum",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Ethereum"
+  },
+  {
+   "id": "spokepool-optimism",
+   "type": "evm-proxy",
+   "chainId": 10,
+   "address": "0x6f26bf09b1c792e3228e5467807a900a503c0281",
+   "label": "Across SpokePool · Optimism"
+  },
+  {
+   "id": "hub-registry-optimism",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    10
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(10) · Optimism (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-optimism",
+   "type": "evm-call",
+   "chainId": 10,
+   "to": "0x6f26bf09b1c792e3228e5467807a900a503c0281",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Optimism"
+  },
+  {
+   "id": "spokepool-unichain",
+   "type": "evm-proxy",
+   "chainId": 130,
+   "address": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64",
+   "label": "Across SpokePool · Unichain"
+  },
+  {
+   "id": "hub-registry-unichain",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    130
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(130) · Unichain (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-unichain",
+   "type": "evm-call",
+   "chainId": 130,
+   "to": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Unichain"
+  },
+  {
+   "id": "spokepool-polygon",
+   "type": "evm-proxy",
+   "chainId": 137,
+   "address": "0x9295ee1d8c5b022be115a2ad3c30c72e34e7f096",
+   "label": "Across SpokePool · Polygon"
+  },
+  {
+   "id": "hub-registry-polygon",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    137
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(137) · Polygon (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-polygon",
+   "type": "evm-call",
+   "chainId": 137,
+   "to": "0x9295ee1d8c5b022be115a2ad3c30c72e34e7f096",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Polygon"
+  },
+  {
+   "id": "spokepool-monad",
+   "type": "evm-proxy",
+   "chainId": 143,
+   "address": "0xd2ecb3afe598b746f8123cae365a598da831a449",
+   "label": "Across SpokePool · Monad"
+  },
+  {
+   "id": "hub-registry-monad",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    143
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(143) · Monad (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-monad",
+   "type": "evm-call",
+   "chainId": 143,
+   "to": "0xd2ecb3afe598b746f8123cae365a598da831a449",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Monad"
+  },
+  {
+   "id": "spokepool-zksync",
+   "type": "evm-proxy",
+   "chainId": 324,
+   "address": "0xe0b015e54d54fc84a6cb9b666099c46ade9335ff",
+   "label": "Across SpokePool · zkSync Era"
+  },
+  {
+   "id": "hub-registry-zksync",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    324
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(324) · zkSync Era (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-zksync",
+   "type": "evm-call",
+   "chainId": 324,
+   "to": "0xe0b015e54d54fc84a6cb9b666099c46ade9335ff",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · zkSync Era"
+  },
+  {
+   "id": "spokepool-worldchain",
+   "type": "evm-proxy",
+   "chainId": 480,
+   "address": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64",
+   "label": "Across SpokePool · World Chain"
+  },
+  {
+   "id": "hub-registry-worldchain",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    480
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(480) · World Chain (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-worldchain",
+   "type": "evm-call",
+   "chainId": 480,
+   "to": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · World Chain"
+  },
+  {
+   "id": "spokepool-hyperevm",
+   "type": "evm-proxy",
+   "chainId": 999,
+   "address": "0x35e63ea3eb0fb7a3bc543c71fb66412e1f6b0e04",
+   "label": "Across SpokePool · HyperEVM"
+  },
+  {
+   "id": "hub-registry-hyperevm",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    999
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(999) · HyperEVM (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-hyperevm",
+   "type": "evm-call",
+   "chainId": 999,
+   "to": "0x35e63ea3eb0fb7a3bc543c71fb66412e1f6b0e04",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · HyperEVM"
+  },
+  {
+   "id": "spokepool-megaeth",
+   "type": "evm-proxy",
+   "chainId": 4326,
+   "address": "0x3db06da8f0a24a525f314eec954fc5c6a973d40e",
+   "label": "Across SpokePool · MegaETH"
+  },
+  {
+   "id": "hub-registry-megaeth",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    4326
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(4326) · MegaETH (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-megaeth",
+   "type": "evm-call",
+   "chainId": 4326,
+   "to": "0x3db06da8f0a24a525f314eec954fc5c6a973d40e",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · MegaETH"
+  },
+  {
+   "id": "spokepool-robinhood",
+   "type": "evm-proxy",
+   "chainId": 4663,
+   "address": "0xd29c85f15df544ba632c9e25829fd29d767d7978",
+   "label": "Across SpokePool · Robinhood Chain"
+  },
+  {
+   "id": "hub-registry-robinhood",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    4663
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(4663) · Robinhood Chain (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-robinhood",
+   "type": "evm-call",
+   "chainId": 4663,
+   "to": "0xd29c85f15df544ba632c9e25829fd29d767d7978",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Robinhood Chain"
+  },
+  {
+   "id": "spokepool-arc",
+   "type": "evm-proxy",
+   "chainId": 5042,
+   "address": "0x9b4a302a548c7e313c2b74c461db7b84d3074a84",
+   "label": "Across SpokePool · Arc"
+  },
+  {
+   "id": "hub-registry-arc",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    5042
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(5042) · Arc (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-arc",
+   "type": "evm-call",
+   "chainId": 5042,
+   "to": "0x9b4a302a548c7e313c2b74c461db7b84d3074a84",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Arc"
+  },
+  {
+   "id": "spokepool-base",
+   "type": "evm-proxy",
+   "chainId": 8453,
+   "address": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64",
+   "label": "Across SpokePool · Base"
+  },
+  {
+   "id": "hub-registry-base",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    8453
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(8453) · Base (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-base",
+   "type": "evm-call",
+   "chainId": 8453,
+   "to": "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Base"
+  },
+  {
+   "id": "spokepool-plasma",
+   "type": "evm-proxy",
+   "chainId": 9745,
+   "address": "0x50039faefebef707cfd94d6d462fe6d10b39207a",
+   "label": "Across SpokePool · Plasma"
+  },
+  {
+   "id": "hub-registry-plasma",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    9745
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(9745) · Plasma (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-plasma",
+   "type": "evm-call",
+   "chainId": 9745,
+   "to": "0x50039faefebef707cfd94d6d462fe6d10b39207a",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Plasma"
+  },
+  {
+   "id": "spokepool-arbitrum",
+   "type": "evm-proxy",
+   "chainId": 42161,
+   "address": "0xe35e9842fceaca96570b734083f4a58e8f7c5f2a",
+   "label": "Across SpokePool · Arbitrum"
+  },
+  {
+   "id": "hub-registry-arbitrum",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    42161
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(42161) · Arbitrum (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-arbitrum",
+   "type": "evm-call",
+   "chainId": 42161,
+   "to": "0xe35e9842fceaca96570b734083f4a58e8f7c5f2a",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Arbitrum"
+  },
+  {
+   "id": "spokepool-avalanche",
+   "type": "evm-proxy",
+   "chainId": 43114,
+   "address": "0xfe9d541c92e4e90437c7152a00244886de37a658",
+   "label": "Across SpokePool · Avalanche"
+  },
+  {
+   "id": "hub-registry-avalanche",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    43114
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(43114) · Avalanche (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-avalanche",
+   "type": "evm-call",
+   "chainId": 43114,
+   "to": "0xfe9d541c92e4e90437c7152a00244886de37a658",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Avalanche"
+  },
+  {
+   "id": "spokepool-ink",
+   "type": "evm-proxy",
+   "chainId": 57073,
+   "address": "0xef684c38f94f48775959ecf2012d7e864ffb9dd4",
+   "label": "Across SpokePool · Ink"
+  },
+  {
+   "id": "hub-registry-ink",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    57073
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(57073) · Ink (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-ink",
+   "type": "evm-call",
+   "chainId": 57073,
+   "to": "0xef684c38f94f48775959ecf2012d7e864ffb9dd4",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Ink"
+  },
+  {
+   "id": "spokepool-linea",
+   "type": "evm-proxy",
+   "chainId": 59144,
+   "address": "0x7e63a5f1a8f0b4d0934b2f2327daed3f6bb2ee75",
+   "label": "Across SpokePool · Linea"
+  },
+  {
+   "id": "hub-registry-linea",
+   "type": "evm-call",
+   "chainId": 1,
+   "to": "0xc186fa914353c44b2e33ebe05f21846f1048beda",
+   "signature": "crossChainContracts(uint256)",
+   "args": [
+    59144
+   ],
+   "decode": "(address,address)",
+   "label": "HubPool crossChainContracts(59144) · Linea (adapter, SpokePool)"
+  },
+  {
+   "id": "paused-linea",
+   "type": "evm-call",
+   "chainId": 59144,
+   "to": "0x7e63a5f1a8f0b4d0934b2f2327daed3f6bb2ee75",
+   "signature": "pausedDeposits()",
+   "decode": "bool",
+   "label": "Across SpokePool pausedDeposits() · Linea"
+  }
+ ]
+}

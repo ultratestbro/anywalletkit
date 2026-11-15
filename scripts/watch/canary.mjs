@@ -11,6 +11,7 @@ import {spawn} from "node:child_process";
 import {readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync} from "node:fs";
 import {resolve, dirname} from "node:path";
 import {fileURLToPath} from "node:url";
+import {runStatus} from "./canary-status.mjs";
 import {fitLines} from "./html-text.mjs";
 import {retryWaitMs} from "./retry-wait.mjs";
 
@@ -90,9 +91,12 @@ if (existsSync(pkg("protocol-swap2-relay"))) jobs.push({id: "relay", module: "re
 // natives on all seven chains — keyless, always. Live quotes (local and through createSwap2Handler) only with
 // ZEROEX_API_KEY; without it the script says so in a neutral line and exits 0.
 if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], timeoutS: 300});
+// Across: every pin on chain (SpokePool proxy, chainId, admin = HubPool, wrapped native, buffers, not paused, token
+// decimals, the HubPool's registry) and /suggested-fees on nine corridors on the pinned SpokePools — keyless, always.
+// Live quotes (local and through createSwap2Handler) only with ACROSS_API_KEY; without it a neutral line, exit 0.
+if (existsSync(pkg("protocol-swap2-across"))) jobs.push({id: "across", module: "across", script: pkg("protocol-swap2-across"), args: [], timeoutS: 300});
 
 const selected = jobs.filter((j) => !ONLY || ONLY.has(j.module) || ONLY.has(j.id));
-const SOFT_FAIL = /(^|\s)(→|->)\s*\w*Error\b|\bFAILED\b|\bError:|not found|revert/i;
 function run(job) {
   return new Promise((done) => {
     if (!existsSync(job.script)) return done({...job, status: "missing", ms: 0, note: "no verify-live script"});
@@ -102,10 +106,7 @@ function run(job) {
     const timer = setTimeout(() => child.kill("SIGKILL"), Math.max(TIMEOUT_MS, (job.timeoutS ?? 0) * 1000)); // a job's own timeoutS can only extend --timeout
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      const lines = out.split("\n").filter(Boolean);
-      const soft = lines.filter((l) => SOFT_FAIL.test(l) && !/no position|0 approval|none in the last|position \{ shares: 0n/.test(l));
-      const expected = code !== 0 && /no listed Morpho (vault|market)/.test(out);
-      const status = signal ? "timeout" : expected ? "none" : code !== 0 ? "fail" : soft.length ? "warn" : "ok";
+      const {status, lines, soft} = runStatus({code, signal, out});
       // A failure note names the cause (viem's Details / Status lines, the error line) rather than the stack tail. URLs are cut:
       // an RPC URL carries its API key and the note goes to Telegram and the committed state file.
       const cause = [...new Set(lines.map((l) => l.trim()).filter((l) => /^(\w*Error: |(Details|Status|Reason|function): )/.test(l)))].slice(0, 4);

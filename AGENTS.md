@@ -11,7 +11,7 @@ per-package `README.md` (shipped inside each npm package). Do not invent APIs.
 
 An open multichain wallet SDK in TypeScript. One seed (or an external signer) gives accounts on
 EVM (30+ networks), Solana, TON, Tron, Bitcoin, NEAR and Zcash. Protocol modules add swaps and
-bridges (one router over 16 venues), staking, lending, approvals, history and names. React Native
+bridges (one router over 17 venues), staking, lending, approvals, history and names. React Native
 (Hermes) is the primary target; Node ≥ 20 works without polyfills. ESM + CJS, types included.
 
 All packages are `@anywalletkit/*` **on npm** (https://www.npmjs.com/org/anywalletkit), published from
@@ -34,7 +34,7 @@ into the app; never install from GitHub.
 | Seed on the phone (Face ID / passcode) | `secure-storage-react-native` (Expo module: dev build, not Expo Go) |
 | Encrypted backup file / iCloud backup | `seed-vault`, `backup-cloud` |
 | Hermes polyfills | `runtime-hermes` |
-| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,curve,wrap,jupiter,omniston,fynd,relay,symbiosis,0x}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
+| Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,uniswap,balancer,curve,wrap,jupiter,omniston,fynd,relay,symbiosis,0x,across}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
 | Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad,native-near,liquid-near}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
 | Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | dApp connection | `walletconnect-ton` (WalletConnect for TON dApps); `extension-kit` (browser extension) |
@@ -289,7 +289,8 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   (double tap), `Swap2InsufficientGasError`, `Swap2FeeLimitError`, `Swap2QuoteError` (no route; message says why).
 - Keys: LI.FI `apiKey` (rate limit), 1Click `jwt` (no fee). Fynd needs an `apiKey`. 0x needs an `apiKey` (a getter
   or a string) on a server only — under React Native a provider with a key throws; the app runs
-  `zeroExRemoteProvider` (with its own `rpcUrls`). Chainflip, Uniswap,
+  `zeroExRemoteProvider` (with its own `rpcUrls`). Across needs its API V5 key
+  (`apiKey`, a getter or a string): keep it on a server, the app runs `acrossRemoteProvider`. Chainflip, Uniswap,
   Balancer, Curve, Wrap, CCTP, USDT0 need no key; on-chain venues need `rpcUrls`.
 - Curve (`curveProvider({ rpcUrls: { 1: [url] } })`, chain ids as keys): same-chain Router NG over a pool allowlist
   pinned in the package (1–2 pools; between them only catalog tokens); no gas limit in the quote (the wallet
@@ -316,6 +317,19 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   Settler call. Every call goes out with the account's own gas estimate (`ownGasEstimate`). A review screen shows
   `plan.source.permit2Transfer` — what the account signs; signing policies get the Settlers as `knownSpenders` from
   `await zeroExKnownSpenders(provider, chainId)`. Every refusal is classified (`onRefusal(text, info)`, `zeroExPins.reasonOf`).
+- Across (`acrossProvider({ apiKey, rpcUrls })` on your server, `acrossRemoteProvider({ baseUrl, maxFeeBps?, rpcUrls?, suggestedFeesUrl? })`
+  in the app; conventional env names `ACROSS_ENABLED` / `ACROSS_API_KEY` — the V5 key; Across's integrator id and V4
+  key are not used): EVM → EVM, the same asset (USDC, USDT / USDT0, ETH / WETH, WBTC) between 17 pinned chains, through
+  a plain `deposit` on the source SpokePool built on the device — depositor = the signing account (`QuoteParams.sender`),
+  recipient, tokens, amounts, destination, empty message, a two-hour fill deadline, no exclusivity, and a per-asset fee
+  floor (stables 1 bp, ETH from Ethereum 0.7, ETH from Optimism / Base / Arbitrum 4.5, from another L2 0.7, WBTC 2.5)
+  held to the request before signing; the quote's `fees` / `feeUsd` must be the deposit's (engine fee caps read them).
+  Price: `max(V5's fee minus its own origin execution gas, Across's /suggested-fees relayer fee)` — the relayer fee alone
+  when V5's fill estimate is over a minute (another rail); a pinned floor when /suggested-fees is gone, which needs
+  `rpcUrls` for Ethereum and the source chain; V5's `nextActions` are never run. The remote provider reads
+  /suggested-fees itself (keyless; CSP `connect-src` app.across.to) and refuses a fee >10 % under it.
+  Ethereum as the destination is not priced (refused, `route-unpriced`). An unfilled deposit is refunded on the source
+  chain after its deadline (hours). Under React Native an `apiKey` throws. Refusals: `across: … [code]` with a reason.
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.
 

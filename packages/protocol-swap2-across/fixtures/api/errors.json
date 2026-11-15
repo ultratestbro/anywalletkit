@@ -1,0 +1,261 @@
+{
+ "note": "Real error answers of Across API V5 (POST /v1/quotes, GET /v1/transfers) and of /suggested-fees, recorded 2026-11-14 with the requests named; bodies exactly as Across sent them, no headers, no key.",
+ "v5": [
+  {
+   "name": "v5-unauthenticated-no-key",
+   "status": 401,
+   "note": "POST /v1/quotes without an Authorization header, 2026-11-14 21:15 UTC",
+   "body": {
+    "code": "unauthenticated",
+    "message": "the request does not have valid authentication credentials for the operation",
+    "details": null
+   }
+  },
+  {
+   "name": "v5-unauthenticated-bad-key",
+   "status": 401,
+   "note": "POST /v1/quotes with a wrong key",
+   "body": {
+    "code": "unauthenticated",
+    "message": "AUTH_INVALID",
+    "details": null
+   }
+  },
+  {
+   "name": "v5-unsupported-param",
+   "status": 400,
+   "note": "a body with a field V5 does not know (slippage)",
+   "body": {
+    "error": {
+     "type": "request",
+     "code": "request.unsupported_param",
+     "message": "unsupported field: slippage",
+     "param": "slippage",
+     "requestId": "uufpthbp0d3eri409e3merprlg"
+    }
+   }
+  },
+  {
+   "name": "v5-missing-field",
+   "status": 400,
+   "note": "a body without destination.recipient",
+   "body": {
+    "error": {
+     "type": "request",
+     "code": "request.missing_field",
+     "message": "destination.recipient is required",
+     "param": "destination.recipient",
+     "requestId": "qimjgof3dsflk2b6jsa4293fuc"
+    }
+   }
+  },
+  {
+   "name": "v5-invalid-field-token",
+   "status": 400,
+   "note": "an unknown token",
+   "body": {
+    "error": {
+     "type": "request",
+     "code": "request.invalid_field",
+     "message": "unknown token 0x000000000000000000000000000000000000dEaD on chain 8453: token 0x000000000000000000000000000000000000dEaD on chain 8453 is not a known token",
+     "requestId": "2i4ru0jchb6m0e7f0rigmjrsk4"
+    }
+   }
+  },
+  {
+   "name": "v5-amount-too-small",
+   "status": 400,
+   "note": "1 base unit of USDC: no details",
+   "body": {
+    "error": {
+     "type": "policy",
+     "code": "policy.amount_out_of_range",
+     "message": "worst-case relayer costs exceed the minimum output; increase the amount or try again when gas is lower",
+     "param": "origin.amount",
+     "requestId": "0pjeanv6nv0sb5i5tkro0tk09s"
+    }
+   }
+  },
+  {
+   "name": "v5-amount-too-large",
+   "status": 400,
+   "note": "1e9 USDC Arbitrum -> Base: amountLimits side max (rail cctp)",
+   "body": {
+    "error": {
+     "type": "policy",
+     "code": "policy.amount_out_of_range",
+     "message": "amount is above the maximum this route will move (10000000000000 base units) \u2014 base units of 0xaf88d065e77c8cc2239327c5edb3a432268e5831 on chain 42161",
+     "param": "origin.amount",
+     "requestId": "etb9d69udir9nrp7741cc4co3s",
+     "details": {
+      "amountLimits": {
+       "side": "max",
+       "amount": "10000000000000",
+       "token": {
+        "chainId": 42161,
+        "address": "0xaf88d065e77c8cc2239327c5edb3a432268e5831"
+       },
+       "rail": "cctp",
+       "observedAt": "2026-11-14T21:14:03.366Z"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "v5-fee-cap-min",
+   "status": 400,
+   "note": "0.00284 ETH Ethereum -> Base at maxFee 1000: the fee-cap refusal, amountLimits side min \u2014 'raise the amount above'",
+   "body": {
+    "error": {
+     "type": "policy",
+     "code": "policy.amount_out_of_range",
+     "message": "quote value loss exceeds the allowance of 1000 bps plus $0; raise the amount above 10794099445838946 base units \u2014 base units of 0x0000000000000000000000000000000000000000 on chain 1",
+     "param": "origin.amount",
+     "requestId": "va6mij61dfq69onr8d4kcst1ek",
+     "details": {
+      "amountLimits": {
+       "side": "min",
+       "amount": "10794099445838946",
+       "token": {
+        "chainId": 1,
+        "address": "0x0000000000000000000000000000000000000000"
+       },
+       "rail": "across",
+       "observedAt": "2026-11-14T22:32:20.717Z"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "v5-fee-cap-min-usdt",
+   "status": 400,
+   "note": "5 USDT Ethereum -> Arbitrum at maxFee 1000",
+   "body": {
+    "error": {
+     "type": "policy",
+     "code": "policy.amount_out_of_range",
+     "message": "quote value loss exceeds the allowance of 1000 bps plus $0; raise the amount above 16515910 base units \u2014 base units of 0xdac17f958d2ee523a2206206994597c13d831ec7 on chain 1",
+     "param": "origin.amount",
+     "requestId": "9irvtrv9adf5038729tn2tucss",
+     "details": {
+      "amountLimits": {
+       "side": "min",
+       "amount": "16515910",
+       "token": {
+        "chainId": 1,
+        "address": "0xdac17f958d2ee523a2206206994597c13d831ec7"
+       },
+       "rail": "across",
+       "observedAt": "2026-11-14T22:33:14.003Z"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "v5-fee-cap-min-wbtc",
+   "status": 400,
+   "note": "~$5 WBTC Ethereum -> Arbitrum at maxFee 1000",
+   "body": {
+    "error": {
+     "type": "policy",
+     "code": "policy.amount_out_of_range",
+     "message": "quote value loss exceeds the allowance of 1000 bps plus $0; raise the amount above 25780 base units \u2014 base units of 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 on chain 1",
+     "param": "origin.amount",
+     "requestId": "stipvhhcjr6rvgs7pvq20n09l4",
+     "details": {
+      "amountLimits": {
+       "side": "min",
+       "amount": "25780",
+       "token": {
+        "chainId": 1,
+        "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+       },
+       "rail": "across",
+       "observedAt": "2026-11-14T22:33:24.510Z"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "v5-system-unavailable",
+   "status": 503,
+   "note": "a 503 V5 answered once on 2026-11-14 22:33 UTC (one retry succeeded)",
+   "body": {
+    "error": {
+     "type": "system",
+     "code": "system.unavailable",
+     "message": "deferred entry could not be armed: arm exceeded its 500ms budget",
+     "requestId": "ihl7i80thmkglbro0u8ttclve4"
+    }
+   }
+  },
+  {
+   "name": "v5-not-found-transfer",
+   "status": 404,
+   "note": "GET /v1/transfers/{orderId} for a quote never executed",
+   "body": {
+    "error": {
+     "type": "not_found",
+     "code": "not_found.transfer",
+     "message": "No transfer found for order: 0xaf662bd8c368b0ff8380193b38ab09c79ecd6c1cd6de1105c94f8473b7997889",
+     "requestId": "986eee65-9818-4e0f-947b-44f1787bc347"
+    }
+   }
+  }
+ ],
+ "suggestedFees": [
+  {
+   "name": "fees-amount-too-low",
+   "status": 400,
+   "note": "/suggested-fees for 0.001 USDC Base -> Arbitrum, 2026-11-14",
+   "body": {
+    "type": "AcrossApiError",
+    "code": "AMOUNT_TOO_LOW",
+    "status": 400,
+    "message": "Sent amount is too low relative to fees",
+    "id": "dxk66-1794689377849-fc6492a755c9"
+   }
+  },
+  {
+   "name": "fees-amount-too-high",
+   "status": 400,
+   "note": "/suggested-fees for 100M USDC Base -> Arbitrum",
+   "body": {
+    "type": "AcrossApiError",
+    "code": "AMOUNT_TOO_HIGH",
+    "status": 400,
+    "message": "Amount is higher than available liquidity. Max amount is 548831.417086 USDC.",
+    "id": "w8f22-1794689379195-d59bb0c4a1ac"
+   }
+  },
+  {
+   "name": "fees-route-not-enabled",
+   "status": 400,
+   "note": "/suggested-fees for USDC Arbitrum -> USDT Base (not a same-asset route)",
+   "body": {
+    "type": "AcrossApiError",
+    "code": "ROUTE_NOT_ENABLED",
+    "status": 400,
+    "message": "Route is not enabled.",
+    "id": "8jdm2-1794689107669-00a222d28be2"
+   }
+  },
+  {
+   "name": "fees-invalid-param",
+   "status": 400,
+   "note": "/suggested-fees for an unknown token",
+   "body": {
+    "type": "AcrossApiError",
+    "code": "INVALID_PARAM",
+    "status": 400,
+    "message": "Unsupported token on given origin chain",
+    "param": "inputTokenAddress",
+    "id": "kfn55-1794689380624-b3c8d7b050c7"
+   }
+  }
+ ]
+}

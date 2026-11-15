@@ -461,6 +461,70 @@
    "dst": "eip155:56:BNB",
    "amount": "100",
    "note": "Permit2 token sale on BNB Smart Chain (needs ZEROEX_API_KEY)"
+  },
+  {
+   "id": "across:base-usdc>arb-usdc",
+   "provider": "across",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:42161:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "across:arb-usdc>base-usdc",
+   "provider": "across",
+   "src": "eip155:42161:USDC",
+   "dst": "eip155:8453:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "across:base-usdc>op-usdc",
+   "provider": "across",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:10:USDC",
+   "amount": "100"
+  },
+  {
+   "id": "across:base-eth>arb-eth",
+   "provider": "across",
+   "src": "eip155:8453:ETH",
+   "dst": "eip155:42161:ETH",
+   "amount": "0.05"
+  },
+  {
+   "id": "across:arb-eth>base-eth",
+   "provider": "across",
+   "src": "eip155:42161:ETH",
+   "dst": "eip155:8453:ETH",
+   "amount": "0.05"
+  },
+  {
+   "id": "across:eth-eth>base-eth",
+   "provider": "across",
+   "src": "eip155:1:ETH",
+   "dst": "eip155:8453:ETH",
+   "amount": "0.05"
+  },
+  {
+   "id": "across:op-eth>base-eth",
+   "provider": "across",
+   "src": "eip155:10:ETH",
+   "dst": "eip155:8453:ETH",
+   "amount": "0.05"
+  },
+  {
+   "id": "across:eth-usdt>arb-usdt0",
+   "provider": "across",
+   "src": "eip155:1:USDT",
+   "dst": "eip155:42161:USDT0",
+   "amount": "100",
+   "note": "V5 prices this route on another rail (~20 min); the plain deposit fills in seconds"
+  },
+  {
+   "id": "across:eth-wbtc>arb-wbtc",
+   "provider": "across",
+   "src": "eip155:1:WBTC",
+   "dst": "eip155:42161:WBTC",
+   "amount": "0.002"
   }
  ],
  "omniston": {

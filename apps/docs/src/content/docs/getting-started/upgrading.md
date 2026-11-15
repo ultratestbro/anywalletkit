@@ -10,6 +10,26 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Next release: Across, `QuoteParams.sender`
+
+Not breaking for existing providers.
+
+- **New package, protocol-swap2-across:** Across Protocol as a swap2 provider — EVM → EVM bridging of the same asset
+  (USDC, USDT / USDT0, ETH / WETH, WBTC) between 17 chains through a plain SpokePool `deposit` built and verified on
+  the device. It needs an Across API V5 key, kept on a server: run `acrossProvider({ apiKey, rpcUrls })` behind
+  `createSwap2Handler` and `acrossRemoteProvider({ baseUrl, maxFeeBps?, rpcUrls?, suggestedFeesUrl? })` in the app (under
+  React Native a provider built with `apiKey` throws). The remote provider reads Across's keyless relayer fee from the
+  app itself: a browser app's CSP must allow `https://app.across.to` in `connect-src` (or pass `suggestedFeesUrl: null`,
+  which leaves only Ethereum, Optimism, Base and Arbitrum to Optimism, Base and Arbitrum). Conventional env names: `ACROSS_ENABLED`, `ACROSS_API_KEY` (the V5 key;
+  Across's integrator id and V4 key are not used). Without a key the provider reports itself disabled and quotes
+  nothing. Ethereum as a destination is not served yet. See [Across](/guides/swaps/#across).
+- **protocol-swap2-core, `QuoteParams.sender`:** the account that signs the source transaction. The engine sets it on
+  every execution quote (its own address) and `createSwap2Handler` passes it through; a dry quote has none. A provider
+  whose deposit gives its sender more than refunds binds to it instead of `refundAddress` (Across: the depositor can
+  sign a speed-up that pays the output elsewhere, so a live Across quote without `sender`, or with a `refundAddress`
+  other than it, is refused). A custom server that rebuilds `QuoteParams` field by field must copy `sender`, or live
+  Across quotes through it are refused ("a live quote needs the signing account (sender)").
+
 ## 2026-11-15: Permit2 signature transfers, and 0x
 
 Not breaking for apps that do not use the new provider: every existing text and check is unchanged.

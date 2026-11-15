@@ -37,6 +37,13 @@ export interface QuoteParams {
   destAddress: string; // recipient on dest (the vault, or a payout address)
   /** Where a failed swap refunds on the source chain (the sender's address). */
   refundAddress?: string;
+  /**
+   * The account that signs the source transaction, set by the engine on an execution quote (its own address); absent
+   * on a dry quote. A provider whose deposit gives its sender more than refunds binds to this, never to
+   * `refundAddress`: an Across depositor can sign a speed-up that pays the output to another recipient, so it must be
+   * the signer, not an address the caller names for refunds.
+   */
+  sender?: string;
   /** Pricing preview only — no deposit address is created upstream. */
   dry?: boolean;
   /**

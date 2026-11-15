@@ -51,6 +51,17 @@ import { RELAY_SOLVERS, RelayRefusal, parseRelayOrder, relayOrderId, relayOrderS
 import relayVectors from '../../packages/protocol-swap2-relay/fixtures/orders/vectors.json'
 import relayUsdcLive from '../../packages/protocol-swap2-relay/fixtures/quotes/user.arb-usdc_base-usdc.json'
 import relayNativeLive from '../../packages/protocol-swap2-relay/fixtures/quotes/base-eth_arb-eth.json'
+import { AcrossSwap2Protocol } from '@anywalletkit/protocol-swap2-across/protocol'
+import { acrossProvider } from '@anywalletkit/protocol-swap2-across/provider'
+import { acrossRemoteProvider } from '@anywalletkit/protocol-swap2-across/remote'
+import { acrossCheckRelayerFee, acrossFloorFee, acrossPlainFee } from '@anywalletkit/protocol-swap2-across/pricing'
+import { parseAcrossV5Error, readAcrossSuggestedFees, readAcrossV5Quote } from '@anywalletkit/protocol-swap2-across/api'
+import { acrossQuoteOf } from '@anywalletkit/protocol-swap2-across/build'
+import { acrossRouteOf } from '@anywalletkit/protocol-swap2-across/config'
+import { decodeAcrossDeposit, encodeAcrossDeposit } from '@anywalletkit/protocol-swap2-across/deposit'
+import { checkAcrossQuote, verifyAcrossDeposit } from '@anywalletkit/protocol-swap2-across/verify'
+import acrossEthLive from '../../packages/protocol-swap2-across/fixtures/api/quotes/eth-arb-base-2000.json'
+import acrossUsdcLive from '../../packages/protocol-swap2-across/fixtures/api/quotes/usdc-base-arb-25.json'
 import { decodeFunctionData, encodeFunctionData, encodeFunctionResult, parseAbi } from 'viem'
 import { nearIntentsProvider } from '@anywalletkit/protocol-swap2-near-intents/provider'
 import { ThorchainSwap2Protocol } from '@anywalletkit/protocol-swap2-thorchain/protocol'
@@ -558,6 +569,50 @@ export async function smokeProtocols(check: Check): Promise<void> {
     check('relay: pinned EVM chains only', relay.supportsChain('eip155:42161') && relay.supportsChain('eip155:99901') && !relay.supportsChain('eip155:14') && !relay.supportsChain('solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'))
     const rp = new RelaySwap2Protocol(evm, { ...swap2Cfg })
     check('relay: RelaySwap2Protocol constructs', typeof rp.quoteSwap2 === 'function')
+  }
+  {
+    // Across: the V5 key is refused under Hermes (it belongs on a server); the app's remote provider builds. On REAL
+    // recorded answers the pricing rule runs here (bigint wei, USD → token units without Number(bigint)), the deposit is
+    // encoded and keccak'd into its intent id, and the device's checks pass it and refuse it below the fee floor.
+    let keyRefused = false
+    try { acrossProvider({ apiKey: () => 'smoke' }) } catch (e) { keyRefused = /belongs on a server/.test(e instanceof Error ? e.message : '') }
+    check('across: an API key is refused under Hermes (server only)', keyRefused)
+    const app = acrossRemoteProvider({ baseUrl: 'https://backend.invalid/api/swap2' })
+    check('across: the remote provider serves pinned same-asset routes, not Ethereum as the destination',
+      app.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:42161', token: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831' })
+      && !app.supportsRoute({ chain: 'eip155:8453', token: 'ETH' }, { chain: 'eip155:1', token: '0x0000000000000000000000000000000000000000' }))
+    type Rec = { nowMs: number; params: { sourceChain: string; destChain: string; sourceToken: string; destToken: string; amountIn: string; destAddress: string; sender: string }
+      calls: { kind: string; status: number; response: any }[]; result: { outputAmount: string; v5Fee: string; relayerFee: string } }
+    for (const [label, raw, token] of [['ETH Arbitrum → Base', acrossEthLive, '0x0000000000000000000000000000000000000000'], ['USDC Base → Arbitrum', acrossUsdcLive, '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913']] as const) {
+      const f = raw as unknown as Rec
+      const request = { sourceChain: f.params.sourceChain, destChain: f.params.destChain, sourceToken: token, destToken: f.params.destToken, amount: BigInt(f.params.amountIn), depositor: f.params.sender, recipient: f.params.destAddress, nowMs: f.nowMs }
+      const route = acrossRouteOf(request.sourceChain, request.sourceToken, request.destChain, request.destToken) as Exclude<ReturnType<typeof acrossRouteOf>, { code: string }>
+      const v5 = readAcrossV5Quote(request, route, f.calls.find((c) => c.kind === 'v5')!.response)
+      const feesCall = f.calls.find((c) => c.kind === 'suggested-fees')!
+      const fees = readAcrossSuggestedFees(request, route, feesCall.status, feesCall.response, Math.floor(f.nowMs / 1000))
+      if (fees.kind !== 'fees') { check(`across: recorded relayer fee reads (${label})`, false, fees.kind); continue }
+      const fee = acrossPlainFee(request.amount, v5, fees.totalRelayFee)
+      check(`across: the pricing rule on a recorded answer gives the recorded deposit (${label})`, fee.f5.toString() === f.result.v5Fee && fee.need.toString() === f.result.relayerFee && (request.amount - fee.fee).toString() === f.result.outputAmount)
+      check(`across: the pinned floor prices without /suggested-fees (${label})`, acrossFloorFee(route, request.amount, v5.amountUsd, v5.destinationGas) > 0n)
+      const q = acrossQuoteOf(request, { sourceChainId: route.input.chain.chainId, destinationChainId: route.output.chain.chainId, inputToken: request.sourceToken, outputToken: request.destToken, inputAmount: f.params.amountIn, outputAmount: f.result.outputAmount, quoteTimestamp: fees.timestamp, fillDeadline: fees.timestamp + 7200, exclusiveRelayer: '0x0000000000000000000000000000000000000000', exclusivityParameter: 0, expectedFillTimeSec: 2 })
+      const ok = checkAcrossQuote(request, q)
+      check(`across: the deposit built here passes the device check (${label})`, ok.args.outputAmount === BigInt(f.result.outputAmount) && decodeAcrossDeposit(q.txRequest!.data!).message === '0x')
+      let floorRefused = ''
+      try { verifyAcrossDeposit(request, { ...q.txRequest, data: encodeAcrossDeposit({ ...ok.args, outputAmount: request.amount - 1n }) }) } catch (e) { floorRefused = e instanceof Error ? e.message : '' }
+      check(`across: a deposit that leaves relayers less than they take is refused (${label})`, /\[tx-fee\]$/.test(floorRefused))
+      // The remote provider's own read of Across's relayer fee: the recorded deposit passes it, one 11 % under it does not.
+      let honestPasses = true
+      try { acrossCheckRelayerFee(route, request.amount, fee.fee, fees) } catch { honestPasses = false }
+      let underRefused = ''
+      try { acrossCheckRelayerFee(route, request.amount, (fees.totalRelayFee * 89n) / 100n, fees) } catch (e) { underRefused = e instanceof Error ? e.message : '' }
+      check(`across: the device's relayer-fee check passes the deposit and refuses one 11 % under Across's fee (${label})`, honestPasses && /\[relayer-price\]$/.test(underRefused))
+      let feesRefused = ''
+      try { checkAcrossQuote(request, { ...q, fees: [] }) } catch (e) { feesRefused = e instanceof Error ? e.message : '' }
+      check(`across: a quote whose fee list is not the deposit's is refused (engine fee caps read it) (${label})`, /\[quote-amounts\]$/.test(feesRefused))
+    }
+    check('across: V5 fee-cap refusal with amountLimits.side min reads as amount_too_small', parseAcrossV5Error(400, { error: { code: 'policy.amount_out_of_range', message: 'raise the amount above 1 base units', details: { amountLimits: { side: 'min', amount: '1' } } } }).info?.reason === 'amount_too_small')
+    const ap = new AcrossSwap2Protocol(evm, { ...swap2Cfg })
+    check('across: AcrossSwap2Protocol constructs (no key: disabled)', typeof ap.quoteSwap2 === 'function')
   }
   check('cctp: claimSwap2 on the router', typeof (router as unknown as { claimSwap2?: unknown }).claimSwap2 === 'function')
 

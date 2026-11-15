@@ -27,6 +27,7 @@
     "@anywalletkit/protocol-staking-ssv-evm": "workspace:*",
     "@anywalletkit/protocol-staking-tonstakers-ton": "workspace:*",
     "@anywalletkit/protocol-swap2-0x": "workspace:*",
+    "@anywalletkit/protocol-swap2-across": "workspace:*",
     "@anywalletkit/protocol-swap2-cctp": "workspace:*",
     "@anywalletkit/protocol-swap2-chainflip": "workspace:*",
     "@anywalletkit/protocol-swap2-core": "workspace:*",
