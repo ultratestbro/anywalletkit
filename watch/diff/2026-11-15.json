@@ -1,0 +1,59 @@
+{
+ "date": "2026-11-15",
+ "modules": 29,
+ "sources": 709,
+ "changes": [
+  {
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
+   "id": "docs-api",
+   "label": "Kamino docs · developers API",
+   "type": "http-text",
+   "what": "page text changed (3733 → 3759 chars)",
+   "link": "https://docs.kamino.finance/developers/api",
+   "before": {
+    "hash": "ba5cff2729f2a364",
+    "chars": 3733
+   },
+   "after": {
+    "hash": "4cce91712c0544a9",
+    "chars": 3759
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-spl-stake-pool-solana",
+   "id": "spl-stake-pool-program",
+   "label": "SPL Stake Pool program · Solana",
+   "type": "solana-program",
+   "what": "last deploy slot 429882117 → 469669929",
+   "link": null,
+   "before": {
+    "programData": "EmiU8AQkB2sswTxVB6aCmsAJftoowZGGDXuytm6X65R3",
+    "slot": 429882117,
+    "authority": "dPpFfahSWhm5M2RB3nVaHsXfnh9ooz5bWtR3WeUguDH"
+   },
+   "after": {
+    "programData": "EmiU8AQkB2sswTxVB6aCmsAJftoowZGGDXuytm6X65R3",
+    "slot": 469669929,
+    "authority": "dPpFfahSWhm5M2RB3nVaHsXfnh9ooz5bWtR3WeUguDH"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-omniston",
+   "id": "docs-omniston",
+   "label": "STON.fi docs · Omniston",
+   "type": "http-text",
+   "what": "page text changed (3422 → 3422 chars)",
+   "link": "https://docs.ston.fi/docs/developer-section/omniston",
+   "before": {
+    "hash": "ce5fea9398520dd5",
+    "chars": 3422
+   },
+   "after": {
+    "hash": "d1c60be07671491e",
+    "chars": 3422
+   }
+  }
+ ],
+ "errors": [],
+ "repointed": []
+}

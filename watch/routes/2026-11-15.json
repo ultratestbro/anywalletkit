@@ -4,26 +4,7 @@
   "quoting": 51,
   "no-route": 1
  },
- "transitions": [
-  {
-   "id": "ni:base-usdc>ton-usdt",
-   "provider": "near_intents",
-   "from": "no-route",
-   "to": "quoting",
-   "note": "out 99.9595 USDT",
-   "suspended": true,
-   "hint": "out 99.9595 USDT"
-  },
-  {
-   "id": "ni:gram>ton-usdt",
-   "provider": "near_intents",
-   "from": "no-route",
-   "to": "quoting",
-   "note": "out 20.9246 USDT",
-   "suspended": true,
-   "hint": "out 20.9246 USDT"
-  }
- ],
+ "transitions": [],
  "down": [
   {
    "id": "lifi:base-usdc>elysium-usdce",
@@ -37,329 +18,308 @@
    "id": "wrap:base-eth>base-weth",
    "provider": "wrap",
    "status": "quoting",
-   "ms": 212,
+   "ms": 153,
    "note": "out 0.0500000 WETH"
   },
   {
    "id": "cctp:eth-usdc>base-usdc",
    "provider": "cctp",
    "status": "quoting",
-   "ms": 261,
+   "ms": 183,
    "note": "out 99.9890 USDC"
-  },
-  {
-   "id": "curve:eth-usdc>eth-usdt",
-   "provider": "curve",
-   "status": "quoting",
-   "ms": 295,
-   "note": "out 100.030 USDT"
   },
   {
    "id": "cctp:base-usdc>arb-usdc",
    "provider": "cctp",
    "status": "quoting",
-   "ms": 47,
+   "ms": 48,
    "note": "out 99.9857 USDC"
   },
   {
    "id": "uni:base-usdc>base-eth",
    "provider": "uniswap",
    "status": "quoting",
-   "ms": 318,
-   "note": "out 0.0557717 ETH"
-  },
-  {
-   "id": "curve:eth-usdc>eth-crvusd",
-   "provider": "curve",
-   "status": "quoting",
-   "ms": 23,
-   "note": "out 100.349 crvUSD"
+   "ms": 331,
+   "note": "out 0.0545494 ETH"
   },
   {
    "id": "relay:arb-usdc>base-usdc",
    "provider": "relay",
    "status": "quoting",
-   "ms": 349,
+   "ms": 340,
    "note": "out 99.9692 USDC"
   },
   {
-   "id": "curve:eth-eth>eth-steth",
+   "id": "curve:eth-usdc>eth-usdt",
    "provider": "curve",
    "status": "quoting",
-   "ms": 37,
-   "note": "out 0.0500179 stETH"
-  },
-  {
-   "id": "curve:eth-crvusd>eth-scrvusd",
-   "provider": "curve",
-   "status": "quoting",
-   "ms": 24,
-   "note": "out 89.7960 scrvUSD"
-  },
-  {
-   "id": "wrap:elysium-hype>whype",
-   "provider": "wrap",
-   "status": "quoting",
-   "ms": 239,
-   "note": "out 1.00000 WHYPE"
+   "ms": 453,
+   "note": "out 100.031 USDT"
   },
   {
    "id": "relay:arb-usdc>ely-hype",
    "provider": "relay",
    "status": "quoting",
-   "ms": 115,
-   "note": "out 1.54139 HYPE"
+   "ms": 139,
+   "note": "out 1.47830 HYPE"
   },
   {
-   "id": "curve:arb-usdc>arb-usdt0",
+   "id": "curve:eth-usdc>eth-crvusd",
    "provider": "curve",
    "status": "quoting",
-   "ms": 146,
-   "note": "out 100.024 USDT0"
+   "ms": 44,
+   "note": "out 100.262 crvUSD"
+  },
+  {
+   "id": "curve:eth-eth>eth-steth",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 29,
+   "note": "out 0.0500135 stETH"
   },
   {
    "id": "relay:base-eth>arb-eth",
    "provider": "relay",
    "status": "quoting",
-   "ms": 71,
-   "note": "out 0.0499835 ETH"
+   "ms": 67,
+   "note": "out 0.0499838 ETH"
   },
   {
-   "id": "curve:base-usdc>base-crvusd",
+   "id": "curve:eth-crvusd>eth-scrvusd",
    "provider": "curve",
    "status": "quoting",
-   "ms": 37,
-   "note": "out 100.495 crvUSD"
+   "ms": 29,
+   "note": "out 89.7916 scrvUSD"
   },
   {
    "id": "ni:eth-usdc>base-usdc",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 633,
-   "note": "out 99.9915 USDC"
+   "ms": 613,
+   "note": "out 99.9774 USDC"
+  },
+  {
+   "id": "wrap:elysium-hype>whype",
+   "provider": "wrap",
+   "status": "quoting",
+   "ms": 457,
+   "note": "out 1.00000 WHYPE"
   },
   {
    "id": "relay:eth-usdt>base-usdc",
    "provider": "relay",
    "status": "quoting",
-   "ms": 103,
-   "note": "out 99.9171 USDC"
-  },
-  {
-   "id": "relay:linea-eth>base-eth",
-   "provider": "relay",
-   "status": "quoting",
-   "ms": 80,
-   "note": "out 0.0499537 ETH"
+   "ms": 139,
+   "note": "out 99.9166 USDC"
   },
   {
    "id": "bal:eth-usdc>eth-eth",
    "provider": "balancer",
    "status": "quoting",
-   "ms": 805,
-   "note": "out 0.0557155 ETH"
+   "ms": 722,
+   "note": "out 0.0543500 ETH"
+  },
+  {
+   "id": "relay:linea-eth>base-eth",
+   "provider": "relay",
+   "status": "quoting",
+   "ms": 82,
+   "note": "out 0.0499539 ETH"
+  },
+  {
+   "id": "curve:arb-usdc>arb-usdt0",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 235,
+   "note": "out 100.027 USDT0"
+  },
+  {
+   "id": "curve:base-usdc>base-crvusd",
+   "provider": "curve",
+   "status": "quoting",
+   "ms": 41,
+   "note": "out 100.474 crvUSD"
   },
   {
    "id": "ni:base-usdc>arb-usdc",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 422,
-   "note": "out 99.9899 USDC"
-  },
-  {
-   "id": "ni:btc>base-usdc",
-   "provider": "near_intents",
-   "status": "quoting",
-   "ms": 433,
-   "note": "out 128.650 USDC"
-  },
-  {
-   "id": "lifi:eth-usdc>base-usdc",
-   "provider": "lifi",
-   "status": "quoting",
-   "ms": 1467,
-   "note": "out 99.7369 USDC"
+   "ms": 651,
+   "note": "out 99.9871 USDC"
   },
   {
    "id": "th:eth-usdt>avax",
    "provider": "thorchain",
    "status": "quoting",
-   "ms": 1849,
-   "note": "out 13.8066 AVAX"
+   "ms": 1412,
+   "note": "out 13.6542 AVAX"
   },
   {
-   "id": "ni:sol>base-usdc",
-   "provider": "near_intents",
+   "id": "lifi:eth-usdc>base-usdc",
+   "provider": "lifi",
    "status": "quoting",
-   "ms": 464,
-   "note": "out 35.0834 USDC"
+   "ms": 1508,
+   "note": "out 99.7369 USDC"
   },
   {
    "id": "th:tron-usdt>eth",
    "provider": "thorchain",
    "status": "quoting",
-   "ms": 235,
-   "note": "out 0.0552901 ETH"
+   "ms": 286,
+   "note": "out 0.0541365 ETH"
+  },
+  {
+   "id": "ni:btc>base-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 513,
+   "note": "out 130.575 USDC"
   },
   {
    "id": "th:eth>btc",
    "provider": "thorchain",
    "status": "quoting",
-   "ms": 246,
-   "note": "out 0.00276384 BTC"
+   "ms": 380,
+   "note": "out 0.00278745 BTC"
+  },
+  {
+   "id": "ni:sol>base-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 587,
+   "note": "out 36.2232 USDC"
   },
   {
    "id": "ni:tron-usdt>base-usdc",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 627,
-   "note": "out 149.923 USDC"
+   "ms": 609,
+   "note": "out 149.772 USDC"
+  },
+  {
+   "id": "om:ton-usdt>base-usdc",
+   "provider": "omniston",
+   "status": "quoting",
+   "ms": 3085,
+   "note": "out 19.9497 USDC"
   },
   {
    "id": "lifi:base-eth>arb-eth",
    "provider": "lifi",
    "status": "quoting",
-   "ms": 1530,
+   "ms": 1654,
    "note": "out 0.0498720 ETH"
   },
   {
    "id": "ni:base-usdc>plasma-usdt0",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 446,
-   "note": "out 99.8127 USDT0"
-  },
-  {
-   "id": "om:ton-usdt>base-usdc",
-   "provider": "omniston",
-   "status": "quoting",
-   "ms": 3111,
-   "note": "out 19.9498 USDC"
+   "ms": 419,
+   "note": "out 99.7986 USDT0"
   },
   {
    "id": "ni:base-usdc>ton-usdt",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 717,
-   "note": "out 99.9595 USDT"
+   "ms": 724,
+   "note": "out 99.9456 USDT"
   },
   {
    "id": "lifi:polygon-usdc>base-usdc",
    "provider": "lifi",
    "status": "quoting",
-   "ms": 1172,
+   "ms": 1208,
    "note": "out 99.7500 USDC"
   },
   {
    "id": "ni:gram>ton-usdt",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 710,
-   "note": "out 20.9246 USDT"
+   "ms": 720,
+   "note": "out 20.8246 USDT"
   },
   {
    "id": "lifi:base-usdc>base-eth",
    "provider": "lifi",
    "status": "quoting",
-   "ms": 476,
-   "note": "out 0.0556431 ETH"
+   "ms": 861,
+   "note": "out 0.0544327 ETH"
   },
   {
    "id": "ni:ton-usdt>base-usdc",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 888,
-   "note": "out 99.9242 USDC"
-  },
-  {
-   "id": "ni:base-usdc>op-usdc",
-   "provider": "near_intents",
-   "status": "quoting",
-   "ms": 782,
-   "note": "out 99.9793 USDC"
+   "ms": 735,
+   "note": "out 99.9272 USDC"
   },
   {
    "id": "om:base-usdc>ton-usdt",
    "provider": "omniston",
    "status": "quoting",
-   "ms": 3002,
-   "note": "out 19.9690 USDT"
+   "ms": 3001,
+   "note": "out 19.9691 USDT"
+  },
+  {
+   "id": "ni:base-usdc>op-usdc",
+   "provider": "near_intents",
+   "status": "quoting",
+   "ms": 795,
+   "note": "out 99.9793 USDC"
   },
   {
    "id": "ni:base-usdc>polygon-usdc",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 420,
+   "ms": 436,
    "note": "out 99.9698 USDC"
-  },
-  {
-   "id": "lifi:base-usdc>plasma-usdt0",
-   "provider": "lifi",
-   "status": "quoting",
-   "ms": 1962,
-   "note": "out 99.7477 USDT0"
   },
   {
    "id": "ni:base-usdc>avax-usdc",
    "provider": "near_intents",
    "status": "quoting",
    "ms": 438,
-   "note": "out 99.9654 USDC"
-  },
-  {
-   "id": "lifi:base-usdc>op-usdc",
-   "provider": "lifi",
-   "status": "quoting",
-   "ms": 1196,
-   "note": "out 99.7500 USDC"
+   "note": "out 99.9652 USDC"
   },
   {
    "id": "ni:base-usdc>scroll-usdt",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 891,
-   "note": "out 99.8015 USDT"
+   "ms": 851,
+   "note": "out 99.7985 USDT"
   },
   {
    "id": "ni:base-usdc>monad-usdc",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 849,
+   "ms": 794,
    "note": "out 99.7793 USDC"
-  },
-  {
-   "id": "lifi:base-usdc>worldchain-usdc",
-   "provider": "lifi",
-   "status": "quoting",
-   "ms": 1003,
-   "note": "out 99.7500 USDC"
   },
   {
    "id": "om:gram>ton-usdt",
    "provider": "omniston",
    "status": "quoting",
    "ms": 3002,
-   "note": "out 21.0388 USDT"
+   "note": "out 20.9949 USDT"
   },
   {
    "id": "ni:base-usdc>bsc-usdt",
    "provider": "near_intents",
    "status": "quoting",
-   "ms": 679,
-   "note": "out 1499.86 USDT"
+   "ms": 497,
+   "note": "out 1499.91 USDT"
   },
   {
-   "id": "lifi:base-usdc>sei-usdc",
+   "id": "lifi:base-usdc>plasma-usdt0",
    "provider": "lifi",
    "status": "quoting",
-   "ms": 1059,
-   "note": "out 99.7500 USDC"
+   "ms": 5600,
+   "note": "out 99.7614 USDT0"
   },
   {
-   "id": "lifi:base-usdc>ink-usdc",
+   "id": "lifi:base-usdc>op-usdc",
    "provider": "lifi",
    "status": "quoting",
-   "ms": 1053,
+   "ms": 1264,
    "note": "out 99.7500 USDC"
   },
   {
@@ -367,34 +327,55 @@
    "provider": "omniston",
    "status": "quoting",
    "ms": 3001,
-   "note": "out 49.7910 USDT"
+   "note": "out 49.8174 USDT"
+  },
+  {
+   "id": "lifi:base-usdc>worldchain-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 819,
+   "note": "out 99.7500 USDC"
+  },
+  {
+   "id": "lifi:base-usdc>sei-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1018,
+   "note": "out 99.7500 USDC"
+  },
+  {
+   "id": "lifi:base-usdc>ink-usdc",
+   "provider": "lifi",
+   "status": "quoting",
+   "ms": 1024,
+   "note": "out 99.7500 USDC"
   },
   {
    "id": "lifi:base-usdc>xlayer-usdt0",
    "provider": "lifi",
    "status": "quoting",
-   "ms": 2513,
-   "note": "out 99.6397 USDT0"
+   "ms": 2097,
+   "note": "out 99.6289 USDT0"
   },
   {
    "id": "lifi:base-usdc>celo-usdc",
    "provider": "lifi",
    "status": "quoting",
-   "ms": 1508,
+   "ms": 1207,
    "note": "out 99.6147 USDC"
   },
   {
    "id": "lifi:base-usdc>gnosis-usdc",
    "provider": "lifi",
    "status": "quoting",
-   "ms": 1835,
+   "ms": 1852,
    "note": "out 99.7198 USDC"
   },
   {
    "id": "lifi:base-usdc>elysium-usdce",
    "provider": "lifi",
    "status": "no-route",
-   "ms": 24,
+   "ms": 45,
    "note": "lifi: No available quotes for the requested transfer"
   }
  ]
