@@ -50,7 +50,9 @@ describe.skipIf(!live)("live: Across prices a plain deposit the device verifies"
   it("remote mode: the provider behind createSwap2Handler, re-checked by acrossRemoteProvider", async () => {
     const [, sourceChain, sourceToken, destChain, destToken, amountIn] = CORRIDORS[0]!;
     const handle = createSwap2Handler<string>({providers: [acrossProvider({apiKey: key})], sealSecret: crypto.getRandomValues(new Uint8Array(32)), guard: () => {}, subject: () => "live"});
+    // The app's fetch: the backend's actions to the handler; Across's relayer fee, which the app reads itself, to Across.
     const fetchImpl = (async (url: string, init: RequestInit) => {
+      if (!String(url).startsWith("https://backend.invalid/")) return fetch(url, init);
       const res = await handle(String(url).split("/").pop()!, JSON.parse(String(init.body)), "live");
       return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
     }) as unknown as typeof fetch;
@@ -59,5 +61,6 @@ describe.skipIf(!live)("live: Across prices a plain deposit the device verifies"
     expect(q?.intentId).toMatch(/~[0-9a-f]{32}$/);
     const tx = await app.buildDeposit(q!);
     expect(tx.data).toBe(q!.txRequest!.data);
+    await app.preflightDeposit!(q!, tx);
   }, 60_000);
 });

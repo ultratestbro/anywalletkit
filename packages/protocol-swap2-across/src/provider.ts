@@ -3,12 +3,12 @@ import {refusal, refusalOf, type Swap2RefusalInfo} from "@anywalletkit/protocol-
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {describeAcrossActivity} from "./activity.js";
 import {
-  ACROSS_SUGGESTED_FEES_URL, acrossHttp, acrossSuggestedFeesQuery, acrossV5QuoteRequest, parseAcrossV5Error, readAcrossSuggestedFees, readAcrossV5Quote,
+  ACROSS_SUGGESTED_FEES_URL, acrossApiUrl, acrossHttp, acrossSuggestedFeesQuery, acrossV5QuoteRequest, parseAcrossV5Error, readAcrossSuggestedFees, readAcrossV5Quote,
   type AcrossSuggestedFees,
 } from "./api.js";
 import {acrossQuoteOf, type NormalizedAcrossQuote} from "./build.js";
 import {ACROSS_API, ACROSS_NATIVE, across as acrossCfg, acrossChain, acrossRouteOf, type AcrossRoute} from "./config.js";
-import {ACROSS_FILL_WINDOW_S, acrossFloorFee, acrossPlainFee, acrossQuoteTimeOf, acrossRouteUnpriced} from "./pricing.js";
+import {ACROSS_FILL_WINDOW_S, acrossFloorFee, acrossPlainFee, acrossQuoteTimeOf, acrossRouteUnpriced, acrossV5OtherRail} from "./pricing.js";
 import {AcrossRefusal} from "./refusal.js";
 import {acrossRpc, trackAcrossDeposit, type AcrossRpc} from "./status.js";
 import {ACROSS_MAX_FEE_BPS_LIMIT, ACROSS_PLACEHOLDER, acrossRequestOf, checkAcrossQuote, checkAcrossTxShape, parseAcrossIntentId, type AcrossRequest} from "./verify.js";
@@ -26,9 +26,10 @@ import {ACROSS_MAX_FEE_BPS_LIMIT, ACROSS_PLACEHOLDER, acrossRequestOf, checkAcro
  *    Periphery calls (origin swaps, `depositNative`), CCTP / OFT routes, destination actions, speed-up signatures and
  *    integrator fees are refused by name.
  *  - Pricing (`pricing.ts`): Across API V5 is the price source and `/suggested-fees` (keyless) what a relayer needs;
- *    the deposit leaves `max(V5's fee net of its origin step, the relayer need)`. V5's `nextActions` are never
- *    executed. The V5 key is server-only: under React Native an `apiKey` is refused — the app runs
- *    `acrossRemoteProvider` against a backend that runs this provider (`createSwap2Handler`).
+ *    the deposit leaves `max(V5's fee net of its origin step, the relayer need)` — the relayer need alone when V5
+ *    prices another rail. V5's `nextActions` are never executed. The V5 key is server-only: under React Native an
+ *    `apiKey` is refused — the app runs `acrossRemoteProvider` against a backend that runs this provider
+ *    (`createSwap2Handler`), and reads Across's keyless relayer fee itself to hold the backend's price to it.
  *  - Status is read on chain (`status.ts`): the intent's own deposit from the source receipt, its relay hash, the
  *    destination's `fillStatuses` — with an RPC URL per chain in `rpcUrls`. Unfilled past its fill deadline it is
  *    `expired` (Across refunds it). Display only, nothing is signed on its word.
@@ -97,14 +98,6 @@ function onReactNative(): boolean {
   return g.HermesInternal !== undefined || g.navigator?.product === "ReactNative";
 }
 
-/** An API URL, refused unless https (or http on this machine). */
-function apiUrl(url: string, what: string): string {
-  const u = String(url).trim().replace(/\/+$/, "");
-  if (/^https:\/\/[^\s/?#@]+(?:\/[^\s?#]*)?$/i.test(u)) return u;
-  if (/^http:\/\/(?:localhost|127\.0\.0\.1)(?::[0-9]{1,5})?(?:\/[^\s?#]*)?$/i.test(u)) return u;
-  throw new Error(`across: ${what} must be an https:// URL (http only for localhost)`);
-}
-
 /**
  * Whether this module serves a route — the source a catalog symbol (or a contract), the destination an address (zero
  * for the native coin): pinned chains and tokens, the same asset, and a route the pricing covers (not Ethereum as the
@@ -136,8 +129,8 @@ export function acrossProvider(config: AcrossProviderConfig = {}): CrossChainPro
   if (!Number.isInteger(quoteTtlMs) || quoteTtlMs <= 0 || quoteTtlMs > 300_000) throw new Error("across: quoteTtlMs must be an integer between 1 and 300000");
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 60_000) throw new Error("across: timeoutMs must be an integer between 1 and 60000");
-  const v5Url = `${apiUrl(config.baseUrl ?? ACROSS_API, "baseUrl")}/v1/quotes`;
-  const feesUrl = config.suggestedFeesUrl === null ? null : apiUrl(config.suggestedFeesUrl ?? ACROSS_SUGGESTED_FEES_URL, "suggestedFeesUrl");
+  const v5Url = `${acrossApiUrl(config.baseUrl ?? ACROSS_API, "baseUrl")}/v1/quotes`;
+  const feesUrl = config.suggestedFeesUrl === null ? null : acrossApiUrl(config.suggestedFeesUrl ?? ACROSS_SUGGESTED_FEES_URL, "suggestedFeesUrl");
   const rpcUrls: Readonly<Record<string, string>> = Object.freeze(Object.assign(Object.create(null) as Record<string, string>, config.rpcUrls ?? {}));
   for (const [chain, url] of Object.entries(rpcUrls)) {
     if (typeof url !== "string" || !/^https?:\/\//.test(url)) throw new Error(`across: the RPC URL for ${chain} must use http or https`);
@@ -231,6 +224,12 @@ export function acrossProvider(config: AcrossProviderConfig = {}): CrossChainPro
 
         // What a relayer needs, and the quote time the deposit carries.
         if (fees.kind === "refused") throw new AcrossRefusal("relayer-price", fees.detail, fees.reason);
+        // V5 priced another rail (a fill estimate over a minute): its fee is no bound on a plain deposit, Across's
+        // relayer fee alone prices it — and without that answer there is no price this module stands behind.
+        const otherRail = acrossV5OtherRail(price.expectedFillTimeMs);
+        if (otherRail && fees.kind !== "fees") {
+          throw new AcrossRefusal("route-unpriced", `Across API V5 prices this transfer on another rail (fill ~${Math.round(price.expectedFillTimeMs / 1000)} s), and Across's relayer fee quote did not answer (${fees.detail.slice(0, 120)}) — no price for a plain deposit`, "upstream_unavailable");
+        }
         let need: bigint;
         let quoteTimestamp: number;
         let etaSec: number;
@@ -243,7 +242,7 @@ export function acrossProvider(config: AcrossProviderConfig = {}): CrossChainPro
           quoteTimestamp = await quoteTimeFromChains(route);
           etaSec = price.expectedFillTimeMs / 1000;
         }
-        const fee = acrossPlainFee(request.amount, price, need);
+        const fee = acrossPlainFee(request.amount, price, need, otherRail);
         const nq: NormalizedAcrossQuote = {
           sourceChainId: route.input.chain.chainId,
           destinationChainId: route.output.chain.chainId,
@@ -260,7 +259,8 @@ export function acrossProvider(config: AcrossProviderConfig = {}): CrossChainPro
         };
         const quote = acrossQuoteOf(request, nq, {quoteTtlMs, ...(dry ? {placeholder: true} : {})});
         // How the number was reached (display and support): the price source, V5's net fee, the relayer need.
-        return {...quote, providerData: {...quote.providerData, priceSource: fees.kind === "fees" ? "suggested-fees" : "floor", v5Fee: fee.f5.toString(10), relayerFee: fee.need.toString(10)}};
+        const priceSource = otherRail ? "suggested-fees (V5 other rail)" : fees.kind === "fees" ? "suggested-fees" : "floor";
+        return {...quote, providerData: {...quote.providerData, priceSource, v5Fee: fee.f5.toString(10), relayerFee: fee.need.toString(10)}};
       } catch (err) {
         if (err instanceof AcrossRefusal) return refuse(err.message, refusalOf(err));
         throw err;

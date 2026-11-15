@@ -17,15 +17,22 @@
  * Fneed = /suggested-fees totalRelayFee.total                                           while Across answers it
  *       = floor(asset, origin, size) + 1.5 × V5's destination gas                       otherwise (studied routes only)
  * fee   = max(F5, Fneed);  outputAmount = input − fee
- * quoteTimestamp = /suggested-fees `timestamp` (the LP fee was priced there), else
+ *       = Fneed, from /suggested-fees only, when V5's fill estimate is over a minute     (V5 prices another rail)
+ * quoteTimestamp = /suggested-fees `timestamp` (the LP fee was priced there; never ahead of the server's clock), else
  *                  min(latest Ethereum block time − 60 s, latest origin block time)
  * fillDeadline   = quoteTimestamp + 7200;  no exclusivity
  * ```
  *
  * `max()` keeps both bounds: never more than V5 charges for the same transfer (net of the step a plain deposit does
- * not have), never less than plain deposits are filled at today. The device holds whatever a server says to its own
- * per-asset fee floor and to the user's cap (`verify.ts`), so a server can delay a deposit, never take it.
+ * not have), never less than plain deposits are filled at today. When V5's fill estimate is over a minute its price
+ * is another rail's (a CCTP or OFT transfer, 1 216 s for USDT Ethereum → Arbitrum on 2026-11-15, at 12× the relayer
+ * fee), not a bound on a plain deposit: the deposit is then priced on Across's relayer fee alone, and refused without it.
+ *
+ * The device holds whatever a server says to its own checks (`verify.ts`, `remote.ts`): the user's cap, a per-asset
+ * fee floor, and — through `acrossRemoteProvider` — Across's keyless relayer fee read on the device itself
+ * ({@link acrossCheckRelayerFee}), so a server can neither take a deposit nor get one signed that relayers leave unfilled.
  */
+import type {AcrossSuggestedFees} from "./api.js";
 import type {AcrossRoute} from "./config.js";
 import {AcrossRefusal} from "./refusal.js";
 
@@ -53,6 +60,19 @@ export const ACROSS_ETH_L2_FLOOR_MAX_USD = 36_000;
 export const ACROSS_FLOOR_ORIGINS: readonly number[] = Object.freeze([1, 10, 8453, 42161]);
 export const ACROSS_FLOOR_DESTINATIONS: readonly number[] = Object.freeze([10, 8453, 42161]);
 
+/** Whether the pinned floor covers a route (its origin and destination are among the studied chains). */
+export function acrossFloorCovers(route: AcrossRoute): boolean {
+  return ACROSS_FLOOR_ORIGINS.includes(route.input.chain.chainId) && ACROSS_FLOOR_DESTINATIONS.includes(route.output.chain.chainId);
+}
+
+/**
+ * Over this fill estimate (ms) a V5 quote prices another rail than an Across relayer fill: Across-rail fills were
+ * estimated at 1.3–14 s on every recorded cell, the OFT rail for USDT Ethereum → Arbitrum at 1 216 s (2026-11-15).
+ */
+export const ACROSS_V5_OTHER_RAIL_FILL_MS = 60_000;
+/** True when a V5 fill estimate says V5 priced another rail. */
+export const acrossV5OtherRail = (expectedFillTimeMs: number): boolean => expectedFillTimeMs > ACROSS_V5_OTHER_RAIL_FILL_MS;
+
 /**
  * Why a route is not priced at all, or null. Ethereum as the destination: small plain deposits to Ethereum went
  * unfilled in the study's window (some paying more than filled ones), for reasons the data does not show — kept out
@@ -66,7 +86,7 @@ export function acrossRouteUnpriced(route: AcrossRoute): string | null {
 /** The floor in hundredths of a bp for a route and size (USD), or a refusal text. */
 export function acrossFloorCbps(route: AcrossRoute, amountUsd: number | undefined): number | string {
   const src = route.input.chain.chainId;
-  if (!ACROSS_FLOOR_ORIGINS.includes(src) || !ACROSS_FLOOR_DESTINATIONS.includes(route.output.chain.chainId)) {
+  if (!acrossFloorCovers(route)) {
     return `without Across's relayer fee quote there is no relayer price for ${route.input.chain.name} → ${route.output.chain.name} (the pinned floor covers Ethereum, Optimism, Base and Arbitrum to Optimism, Base and Arbitrum)`;
   }
   if (route.asset === "USDC" || route.asset === "USDT") return ACROSS_FLOOR_CBPS.stable;
@@ -92,7 +112,8 @@ export const acrossCbpsOf = (amount: bigint, cbps: number): bigint => (amount * 
 export function acrossFloorFee(route: AcrossRoute, amount: bigint, amountUsd: number | undefined, destinationGas: bigint | null): bigint {
   const cbps = acrossFloorCbps(route, amountUsd);
   if (typeof cbps === "string") {
-    const tooLarge = route.asset === "ETH" && amountUsd !== undefined && amountUsd > ACROSS_ETH_L2_FLOOR_MAX_USD;
+    // Too large only where the floor covers the route and the size is what it lacks; elsewhere the relayer price is.
+    const tooLarge = acrossFloorCovers(route) && route.asset === "ETH" && route.input.chain.chainId !== 1 && amountUsd !== undefined && amountUsd > ACROSS_ETH_L2_FLOOR_MAX_USD;
     throw new AcrossRefusal("relayer-price", cbps, tooLarge ? "amount_too_large" : "upstream_unavailable");
   }
   if (destinationGas === null) throw new AcrossRefusal("relayer-price", "without Across's relayer fee quote the floor needs V5's destination gas, and it does not read", "upstream_unavailable");
@@ -108,12 +129,42 @@ export interface AcrossPlainFee {
   need: bigint;
 }
 
-/** `max(F5, Fneed)`. Refuses a fee that eats the whole input (`amount_too_small`). */
-export function acrossPlainFee(amount: bigint, v5: {totalFee: bigint; originGas: bigint}, need: bigint): AcrossPlainFee {
+/**
+ * `max(F5, Fneed)`; `Fneed` alone when V5 priced another rail (`otherRail`: F5 is then that rail's price, kept for
+ * display only). Refuses a fee that eats the whole input (`amount_too_small`).
+ */
+export function acrossPlainFee(amount: bigint, v5: {totalFee: bigint; originGas: bigint}, need: bigint, otherRail = false): AcrossPlainFee {
   const f5 = v5.totalFee - (v5.originGas > v5.totalFee ? v5.totalFee : v5.originGas);
-  const fee = f5 > need ? f5 : need;
+  const fee = otherRail || need > f5 ? need : f5;
   if (fee >= amount) throw new AcrossRefusal("relayer-price", `relayers would keep all of the ${amount} sent (fee ${fee})`, "amount_too_small");
   return {fee, f5, need};
+}
+
+/**
+ * How far under Across's own relayer fee a deposit's fee may sit when the device reads that fee itself, in percent of
+ * it: the server's read and the device's are seconds apart, and the same quote moved at most 2.2 % over a minute
+ * (five corridors, 2026-11-15).
+ */
+export const ACROSS_RELAYER_FEE_TOLERANCE_PCT = 10;
+
+/**
+ * The device's own check of a deposit's fee against Across's keyless relayer fee for it, read on the device
+ * (`acrossRemoteProvider`): a fee more than {@link ACROSS_RELAYER_FEE_TOLERANCE_PCT} % under it is refused
+ * (`price_check_failed` — relayers would leave the deposit unfilled for its two-hour deadline and the refund after);
+ * Across refusing the deposit refuses it with Across's reason. Without an answer only a route the pinned floor covers
+ * stands, on the per-asset floor the verifier already held it to; any other route is refused (`upstream_unavailable`).
+ * Throws {@link AcrossRefusal} `relayer-price`.
+ */
+export function acrossCheckRelayerFee(route: AcrossRoute, amount: bigint, fee: bigint, answer: AcrossSuggestedFees): void {
+  if (answer.kind === "refused") throw new AcrossRefusal("relayer-price", `${answer.detail} (read on this device)`, answer.reason);
+  if (answer.kind === "unavailable") {
+    if (acrossFloorCovers(route)) return;
+    throw new AcrossRefusal("relayer-price", `Across's relayer fee quote did not answer on this device (${answer.detail.slice(0, 120)}), and ${route.input.chain.name} → ${route.output.chain.name} has no studied floor to stand on`, "upstream_unavailable");
+  }
+  const need = answer.totalRelayFee;
+  if (fee * 100n < need * BigInt(100 - ACROSS_RELAYER_FEE_TOLERANCE_PCT)) {
+    throw new AcrossRefusal("relayer-price", `the deposit leaves relayers ${fee} of ${amount}, under the ${need} Across's own relayer fee quote names for it (read on this device) — relayers would leave it unfilled, and the funds wait for a refund`, "price_check_failed");
+  }
 }
 
 /** The deposit's quote time without `/suggested-fees`: `min(Ethereum − 60 s, origin)`, from the chains' latest blocks. */

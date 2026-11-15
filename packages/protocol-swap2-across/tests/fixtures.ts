@@ -55,12 +55,12 @@ export function ethRequest(over: Loose<AcrossRequest> = {}): AcrossRequest {
   }, over);
 }
 
-/** The numbers an Across quote would supply for {@link usdcRequest}: 9 033 of fees, two hours to fill, 3 s exclusivity. */
+/** The numbers an Across quote would supply for {@link usdcRequest}: 9 033 of fees, two hours to fill, no exclusivity. */
 export function usdcQuote(over: Loose<NormalizedAcrossQuote> = {}): NormalizedAcrossQuote {
   return merged<NormalizedAcrossQuote>({
     sourceChainId: 8453, destinationChainId: 42161, inputToken: BASE_USDC, outputToken: ARB_USDC,
     inputAmount: "25000000", outputAmount: "24990967", quoteTimestamp: NOW_S - 60, fillDeadline: NOW_S - 60 + 7200,
-    exclusiveRelayer: RELAYER, exclusivityParameter: 3, expectedFillTimeSec: 2,
+    exclusiveRelayer: ZERO, exclusivityParameter: 0, expectedFillTimeSec: 2,
     fees: {total: "9033", relayerCapital: "2500", destinationGas: "6533", lp: "0"},
   }, over);
 }
@@ -69,8 +69,8 @@ export function usdcQuote(over: Loose<NormalizedAcrossQuote> = {}): NormalizedAc
 export function usdcArgs(over: Partial<AcrossDepositArgs> = {}): AcrossDepositArgs {
   return {
     depositor: USER, recipient: USER, inputToken: BASE_USDC, outputToken: ARB_USDC, inputAmount: 25_000_000n, outputAmount: 24_990_967n,
-    destinationChainId: 42161n, exclusiveRelayer: RELAYER, quoteTimestamp: NOW_S - 60, fillDeadline: NOW_S - 60 + 7200,
-    exclusivityParameter: 3, message: "0x", ...over,
+    destinationChainId: 42161n, exclusiveRelayer: ZERO, quoteTimestamp: NOW_S - 60, fillDeadline: NOW_S - 60 + 7200,
+    exclusivityParameter: 0, message: "0x", ...over,
   };
 }
 

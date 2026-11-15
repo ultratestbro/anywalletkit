@@ -122,7 +122,7 @@ export interface AcrossV5Price {
   originGas: bigint;
   /** Σ `gasEstimates[leg = "destination", effect = "included_in_transfer_fee"]`, converted alike; null when a leg cannot be. */
   destinationGas: bigint | null;
-  /** `expectedFillTimeMs`. Over a minute it is not an Across relayer fill (V5 prices another rail). */
+  /** `expectedFillTimeMs`. Over a minute it is not an Across relayer fill: V5 prices another rail (`acrossV5OtherRail`). */
   expectedFillTimeMs: number;
   /** `origin.amountUsd`, when given: the transfer's size in dollars (the floor curve for ETH from an L2 is by size). */
   amountUsd?: number;
@@ -237,24 +237,42 @@ export function acrossSuggestedFeesQuery(request: AcrossRequest, route: AcrossRo
   return q.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 }
 
-/** How old a `/suggested-fees` timestamp may be, and how far ahead (s): it becomes the deposit's quote time. */
+/**
+ * How old a `/suggested-fees` timestamp may be (s). It becomes the deposit's quote time, so it is never taken from
+ * ahead of the reader's clock: the SpokePool reverts a quote time ahead of its block, and Across's are HubPool block
+ * times minutes in the past (217–245 s on every recorded answer).
+ */
 export const ACROSS_SUGGESTED_FEES_MAX_AGE_S = 600;
-export const ACROSS_SUGGESTED_FEES_MAX_AHEAD_S = 120;
+export const ACROSS_SUGGESTED_FEES_MAX_AHEAD_S = 0;
 
 /**
- * A `/suggested-fees` answer for a request, at `nowS`. Only Across's own refusals of the deposit (`AMOUNT_TOO_LOW`,
- * `AMOUNT_TOO_HIGH`, `ROUTE_NOT_ENABLED`, `isAmountTooLow`, an amount outside `limits`) and a SpokePool other than the
- * pinned one are `refused`; anything else that is not a clean, consistent, fresh answer is `unavailable`.
+ * A `/suggested-fees` answer for a request, at `nowS`. Across's own refusals of the deposit — any 400 it answers
+ * (`AMOUNT_TOO_LOW`, `AMOUNT_TOO_HIGH`, `ROUTE_NOT_ENABLED`, `INVALID_PARAM` for a token or a chain it does not serve,
+ * or a code this module does not know), `isAmountTooLow`, an amount outside `limits` — and a SpokePool other than the
+ * pinned one are `refused`; no answer, another status, or one that is not a clean, consistent, fresh answer is
+ * `unavailable` (the pinned floor may then stand in).
  */
 export function readAcrossSuggestedFees(request: AcrossRequest, route: AcrossRoute, status: number, body: unknown, nowS: number): AcrossSuggestedFees {
   const unavailable = (detail: string): AcrossSuggestedFees => ({kind: "unavailable", detail});
   const refused = (detail: string, reason: Swap2RefusalReason): AcrossSuggestedFees => ({kind: "refused", detail, reason});
   if (status !== 200) {
     const code = plain(body) ? own(body, "code") : undefined;
-    if (status === 400 && code === "AMOUNT_TOO_LOW") return refused("Across's relayer fee quote says the amount is too low relative to fees", "amount_too_small");
-    if (status === 400 && code === "AMOUNT_TOO_HIGH") return refused("Across's relayer fee quote says the amount is higher than relayer liquidity", "amount_too_large");
-    if (status === 400 && code === "ROUTE_NOT_ENABLED") return refused("Across's relayer fee quote says this route is not enabled for relayers", "unsupported_pair");
-    return unavailable(`it answered HTTP ${status}${typeof code === "string" ? ` ${code.slice(0, 40)}` : ""}`);
+    const label = typeof code === "string" ? ` ${code.slice(0, 40)}` : "";
+    if (status === 400) {
+      if (code === "AMOUNT_TOO_LOW") return refused("Across's relayer fee quote says the amount is too low relative to fees", "amount_too_small");
+      if (code === "AMOUNT_TOO_HIGH") return refused("Across's relayer fee quote says the amount is higher than relayer liquidity", "amount_too_large");
+      if (code === "ROUTE_NOT_ENABLED") return refused("Across's relayer fee quote says this route is not enabled for relayers", "unsupported_pair");
+      // Only pinned tokens and chains are asked for: one Across calls invalid ("Unsupported token on given origin
+      // chain") is one its relayers do not serve — a deposit priced on the floor for it would never be filled.
+      const param = plain(body) ? own(body, "param") : undefined;
+      const message = plain(body) ? own(body, "message") : undefined;
+      if (code === "INVALID_PARAM" && /token|chain/i.test(`${typeof param === "string" ? param : ""} ${typeof message === "string" ? message : ""}`)) {
+        return refused(`Across's relayer fee quote does not serve this token or chain (INVALID_PARAM${typeof param === "string" ? ` ${param.slice(0, 40)}` : ""})`, "unsupported_pair");
+      }
+      // Any other refusal of this exact deposit: Across said no, so nothing stands in for its price.
+      return refused(`Across's relayer fee quote refused the deposit (HTTP 400${label})`, "upstream_unavailable");
+    }
+    return unavailable(`it answered HTTP ${status}${label}`);
   }
   if (!plain(body)) return unavailable("its answer is not a JSON object");
   const inputToken = own(body, "inputToken");
@@ -287,7 +305,8 @@ export function readAcrossSuggestedFees(request: AcrossRequest, route: AcrossRou
   const ts = own(body, "timestamp");
   const timestamp = typeof ts === "string" && /^[1-9]\d{8,9}$/.test(ts) ? Number(ts) : NaN;
   if (!Number.isInteger(timestamp)) return unavailable("its answer states no quote time");
-  if (nowS - timestamp > ACROSS_SUGGESTED_FEES_MAX_AGE_S || timestamp - nowS > ACROSS_SUGGESTED_FEES_MAX_AHEAD_S) return unavailable(`its quote time is ${nowS - timestamp} s old`);
+  if (timestamp - nowS > ACROSS_SUGGESTED_FEES_MAX_AHEAD_S) return unavailable(`its quote time is ${timestamp - nowS} s ahead of this clock`);
+  if (nowS - timestamp > ACROSS_SUGGESTED_FEES_MAX_AGE_S) return unavailable(`its quote time is ${nowS - timestamp} s old`);
   const eta = own(body, "estimatedFillTimeSec");
   return {kind: "fees", totalRelayFee: total, timestamp, estimatedFillTimeSec: typeof eta === "number" && Number.isFinite(eta) && eta >= 0 ? eta : 2};
 }
@@ -327,7 +346,7 @@ const text = (v: unknown, max: number): string | undefined => (typeof v === "str
 const FEE_CAP = /\bmax[ _-]?fee\b|\bmaximum (?:total |transfer )?fee\b|\bfee (?:cap|limit)\b|\bfees? (?:is |are )?(?:above|exceeds?|over|greater than|more than)\b/;
 
 /** What an error code says on its own (Across's documented codes), before the HTTP status is consulted. */
-function reasonOfCode(code: string, message: string | undefined, side: "min" | "max" | undefined, status: number): Swap2RefusalInfo | undefined {
+function reasonOfCode(code: string, message: string | undefined, param: string | undefined, side: "min" | "max" | undefined, status: number): Swap2RefusalInfo | undefined {
   switch (code) {
     case "unauthenticated":
     case "auth.missing_credentials":
@@ -354,8 +373,10 @@ function reasonOfCode(code: string, message: string | undefined, side: "min" | "
     case "request.unsupported_param":
     case "request.missing_field":
       return {reason: "upstream_unavailable", httpStatus: status};
+    // Only pinned tokens and chains are sent: one V5 calls invalid ("unknown token … is not a known token") is one it
+    // does not serve. Any other value it no longer takes is, like the codes above, an API of another shape.
     case "request.invalid_field":
-      return {reason: "policy_refused"};
+      return /token|chain/i.test(`${param ?? ""} ${message ?? ""}`) ? {reason: "unsupported_pair"} : {reason: "upstream_unavailable", httpStatus: status};
     case "system.unavailable":
     case "conflict.submission_state_unknown":
       return {reason: "upstream_unavailable", httpStatus: status};
@@ -388,7 +409,7 @@ export function parseAcrossV5Error(status: number, body: unknown, retryAfter?: s
   const byStatus = httpRefusal(status, retryAfter, nowMs);
   let info: Swap2RefusalInfo | undefined;
   if (byStatus?.reason === "rate_limited") info = byStatus;
-  else info = (code !== undefined ? reasonOfCode(code, message, side, status) : undefined) ?? byStatus ?? (o !== undefined && status >= 400 && status < 500 && status !== 404 ? {reason: "no_route"} : undefined);
+  else info = (code !== undefined ? reasonOfCode(code, message, param, side, status) : undefined) ?? byStatus ?? (o !== undefined && status >= 400 && status < 500 && status !== 404 ? {reason: "no_route"} : undefined);
   return {
     status,
     ...(code !== undefined ? {code} : {}),
@@ -403,6 +424,14 @@ export function parseAcrossV5Error(status: number, body: unknown, retryAfter?: s
 }
 
 // ── HTTP ───────────────────────────────────────────────────────────────────────
+
+/** An API URL, trailing slashes trimmed; throws a plain `Error` unless https (or http on this machine). */
+export function acrossApiUrl(url: string, what: string): string {
+  const u = String(url).trim().replace(/\/+$/, "");
+  if (/^https:\/\/[^\s/?#@]+(?:\/[^\s?#]*)?$/i.test(u)) return u;
+  if (/^http:\/\/(?:localhost|127\.0\.0\.1)(?::[0-9]{1,5})?(?:\/[^\s?#]*)?$/i.test(u)) return u;
+  throw new Error(`across: ${what} must be an https:// URL (http only for localhost)`);
+}
 
 /** `scheme://host[:port]` of a URL, lowercase; "" when it has none. No URL class: React Native's lacks `origin`. */
 export const acrossOriginOf = (url: string): string => (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i.exec(url)?.[0] ?? "").toLowerCase();

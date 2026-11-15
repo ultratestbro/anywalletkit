@@ -2,7 +2,7 @@ import {describe, expect, it} from "vitest";
 import {decodeFunctionData, encodeFunctionData, parseAbi, toFunctionSelector, type Hex} from "viem";
 import {ACROSS_DEPOSIT} from "../src/config.js";
 import {ACROSS_MAX_MESSAGE_BYTES, SPOKE_POOL_ABI, acrossAddressOf, acrossBytes32, decodeAcrossDeposit, encodeAcrossDeposit} from "../src/deposit.js";
-import {ARB_USDC, BASE_USDC, RELAYER, USER, apiQuote, refused, statusFixture, usdcArgs} from "./fixtures.js";
+import {ARB_USDC, BASE_USDC, RELAYER, USER, ZERO, apiQuote, refused, statusFixture, usdcArgs} from "./fixtures.js";
 
 /** Across's toolkit appends these after the ABI arguments of every call its API hands out (SWAP_CALLDATA_MARKER). */
 const SWAP_MARKER = "73c0de";
@@ -22,7 +22,7 @@ describe("deposit codec", () => {
       // The same call encoded with an ABI written out a second time, addresses as bytes32 by hand.
       const abi = parseAbi(["function deposit(bytes32,bytes32,bytes32,bytes32,uint256,uint256,uint256,bytes32,uint32,uint32,uint32,bytes)"]);
       const pad = (a: string) => `0x${a.slice(2).padStart(64, "0")}` as Hex;
-      const other = encodeFunctionData({abi, functionName: "deposit", args: [pad(USER), pad(USER), pad(BASE_USDC), pad(ARB_USDC), 25_000_000n, 24_990_967n, 42161n, pad(RELAYER), args.quoteTimestamp, args.fillDeadline, 3, message]});
+      const other = encodeFunctionData({abi, functionName: "deposit", args: [pad(USER), pad(USER), pad(BASE_USDC), pad(ARB_USDC), 25_000_000n, 24_990_967n, 42161n, pad(ZERO), args.quoteTimestamp, args.fillDeadline, 0, message]});
       expect(data).toBe(other.toLowerCase());
     }
   });

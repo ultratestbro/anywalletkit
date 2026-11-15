@@ -73,7 +73,7 @@ describe("routes not priced", () => {
 
 describe("the device's own fee floor", () => {
   it("by asset and origin: what relayers take, so a server cannot name a deposit nobody fills", () => {
-    expect(ACROSS_MIN_FEE_PPM).toEqual({stable: 100, ethFromEthereum: 70, ethFromL2: 450, wbtc: 250});
+    expect(ACROSS_MIN_FEE_PPM).toEqual({stable: 100, ethFromEthereum: 70, ethFromL2: 450, ethFromOtherL2: 70, wbtc: 250});
     expect(acrossMinFeePpm(USDC)).toBe(100);
     expect(acrossMinFeePpm(USDT)).toBe(100);
     expect(acrossMinFeePpm(ETH_L1)).toBe(70);

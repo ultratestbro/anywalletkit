@@ -29,7 +29,7 @@ export interface RecordedQuote {
   floor: boolean;
   calls: RecordedCall[];
   result:
-    | {outputAmount: string; fee: string; priceSource: "suggested-fees" | "floor"; v5Fee: string; relayerFee: string; quoteTimestamp: number; fillDeadline: number; etaSeconds: number; placeholder: boolean}
+    | {outputAmount: string; fee: string; priceSource: "suggested-fees" | "suggested-fees (V5 other rail)" | "floor"; v5Fee: string; relayerFee: string; quoteTimestamp: number; fillDeadline: number; etaSeconds: number; placeholder: boolean}
     | {refusal: {text: string; reason: string | null}};
 }
 

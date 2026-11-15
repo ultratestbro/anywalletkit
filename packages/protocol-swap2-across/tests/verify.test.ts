@@ -1,8 +1,8 @@
 import {describe, expect, it} from "vitest";
-import {encodeAcrossDeposit} from "../src/deposit.js";
+import {decodeAcrossDeposit, encodeAcrossDeposit} from "../src/deposit.js";
 import {ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S, ACROSS_V5_MESSAGE_PREFIX, acrossChain, acrossRouteOf} from "../src/config.js";
 import {
-  ACROSS_DEFAULT_MAX_FEE_BPS, ACROSS_LANDING_WINDOW_S, ACROSS_MAX_FILL_WINDOW_S, ACROSS_MIN_FILL_WINDOW_S, ACROSS_MIN_OPEN_FILL_S, acrossRequestOf,
+  ACROSS_DEFAULT_MAX_FEE_BPS, ACROSS_MAX_FILL_WINDOW_S, ACROSS_MIN_FILL_WINDOW_S, ACROSS_QUOTE_TIME_AHEAD_S, acrossRequestOf,
   checkAcrossRequest, isAcrossSpeedUpTypedData, verifyAcrossDeposit,
 } from "../src/verify.js";
 import {
@@ -36,21 +36,27 @@ describe("verifyAcrossDeposit: what passes", () => {
     verifyAcrossDeposit(usdcRequest(), txOf(usdcArgs({exclusiveRelayer: ZERO, exclusivityParameter: 0})));
   });
 
-  it("Across's own API calldata for the same request passes once the marker is off (the numbers fit every bound)", () => {
+  it("Across's own API calldata for the same request fits every bound but its exclusive relayer (marker off); marker on, the bytes are refused", () => {
     const q = apiQuote("base-usdc-arb-usdc");
     const req = usdcRequest({depositor: DEAD, recipient: DEAD, minAmountOut: BigInt(q.minOutputAmount!), nowMs: q.serverTimeMs});
     const tx = {to: q.tx.to, data: q.tx.data.slice(0, -6), value: "0", chainId: 8453, approvalAddress: BASE.spokePool};
-    expect(verifyAcrossDeposit(req, tx).args.outputAmount).toBe(24_990_967n);
+    // Across's V4 quotes name a relayer for 3 s; this module signs only deposits any relayer may fill.
+    expect(refused(() => verifyAcrossDeposit(req, tx), "tx-exclusivity", "policy_refused")).toMatch(/exclusive relayer/);
+    // The same numbers without the exclusivity pass.
+    const plain = encodeAcrossDeposit({...decodeAcrossDeposit(tx.data), exclusiveRelayer: ZERO, exclusivityParameter: 0});
+    expect(verifyAcrossDeposit(req, {...tx, data: plain}).args.outputAmount).toBe(24_990_967n);
     // As handed out (marker on), it is refused: the bytes signed are the canonical call.
     refused(() => verifyAcrossDeposit(req, {...tx, data: q.tx.data}), "tx-calldata", "policy_refused");
   });
 
-  it("and USDT → USDT0, whose exclusivity is a timestamp", () => {
+  it("and USDT → USDT0, whose exclusivity is a timestamp: refused for it alone", () => {
     const q = apiQuote("eth-usdt-arb-usdt0");
     const req = usdcRequest({sourceChain: "eip155:1", sourceToken: ETH_USDT, destToken: ARB_USDT0, depositor: DEAD, recipient: DEAD, minAmountOut: undefined, nowMs: q.serverTimeMs});
     const spoke = acrossChain("eip155:1")!.spokePool;
-    const v = verifyAcrossDeposit(req, {to: q.tx.to, data: q.tx.data.slice(0, -6), value: "0", chainId: 1, approvalAddress: spoke});
-    expect(v.args.exclusivityParameter).toBeGreaterThan(31_536_000);
+    const tx = {to: q.tx.to, data: q.tx.data.slice(0, -6), value: "0", chainId: 1, approvalAddress: spoke};
+    expect(decodeAcrossDeposit(tx.data).exclusivityParameter).toBeGreaterThan(31_536_000);
+    refused(() => verifyAcrossDeposit(req, tx), "tx-exclusivity", "policy_refused");
+    verifyAcrossDeposit(req, {...tx, data: encodeAcrossDeposit({...decodeAcrossDeposit(tx.data), exclusiveRelayer: ZERO, exclusivityParameter: 0})});
   });
 });
 
@@ -137,30 +143,19 @@ describe("verifyAcrossDeposit: a negative for every field", () => {
     refused(() => verifyAcrossDeposit(req, txOf({...ok, message: ACROSS_V5_MESSAGE_PREFIX.slice(0, 64) as `0x${string}`})), "tx-message", "policy_refused");
   });
 
-  it("exclusivity", () => {
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: 0})), "tx-exclusivity", "policy_refused");
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusiveRelayer: ZERO})), "tx-exclusivity", "policy_refused");
-    // An offset of an hour passes (Across's two-hour fill window leaves room after the last landing), one beyond it does not.
-    verifyAcrossDeposit(req, txOf({...ok, fillDeadline: ok.quoteTimestamp + ACROSS_MAX_FILL_WINDOW_S, exclusivityParameter: 3600}));
-    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: 3601})), "tx-exclusivity", "policy_refused")).toMatch(/alone/);
-    // A timestamp: past is no exclusivity; too close to the fill deadline is refused.
-    verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: NOW_S - 600}));
-    const qt = NOW_S - 1200;
-    const fd = qt + ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S + ACROSS_MIN_FILL_WINDOW_S;
-    verifyAcrossDeposit(req, txOf({...ok, quoteTimestamp: qt, fillDeadline: fd, exclusivityParameter: fd - ACROSS_MIN_OPEN_FILL_S}));
-    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, quoteTimestamp: qt, fillDeadline: fd, exclusivityParameter: fd - ACROSS_MIN_OPEN_FILL_S + 1})), "tx-exclusivity", "policy_refused")).toMatch(/before the fill deadline/);
-    // A timestamp more than an hour out.
-    expect(refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: NOW_S + 3600 + ACROSS_LANDING_WINDOW_S + 1})), "tx-exclusivity", "policy_refused")).toMatch(/alone/);
-    // An offset that would run into the fill deadline for a deposit landing as late as the SpokePool takes it.
-    const lastLanding = ok.quoteTimestamp + ACROSS_DEPOSIT_QUOTE_TIME_BUFFER_S;
-    verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: ok.fillDeadline - ACROSS_MIN_OPEN_FILL_S - lastLanding}));
-    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: ok.fillDeadline - ACROSS_MIN_OPEN_FILL_S - lastLanding + 1})), "tx-exclusivity", "policy_refused");
+  it("exclusivity: none at all (a relayer, a window, an offset, a timestamp — past or not — are each refused)", () => {
+    verifyAcrossDeposit(req, txOf(ok));
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusiveRelayer: RELAYER})), "tx-exclusivity", "policy_refused");
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusivityParameter: 3})), "tx-exclusivity", "policy_refused");
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusiveRelayer: RELAYER, exclusivityParameter: 3})), "tx-exclusivity", "policy_refused");
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusiveRelayer: RELAYER, exclusivityParameter: NOW_S - 600})), "tx-exclusivity", "policy_refused");
+    refused(() => verifyAcrossDeposit(req, txOf({...ok, exclusiveRelayer: RELAYER, fillDeadline: ok.quoteTimestamp + ACROSS_MAX_FILL_WINDOW_S, exclusivityParameter: 3600})), "tx-exclusivity", "policy_refused");
   });
 
   it("quote time", () => {
     const at = (qt: number) => txOf({...ok, quoteTimestamp: qt, fillDeadline: qt + 7200});
-    verifyAcrossDeposit(req, at(NOW_S + 120));
-    refused(() => verifyAcrossDeposit(req, at(NOW_S + 121)), "tx-quote-time", "policy_refused");
+    verifyAcrossDeposit(req, at(NOW_S + ACROSS_QUOTE_TIME_AHEAD_S));
+    refused(() => verifyAcrossDeposit(req, at(NOW_S + ACROSS_QUOTE_TIME_AHEAD_S + 1)), "tx-quote-time", "policy_refused");
     verifyAcrossDeposit(req, at(NOW_S - 3300));
     refused(() => verifyAcrossDeposit(req, at(NOW_S - 3301)), "tx-quote-time", "quote_expired");
   });

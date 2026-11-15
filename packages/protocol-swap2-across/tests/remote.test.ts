@@ -5,8 +5,9 @@ import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import {acrossQuoteOf} from "../src/build.js";
 import {decodeAcrossDeposit, encodeAcrossDeposit, type AcrossDepositArgs} from "../src/deposit.js";
 import {acrossRemoteProvider} from "../src/remote.js";
-import {acrossIntentId} from "../src/verify.js";
-import {ARB_USDC, NOW_MS, NOW_S, USER, recordedIntentId, rpcFrom, statusFixture, usdcQuote, usdcRequest} from "./fixtures.js";
+import {acrossRouteOf, type AcrossRoute} from "../src/config.js";
+import {acrossIntentId, acrossQuoteFeesOf} from "../src/verify.js";
+import {ARB_USDC, BASE_USDC, NOW_MS, NOW_S, USER, recordedIntentId, rpcFrom, statusFixture, usdcQuote, usdcRequest} from "./fixtures.js";
 
 beforeEach(() => { vi.useFakeTimers({toFake: ["Date"], now: NOW_MS}); });
 afterEach(() => { vi.useRealTimers(); });
@@ -18,9 +19,14 @@ const params = (over: Partial<QuoteParams> = {}): QuoteParams => ({
   destAddress: USER, refundAddress: USER, sender: USER, dry: false, ...over,
 });
 
-/** A backend that answers `quote` with whatever the test hands it, and records every call. */
+/**
+ * A backend that answers `quote` with whatever the test hands it, and records every call. Across's relayer fee quote
+ * (read by the app itself) does not answer here: the routes below are ones the pinned floor covers, so the per-asset
+ * floor stands in (review-2026-11-15-pricing.test.ts holds quotes to a live answer).
+ */
 function backend(answer: (body: {provider: string; params?: QuoteParams}) => unknown, calls: string[] = []): typeof fetch {
   return (async (url: string, init: RequestInit) => {
+    if (String(url).startsWith("https://app.across.to/")) throw new TypeError("offline");
     const action = String(url).slice(BASE_URL.length + 1);
     calls.push(action);
     return new Response(JSON.stringify(answer(JSON.parse(String(init.body)))), {status: 200, headers: {"content-type": "application/json"}});
@@ -33,12 +39,16 @@ function honest(): Quote {
   return {...q, intentId: `${q.intentId}${TAG}`};
 }
 
-/** The honest quote with its deposit re-encoded with other arguments (and an id that names the new deposit). */
+/** The honest quote with its deposit re-encoded with other arguments (and an id, amounts and fees that name the new deposit). */
 function withArgs(edit: Partial<AcrossDepositArgs>): Quote {
   const q = honest();
   const args = {...decodeAcrossDeposit(q.txRequest!.data!), ...edit};
   const data = encodeAcrossDeposit(args);
-  return {...q, txRequest: {...q.txRequest!, data}, intentId: `${acrossIntentId(8453, 42161, data)}${TAG}`, destAmount: args.outputAmount.toString(), minDestAmount: args.outputAmount.toString()};
+  const route = acrossRouteOf("eip155:8453", BASE_USDC, "eip155:42161", ARB_USDC) as AcrossRoute;
+  return {
+    ...q, txRequest: {...q.txRequest!, data}, intentId: `${acrossIntentId(8453, 42161, data)}${TAG}`, destAmount: args.outputAmount.toString(), minDestAmount: args.outputAmount.toString(),
+    ...acrossQuoteFeesOf(route, args.inputAmount - args.outputAmount),
+  };
 }
 
 describe("a backend's quote, checked on the device", () => {

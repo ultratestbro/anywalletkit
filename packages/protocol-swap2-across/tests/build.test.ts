@@ -12,7 +12,7 @@ describe("buildAcrossDeposit", () => {
     expect(v.deposit).toMatchObject({to: BASE.spokePool, value: "0", chainId: 8453, approvalAddress: BASE.spokePool});
     expect(decodeAcrossDeposit(v.deposit.data)).toEqual({
       depositor: USER, recipient: USER, inputToken: BASE_USDC, outputToken: ARB_USDC, inputAmount: 25_000_000n, outputAmount: 24_990_967n,
-      destinationChainId: 42161n, exclusiveRelayer: RELAYER, quoteTimestamp: NOW_S - 60, fillDeadline: NOW_S + 7140, exclusivityParameter: 3, message: "0x",
+      destinationChainId: 42161n, exclusiveRelayer: ZERO, quoteTimestamp: NOW_S - 60, fillDeadline: NOW_S + 7140, exclusivityParameter: 0, message: "0x",
     });
   });
 
@@ -47,8 +47,8 @@ describe("buildAcrossDeposit", () => {
   it("what the verifier refuses, the builder refuses with the same code", () => {
     refused(() => buildAcrossDeposit(usdcRequest(), usdcQuote({outputAmount: "1", fees: undefined})), "tx-output-amount", "price_check_failed");
     refused(() => buildAcrossDeposit(usdcRequest({minAmountOut: undefined}), usdcQuote({outputAmount: "20000000", fees: undefined})), "tx-fee", "price_check_failed");
-    refused(() => buildAcrossDeposit(usdcRequest(), usdcQuote({fillDeadline: NOW_S + 60})), "tx-exclusivity", "policy_refused");
-    refused(() => buildAcrossDeposit(usdcRequest(), usdcQuote({exclusiveRelayer: ZERO, exclusivityParameter: 0, fillDeadline: NOW_S + 60})), "tx-fill-deadline", "quote_expired");
+    refused(() => buildAcrossDeposit(usdcRequest(), usdcQuote({exclusiveRelayer: RELAYER, exclusivityParameter: 3})), "tx-exclusivity", "policy_refused");
+    refused(() => buildAcrossDeposit(usdcRequest(), usdcQuote({fillDeadline: NOW_S + 60})), "tx-fill-deadline", "quote_expired");
     refused(() => buildAcrossDeposit(usdcRequest(), usdcQuote({quoteTimestamp: NOW_S - 3500})), "tx-quote-time", "quote_expired");
     refused(() => buildAcrossDeposit(usdcRequest({destToken: OTHER}), usdcQuote()), "token-unsupported", "unsupported_pair");
   });

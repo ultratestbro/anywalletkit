@@ -7,8 +7,10 @@
 //     and on Ethereum the HubPool's crossChainContracts(chainId) names the pinned SpokePool. Any difference is "BAD":
 //     a pin to review before a deposit is signed against it.
 //  2. Keyless too: Across's /suggested-fees answers a plain deposit on the corridors below, on the pinned SpokePools
-//     (the relayer price the module stands behind while Across serves it). A corridor it does not answer is "warn":
-//     the provider then prices from the pinned floor.
+//     (the relayer price the module stands behind while Across serves it). A corridor it does not answer prints a
+//     "FAILED" line, which the watch's canary reports as "warn": the provider then prices from the pinned floor where
+//     it covers the route and refuses the rest, and the app's own read stands on the floor alike. A corridor Across
+//     refuses (a 400, another SpokePool) is "BAD" and fails the run: the module would refuse every quote on it.
 //  3. Only with ACROSS_API_KEY (the Across API V5 key): live quotes for the corridors below through the provider —
 //     priced by the rule, built, held to the request by acrossPins and preflighted — and once through the real server
 //     handler and acrossRemoteProvider (remote mode). Without the key this part is skipped with a neutral line and the
@@ -116,10 +118,10 @@ if (!args.includes("--no-quotes")) {
       const r = readAcrossSuggestedFees(request, route, res.status, body, Math.floor(Date.now() / 1000));
       if (r.kind === "fees") console.log(`ok  fees    ${name.padEnd(32)} relayer fee ${r.totalRelayFee} of ${amount} (${(Number((r.totalRelayFee * 1_000_000n) / BigInt(amount)) / 100).toFixed(2)} bps), quote time ${Math.floor(Date.now() / 1000) - r.timestamp} s old`);
       else if (r.kind === "refused") { bad++; console.log(`BAD fees    ${name.padEnd(32)} ${r.detail} [${r.reason}]`); }
-      else { warn++; console.log(`warn fees   ${name.padEnd(32)} /suggested-fees unavailable (${r.detail}) — the provider prices from the pinned floor`); }
+      else { warn++; console.log(`warn fees   ${name.padEnd(32)} /suggested-fees FAILED: unavailable (${r.detail}) — the pinned floor prices where it covers the route, the rest is refused`); }
     } catch (e) {
       warn++;
-      console.log(`warn fees   ${name.padEnd(32)} /suggested-fees did not answer (${String(e?.name ?? e).slice(0, 40)})`);
+      console.log(`warn fees   ${name.padEnd(32)} /suggested-fees FAILED: no answer (${String(e?.name ?? e).slice(0, 40)})`);
     }
     await pause();
   }
@@ -156,7 +158,9 @@ if (!args.includes("--no-quotes")) {
     if (CORRIDORS[0] && (!ONLY || ONLY.test("remote"))) {
       try {
         const handle = createSwap2Handler({providers: [provider], sealSecret: crypto.getRandomValues(new Uint8Array(32)), guard: () => {}, subject: () => "verify-live"});
+        // The app's fetch: the backend's actions to the handler; Across's relayer fee, which the app reads itself, to Across.
         const backend = async (url, init) => {
+          if (!String(url).startsWith("https://backend.invalid/")) return fetch(url, init);
           const res = await handle(String(url).split("/").pop(), JSON.parse(String(init.body)), "verify-live");
           return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
         };
@@ -165,7 +169,8 @@ if (!args.includes("--no-quotes")) {
         if (!q || !/~[0-9a-f]{32}$/.test(q.intentId)) throw new Error("no sealed quote");
         const tx = await app.buildDeposit(q);
         if (lc(tx.data) !== lc(q.txRequest.data)) throw new Error("the build is not the quoted deposit");
-        console.log(`ok  remote  ${CORRIDORS[0][0].padEnd(32)} through createSwap2Handler + acrossRemoteProvider: out ${q.destAmount}`);
+        await app.preflightDeposit(q, tx);
+        console.log(`ok  remote  ${CORRIDORS[0][0].padEnd(32)} through createSwap2Handler + acrossRemoteProvider (relayer fee read on the "device" too): out ${q.destAmount}`);
       } catch (e) {
         bad++;
         console.log(`BAD remote  ${String(e?.message ?? e).replace(/\s+/g, " ").slice(0, 260)}`);

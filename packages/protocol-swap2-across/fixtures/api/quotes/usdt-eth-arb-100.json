@@ -1,5 +1,5 @@
 {
- "note": "USDT Ethereum → USDT0 Arbitrum, 100 USDT (V5 prices another rail, ~20 min; the plain deposit is priced at V5's fee net of its origin step). Recorded 2026-11-14T23:30:13.029Z through acrossProvider (dist), the subject a public address; nothing signed or sent.",
+ "note": "USDT Ethereum → USDT0 Arbitrum, 100 USDT (V5 prices another rail, ~20 min: the plain deposit is priced on Across's relayer fee alone). Recorded 2026-11-14T23:30:13.029Z through acrossProvider (dist), the subject a public address; nothing signed or sent. `result` re-derived from these same answers on 2026-11-15 under the other-rail rule (it was V5's net fee, 201095).",
  "nowMs": 1794699013029,
  "params": {
   "sourceChain": "eip155:1",
@@ -364,9 +364,9 @@
   }
  ],
  "result": {
-  "outputAmount": "99798905",
-  "fee": "201095",
-  "priceSource": "suggested-fees",
+  "outputAmount": "99983651",
+  "fee": "16349",
+  "priceSource": "suggested-fees (V5 other rail)",
   "v5Fee": "201095",
   "relayerFee": "16349",
   "quoteTimestamp": 1794698771,

@@ -160,6 +160,11 @@ describe("reading /suggested-fees", () => {
     expect(refusedOf(feesError("fees-amount-too-low").body, 400)).toMatchObject({kind: "refused", reason: "amount_too_small"});
     expect(refusedOf(feesError("fees-amount-too-high").body, 400)).toMatchObject({kind: "refused", reason: "amount_too_large"});
     expect(refusedOf(feesError("fees-route-not-enabled").body, 400)).toMatchObject({kind: "refused", reason: "unsupported_pair"});
+    // A token Across does not serve (only pinned ones are asked for): its relayers would not fill a deposit priced on the floor.
+    expect(refusedOf(feesError("fees-invalid-param").body, 400)).toMatchObject({kind: "refused", reason: "unsupported_pair"});
+    // Any other 400 is Across refusing this exact deposit.
+    expect(refusedOf({type: "AcrossApiError", code: "INVALID_PARAM", status: 400, message: "Invalid amount", param: "amount"}, 400)).toMatchObject({kind: "refused", reason: "upstream_unavailable"});
+    expect(refusedOf(undefined, 400)).toMatchObject({kind: "refused", reason: "upstream_unavailable"});
     expect(refusedOf({...body(), isAmountTooLow: true})).toMatchObject({kind: "refused", reason: "amount_too_small"});
     expect(refusedOf({...body(), limits: {...body().limits, maxDeposit: "24999999"}})).toMatchObject({kind: "refused", reason: "amount_too_large"});
     expect(refusedOf({...body(), limits: {...body().limits, minDeposit: "25000001"}})).toMatchObject({kind: "refused", reason: "amount_too_small"});
@@ -169,7 +174,6 @@ describe("reading /suggested-fees", () => {
 
   it("anything else is unavailable — the pinned floor stands in", () => {
     const at = (b: unknown, status = 200, now = nowS) => readAcrossSuggestedFees(request, route, status, b, now).kind;
-    expect(at(feesError("fees-invalid-param").body, 400)).toBe("unavailable");
     expect(at(undefined, 502)).toBe("unavailable");
     expect(at({error: "gone"}, 404)).toBe("unavailable");
     expect(at("not json")).toBe("unavailable");
@@ -178,9 +182,10 @@ describe("reading /suggested-fees", () => {
     expect(at({...body(), inputToken: {...body().inputToken, chainId: 10}})).toBe("unavailable");
     expect(at({...body(), outputToken: {...body().outputToken, address: BASE_USDC}})).toBe("unavailable");
     expect(at({...body(), timestamp: 1794698771})).toBe("unavailable");
-    // Stale or ahead: its timestamp would be the deposit's quote time.
+    // Stale or ahead of this clock at all: its timestamp would be the deposit's quote time (the SpokePool reverts one ahead).
     expect(at(body(), 200, 1_794_698_771 + ACROSS_SUGGESTED_FEES_MAX_AGE_S + 1)).toBe("unavailable");
-    expect(at(body(), 200, 1_794_698_771 - 121)).toBe("unavailable");
+    expect(at(body(), 200, 1_794_698_771 - 1)).toBe("unavailable");
+    expect(at(body(), 200, 1_794_698_771)).toBe("fees");
     expect(at(body(), 200, 1_794_698_771 + ACROSS_SUGGESTED_FEES_MAX_AGE_S)).toBe("fees");
   });
 
@@ -196,7 +201,8 @@ describe("V5 error envelopes → CS-13", () => {
       "v5-unauthenticated-bad-key": {reason: "key_rejected", httpStatus: 401},
       "v5-unsupported-param": {reason: "upstream_unavailable", httpStatus: 400},
       "v5-missing-field": {reason: "upstream_unavailable", httpStatus: 400},
-      "v5-invalid-field-token": {reason: "policy_refused"},
+      // A token V5 does not know (the module sends only pinned ones): a pair it does not serve.
+      "v5-invalid-field-token": {reason: "unsupported_pair"},
       "v5-amount-too-small": {reason: "amount_too_small"},
       "v5-amount-too-large": {reason: "amount_too_large"},
       // "raise the amount above N base units", amountLimits.side = "min": the amount is too small, not too large.

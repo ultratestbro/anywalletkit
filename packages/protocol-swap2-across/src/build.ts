@@ -8,12 +8,13 @@
  * {@link verifyAcrossDeposit} on its own result before handing it out, so a deposit leaves this file only in the shape
  * the verifier signs.
  */
-import {bigintToUnits} from "@anywalletkit/core";
 import type {Quote} from "@anywalletkit/protocol-swap2-core/types";
-import {ACROSS_NATIVE} from "./config.js";
 import {encodeAcrossDeposit} from "./deposit.js";
 import {AcrossRefusal} from "./refusal.js";
-import {ACROSS_MAX_QUOTE_LIFE_MS, acrossIntentId, checkAcrossRequest, verifyAcrossDeposit, type AcrossRequest, type VerifiedAcrossDeposit} from "./verify.js";
+import {
+  ACROSS_MAX_QUOTE_LIFE_MS, acrossIntentId, acrossQuoteFeesOf, acrossQuoteTimeLimitMs, checkAcrossRequest, verifyAcrossDeposit, type AcrossRequest,
+  type VerifiedAcrossDeposit,
+} from "./verify.js";
 
 /**
  * What a quote source must say about one Across transfer, normalized from whatever it answers. Integers that can
@@ -158,20 +159,17 @@ export interface AcrossQuoteOptions {
 /**
  * A swap2 `Quote` for a request and a quote source's numbers: the deposit is built here (and verified), the amounts it
  * shows are the deposit's, and `providerData` seals the request and the numbers so the same deposit can be rebuilt and
- * checked again before a build and a signature. `feeUsd` is the verified fee itself for a dollar stablecoin (USDC,
- * USDT, one unit a dollar) and 0 for an asset this module has no price for — never the quote source's own figure.
+ * checked again before a build and a signature. `fees` and `feeUsd` are the verified fee's own ({@link acrossQuoteFeesOf})
+ * — never the quote source's figures — and `validUntilMs` ends while the SpokePool still takes the quote time.
  */
 export function acrossQuoteOf(request: AcrossRequest, quote: NormalizedAcrossQuote, opts: AcrossQuoteOptions = {}): Quote {
   const v = buildAcrossDeposit(request, quote);
   const ttl = opts.quoteTtlMs ?? 60_000;
   if (!Number.isInteger(ttl) || ttl <= 0 || ttl > 300_000) throw new AcrossRefusal("request-invalid", "quoteTtlMs must be an integer between 1 and 300000");
   const now = request.nowMs ?? Date.now();
-  const validUntilMs = Math.min(now + ttl, now + ACROSS_MAX_QUOTE_LIFE_MS, quote.expiresAtMs ?? Number.POSITIVE_INFINITY);
+  // Never past the moment the SpokePool stops taking the deposit's quote time (with time to land).
+  const validUntilMs = Math.min(now + ttl, now + ACROSS_MAX_QUOTE_LIFE_MS, quote.expiresAtMs ?? Number.POSITIVE_INFINITY, acrossQuoteTimeLimitMs(v.args.quoteTimestamp));
   const reliability = opts.reliability ?? 0.97;
-  const nativeIn = v.route.input.native;
-  const feeToken = nativeIn ? ACROSS_NATIVE : v.route.input.token;
-  const fee = v.fee.toString(10);
-  const usd = v.route.asset === "USDC" || v.route.asset === "USDT";
   return {
     provider: "across",
     intentId: acrossIntentId(v.route.input.chain.chainId, v.route.output.chain.chainId, v.deposit.data),
@@ -188,8 +186,7 @@ export function acrossQuoteOf(request: AcrossRequest, quote: NormalizedAcrossQuo
     destAmount: v.args.outputAmount.toString(10),
     minDestAmount: v.args.outputAmount.toString(10),
     destDecimals: v.route.output.decimals,
-    feeUsd: usd ? bigintToUnits(v.fee, v.route.input.decimals) : 0,
-    fees: v.fee > 0n ? [{type: "protocol", amount: fee, token: feeToken, included: true, description: "Across relayer and LP fee"}] : [],
+    ...acrossQuoteFeesOf(v.route, v.fee),
     etaSeconds: Math.min(Math.max(Math.ceil(quote.expectedFillTimeSec), 1), 86_400),
     reliability: Number.isFinite(reliability) && reliability >= 0 && reliability <= 1 ? reliability : 0.97,
     validUntilMs,

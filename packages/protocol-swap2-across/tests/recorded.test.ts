@@ -30,9 +30,9 @@ function withReasons(params: QuoteParams): QuoteParams & {reasons: [string, Swap
 /**
  * The rule, recomputed from the raw answers: F5 = V5 total fee − its origin execution legs (wei on ETH routes, the USD
  * figure at the destination token's price otherwise); the need = /suggested-fees' total (or the recorded floor);
- * fee = max(F5, need).
+ * fee = max(F5, need) — the need alone when V5's fill estimate is over a minute (another rail).
  */
-function expectedFee(f: RecordedQuote): {f5: bigint; need: bigint | null; tolerance: bigint} {
+function expectedFee(f: RecordedQuote): {f5: bigint; need: bigint | null; tolerance: bigint; otherRail: boolean} {
   const v5 = v5Call(f).response;
   const total = BigInt(v5.fee.totalFee.amount);
   const eth = /^0x0{40}$/.test(f.params.destToken);
@@ -47,7 +47,7 @@ function expectedFee(f: RecordedQuote): {f5: bigint; need: bigint | null; tolera
     }
   }
   const fees = feesCall(f);
-  return {f5: total - addBack, need: fees ? BigInt(fees.response.totalRelayFee.total) : null, tolerance};
+  return {f5: total - addBack, need: fees ? BigInt(fees.response.totalRelayFee.total) : null, tolerance, otherRail: v5.expectedFillTimeMs > 60_000};
 }
 
 describe("recorded answers → the deposit's numbers (max of V5's net fee and what a relayer needs)", () => {
@@ -87,7 +87,8 @@ describe("recorded answers → the deposit's numbers (max of V5's net fee and wh
       const f5 = BigInt(r.v5Fee);
       expect(f5 >= want.f5 - want.tolerance && f5 <= want.f5 + want.tolerance).toBe(true);
       if (want.need !== null) expect(BigInt(r.relayerFee)).toBe(want.need);
-      expect(fee).toBe(f5 > BigInt(r.relayerFee) ? f5 : BigInt(r.relayerFee));
+      expect(fee).toBe(want.otherRail || BigInt(r.relayerFee) > f5 ? BigInt(r.relayerFee) : f5);
+      expect(r.priceSource === "suggested-fees (V5 other rail)").toBe(want.otherRail);
 
       // The deposit: built here, plain — the pinned SpokePool, empty message, no exclusivity, two hours from the quote time.
       const src = acrossChain(f.params.sourceChain)!;
@@ -128,7 +129,7 @@ describe("recorded answers → the deposit's numbers (max of V5's net fee and wh
 
   it("the cells the study singled out", () => {
     const bps = (name: string) => { const f = loadRecorded(name); return quoted(f) ? Number(((BigInt(f.params.amountIn) - BigInt(f.result.outputAmount)) * 1_000_000n) / BigInt(f.params.amountIn)) / 100 : NaN; };
-    const source = (name: string) => { const f = loadRecorded(name); return quoted(f) && BigInt(f.result.v5Fee) >= BigInt(f.result.relayerFee) ? "v5" : "relayer"; };
+    const source = (name: string) => { const f = loadRecorded(name); return quoted(f) && f.result.priceSource !== "suggested-fees (V5 other rail)" && BigInt(f.result.v5Fee) >= BigInt(f.result.relayerFee) ? "v5" : "relayer"; };
     // ETH L2 → L2 at ~$2 000: V5's auction price (~2.7 bps) is under the 5+ bps plain deposits are filled at — the relayer fee binds.
     expect(source("eth-arb-base-2000")).toBe("relayer");
     expect(bps("eth-arb-base-2000")).toBeGreaterThan(5);
@@ -137,7 +138,10 @@ describe("recorded answers → the deposit's numbers (max of V5's net fee and wh
     expect(source("eth-eth-base-5")).toBe("v5");
     expect(bps("eth-eth-base-100")).toBeLessThan(10);
     // Stables: V5's price is the higher one (a few cents a transfer over the relayer market) and stands.
-    for (const n of ["usdc-base-arb-25", "usdc-arb-base-2000", "usdc-base-op-5", "usdt-eth-arb-100"]) expect(source(n)).toBe("v5");
+    for (const n of ["usdc-base-arb-25", "usdc-arb-base-2000", "usdc-base-op-5"]) expect(source(n)).toBe("v5");
+    // Unless V5 priced another rail (USDT Ethereum → Arbitrum, ~20 min at 12× the relayer fee): the relayer fee alone.
+    expect(source("usdt-eth-arb-100")).toBe("relayer");
+    expect(bps("usdt-eth-arb-100")).toBeLessThan(2);
   });
 });
 
@@ -165,9 +169,12 @@ describe("the engine, on a recorded answer", () => {
 });
 
 describe("remote mode: the real provider behind createSwap2Handler, every answer checked again on the device", () => {
-  function backendFor(f: RecordedQuote) {
+  /** The backend (the real provider under the real handler) — and Across's relayer fee, which the app reads itself, from the recording. */
+  function backendFor(f: RecordedQuote, seen: Seen[] = []) {
     const handle = createSwap2Handler<string>({providers: [providerFor(f)], sealSecret: "recorded-test-seal-secret-at-least-32-bytes", guard: () => {}, subject: () => "alice"});
+    const across = replay(f, seen);
     return (async (url: string, init: RequestInit) => {
+      if (String(url).startsWith("https://app.across.to/")) return across(url, init);
       const res = await handle(String(url).split("/").pop()!, JSON.parse(String(init.body)), "user");
       return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
     }) as unknown as typeof fetch;
@@ -176,9 +183,13 @@ describe("remote mode: the real provider behind createSwap2Handler, every answer
   it.each(["usdc-base-arb-25", "eth-arb-base-2000", "wbtc-eth-arb-100"])("%s: quoted through the backend (intent id with the server's ~tag), built, verified", async (name) => {
     const f = loadRecorded(name);
     vi.setSystemTime(f.nowMs);
-    const app = acrossRemoteProvider({baseUrl: "https://backend.example/api/swap2", fetchImpl: backendFor(f)});
+    const seen: Seen[] = [];
+    const app = acrossRemoteProvider({baseUrl: "https://backend.example/api/swap2", fetchImpl: backendFor(f, seen)});
     const q = await app.getQuote(f.params);
     expect(q).not.toBeNull();
+    // The device read Across's relayer fee itself, with nothing secret (the key never left the backend).
+    expect(seen.filter((s) => s.url.startsWith("https://app.across.to/api/suggested-fees"))).toHaveLength(1);
+    expect(JSON.stringify(seen)).not.toContain(TEST_KEY);
     expect(q!.intentId).toMatch(/^across:\d+:\d+:[0-9a-f]{32}~[0-9a-f]{32}$/);
     expect(q!.destAmount).toBe((f.result as {outputAmount: string}).outputAmount);
     const tx = await app.buildDeposit(q!);

@@ -52,14 +52,13 @@ describe("deadlines hold for a deposit that lands as late as the SpokePool still
     expect(refused(() => verifyAcrossDeposit(usdcRequest(), txOf(usdcArgs({...noExclusivity, quoteTimestamp: qt, fillDeadline: qt + 3600 + 1799}))), "tx-fill-deadline", "policy_refused")).toMatch(/land/);
   });
 
-  it("an exclusivity offset is counted from that last landing", () => {
+  it("an exclusivity offset is refused (since the quoting review: no exclusivity at all)", () => {
     // The reviewer's case C: offset 3600 with a deadline the check let through.
     refused(() => buildAcrossDeposit(usdcRequest(), usdcQuote({quoteTimestamp: NOW_S, fillDeadline: NOW_S + 4500, exclusiveRelayer: OTHER, exclusivityParameter: 3600})), "tx-exclusivity", "policy_refused");
     const qt = NOW_S - 60;
     const fd = qt + 3600 + 1800;
-    // Landing at qt + 3600: the window ends at qt + 3600 + p, and must end 600 s before the deadline.
-    verifyAcrossDeposit(usdcRequest(), txOf(usdcArgs({quoteTimestamp: qt, fillDeadline: fd, exclusivityParameter: 1200})));
-    refused(() => verifyAcrossDeposit(usdcRequest(), txOf(usdcArgs({quoteTimestamp: qt, fillDeadline: fd, exclusivityParameter: 1201}))), "tx-exclusivity", "policy_refused");
+    refused(() => verifyAcrossDeposit(usdcRequest(), txOf(usdcArgs({quoteTimestamp: qt, fillDeadline: fd, exclusiveRelayer: OTHER, exclusivityParameter: 1200}))), "tx-exclusivity", "policy_refused");
+    verifyAcrossDeposit(usdcRequest(), txOf(usdcArgs({quoteTimestamp: qt, fillDeadline: fd, ...noExclusivity})));
   });
 });
 
