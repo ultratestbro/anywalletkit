@@ -11,7 +11,7 @@
  */
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {callSelector, chainLabel, describeSwapLike} from "@anywalletkit/protocol-swap2-core/activity";
-import {ZEROEX_CHAINS, zeroExChain, zeroExChainId} from "./chains.js";
+import {ZEROEX_CHAINS, ZEROEX_SETTLER_NONCE_MARGIN, zeroExChain, zeroExChainId} from "./chains.js";
 import {SETTLER_EXECUTE_SELECTOR, decodeSettlerExecute, zeroExSettlerNonce} from "./settler.js";
 
 export const ZEROEX_MODULE = "@anywalletkit/protocol-swap2-0x";
@@ -22,8 +22,9 @@ export function describeZeroExActivity(tx: ChainTx, ctx: DescribeActivityContext
   if (!chain) return null;
   if (callSelector(tx) !== SETTLER_EXECUTE_SELECTOR) return null;
   const target = tx.call?.to ?? tx.to;
-  // Bounded by the chain's pinned newest deployment: an address that is no Settler costs a few dozen derivations.
-  if (typeof target !== "string" || zeroExSettlerNonce(chainId, target, chain.registry, chain.maxSettlerNonce) === null) return null;
+  // Any deployment up to the newest one the chain accepts (past swaps went to older Settlers too); bounded by the pin,
+  // an address that is no Settler costs a few dozen derivations.
+  if (typeof target !== "string" || zeroExSettlerNonce(chainId, target, chain.registry, chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN) === null) return null;
   const data = tx.call?.data;
   if (typeof data === "string" && data.length > 10) {
     try {

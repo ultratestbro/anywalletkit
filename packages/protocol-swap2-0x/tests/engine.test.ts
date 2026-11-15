@@ -358,9 +358,11 @@ describe("zeroExVerifyQuote / zeroExVerifyBuild", () => {
     expect(await check({...built, typedData: "{}"})).toMatch(/built transaction is not the quoted swap/);
     const {txRequest: _, ...bare} = q;
     expect(await check(built, PARAMS, bare)).toMatch(/quote carries no transaction/);
-    // the registry moved on since the quote
-    world({registry: {current: OLDER_SETTLER, prev: null}});
+    // the registry moved on since the quote (rolled back to the previous Settler), or names a replaced one
+    world({registry: {current: PREV_SETTLER, prev: null}});
     expect(await check()).toMatch(/is not a 0x Settler from the on-chain registry/);
+    world({registry: {current: OLDER_SETTLER, prev: null}});
+    expect(await check()).toMatch(/\(Settler deployment 20\) as the 0x Settler, older than the oldest this module accepts there \(21\)/);
     world({registry: {current: null}});
     expect(await check()).toMatch(/reports no taker Settler in force/);
   });

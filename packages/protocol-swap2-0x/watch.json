@@ -48,7 +48,7 @@
         2
       ],
       "decode": "address",
-      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Ethereum \u2014 a change is a new 0x deployment: check it (verify:live), then raise maxSettlerNonce for the chain in src/chains.ts"
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Ethereum \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
     },
     {
       "id": "permit2-ethereum",
@@ -90,7 +90,7 @@
         2
       ],
       "decode": "address",
-      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Optimism \u2014 a change is a new 0x deployment: check it (verify:live), then raise maxSettlerNonce for the chain in src/chains.ts"
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Optimism \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
     },
     {
       "id": "permit2-optimism",
@@ -132,7 +132,7 @@
         2
       ],
       "decode": "address",
-      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 BNB Smart Chain \u2014 a change is a new 0x deployment: check it (verify:live), then raise maxSettlerNonce for the chain in src/chains.ts"
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 BNB Smart Chain \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
     },
     {
       "id": "permit2-bsc",
@@ -174,7 +174,7 @@
         2
       ],
       "decode": "address",
-      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Polygon \u2014 a change is a new 0x deployment: check it (verify:live), then raise maxSettlerNonce for the chain in src/chains.ts"
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Polygon \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
     },
     {
       "id": "permit2-polygon",
@@ -216,7 +216,7 @@
         2
       ],
       "decode": "address",
-      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Base \u2014 a change is a new 0x deployment: check it (verify:live), then raise maxSettlerNonce for the chain in src/chains.ts"
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Base \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
     },
     {
       "id": "permit2-base",
@@ -258,7 +258,7 @@
         2
       ],
       "decode": "address",
-      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Arbitrum \u2014 a change is a new 0x deployment: check it (verify:live), then raise maxSettlerNonce for the chain in src/chains.ts"
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Arbitrum \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
     },
     {
       "id": "permit2-arbitrum",
@@ -300,7 +300,7 @@
         2
       ],
       "decode": "address",
-      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Avalanche \u2014 a change is a new 0x deployment: check it (verify:live), then raise maxSettlerNonce for the chain in src/chains.ts"
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Avalanche \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
     },
     {
       "id": "permit2-avalanche",

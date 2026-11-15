@@ -55,7 +55,7 @@ describe("zeroExProvider — routes", () => {
   });
 
   it("the chain table is config", () => {
-    const p = zeroExProvider({apiKey: getKey, chains: {130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 4}, 56: null}});
+    const p = zeroExProvider({apiKey: getKey, chains: {130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce: 4, previousLiveNonce: 3}, 56: null}});
     expect(p.supportsChain!("eip155:130")).toBe(true);
     expect(p.supportsChain!("eip155:56")).toBe(false);
   });
@@ -352,8 +352,9 @@ describe("zeroExProvider — live quote (what will be signed)", () => {
     const s = setup({onRegistryRead: (n) => (n === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
     const q = (await s.quote(live))!;
     expect(q.txRequest!.to).toBe(SETTLER);
-    // read 1: ownerOf → 21, its code, prev → 20, its code; read 2: ownerOf → 22, its code, prev → 21 (code already seen)
-    expect(s.rpc()).toHaveLength(7);
+    // read 1: ownerOf → 21, its code, prev → 20 (older than the pinned previous: left out, its code never read);
+    // read 2: ownerOf → 22, its code, prev → 21 (code already seen)
+    expect(s.rpc()).toHaveLength(6);
   });
 
   const cases: [string, ApiStub, string | RegExp, Record<string, unknown>?][] = [

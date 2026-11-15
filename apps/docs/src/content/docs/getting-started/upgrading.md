@@ -44,8 +44,10 @@ Not breaking for apps that do not use the new provider: every existing text and 
 - **New package `@anywalletkit/protocol-swap2-0x`:** `zeroExProvider({ apiKey, rpcUrls })` on your server only (under
   React Native it refuses a key), `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app (see
   [0x](/guides/swaps/#0x)). Conventional flags: `ZEROEX_ENABLED` (dark unless set) and `ZEROEX_API_KEY`. The chain
-  table pins the newest Settler deployment accepted per chain (`maxSettlerNonce`); a custom `chains` entry must
-  name one.
+  table pins, per chain, the Settler deployments the registry named as current and previous when it was pinned
+  (`newestLiveNonce`, `previousLiveNonce`): native-coin sales go only to those two, token sales also to the next two
+  once they hold code. A custom `chains` entry must name both; update the package (or raise both pins) when 0x
+  deploys a new Settler, or native sales on that chain are refused.
 - **extension-kit (minor), conformance (minor):** the Permit2 swap is one sheet and three pre-approved operations;
   the behaviour suite runs Permit2 swaps (`createMockAccount({ signTypedData: true })`).
 

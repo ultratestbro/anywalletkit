@@ -307,8 +307,10 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
 - 0x (`zeroExProvider({ apiKey, rpcUrls })` on your server, `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app;
   conventional env names `ZEROEX_ENABLED` / `ZEROEX_API_KEY`): same-chain exact-input swaps on Ethereum, Base,
   Arbitrum, Optimism, Polygon, Avalanche and BNB Smart Chain through the Permit2 flow. The Settler is read from 0x's
-  registry over the app's own RPC (and must be a CREATE3 deployment of that registry, no newer than the chain's pinned
-  `maxSettlerNonce`, with code — raise the pin in `chains.ts` when the watch reports a new deployment); the Permit2 payload is rebuilt
+  registry over the app's own RPC (and must be a CREATE3 deployment of that registry between the chain's pinned
+  `previousLiveNonce` and `newestLiveNonce` + 2, with code; a native sale goes only to the pinned current or previous
+  Settler — raise both pins in `chains.ts` when the watch reports a new deployment); in remote mode the device reads the
+  registry again before the backend's preflight; the Permit2 payload is rebuilt
   on the device and signed as EIP-712 typed data (the account needs `signTypedData`; the engine signs it before the
   exact approval to Permit2 and appends it to the calldata); recipient, buy token and minimum are read from the
   Settler call. Every call goes out with the account's own gas estimate (`ownGasEstimate`). A review screen shows

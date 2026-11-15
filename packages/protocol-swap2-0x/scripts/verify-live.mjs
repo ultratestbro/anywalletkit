@@ -4,12 +4,15 @@
 //  1. Always, keyless, on all seven chains over a public RPC: the chain id; the Settler registry is an ERC-1967 proxy
 //     with an implementation that has code and an owner(); ownerOf(2) (and prev(2) when there is one) name contracts
 //     with code that are CREATE3 deployments of the registry (zeroExSettlerNonce); Permit2 and the wrapped native have code.
-//     The pin: the deployment in force must be no newer than the newest one pinned in src/chains.ts (maxSettlerNonce
-//     minus ZEROEX_SETTLER_NONCE_MARGIN). A newer one is 0x deploying: the device still accepts it inside the margin,
-//     but this run fails ("NEW") until the pin is raised — past the margin the device refuses it ("PIN").
+//     The pins: the registry must name exactly the current and previous deployments pinned in src/chains.ts
+//     (newestLiveNonce / previousLiveNonce; verdict in pin-status.mjs). A newer one is 0x deploying: native-coin sales
+//     to it are refused from that day, token sales still use it inside ZEROEX_SETTLER_NONCE_MARGIN, and this run fails
+//     ("NEW") until the pins are raised — past the margin every sale is refused ("PIN"). A rollback ("OLD") or another
+//     previous Settler ("PREV") fails it too.
 //  2. Only with ZEROEX_API_KEY: live quotes for the corridors below through the provider — the Settler call and the
 //     Permit2 payload checked on the way — then held to the request by zeroExVerifyQuote, built, checked by
-//     zeroExVerifyBuild and preflighted; and once through the real server handler and zeroExRemoteProvider (remote mode).
+//     zeroExVerifyBuild and preflighted; and a token and a native sale through the real server handler and
+//     zeroExRemoteProvider (remote mode: quote, build, preflight).
 //     Without the key this part is skipped with a neutral line and the script exits 0 (CI has no key).
 //
 //   node scripts/verify-live.mjs [--no-chain] [--no-quotes] [--only REGEX]
@@ -17,6 +20,7 @@
 // RPC_<chainId>=url overrides a public endpoint.
 import {ZEROEX_CHAINS, ZEROEX_PERMIT2, ZEROEX_SETTLER_LOOKAHEAD, ZEROEX_SETTLER_NONCE_MARGIN, createSettlerResolver, zeroExProvider, zeroExRemoteProvider, zeroExSettlerNonce, zeroExVerifyBuild, zeroExVerifyQuote} from "../dist/index.js";
 import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
+import {pinStatus} from "./pin-status.mjs";
 
 const args = process.argv.slice(2);
 const ONLY = args.includes("--only") ? new RegExp(args[args.indexOf("--only") + 1]) : null;
@@ -60,27 +64,28 @@ if (!args.includes("--no-chain")) {
         const prev = addressOf(prevAnswer.result);
         const codeOf = async (a) => (a ? ((await call(url, "eth_getCode", [a, "latest"])).result ?? "0x").length > 2 : false);
         // Derived past the pin too, so a newer 0x deployment is named rather than called "not a Settler".
-        const nonceOf = (a) => (a ? zeroExSettlerNonce(Number(id), a, chain.registry, chain.maxSettlerNonce + ZEROEX_SETTLER_LOOKAHEAD) : null);
+        const nonceOf = (a) => (a ? zeroExSettlerNonce(Number(id), a, chain.registry, chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN + ZEROEX_SETTLER_LOOKAHEAD) : null);
         const nonce = nonceOf(current);
-        const pinnedNewest = chain.maxSettlerNonce - ZEROEX_SETTLER_NONCE_MARGIN;
+        const prevNonce = nonceOf(prev);
+        const status = pinStatus({id, chain, current: nonce, previous: prevAnswer.reverted ? null : prevNonce, margin: ZEROEX_SETTLER_NONCE_MARGIN});
         const checks = {
           chain: BigInt(chainId.result) === BigInt(id),
           registryIsProxy: proxyCode.length > 2 && !!impl && implCode.length > 2,
           owner: !!owner,
           settler: nonce !== null && (await codeOf(current)),
-          previous: prevAnswer.reverted || (nonceOf(prev) !== null && (await codeOf(prev))),
+          previous: prevAnswer.reverted || (prevNonce !== null && (await codeOf(prev))),
           permit2: await codeOf(ZEROEX_PERMIT2),
           wrappedNative: await codeOf(chain.wrappedNative),
-          // the device refuses a deployment past maxSettlerNonce; one past the pinned newest means the pin is stale
-          withinPin: nonce !== null && nonce <= chain.maxSettlerNonce,
-          pinCurrent: nonce !== null && nonce <= pinnedNewest,
+          // the registry names exactly the pinned current and previous Settlers (pin-status.mjs says what to do otherwise)
+          pins: status.tag === "ok",
         };
         const ok = Object.values(checks).every(Boolean);
         if (!ok) bad++;
-        const tag = ok ? "ok " : nonce !== null && checks.settler && !checks.withinPin ? "PIN" : nonce !== null && checks.settler && checks.withinPin && !checks.pinCurrent ? "NEW" : "BAD";
-        const pin = `pinned newest ${pinnedNewest}, accepted up to ${chain.maxSettlerNonce}`;
-        const advice = tag === "NEW" ? ` — 0x deployed Settler ${nonce}: check it, then raise maxSettlerNonce for chain ${id} in src/chains.ts` : tag === "PIN" ? ` — the device refuses Settler ${nonce} until maxSettlerNonce for chain ${id} is raised in src/chains.ts` : "";
-        console.log(`${tag} chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} Settler ${current ?? "—"} (deployment ${nonce ?? "?"}; ${pin})${prev ? `, previous ${prev}` : ""} · registry impl ${impl ?? "—"} owner ${owner ?? "—"}${advice}`, ok || tag !== "BAD" ? "" : checks);
+        const onChain = Object.entries(checks).filter(([k]) => k !== "pins").every(([, v]) => v);
+        const tag = ok ? "ok " : onChain && status.tag !== "BAD" ? status.tag.padEnd(3) : "BAD";
+        const pin = `pinned ${chain.newestLiveNonce} / previous ${chain.previousLiveNonce}, token sales up to ${chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN}`;
+        const advice = status.advice && tag !== "BAD" ? ` — ${status.advice}` : "";
+        console.log(`${tag} chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} Settler ${current ?? "—"} (deployment ${nonce ?? "?"}; ${pin})${prev ? `, previous ${prev} (deployment ${prevNonce ?? "?"})` : ""} · registry impl ${impl ?? "—"} owner ${owner ?? "—"}${advice}`, tag === "BAD" ? checks : "");
         return;
       } catch { /* second try */ }
     }
@@ -137,25 +142,29 @@ if (!args.includes("--no-quotes")) {
       }
       await pause();
     }
-    // Remote mode once: the real provider behind the real server handler, every answer checked again on the "device".
+    // Remote mode: the real provider behind the real server handler, every answer checked again on the "device" — a
+    // token sale and a native sale (the first of each selected), each quoted, built and preflighted (the device reads
+    // the registry again, then the backend's preflight runs).
     if (!ONLY || ONLY.test("remote")) {
-      const corridor = corridors[0] ?? null;
-      if (corridor) {
+      const picked = [corridors.find(([, , source]) => source !== NATIVE), corridors.find(([, , source]) => source === NATIVE)].filter(Boolean);
+      const handle = createSwap2Handler({providers: [provider], sealSecret: crypto.getRandomValues(new Uint8Array(32)), guard: () => {}, subject: () => "verify-live"});
+      const backend = async (url, init) => {
+        const res = await handle(String(url).split("/").pop(), JSON.parse(String(init.body)), "verify-live");
+        return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
+      };
+      const app = zeroExRemoteProvider({baseUrl: "https://backend.invalid/api/swap2", fetchImpl: backend, rpcUrls});
+      for (const corridor of picked) {
         try {
-          const handle = createSwap2Handler({providers: [provider], sealSecret: crypto.getRandomValues(new Uint8Array(32)), guard: () => {}, subject: () => "verify-live"});
-          const backend = async (url, init) => {
-            const res = await handle(String(url).split("/").pop(), JSON.parse(String(init.body)), "verify-live");
-            return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
-          };
-          const app = zeroExRemoteProvider({baseUrl: "https://backend.invalid/api/swap2", fetchImpl: backend, rpcUrls});
           const q = await app.getQuote(paramsOf(corridor));
           if (!q) throw new Error("null quote");
           const tx = await app.buildDeposit(q);
-          console.log(`ok  remote  ${corridor[0].padEnd(38)} through createSwap2Handler → zeroExRemoteProvider · ${tx.to}`);
+          await app.preflightDeposit(q, tx);
+          console.log(`ok  remote  ${corridor[0].padEnd(38)} through createSwap2Handler → zeroExRemoteProvider (quote, build, preflight) · ${tx.to}`);
         } catch (e) {
           bad++;
-          console.log(`BAD remote  ${String(e?.message ?? e).replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").slice(0, 260)}`);
+          console.log(`BAD remote  ${corridor[0].padEnd(38)} ${String(e?.message ?? e).replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").slice(0, 260)}`);
         }
+        await pause();
       }
     }
   }

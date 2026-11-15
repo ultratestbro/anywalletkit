@@ -15,10 +15,11 @@ export const WETH = "0x4200000000000000000000000000000000000006";
 export const ME = "0x4444444444444444444444444444444444444444";
 export const OTHER = "0x9999999999999999999999999999999999999999";
 /**
- * What the registry answers on Base: deployment 22 (in force on 2026-11-15) and 21 (the one it replaced); 20 is the one
- * before. All three are real deployments with code. A rotation in these tests is the one that really happened: from
- * {21, 20} to {22, 21}. Real Settlers rotate and none is pinned, but every one is an address the registry deploys to,
- * no newer than the chain's pinned `maxSettlerNonce`, with code.
+ * What the registry answers on Base: deployment 22 (in force on 2026-11-15) and 21 (the one it replaced) — the pair the
+ * chain table pins (`newestLiveNonce`, `previousLiveNonce`); 20 is the one before, a real deployment with code that is
+ * older than the pinned previous and so refused. A rotation in these tests is the one that really happened: from
+ * {21, 20} to {22, 21}. Real Settlers rotate, but every one accepted is an address the registry deploys to, inside the
+ * chain's pinned window, with code.
  */
 export const SETTLER = zeroExSettlerAddress(8453, 22);
 export const PREV_SETTLER = zeroExSettlerAddress(8453, 21);

@@ -27,42 +27,50 @@ export interface ZeroExChain {
   /** The Settler registry on this chain. */
   registry: string;
   /**
-   * The newest Settler deployment (the registry's taker-feature nonce, see `zeroExSettlerAddress`) accepted on this
-   * chain: the newest one live when the table was pinned plus {@link ZEROEX_SETTLER_NONCE_MARGIN}. A registry answer
-   * naming a newer deployment is refused, clearly, until this pin is raised — the watch job reports every new
+   * The taker Settler deployment (the registry's taker-feature nonce, see `zeroExSettlerAddress`) the registry named as
+   * the one in force when the table was pinned. A native-coin sale is sent only to this deployment or to
+   * {@link previousLiveNonce}: its value goes straight to the Settler's address, so that address must be a Settler that
+   * was live then. A token sale (Permit2) may also go to the next {@link ZEROEX_SETTLER_NONCE_MARGIN} deployments once
+   * they hold code. Anything newer is refused, clearly, until the pin is raised — the watch job reports every new
    * deployment (`ownerOf(2)` per chain in watch.json, `verify:live` on the canary). 1…{@link ZEROEX_SETTLER_MAX_NONCE}.
    */
-  maxSettlerNonce: number;
+  newestLiveNonce: number;
+  /**
+   * The deployment the registry named as the previous one (`prev(2)`) when the table was pinned: the oldest accepted.
+   * An older Settler — a replaced one, whose code predates what the checks rely on — is refused as the one in force
+   * and dropped as the previous one. 1…{@link newestLiveNonce} (equal to it on a chain with a single deployment).
+   */
+  previousLiveNonce: number;
   /** Wrapped native token; native ↔ wrapped pairs are refused up front (0x answers them with a call to this token, not a Settler). */
   wrappedNative?: string;
 }
 
 /**
- * Deployments of the taker feature accepted past the newest one live when {@link ZEROEX_CHAINS} was pinned: room for
- * 0x's next Settlers (about one a month per chain) before the pin must be raised. Kept small on purpose: within it the
- * device relies on the code check (a deployment that does not exist yet has no code) and on its RPC answering that
- * check truthfully.
+ * Deployments of the taker feature a token sale (Permit2) may use past {@link ZeroExChain.newestLiveNonce}: room for
+ * 0x's next Settlers (about one a month per chain) before the pin must be raised. Within it the device relies on the
+ * code check (a deployment that does not exist yet has no code) and on its RPC answering that check truthfully; a token
+ * sale's permit can be spent only with the account itself as the caller, so a wrong answer costs nothing. Native-coin
+ * sales get no margin: their value would be sent to the address as it is.
  */
 export const ZEROEX_SETTLER_NONCE_MARGIN = 2;
-/** The highest {@link ZeroExChain.maxSettlerNonce} a chain table may pin. */
+/** The highest {@link ZeroExChain.newestLiveNonce} a chain table may pin. */
 export const ZEROEX_SETTLER_MAX_NONCE = 1024;
 
-const chain = (name: string, wrappedNative: string, liveSettler: number): ZeroExChain =>
-  Object.freeze({name, registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: liveSettler + ZEROEX_SETTLER_NONCE_MARGIN, wrappedNative});
+const chain = (name: string, wrappedNative: string, newestLiveNonce: number, previousLiveNonce: number): ZeroExChain =>
+  Object.freeze({name, registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce, previousLiveNonce, wrappedNative});
 
 /**
- * The default chain table (EVM chain id → entry). The third argument is the newest taker Settler deployment live on
- * the chain when pinned (2026-11-15, `pnpm verify:live`: every deployment up to it has code, the registry names it
- * as current and the one before as previous).
+ * The default chain table (EVM chain id → entry). The last two arguments are the taker Settler deployments the
+ * registry named as current and previous when pinned (2026-11-15, `pnpm verify:live`: both have code).
  */
 export const ZEROEX_CHAINS: Readonly<Record<number, ZeroExChain>> = Object.freeze({
-  1: chain("Ethereum", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", 21),
-  10: chain("Optimism", "0x4200000000000000000000000000000000000006", 21),
-  56: chain("BNB Smart Chain", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", 23),
-  137: chain("Polygon", "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", 20),
-  8453: chain("Base", "0x4200000000000000000000000000000000000006", 22),
-  42161: chain("Arbitrum", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", 20),
-  43114: chain("Avalanche", "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", 20),
+  1: chain("Ethereum", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", 21, 20),
+  10: chain("Optimism", "0x4200000000000000000000000000000000000006", 21, 20),
+  56: chain("BNB Smart Chain", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", 23, 22),
+  137: chain("Polygon", "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", 20, 19),
+  8453: chain("Base", "0x4200000000000000000000000000000000000006", 22, 21),
+  42161: chain("Arbitrum", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", 20, 19),
+  43114: chain("Avalanche", "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", 20, 19),
 });
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -70,8 +78,9 @@ const ZERO_ADDRESS = /^0x0{40}$/;
 
 /**
  * The chain table in force: the defaults with `overrides` merged over them (an entry replaces the default for that
- * chain id, `null` removes the chain). An entry whose registry or wrapped native is not an address, or that pins no
- * newest Settler deployment, throws — a typo here would move the root of every check.
+ * chain id, `null` removes the chain). An entry whose registry or wrapped native is not an address, or whose pins are
+ * missing or out of order (`newestLiveNonce` 1…{@link ZEROEX_SETTLER_MAX_NONCE}, `previousLiveNonce` 1…newestLiveNonce),
+ * throws — a typo here would move the root of every check.
  */
 export function zeroExChains(overrides?: Readonly<Record<number, ZeroExChain | null>>): Readonly<Record<number, ZeroExChain>> {
   if (!overrides) return ZEROEX_CHAINS;
@@ -87,10 +96,15 @@ export function zeroExChains(overrides?: Readonly<Record<number, ZeroExChain | n
     if (typeof entry.name !== "string" || !entry.name) throw new Error(`zeroex: chain ${id} has no name`);
     if (typeof entry.registry !== "string" || !ADDRESS.test(entry.registry) || ZERO_ADDRESS.test(entry.registry)) throw new Error(`zeroex: chain ${id} names no Settler registry address`);
     if (entry.wrappedNative !== undefined && (typeof entry.wrappedNative !== "string" || !ADDRESS.test(entry.wrappedNative))) throw new Error(`zeroex: chain ${id} wrapped native is not an address`);
-    if (!Number.isSafeInteger(entry.maxSettlerNonce) || entry.maxSettlerNonce < 1 || entry.maxSettlerNonce > ZEROEX_SETTLER_MAX_NONCE) {
-      throw new Error(`zeroex: chain ${id} pins no newest Settler deployment (maxSettlerNonce, 1 to ${ZEROEX_SETTLER_MAX_NONCE})`);
+    const newest = entry.newestLiveNonce;
+    const previous = entry.previousLiveNonce;
+    if (!Number.isSafeInteger(newest) || newest < 1 || newest > ZEROEX_SETTLER_MAX_NONCE) {
+      throw new Error(`zeroex: chain ${id} pins no newest live Settler deployment (newestLiveNonce, 1 to ${ZEROEX_SETTLER_MAX_NONCE})`);
     }
-    out[id] = Object.freeze({name: entry.name, registry: entry.registry, maxSettlerNonce: entry.maxSettlerNonce, ...(entry.wrappedNative ? {wrappedNative: entry.wrappedNative} : {})});
+    if (!Number.isSafeInteger(previous) || previous < 1 || previous > newest) {
+      throw new Error(`zeroex: chain ${id} pins no previous live Settler deployment (previousLiveNonce, 1 to its newestLiveNonce)`);
+    }
+    out[id] = Object.freeze({name: entry.name, registry: entry.registry, newestLiveNonce: newest, previousLiveNonce: previous, ...(entry.wrappedNative ? {wrappedNative: entry.wrappedNative} : {})});
   }
   return Object.freeze(out);
 }

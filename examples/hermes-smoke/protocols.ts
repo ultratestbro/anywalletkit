@@ -440,7 +440,8 @@ export async function smokeProtocols(check: Check): Promise<void> {
   {
     // 0x Settler: the word-level execute decoder and the pre-signing check run under Hermes (bigint words, checksums).
     const dead = '0x000000000000000000000000000000000000dEaD'
-    const settler = '0x1035029091415555555555555555555555550001'
+    // Base deployment 22: the Settler pinned as live on 2026-11-15 (a native sale goes only to a pinned one).
+    const settler = zeroExSettlerAddress(8453, 22)
     const usdc = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
     // Under Hermes the key is refused outright (it belongs on a server); the app runs the remote provider.
     let keyRefused = false
@@ -459,6 +460,10 @@ export async function smokeProtocols(check: Check): Promise<void> {
     check('zeroex: refuses another recipient, a lower minimum, a foreign target', refuses({ to: settler, data, value: '1000000000000000', chainId: 8453 }, { ...expected, recipient: '0x1111111111111111111111111111111111111111' }) && refuses({ to: settler, data, value: '1000000000000000', chainId: 8453 }, { ...expected, minBuyAmount: 2_487_501n }) && refuses({ to: dead, data, value: '1000000000000000', chainId: 8453 }, expected))
     const notNativeCheck = encodeFunctionData({ abi: executeAbi, functionName: 'execute', args: [{ recipient: dead, buyToken: usdc, minAmountOut: 2_487_500n }, [`0x38c9c147${'00'.repeat(160)}`], `0x${'00'.repeat(32)}`] })
     check('zeroex: refuses a native sale whose first action is not NATIVE_CHECK', refuses({ to: settler, data: notNativeCheck, value: '1000000000000000', chainId: 8453 }, expected))
+    // Native value only to a Settler live when the table was pinned (Base 22 / 21), never into the margin (23, which a
+    // lying RPC can claim holds code); a replaced Settler (20) for no sale at all.
+    const reason = (to: string): string | undefined => { try { checkZeroExTransaction({ to, data, value: '1000000000000000', chainId: 8453 }, { ...expected, settlers: [to] }); return 'passed' } catch (e) { return refusalOf(e)?.reason } }
+    check('zeroex: a native sale goes to the pinned current or previous Settler only (the margin and a replaced one: vault_mismatch)', reason(zeroExSettlerAddress(8453, 21)) === 'passed' && reason(zeroExSettlerAddress(8453, 23)) === 'vault_mismatch' && reason(zeroExSettlerAddress(8453, 20)) === 'vault_mismatch')
   }
   {
     // 0x on REAL recorded answers (fixtures/quotes, 2026-11-15): the Permit2 reader and rebuild, the signature appended,
@@ -479,7 +484,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
     check('zeroex: appends uint256(65) and the signature to the real calldata', appendPermit2Signature(tok.response.transaction.data, sig) === `${tok.response.transaction.data}${'0'.repeat(62)}41${'ab'.repeat(65)}`)
     check('zeroex: the recorded Settlers are CREATE3 deployments of the registry; another address is not', zeroExSettlerNonce(8453, tok.registry.current) === 22 && zeroExSettlerNonce(8453, tok.registry.prev) === 21 && zeroExSettlerNonce(8453, '0x1111111111111111111111111111111111111111') === null)
     const started = Date.now()
-    check('zeroex: a deployment past the pinned maxSettlerNonce is not accepted, and a miss stays cheap under Hermes', zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 25)) === null && zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 24)) === 24 && zeroExSettlerNonce(1, '0x2222222222222222222222222222222222222222') === null && Date.now() - started < 1_000, `${Date.now() - started} ms`)
+    check('zeroex: a deployment past the token-sale ceiling (pinned newest + margin) is not accepted, and a miss stays cheap under Hermes', zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 25)) === null && zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 24)) === 24 && zeroExSettlerNonce(1, '0x2222222222222222222222222222222222222222') === null && Date.now() - started < 1_000, `${Date.now() - started} ms`)
     const txOf = (r: typeof tok, permit2Transfer?: string) => ({ to: r.response.transaction.to, data: r.response.transaction.data, value: r.response.transaction.value, chainId: 8453, ...(permit2Transfer ? { approvalAddress: '0x000000000022D473030F116dDEE9F6B43aC78BA3', permit2Transfer } : {}) })
     const expectOf = (r: typeof tok) => ({ chainId: 8453, settlers: [r.registry.current, r.registry.prev], sellToken: r.request.sourceToken, buyToken: r.request.destToken, sellAmount: BigInt(r.request.amountIn), recipient: r.request.destAddress, minBuyAmount: BigInt(r.response.minBuyAmount), nowMs: r.request.nowMs })
     let tokenChecked: ReturnType<typeof checkZeroExTransaction> | null = null

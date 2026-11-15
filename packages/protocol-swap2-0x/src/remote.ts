@@ -5,8 +5,10 @@
  * `zeroExProvider` with the key) and checks, on the device, everything that comes back before the
  * engine signs: the Settler from the on-chain registry read through the app's own RPC, the
  * transaction and the Permit2 payload held to the request the app itself sent
- * ({@link zeroExVerifyQuote} on the quote, {@link zeroExVerifyBuild} on the build). The backend is
- * what these checks guard against; it never names its own Settler, spender, recipient or minimum.
+ * ({@link zeroExVerifyQuote} on the quote, {@link zeroExVerifyBuild} on the build), and, right
+ * before the broadcast, the registry read once more ({@link zeroExPreflightDeposit}) ahead of the
+ * backend's own preflight. The backend is what these checks guard against; it never names its own
+ * Settler, spender, recipient or minimum.
  *
  * Every text the verifiers return is classified (`zeroExPins.reasonOf`, CS-13), so a remote stub's
  * refusal carries its `Swap2RefusalReason`; the app's own malformed request stays unclassified.
@@ -19,9 +21,9 @@ import {slippageFloor} from "@anywalletkit/protocol-swap2-core/validate";
 import type {CrossChainProvider, Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {describeZeroExActivity} from "./activity.js";
 import {ZEROEX_NATIVE, ZEROEX_PERMIT2, zeroExChain, zeroExChainId, zeroExChains, type ZeroExChain} from "./chains.js";
-import {ZEROEX_PROVIDER} from "./provider.js";
+import {ZEROEX_PROVIDER, zeroExPreflightDeposit} from "./provider.js";
 import type {RpcUrls} from "./rpc.js";
-import {checkZeroExTransaction, createSettlerResolver, isZeroExNative, type SettlerResolver} from "./settler.js";
+import {ZEROEX_MAX_NATIVE_QUOTE_SECONDS, checkZeroExTransaction, createSettlerResolver, isZeroExNative, type SettlerResolver} from "./settler.js";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const same = (a: string, b: string): boolean => a.length === b.length && a.toLowerCase() === b.toLowerCase();
@@ -56,14 +58,16 @@ export interface ZeroExVerifyContext {
  *
  * An indicative quote (`dry`) carries no transaction and only its amounts are checked. A live quote must carry one,
  * and it goes through {@link checkZeroExTransaction} with an expectation built only from `params`: the sell token and
- * amount, the buy token, the app's recipient, the quote's minimum (itself held to the requested slippage and floor)
- * and the Settlers the app resolved.
+ * amount, the buy token, the app's recipient, the quote's minimum (itself held to the requested slippage and floor),
+ * the chain's pins and the Settlers the app resolved. It may stay valid no longer than its Permit2 deadline (a token
+ * sale) or {@link ZEROEX_MAX_NATIVE_QUOTE_SECONDS} from now (a native-coin sale).
  */
 export function zeroExVerifyQuote(params: QuoteParams, quote: Quote, ctx: ZeroExVerifyContext): string | null {
   if (quote.provider !== ZEROEX_PROVIDER) return note("the quote is not a 0x quote", "policy_refused");
   if (params.sourceChain !== params.destChain) return note("0x swaps stay on one chain", "unsupported_pair");
   const chainId = zeroExChainId(params.sourceChain);
-  if (!zeroExChain(ctx.chains, chainId)) return note("the chain is not in the 0x chain table", "unsupported_pair");
+  const chain = zeroExChain(ctx.chains, chainId);
+  if (!chain) return note("the chain is not in the 0x chain table", "unsupported_pair");
   if (quote.intentId.replace(/~[0-9a-f]{32}$/, "").split(":").slice(0, 2).join(":") !== `zeroex:${chainId}`) return note("the intent id does not name this chain", "policy_refused");
   const src = sourceAssetOf(params);
   if (!src) return note("unknown source token");
@@ -96,6 +100,7 @@ export function zeroExVerifyQuote(params: QuoteParams, quote: Quote, ctx: ZeroEx
   try {
     const checked = checkZeroExTransaction(tx, {
       chainId,
+      chain,
       settlers: ctx.settlers(chainId),
       sellToken,
       buyToken,
@@ -104,8 +109,11 @@ export function zeroExVerifyQuote(params: QuoteParams, quote: Quote, ctx: ZeroEx
       minBuyAmount: min,
       ...(ctx.nowMs !== undefined ? {nowMs: ctx.nowMs} : {}),
     });
-    // The quote must lapse before the signature it asks for does.
+    // The quote must lapse before the signature it asks for does; a native sale, which signs nothing, within a short window.
     if (checked.permit2 && !(Number.isFinite(quote.validUntilMs) && BigInt(Math.ceil(quote.validUntilMs)) <= checked.permit2.deadline * 1000n)) return note("the quote outlives its Permit2 deadline", "policy_refused");
+    if (!checked.permit2 && !(Number.isFinite(quote.validUntilMs) && quote.validUntilMs <= (ctx.nowMs ?? Date.now()) + ZEROEX_MAX_NATIVE_QUOTE_SECONDS * 1000)) {
+      return note(`the native-coin sale's quote is valid for more than ${ZEROEX_MAX_NATIVE_QUOTE_SECONDS} s`, "policy_refused");
+    }
   } catch (e) {
     return noteError(e, "the transaction is refused");
   }
@@ -183,11 +191,12 @@ export type ZeroExRemoteProvider = CrossChainProvider & {readonly ownGasEstimate
 const QUOTED_SET_MAX_MS = 120_000;
 
 /**
- * 0x through your backend: `remoteProvider` with {@link zeroExPins}, plus the registry read the pins need — the
+ * 0x through your backend: `remoteProvider` with {@link zeroExPins}, plus the registry reads the pins need — the
  * Settler is resolved through the app's RPC before a live quote is asked for (and once more, fresh, if the backend
  * quotes a Settler the app has not seen yet), and the quote is held to exactly that set, however long the backend
- * takes to answer. Indicative quotes need no RPC. `settlerResolver` is the resolver it reads through (signing
- * policies: {@link zeroExKnownSpenders}).
+ * takes to answer; right before the broadcast `preflightDeposit` reads the registry again on the device and refuses a
+ * Settler no longer in it ({@link zeroExPreflightDeposit}), then asks the backend's preflight. Indicative quotes need
+ * no RPC. `settlerResolver` is the resolver it reads through (signing policies: {@link zeroExKnownSpenders}).
  */
 export function zeroExRemoteProvider(options: ZeroExRemoteOptions): ZeroExRemoteProvider {
   const pins = zeroExPins(options);
@@ -232,6 +241,12 @@ export function zeroExRemoteProvider(options: ZeroExRemoteOptions): ZeroExRemote
     // The quoted gas limit is the backend's word: every call goes out with the account's own estimate.
     ownGasEstimate: true,
     settlerResolver: pins.resolver,
+    // The backend's preflight is its own word: the device reads the registry first (a Settler paused, replaced or
+    // removed while the user was on the review screen is refused here, nothing sent), then asks the backend.
+    async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
+      await zeroExPreflightDeposit(quote, tx, {chains: pins.chains, resolver: pins.resolver});
+      await inner.preflightDeposit!(quote, tx);
+    },
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
       if (params.dry !== false) return inner.getQuote(params, signal);
       const chainId = zeroExChainId(params.sourceChain);

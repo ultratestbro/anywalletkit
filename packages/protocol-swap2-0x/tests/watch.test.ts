@@ -2,8 +2,9 @@
 // without a watch entry fails here. The Settler registry is the trust root (whatever it names is the accepted Settler)
 // and an ERC-1967 proxy: it is watched as a proxy (implementation slot and code) with its owner(), not by the code of
 // its forwarder alone, which an upgrade or an ownership change would leave unchanged. What it names — ownerOf(2), the
-// Settler in force — is watched too: a new 0x deployment shows up in the digest the day it happens, before it can
-// pass the chain's pinned maxSettlerNonce (and verify:live on the canary fails once it is past the pinned newest).
+// Settler in force — is watched too: a new 0x deployment shows up in the digest the day it happens (native-coin sales to
+// it are refused from then until the chain's newestLiveNonce / previousLiveNonce are raised; verify:live on the canary
+// fails as long as the registry names anything else than the pinned current and previous Settlers).
 // Permit2 and the wrapped natives are watched by their code.
 import {describe, expect, it} from "vitest";
 import {readFileSync} from "node:fs";
@@ -39,7 +40,7 @@ describe("watch.json coverage", () => {
     expect(owners).toHaveLength(7);
     // the Settler in force on every chain: a new deployment is a diff
     const inForce = calls.filter((s) => s.signature === "ownerOf(uint256)");
-    expect(inForce.every((s) => s.decode === "address" && JSON.stringify(s.args) === "[2]" && /maxSettlerNonce/.test(s.label!))).toBe(true);
+    expect(inForce.every((s) => s.decode === "address" && JSON.stringify(s.args) === "[2]" && /newestLiveNonce \/ previousLiveNonce/.test(s.label!))).toBe(true);
     expect(new Set(inForce.map((s) => `${s.chainId} ${s.to!.toLowerCase()}`))).toEqual(new Set(registries));
     expect(inForce).toHaveLength(7);
     expect(calls).toHaveLength(14);

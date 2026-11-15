@@ -37,10 +37,12 @@ Selling the native coin needs no approval and no signature: the call carries the
 
 **The Settler comes from the chain, not from the API.** 0x replaces its Settler contracts regularly. The module reads the Settler in force (`ownerOf(2)`) and the one it replaced (`prev(2)`) from 0x's on-chain registry `0x00000000000004533Fe15556B1E086BB1A72cEae` through your RPC, and accepts a transaction only when its target is one of the two. The answer is held to bounds the RPC cannot move:
 - it must be an address the registry deploys Settlers to — `CREATE3(registry, feature 2, this chain, nonce)`, computed on the device (`zeroExSettlerNonce`) — so an RPC cannot name an arbitrary contract or account;
-- that deployment must be no newer than the chain's pinned `maxSettlerNonce`: the newest deployment live when the table was pinned plus a margin of two (`ZEROEX_SETTLER_NONCE_MARGIN`; Base: 22 + 2 on 2026-11-15). A newer one is refused with what to do (update the package, or raise the pin once the deployment is checked). The watch job reports every new deployment (`ownerOf(2)` per chain in `watch.json`) and `verify:live` fails once the live one is past the pinned newest, so the pin is raised before the margin runs out;
+- that deployment must sit inside the window the chain table pins: no older than the previous Settler live when the table was pinned (`previousLiveNonce`; an older, replaced Settler is refused) and no newer than the one in force then (`newestLiveNonce`; Base: 22 and 21 on 2026-11-15) plus, for a token sale, a margin of two (`ZEROEX_SETTLER_NONCE_MARGIN`);
+- a **native-coin sale goes only to the pinned current or previous Settler**, never into the margin: its value is sent to the address as it is, and whether a deployment inside the margin exists is only the RPC's word. A token sale may use the margin, since its permit can be spent only with the account itself as the caller;
+- a newer deployment is refused with what to do (update the package, or raise the pins once the deployment is checked) — native sales from the day 0x deploys it, token sales once it is past the margin. The watch job reports every new deployment (`ownerOf(2)` per chain in `watch.json`) and `verify:live` fails as long as the registry names anything but the pinned pair, so the pins are raised promptly;
 - there must be a contract at that address (`eth_getCode`, through the same RPC): a deployment that does not exist yet would strand what is sent to it.
 
-A live quote therefore needs `rpcUrls` for its chain. The read is cached for five minutes (`settlerMaxAgeMs`), repeated before execution, and a live quote in remote mode is held to exactly the set its own request read, however long the backend takes.
+A live quote therefore needs `rpcUrls` for its chain. The read is cached for five minutes (`settlerMaxAgeMs`) and repeated right before the broadcast — in remote mode on the device, before the backend's own preflight is asked — so a Settler paused, replaced or removed while the review screen is open is refused with nothing sent. A live quote in remote mode is held to exactly the set its own request read, however long the backend takes, and a native sale's quote stays valid for at most two minutes (`ZEROEX_MAX_NATIVE_QUOTE_SECONDS`; a token sale's is bounded by its permit).
 
 **The Permit2 payload is rebuilt locally.** The API's typed data is read strictly and compared with the request; what the account signs is rebuilt from local constants:
 - domain: `Permit2`, the chain of the swap, the canonical Permit2 address;
@@ -50,7 +52,7 @@ A live quote therefore needs `rpcUrls` for its chain. The read is cached for fiv
 - deadline: in the future and no further than ten minutes away (0x signs five minutes ahead).
 
 **The transaction is decoded.** The calldata must be the Settler's `execute(AllowedSlippage, bytes[], bytes32)`:
-- `to` is a registry Settler; the chain id matches; the value is zero for a token sale and exactly the input for a native sale;
+- `to` is a registry Settler inside the pinned window (for a native sale, one of the two pinned); the chain id matches; the value is zero for a token sale and exactly the input for a native sale;
 - the slippage tuple pays **the recipient of this swap**, in **the token asked for**, at least **the quoted minimum** — and the quoted minimum is within the requested slippage of the quoted output and not below the caller's floor;
 - for a token sale, the first action is one of the Settler's Permit2 payments, it pulls the sold token for the input amount with the same nonce and deadline as the signed payload, and the place for the signature is the very end of the calldata;
 - for a native sale, the first action is `NATIVE_CHECK`. The Settler spends a Permit2 signature only in its first action and pulls from the caller, so this keeps an earlier, unspent permit of the account (one whose swap reverted) from being spent inside what looks like a plain native sale;
@@ -67,9 +69,9 @@ One exception to "at least the minimum": the Settler measures its own balance of
 - The route and the price above the minimum. A better fill than the minimum is not guaranteed by any check here: 0x's routes end in a `POSITIVE_SLIPPAGE` action that keeps the surplus above the quoted amount for 0x (it is in the calldata), and a route could set that line at the minimum.
 - The fee amounts and the gas estimate it reports.
 - The actions after the first one (the route itself), the recipient argument inside the first action (where the Settler sends the pulled tokens on its way through the route) and `zidAndAffiliate`. These decide how the swap is filled, not what the recipient must receive.
-- The device trusts its own RPC for the registry read, within the bounds above: the RPC can name only a genuine 0x deployment no newer than the pin, and within the margin it is trusted to say truthfully whether a contract is there.
+- The device trusts its own RPC for the registry read, within the bounds above: the RPC can name only a genuine 0x deployment inside the pinned window, and within the margin (token sales only) it is trusted to say truthfully whether a contract is there.
 
-In remote mode the same checks run on the device (`zeroExPins` → `verifyQuote`, `verifyBuild`, pinned call targets and spender), so the list above is what the app trusts in its backend and in 0x together. Keep the app's `rpcUrls` out of the backend's hands where you can: the registry read is what the device trusts for "which contract is the Settler", and the CREATE3, pin and code checks bound it to deployed 0x Settlers.
+In remote mode the same checks run on the device (`zeroExPins` → `verifyQuote`, `verifyBuild`, pinned call targets and spender, and the fresh registry read in `preflightDeposit`), so the list above is what the app trusts in its backend and in 0x together. Keep the app's `rpcUrls` out of the backend's hands where you can: the registry read is what the device trusts for "which contract is the Settler", and the CREATE3, pin and code checks bound it to deployed 0x Settlers — for native value, to the two pinned ones.
 
 **Signing policies.** The engine's permit names the Settler as spender, and the Settler rotates. A kit allowlist must list Permit2, the token and the Settlers in force, and wallet-evm's `describeTypedData` should know them as `knownSpenders` rather than a fixed address. `zeroExKnownSpenders(provider, chainId)` gives that map (`{ [settler]: "0x Settler" }`) from the resolver the provider itself reads through (`provider.settlerResolver`):
 
@@ -123,9 +125,9 @@ const zeroex = zeroExRemoteProvider({
 | `apiKey` | none | The 0x key (local mode, servers only — refused under React Native): a getter (preferred) or a string. Without one the provider serves no route. |
 | `baseUrl` | `https://api.0x.org` | API origin (local mode), or your swap2 backend (remote mode). `https` only. |
 | `rpcUrls` | none | `{ chainId: [url…] }` — registry reads and receipts. Required for live quotes. |
-| `chains` | the seven chains above | Chain table: `{ chainId: { name, registry, maxSettlerNonce, wrappedNative } }` merged over the defaults; `null` removes a chain. `maxSettlerNonce` (required) is the newest Settler deployment accepted on the chain. |
+| `chains` | the seven chains above | Chain table: `{ chainId: { name, registry, newestLiveNonce, previousLiveNonce, wrappedNative } }` merged over the defaults; `null` removes a chain. `newestLiveNonce` and `previousLiveNonce` (required) are the Settler deployments the registry names as current and previous when you pin the entry (`pnpm verify:live` prints both): native sales go only to these two, token sales also to the next two deployments once they hold code, nothing older than the previous one. |
 | `defaultSlippageBps` | `50` | Used when the caller passes none. Keep it the same on the backend and in the app. |
-| `quoteTtlMs` | `45000` | How long a quote is offered; never past the Permit2 deadline. |
+| `quoteTtlMs` | `45000` | How long a quote is offered; never past the Permit2 deadline, and a native sale's never past two minutes. |
 | `timeoutMs` | `10000` | Per API request. |
 | `excludedSources` | none | Liquidity sources 0x must not route through, by their names in 0x's `/sources` list. A name 0x does not know refuses the quote (it would not be excluded). |
 | `settlerMaxAgeMs` | `300000` (5 minutes) | How long a registry read is reused. |
@@ -141,14 +143,29 @@ const zeroex = zeroExRemoteProvider({
 
 ## Refusals
 
-Every refusal reads `zeroex: <what was found>` and reaches `onRefusal(text, info)` with a `Swap2RefusalReason` in `info` (thrown errors carry it for `refusalOf`; `zeroExPins().reasonOf` classifies the remote verifiers' texts): HTTP 429 → `rate_limited` (with `retryAfterMs` from Retry-After), 401 / 403 → `key_rejected`, 5xx and an unreachable or malformed API → `upstream_unavailable`, no liquidity → `insufficient_liquidity`, 0x's own error names → the closest reason (`TOKEN_NOT_SUPPORTED` → `unsupported_pair`, `INPUT_INVALID` → `no_route`, …), a chain or pair 0x does not serve → `unsupported_pair`, a paused registry → `chain_halted`, another Settler, spender or domain, a Settler past the pinned `maxSettlerNonce` or without code → `vault_mismatch`, an answer that came through a redirect → `policy_refused`, another recipient → `recipient_mismatch`, another token, amount or minimum → `price_check_failed`, a passed deadline → `quote_expired`, anything else the checks refuse → `policy_refused`. A malformed request and the caller's own abort stay unclassified.
+Every refusal reads `zeroex: <what was found>` and reaches `onRefusal(text, info)` with a `Swap2RefusalReason` in `info` (thrown errors carry it for `refusalOf`; `zeroExPins().reasonOf` classifies the remote verifiers' texts). A malformed request and the caller's own abort stay unclassified.
+
+| What was found | Reason |
+|---|---|
+| HTTP 429 | `rate_limited` (with `retryAfterMs` from Retry-After) |
+| HTTP 401 / 403, no key configured | `key_rejected` |
+| 5xx, an unreachable API, an answer that cannot be read (amounts, fees, transaction) | `upstream_unavailable` |
+| no liquidity | `insufficient_liquidity` |
+| 0x's own error names | the closest reason (`TOKEN_NOT_SUPPORTED` → `unsupported_pair`, `INPUT_INVALID` → `no_route`, …) |
+| a chain or pair 0x does not serve, wrapping, a buy token that taxes transfers | `unsupported_pair` |
+| a paused registry | `chain_halted` |
+| another Settler; a Settler outside the pinned window, without code, or — for a native sale — not one of the two pinned; another Permit2 spender, domain or allowance target | `vault_mismatch` |
+| another recipient | `recipient_mismatch` |
+| what the swap is held to deliver: a transaction value other than the input (a native sale) or zero (a token sale), the slippage check's buy token or minimum, a quoted minimum outside the requested slippage or below the caller's floor, a Permit2 payload for another token or amount | `price_check_failed` |
+| what the answer itself says: other tokens or another sell amount than the ones asked for, a first action that pulls another token, amount or permit; an integrator fee nobody asked for, an excluded source 0x does not know, an answer that came through a redirect, a native-sale quote valid for more than two minutes, and anything else the checks refuse | `policy_refused` |
+| a passed deadline, a Permit2 deadline too close to sign against | `quote_expired` |
 
 ## Checks
 
 ```sh
 pnpm test                                   # unit, probes, and every recorded real 0x answer (fixtures/quotes)
 ZEROEX_LIVE=1 ZEROEX_API_KEY=… pnpm test    # also live quotes from api.0x.org (read-only)
-pnpm verify:live                            # registry, Settlers (code, pinned maxSettlerNonce), Permit2 on all seven chains; with ZEROEX_API_KEY also live corridors
+pnpm verify:live                            # registry, Settlers (code, the pinned current / previous pair), Permit2 on all seven chains; with ZEROEX_API_KEY also live corridors
 ```
 
 ## License

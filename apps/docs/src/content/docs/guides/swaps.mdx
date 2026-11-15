@@ -138,10 +138,14 @@ const zeroexInApp = zeroExRemoteProvider({ baseUrl: 'https://your-backend.exampl
 
 - **The Settler comes from the chain.** The call target must be the Settler 0x's registry names
   now (or the one before it), read over the app's own RPC. It must be an address the registry
-  deploys Settlers to (CREATE3, computed on the device), no newer than the deployment the chain
-  table pins (`maxSettlerNonce`: the newest live one plus two), and a contract (`eth_getCode`):
-  an RPC can name only a deployed 0x Settler. A newer deployment is refused, with what to do,
-  until the pin is raised; the watch job reports each one the day it happens.
+  deploys Settlers to (CREATE3, computed on the device), between the deployments the chain table
+  pins as previous and current (`previousLiveNonce`, `newestLiveNonce`) plus two newer ones for
+  token sales, and a contract (`eth_getCode`): an RPC can name only a deployed 0x Settler. A
+  native-coin sale goes only to the two pinned Settlers, since its value is sent to the address
+  as it is. A newer deployment is refused, with what to do, until the pins are raised; the watch
+  job reports each one the day it happens. Right before the broadcast the registry is read again
+  on the device (in remote mode before the backend's preflight), and a native sale's quote stays
+  valid for at most two minutes.
 - **What the account signs.** A token sale is paid with a Permit2 signature transfer: exactly the
   input, of the token sold, usable only by that Settler, valid for at most ten minutes. The engine
   rebuilds the EIP-712 payload itself, asks the account to sign it (the account needs

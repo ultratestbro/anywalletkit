@@ -7,7 +7,7 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
 import {describeZeroExActivity} from "./activity.js";
 import {ZEROEX_NATIVE, ZEROEX_PERMIT2, zeroExChain, zeroExChainId, zeroExChains, type ZeroExChain} from "./chains.js";
 import {rpcRequest, rpcUrlsFor, type RpcUrls} from "./rpc.js";
-import {checkZeroExTransaction, createSettlerResolver, isZeroExNative, type SettlerResolver, type ZeroExExpectation} from "./settler.js";
+import {ZEROEX_MAX_NATIVE_QUOTE_SECONDS, checkZeroExTransaction, createSettlerResolver, isZeroExNative, type SettlerResolver, type ZeroExExpectation} from "./settler.js";
 
 /**
  * 0x Swap API v2 (docs.0x.org) as a same-chain swap2 provider, Permit2 flow: `/swap/permit2/price` for
@@ -59,6 +59,7 @@ export interface ZeroExProviderConfig {
   rpcUrls?: RpcUrls | undefined;
   /** Slippage when the request names none, bps. Default 50. */
   defaultSlippageBps?: number | undefined;
+  /** How long a quote is offered, ms. Default 45 s; never past the Permit2 deadline, and a native-coin sale's never past {@link ZEROEX_MAX_NATIVE_QUOTE_SECONDS}. */
   quoteTtlMs?: number | undefined;
   timeoutMs?: number | undefined;
   /** Liquidity sources 0x must not route through (its `excludedSources` names). */
@@ -448,6 +449,8 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
         const permit = own(r, "permit2");
         if (nativeSell) {
           if (permit !== null && permit !== undefined) return refuse("the API asks for a Permit2 signature on a native-coin sale", "policy_refused");
+          // A native sale signs nothing that would lapse: its quote is bounded here (the app's verifier holds it to the same).
+          validUntilMs = Math.min(validUntilMs, now + ZEROEX_MAX_NATIVE_QUOTE_SECONDS * 1000);
         } else {
           const eip712 = plain(permit) ? own(permit, "eip712") : undefined;
           if (!plain(permit) || !plain(eip712)) return refuse("the quote carries no Permit2 payload to sign", "policy_refused");
@@ -493,7 +496,7 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
           ...(nativeSell ? {} : {approvalAddress: ZEROEX_PERMIT2}),
           ...(permit2Transfer !== undefined ? {permit2Transfer} : {}),
         };
-        const expectation = (set: readonly string[]): ZeroExExpectation => ({chainId, settlers: set, sellToken, buyToken, sellAmount: amountIn, recipient: recipient!, minBuyAmount, nowMs: now});
+        const expectation = (set: readonly string[]): ZeroExExpectation => ({chainId, chain, settlers: set, sellToken, buyToken, sellAmount: amountIn, recipient: recipient!, minBuyAmount, nowMs: now});
         try {
           try {
             checkZeroExTransaction(candidate, expectation(settlers));
@@ -548,26 +551,10 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
 
     /**
      * Before the engine signs: the transaction must be the quoted one, and its target must still be a Settler in the
-     * registry now (a fresh read — a Settler paused or replaced since the quote is refused here, with nothing signed).
-     * The call itself cannot be simulated yet: it needs the Permit2 signature, which the engine makes next and then
-     * estimates as signed.
+     * registry now ({@link zeroExPreflightDeposit}). The call itself cannot be simulated yet: it needs the Permit2
+     * signature, which the engine makes next and then estimates as signed.
      */
-    async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
-      const quoted = quote.txRequest;
-      if (
-        !quoted?.to || !quoted.data || typeof tx.to !== "string" || typeof tx.data !== "string" ||
-        !same(tx.to, quoted.to) || !same(tx.data, quoted.data) || !sameAmount(tx.value || "0", quoted.value ?? "0") ||
-        tx.permit2Transfer !== quoted.permit2Transfer
-      ) {
-        throw refusal("policy_refused", "zeroex: the transaction is not the quoted swap. Nothing was sent; refresh the quote.");
-      }
-      const chainId = chainOfIntent(quote.intentId);
-      if (Number.isNaN(chainId)) throw refusal("policy_refused", "zeroex: the quote names no chain this provider serves. Nothing was sent.");
-      const settlers = await resolver.resolve(chainId, {fresh: true});
-      if (!settlers.some((s) => same(s, quoted.to!))) {
-        throw refusal("vault_mismatch", "zeroex: the quoted 0x Settler is no longer in the on-chain registry. Nothing was sent; refresh the quote.");
-      }
-    },
+    preflightDeposit: (quote: Quote, tx: UnsignedTx): Promise<void> => zeroExPreflightDeposit(quote, tx, {chains, resolver}),
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = quote.txRequest;
@@ -595,6 +582,30 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
       return status === "0x0" ? {state: "failed"} : {state: "pending"};
     },
   };
+}
+
+/**
+ * The device's last check before the engine signs a 0x swap, run by the `preflightDeposit` of both providers (in remote
+ * mode before the backend's own preflight is asked): the transaction must be the quoted one, and its target must still
+ * be a Settler the registry names now — a fresh read through `resolver` (the device's own RPC), so a Settler paused,
+ * replaced or removed since the quote (on the review screen, during an approval) is refused here, with nothing signed
+ * or sent.
+ */
+export async function zeroExPreflightDeposit(quote: Quote, tx: UnsignedTx, ctx: {chains: Readonly<Record<number, ZeroExChain>>; resolver: SettlerResolver}): Promise<void> {
+  const quoted = quote.txRequest;
+  if (
+    !quoted?.to || !quoted.data || typeof tx.to !== "string" || typeof tx.data !== "string" ||
+    !same(tx.to, quoted.to) || !same(tx.data, quoted.data) || !sameAmount(tx.value || "0", quoted.value ?? "0") ||
+    tx.permit2Transfer !== quoted.permit2Transfer
+  ) {
+    throw refusal("policy_refused", "zeroex: the transaction is not the quoted swap. Nothing was sent; refresh the quote.");
+  }
+  const chainId = typeof quote.intentId === "string" ? Number(quote.intentId.split(":")[1]) : NaN;
+  if (!zeroExChain(ctx.chains, chainId)) throw refusal("policy_refused", "zeroex: the quote names no chain this provider serves. Nothing was sent.");
+  const settlers = await ctx.resolver.resolve(chainId, {fresh: true});
+  if (!settlers.some((s) => same(s, quoted.to!))) {
+    throw refusal("vault_mismatch", "zeroex: the quoted 0x Settler is no longer in the on-chain registry. Nothing was sent; refresh the quote.");
+  }
 }
 
 /** The liquidity sources of `route.fills`, at most six short names, for display. */

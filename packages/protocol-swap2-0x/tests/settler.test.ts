@@ -53,13 +53,13 @@ describe("chain table", () => {
     }
   });
   it("is config: an entry adds or replaces a chain, null removes one, a bad entry throws", () => {
-    const t = zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 4}, 56: null});
+    const t = zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce: 4, previousLiveNonce: 3}, 56: null});
     expect(zeroExChain(t, 130)?.name).toBe("Unichain");
     expect(zeroExChain(t, 56)).toBeUndefined();
     expect(zeroExChain(t, 8453)?.name).toBe("Base");
-    expect(() => zeroExChains({130: {name: "Unichain", registry: "0x1234", maxSettlerNonce: 4}})).toThrow(/names no Settler registry address/);
-    expect(() => zeroExChains({130: {name: "", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 4}})).toThrow(/has no name/);
-    expect(() => zeroExChains({130: {name: "U", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 4, wrappedNative: "weth"}})).toThrow(/wrapped native is not an address/);
+    expect(() => zeroExChains({130: {name: "Unichain", registry: "0x1234", newestLiveNonce: 4, previousLiveNonce: 3}})).toThrow(/names no Settler registry address/);
+    expect(() => zeroExChains({130: {name: "", registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce: 4, previousLiveNonce: 3}})).toThrow(/has no name/);
+    expect(() => zeroExChains({130: {name: "U", registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce: 4, previousLiveNonce: 3, wrappedNative: "weth"}})).toThrow(/wrapped native is not an address/);
   });
   it("reads only eip155 chain ids, and only own table entries", () => {
     expect(zeroExChainId("eip155:8453")).toBe(8453);
@@ -146,7 +146,8 @@ describe("createSettlerResolver", () => {
 
   it("follows a rotation on the next fresh read", async () => {
     const {r} = resolver({onRegistryRead: (n) => (n === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
-    expect(await r.resolve(8453)).toEqual([PREV_SETTLER, OLDER_SETTLER]);
+    // before the rotation the previous one (20) is older than the pinned previous (21): left out
+    expect(await r.resolve(8453)).toEqual([PREV_SETTLER]);
     expect(await r.resolve(8453, {fresh: true})).toEqual([SETTLER, PREV_SETTLER]);
   });
 

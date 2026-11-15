@@ -3,13 +3,15 @@
  *
  *  - {@link createSettlerResolver}: the Settler in force is read from the pinned on-chain registry
  *    (`ownerOf(2)`, and `prev(2)` for 0x's dwell time after a new deployment) — never taken from a
- *    quote — and held to a CREATE3 deployment of that registry no newer than the chain's pinned
- *    ceiling, with code. A paused or removed feature reverts there and the swap is refused.
+ *    quote — and held to a CREATE3 deployment of that registry between the chain's pinned previous
+ *    deployment and its newest plus the margin, with code. A paused or removed feature reverts there
+ *    and the swap is refused.
  *  - {@link decodeSettlerExecute}: a word-level reader of `Settler.execute(slippage, actions, zid)`.
- *  - {@link checkZeroExTransaction}: the transaction a quote carries, held to the request — target,
- *    value, chain, method, the recipient / buy token / minimum of Settler's own slippage check, and,
- *    for a token sale, the Permit2 payload (rebuilt locally by the core reader) and the first action
- *    that spends it.
+ *  - {@link checkZeroExTransaction}: the transaction a quote carries, held to the request — target
+ *    (and, for a native-coin sale, a Settler live when the chain table was pinned), value, chain,
+ *    method, the recipient / buy token / minimum of Settler's own slippage check, and, for a token
+ *    sale, the Permit2 payload (rebuilt locally by the core reader) and the first action that
+ *    spends it.
  *
  * Why the slippage tuple is the anchor: `execute` ends in Settler's `_checkSlippageAndTransfer`,
  * which sends the Settler's whole balance of `buyToken` to `recipient` and reverts below
@@ -29,7 +31,7 @@
 import {getAddress, getContractAddress, numberToHex, pad} from "viem";
 import {refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {readPermit2Transfer, type Permit2Transfer} from "@anywalletkit/protocol-swap2-core/util";
-import {ZEROEX_CHAINS, ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_MAX_NONCE, ZEROEX_SETTLER_REGISTRY, ZEROEX_TAKER_FEATURE, zeroExChain, type ZeroExChain} from "./chains.js";
+import {ZEROEX_CHAINS, ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_MAX_NONCE, ZEROEX_SETTLER_NONCE_MARGIN, ZEROEX_SETTLER_REGISTRY, ZEROEX_TAKER_FEATURE, zeroExChain, type ZeroExChain} from "./chains.js";
 import {isRevert, rpcRequest, rpcUrlsFor, type RpcUrls} from "./rpc.js";
 
 /** `execute((address recipient, address buyToken, uint256 minAmountOut), bytes[] actions, bytes32 zidAndAffiliate)`. */
@@ -45,6 +47,12 @@ export const SETTLER_NATIVE_CHECK_SELECTOR = "0xbd01c226";
  * provider. A shorter window leaves less time for a permit that was published but not spent (its swap reverted).
  */
 export const ZEROEX_MAX_PERMIT_SECONDS = 600;
+/**
+ * The longest a native-coin sale's quote may stay valid from now. A token sale's quote is bounded by its permit's
+ * deadline; a native sale signs nothing, so its quote is bounded here instead: the transaction goes out within this
+ * window of the registry read it was checked against, or not at all.
+ */
+export const ZEROEX_MAX_NATIVE_QUOTE_SECONDS = 120;
 
 const PERMIT = "((address,uint256),uint256,uint256)";
 /**
@@ -88,10 +96,14 @@ export const isZeroExNative = (token: string): boolean => ZERO_ADDRESS.test(toke
  */
 export const ZEROEX_SETTLER_SHIM_INIT_HASH = "0x3bf3f97f0be1e2c00023033eefeb4fc062ac552ff36778b17060d90b6764902f";
 /**
- * How far past a chain's pinned {@link ZeroExChain.maxSettlerNonce} the resolver still derives, only to tell "0x
- * deployed a newer Settler than this module accepts" (refused until the pin is raised) from "not a 0x Settler at all".
+ * How far past the newest deployment a chain accepts ({@link ZeroExChain.newestLiveNonce} plus the margin) the resolver
+ * still derives, only to tell "0x deployed a newer Settler than this module accepts" (refused until the pin is raised)
+ * from "not a 0x Settler at all".
  */
 export const ZEROEX_SETTLER_LOOKAHEAD = 16;
+
+/** The newest deployment a token sale may use on a chain: the newest one live when pinned, plus the margin. */
+const tokenCeiling = (chain: ZeroExChain): number => chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN;
 
 /** The address the registry deploys taker-feature Settler number `nonce` to on `chainId` — computed, no network. */
 export function zeroExSettlerAddress(chainId: number, nonce: number, registry: string = ZEROEX_SETTLER_REGISTRY): string {
@@ -104,14 +116,16 @@ export function zeroExSettlerAddress(chainId: number, nonce: number, registry: s
 const derived = new Map<string, string[]>();
 /**
  * Which deployment of the registry's taker feature `address` is on `chainId` (its nonce), or null when it is none of
- * deployments 1…`maxNonce` — by default the chain's pinned {@link ZeroExChain.maxSettlerNonce} in the default table
- * (a chain outside it has none: null). An RPC (or an API) can therefore only ever name a contract 0x's own registry
- * deployed as a Settler — never an arbitrary contract or account. Bounded by the pin, an address that is no Settler
- * costs a few dozen derivations, not a thousand. Memoized per chain.
+ * deployments 1…`maxNonce` — by default the newest one the default table accepts on the chain
+ * ({@link ZeroExChain.newestLiveNonce} plus {@link ZEROEX_SETTLER_NONCE_MARGIN}; a chain outside the table has none:
+ * null). An RPC (or an API) can therefore only ever name a contract 0x's own registry deployed as a Settler — never an
+ * arbitrary contract or account. Bounded by the pin, an address that is no Settler costs a few dozen derivations, not
+ * a thousand. Memoized per chain.
  */
 export function zeroExSettlerNonce(chainId: number, address: string, registry: string = ZEROEX_SETTLER_REGISTRY, maxNonce?: number): number | null {
   if (typeof address !== "string" || !ADDRESS.test(address) || !Number.isSafeInteger(chainId) || chainId <= 0 || !ADDRESS.test(registry)) return null;
-  const bound = Math.min(maxNonce ?? zeroExChain(ZEROEX_CHAINS, chainId)?.maxSettlerNonce ?? 0, ZEROEX_SETTLER_MAX_NONCE + ZEROEX_SETTLER_LOOKAHEAD);
+  const pinned = zeroExChain(ZEROEX_CHAINS, chainId);
+  const bound = Math.min(maxNonce ?? (pinned ? tokenCeiling(pinned) : 0), ZEROEX_SETTLER_MAX_NONCE + ZEROEX_SETTLER_NONCE_MARGIN + ZEROEX_SETTLER_LOOKAHEAD);
   if (!Number.isSafeInteger(bound) || bound < 1) return null;
   const key = `${registry.toLowerCase()}:${chainId}`;
   let list = derived.get(key);
@@ -160,8 +174,9 @@ function addressWord(result: unknown): string | null {
  * Reads the Settler in force from the registry and caches it per chain. The registry address comes from the chain
  * table; the answer comes from the integrator's own RPC — that RPC is what this module trusts for "which contract
  * is 0x's Settler right now", within hard bounds it cannot move: the answer must be a CREATE3 deployment of that
- * registry, no newer than the chain's pinned {@link ZeroExChain.maxSettlerNonce}, with code at the address (read
- * through the same RPC).
+ * registry, no older than the chain's pinned {@link ZeroExChain.previousLiveNonce} and no newer than its
+ * {@link ZeroExChain.newestLiveNonce} plus {@link ZEROEX_SETTLER_NONCE_MARGIN}, with code at the address (read through
+ * the same RPC). Which of these a native-coin sale may use is narrower still ({@link checkZeroExTransaction}).
  */
 export function createSettlerResolver(config: SettlerResolverConfig): SettlerResolver {
   const maxAge = config.maxAgeMs !== undefined && Number.isFinite(config.maxAgeMs) && config.maxAgeMs >= 0 ? config.maxAgeMs : DEFAULT_SETTLER_MAX_AGE_MS;
@@ -205,27 +220,31 @@ export function createSettlerResolver(config: SettlerResolverConfig): SettlerRes
     if ("reverted" in current) throw refuse(`the 0x Settler registry on chain ${chainId} reports no taker Settler in force (paused or removed)`, "chain_halted");
     const settler = addressWord(current.result);
     if (!settler) throw refuse(`the 0x Settler registry on chain ${chainId} answered something that is not an address`, "vault_mismatch");
-    // The answer comes from one RPC: it must be a deployment the registry itself made, no newer than the one this
-    // module pins for the chain, and a contract. A newer deployment is 0x moving on: refused, with what to do, until
-    // the pin is raised (the watch job reports it the day it happens).
-    const ceiling = entry.maxSettlerNonce;
+    // The answer comes from one RPC: it must be a deployment the registry itself made, inside the window this module
+    // pins for the chain, and a contract. A newer deployment is 0x moving on: refused, with what to do, until the pin
+    // is raised (the watch job reports it the day it happens). An older one is a replaced Settler: refused.
+    const oldest = entry.previousLiveNonce;
+    const ceiling = tokenCeiling(entry);
     const nonce = zeroExSettlerNonce(chainId, settler, entry.registry, ceiling);
     if (nonce === null) {
       const newer = zeroExSettlerNonce(chainId, settler, entry.registry, ceiling + ZEROEX_SETTLER_LOOKAHEAD);
       if (newer !== null) {
-        throw refuse(`the 0x registry on chain ${chainId} names Settler deployment ${newer} (${settler}), newer than the newest this module accepts there (${ceiling}) — update @anywalletkit/protocol-swap2-0x, or raise the chain's maxSettlerNonce once that deployment is checked`, "vault_mismatch");
+        throw refuse(`the 0x registry on chain ${chainId} names Settler deployment ${newer} (${settler}), newer than the newest this module accepts there (${ceiling}) — update @anywalletkit/protocol-swap2-0x, or raise the chain's newestLiveNonce and previousLiveNonce once that deployment is checked`, "vault_mismatch");
       }
       throw refuse(`the RPC on chain ${chainId} names ${settler} as the 0x Settler, which is not an address the 0x registry deploys Settlers to`, "vault_mismatch");
     }
+    if (nonce < oldest) throw refuse(`the RPC on chain ${chainId} names ${settler} (Settler deployment ${nonce}) as the 0x Settler, older than the oldest this module accepts there (${oldest}) — a replaced Settler is not called`, "vault_mismatch");
     // A deployment that does not exist yet (inside the margin past the newest live one) has no code: value or tokens
     // sent there would be stranded until 0x deploys it.
     if (!(await hasCode(chainId, settler))) throw refuse(`the RPC on chain ${chainId} names ${settler} (Settler deployment ${nonce}) as the 0x Settler, but no contract is deployed there`, "vault_mismatch");
     const settlers = [settler];
-    // The instance it replaced: 0x keeps quoting it for a while after a new deployment. No previous instance reverts.
+    // The instance it replaced: 0x keeps quoting it for a while after a new deployment. No previous instance reverts;
+    // one outside the pinned window, or without code, is left out.
     try {
       const previous = await call(chainId, entry.registry, `${REGISTRY_PREV_SELECTOR}${feature}`);
       const prev = "result" in previous ? addressWord(previous.result) : null;
-      if (prev && !same(prev, settler) && zeroExSettlerNonce(chainId, prev, entry.registry, ceiling) !== null && (await hasCode(chainId, prev))) settlers.push(prev);
+      const prevNonce = prev && !same(prev, settler) ? zeroExSettlerNonce(chainId, prev, entry.registry, ceiling) : null;
+      if (prev && prevNonce !== null && prevNonce >= oldest && (await hasCode(chainId, prev))) settlers.push(prev);
     } catch {
       // The current Settler alone is a valid (stricter) answer.
     }
@@ -341,6 +360,12 @@ export function decodeSettlerExecute(data: string): SettlerExecute {
 export interface ZeroExExpectation {
   /** EVM chain id of the swap. */
   chainId: number;
+  /**
+   * The chain's entry in the table in force: its pins bound the target (a token sale: `previousLiveNonce` up to
+   * `newestLiveNonce` plus the margin; a native-coin sale: exactly `newestLiveNonce` or `previousLiveNonce`). Default:
+   * the default table's entry for `chainId`.
+   */
+  chain?: ZeroExChain | undefined;
   /** Settlers resolved from the registry for that chain ({@link SettlerResolver.resolve}). */
   settlers: readonly string[];
   /** The token sold: an ERC-20 address, or the zero address / `0xEeee…` for the native coin. */
@@ -385,9 +410,12 @@ export interface ZeroExCheckedTransaction {
 /**
  * Hold a 0x transaction to the request, or throw {@link ZeroExTransactionError}. Checked:
  *
- *  1. `to` is one of the registry's Settlers; `chainId`, when present, is the swap's chain.
- *  2. `value` is the input for a native-coin sale and zero for a token sale; a gas limit, when given, is at most
- *     {@link ZEROEX_MAX_GAS_LIMIT}.
+ *  1. `to` is one of the registry's Settlers, and a deployment inside the chain's pinned window
+ *     (`previousLiveNonce` … `newestLiveNonce` + {@link ZEROEX_SETTLER_NONCE_MARGIN}); `chainId`, when present, is the
+ *     swap's chain.
+ *  2. `value` is the input for a native-coin sale and zero for a token sale; a sale that sends value goes only to the
+ *     chain's `newestLiveNonce` or `previousLiveNonce` deployment — Settlers that were live when the table was pinned —
+ *     never into the margin; a gas limit, when given, is at most {@link ZEROEX_MAX_GAS_LIMIT}.
  *  3. The method is `execute`, and its slippage tuple names the expected recipient, the requested buy token and
  *     exactly the expected minimum (never zero).
  *  4. Token sale: the allowance target is canonical Permit2; the Permit2 payload passes the core reader (Permit2
@@ -415,9 +443,23 @@ export function checkZeroExTransaction(tx: ZeroExTransaction, expected: ZeroExEx
   if (!expected.settlers.length) throw refuse(`the 0x Settler for chain ${expected.chainId} is not resolved`, "upstream_unavailable");
   if (!expected.settlers.some((s) => same(s, to))) throw refuse(`the transaction target ${to} is not a 0x Settler from the on-chain registry`, "vault_mismatch");
   if (tx.chainId !== undefined && tx.chainId !== expected.chainId) throw refuse(`the transaction is for chain ${String(tx.chainId).slice(0, 20)}, not ${expected.chainId}`, "vault_mismatch");
+  // Whatever settler list the caller hands in, the target is held to the chain's pins: a deployment of the registry
+  // between the previous one live at pin time and the newest one a token sale may use.
+  const pin = expected.chain ?? zeroExChain(ZEROEX_CHAINS, expected.chainId);
+  if (!pin) throw refuse(`chain ${expected.chainId} is not in the 0x chain table`, "unsupported_pair");
+  const deployment = zeroExSettlerNonce(expected.chainId, to, pin.registry, tokenCeiling(pin));
+  if (deployment === null || deployment < pin.previousLiveNonce) throw refuse(`the transaction target ${to} is not a 0x Settler deployment this module accepts on chain ${expected.chainId}`, "vault_mismatch");
   if (typeof tx.value !== "string" || !/^[0-9]{1,78}$/.test(tx.value)) throw refuse("the transaction value is not a decimal amount", "policy_refused");
   const value = BigInt(tx.value);
   if (value !== (nativeSell ? expected.sellAmount : 0n)) throw refuse(nativeSell ? "the transaction value is not the amount being sold" : "the transaction sends native coin with a token sale", "price_check_failed");
+  // Value goes straight to the target: only to a Settler that was live when the table was pinned. A deployment inside
+  // the margin may not exist yet (its code is the RPC's word) — what is sent there would be stranded, or swept by
+  // whatever 0x deploys there later. Refused until the package (its pins) is updated.
+  if (value > 0n && deployment !== pin.newestLiveNonce && deployment !== pin.previousLiveNonce) {
+    throw refuse(deployment > pin.newestLiveNonce
+      ? `the swap sends native coin to Settler deployment ${deployment} (${to}) on chain ${expected.chainId}, newer than the newest one live when this module's chain table was pinned (${pin.newestLiveNonce}) — a native-coin sale goes only to a pinned Settler: update @anywalletkit/protocol-swap2-0x`
+      : `the swap sends native coin to Settler deployment ${deployment} (${to}) on chain ${expected.chainId}, which was not live when this module's chain table was pinned (${pin.newestLiveNonce} and ${pin.previousLiveNonce} were) — a native-coin sale goes only to a pinned Settler`, "vault_mismatch");
+  }
   if (tx.gasLimit !== undefined && (typeof tx.gasLimit !== "string" || !/^[0-9]{1,12}$/.test(tx.gasLimit) || BigInt(tx.gasLimit) === 0n || BigInt(tx.gasLimit) > ZEROEX_MAX_GAS_LIMIT)) {
     throw refuse("the transaction asks for more gas than any 0x swap needs", "policy_refused");
   }

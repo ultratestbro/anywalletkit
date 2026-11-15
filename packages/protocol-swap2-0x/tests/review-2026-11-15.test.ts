@@ -37,7 +37,8 @@ const caught = async (p: Promise<unknown>): Promise<unknown> => p.then(() => nul
 // ── 1. undeployed and unpinned Settlers ─────────────────────────────────────
 
 describe("1. the resolver accepts only a pinned, deployed Settler", () => {
-  const BASE_PIN = ZEROEX_CHAINS[8453]!.maxSettlerNonce;
+  // The newest deployment a token sale may use on Base (round 3: a native sale only the pinned current and previous).
+  const BASE_PIN = ZEROEX_CHAINS[8453]!.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN;
   const resolver = (o: Parameters<typeof stub>[0]) => {
     vi.stubGlobal("fetch", stub(o));
     return createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: RPC});
@@ -45,18 +46,18 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
 
   it("pins the newest deployment live on 2026-11-15 plus a small margin on every chain", () => {
     expect(ZEROEX_SETTLER_NONCE_MARGIN).toBe(2);
-    expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, c.maxSettlerNonce]))).toEqual({1: 23, 10: 23, 56: 25, 137: 22, 8453: 24, 42161: 22, 43114: 22});
+    expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, c.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN]))).toEqual({1: 23, 10: 23, 56: 25, 137: 22, 8453: 24, 42161: 22, 43114: 22});
   });
 
-  it("every recorded registry answer is covered by the pin, margin untouched — a newer live deployment fails this and verify:live", () => {
+  it("every recorded registry answer is covered by the pins, margin untouched — a newer live deployment fails this and verify:live", () => {
     for (const name of RECORDED) {
       const f = loadRecorded(name);
       const c = ZEROEX_CHAINS[chainIdOf(f)]!;
       for (const a of [f.registry.current, f.registry.prev]) {
         if (!a) continue;
-        const n = zeroExSettlerNonce(chainIdOf(f), a, c.registry, c.maxSettlerNonce);
+        const n = zeroExSettlerNonce(chainIdOf(f), a, c.registry, c.newestLiveNonce);
         expect(n, `${name} ${a}`).not.toBeNull();
-        expect(n!, `${name} ${a}`).toBeLessThanOrEqual(c.maxSettlerNonce - ZEROEX_SETTLER_NONCE_MARGIN);
+        expect(n!, `${name} ${a}`).toBe(a === f.registry.current ? c.newestLiveNonce : c.previousLiveNonce);
       }
     }
   });
@@ -78,7 +79,7 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
   it("refuses a deployment newer than the pin with what to do — even when it holds code", async () => {
     const newer = zeroExSettlerAddress(8453, BASE_PIN + 1);
     const err = await caught(resolver({registry: {current: newer, prev: SETTLER}, code: () => true}).resolve(8453));
-    expect((err as Error).message).toBe(`zeroex: the 0x registry on chain 8453 names Settler deployment ${BASE_PIN + 1} (${newer}), newer than the newest this module accepts there (${BASE_PIN}) — update @anywalletkit/protocol-swap2-0x, or raise the chain's maxSettlerNonce once that deployment is checked`);
+    expect((err as Error).message).toBe(`zeroex: the 0x registry on chain 8453 names Settler deployment ${BASE_PIN + 1} (${newer}), newer than the newest this module accepts there (${BASE_PIN}) — update @anywalletkit/protocol-swap2-0x, or raise the chain's newestLiveNonce and previousLiveNonce once that deployment is checked`);
     expect(refusalOf(err)?.reason).toBe("vault_mismatch");
     // far past the pin it is no Settler this module can tell at all (the reviewer's nonce 1000)
     const far = zeroExSettlerAddress(8453, 1000);
@@ -94,9 +95,9 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
   });
 
   it("a chain table entry must pin its newest Settler deployment", () => {
-    expect(() => zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY} as never})).toThrow(/chain 130 pins no newest Settler deployment \(maxSettlerNonce, 1 to 1024\)/);
-    expect(() => zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: ZEROEX_SETTLER_MAX_NONCE + 1}})).toThrow(/pins no newest Settler deployment/);
-    expect(zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, maxSettlerNonce: 3}})[130]!.maxSettlerNonce).toBe(3);
+    expect(() => zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY} as never})).toThrow(/chain 130 pins no newest live Settler deployment \(newestLiveNonce, 1 to 1024\)/);
+    expect(() => zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce: ZEROEX_SETTLER_MAX_NONCE + 1, previousLiveNonce: 1}})).toThrow(/pins no newest live Settler deployment/);
+    expect(zeroExChains({130: {name: "Unichain", registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce: 3, previousLiveNonce: 2}})[130]!.newestLiveNonce).toBe(3);
   });
 
   // The reviewer's reproduction (a real native sale; backend = RPC + API): before this fix every step below passed and
@@ -277,7 +278,7 @@ describe("4. a slow backend does not age a live quote's Settler set out from und
 
 describe("6. deriving Settler addresses stops at the chain's pin", () => {
   it("an address past the pin is not derived to (it used to be, up to 1024)", () => {
-    const pin = ZEROEX_CHAINS[8453]!.maxSettlerNonce;
+    const pin = ZEROEX_CHAINS[8453]!.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN;
     expect(zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, pin))).toBe(pin);
     expect(zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, pin + 1))).toBeNull();
     expect(zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 100))).toBeNull();
