@@ -10,7 +10,7 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: Permit2 signature transfers, and 0x
+## 2026-11-15: Permit2 signature transfers, and 0x
 
 Not breaking for apps that do not use the new provider: every existing text and check is unchanged.
 

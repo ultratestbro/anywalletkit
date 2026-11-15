@@ -1,5 +1,19 @@
 # @anywalletkit/extension-kit
 
+## 0.6.0
+
+### Minor Changes
+
+- 9b38294: Permit2 signature-transfer swaps (0x) are reviewed in one sheet. `swapApprovalPayload` carries the permit the account will sign (`source.permit2Transfer`: the typed data, its text, token, exact amount, the one contract that may use it, deadline) with a check line, and labels an approval to Permit2. `planMatchers` pre-approves the permit by its EIP-712 digest and the swap call by its exact signed structure (the reviewed calldata, one length word, that many signature bytes) instead of the unsigned calldata the engine never sends — before, the permit and the signed call each stopped for a second, raw review and one pre-approval stayed unused in the gate. New export: `evmSignedCallMatcher`.
+
+### Patch Changes
+
+- Updated dependencies [e495f43]
+  - @anywalletkit/protocol-swap2-core@0.13.0
+  - @anywalletkit/swap2-assets@0.3.0
+  - @anywalletkit/wallet-evm@0.8.0
+  - @anywalletkit/wallet-ton@0.8.1
+
 ## 0.5.2
 
 ### Patch Changes
