@@ -11,7 +11,7 @@ per-package `README.md` (shipped inside each npm package). Do not invent APIs.
 
 An open multichain wallet SDK in TypeScript. One seed (or an external signer) gives accounts on
 EVM (30+ networks), Solana, TON, Tron, Bitcoin, NEAR and Zcash. Protocol modules add swaps and
-bridges (one router over 16 venues), staking, lending, approvals, history and names. React Native
+bridges (one router over 17 venues), staking, lending, approvals, history and names. React Native
 (Hermes) is the primary target; Node ≥ 20 works without polyfills. ESM + CJS, types included.
 
 All packages are `@anywalletkit/*` **on npm** (https://www.npmjs.com/org/anywalletkit), published from
