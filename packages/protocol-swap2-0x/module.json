@@ -1,0 +1,22 @@
+{
+  "name": "@anywalletkit/protocol-swap2-0x",
+  "type": "swap2",
+  "chains": [
+    "eip155:1",
+    "eip155:10",
+    "eip155:56",
+    "eip155:137",
+    "eip155:8453",
+    "eip155:42161",
+    "eip155:43114"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
+  "path": "packages/protocol-swap2-0x",
+  "description": "0x Swap API v2 same-chain swaps through the Permit2 flow: the Settler is read from 0x's on-chain registry, and the Permit2 payload, target, value, recipient, buy token and minimum are checked against the request before anything is signed. Needs a 0x API key (on a backend, or supplied by the integrator).",
+  "addedAt": "2026-11-15"
+}

@@ -1,0 +1,100 @@
+{
+ "note": "Real 0x Swap API v2 answer (/swap/permit2/price), Polygon USDC->POL, recorded 2026-11-15 from api.0x.org with a throwaway taker that holds nothing. Response body as 0x sent it; request rebuilt from the recorded query (no headers, no key). registry = what ownerOf(2) / prev(2) answered on that chain.",
+ "request": {
+  "endpoint": "/swap/permit2/price",
+  "sourceChain": "eip155:137",
+  "sourceToken": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+  "sourceDecimals": 6,
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amountIn": "25000000",
+  "slippageBps": 50,
+  "destAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "refundAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "dry": true,
+  "nowMs": 1794690565000
+ },
+ "registry": {
+  "current": "0x73Dae2FdF839AF5f6BC62890f65A4357937cCf04",
+  "prev": "0x1cA8dd7e4B0F8162ff899162cD3B1025f02C177b"
+ },
+ "response": {
+  "allowanceTarget": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  "blockNumber": "97323276",
+  "buyAmount": "319722235194487606870",
+  "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "fees": {
+   "integratorFee": null,
+   "integratorFees": null,
+   "zeroExFee": {
+    "amount": "37500",
+    "token": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+    "type": "volume"
+   },
+   "gasFee": null
+  },
+  "issues": {
+   "allowance": {
+    "actual": "0",
+    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
+   "balance": {
+    "token": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+    "actual": "0",
+    "expected": "25000000"
+   },
+   "simulationIncomplete": false,
+   "invalidSourcesPassed": []
+  },
+  "liquidityAvailable": true,
+  "minBuyAmount": "318123624018515168836",
+  "mode": "exact-in",
+  "route": {
+   "fills": [
+    {
+     "from": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+     "to": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+     "source": "Uniswap_V4",
+     "proportionBps": "10000"
+    },
+    {
+     "from": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+     "to": "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270",
+     "source": "Uniswap_V3",
+     "proportionBps": "10000"
+    }
+   ],
+   "tokens": [
+    {
+     "address": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+     "symbol": "USDC"
+    },
+    {
+     "address": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+     "symbol": "USDT0"
+    },
+    {
+     "address": "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270",
+     "symbol": "WPOL"
+    }
+   ]
+  },
+  "sellAmount": "25000000",
+  "sellToken": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+  "tokenMetadata": {
+   "buyToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   },
+   "sellToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   }
+  },
+  "totalNetworkFee": "165418198116907889",
+  "zid": "0x64b2b046ba54f867184dee6a",
+  "gas": "452363",
+  "gasPrice": "365675791603"
+ }
+}

@@ -10,7 +10,48 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: refusal reasons
+## Next release: Permit2 signature transfers, and 0x
+
+Not breaking for apps that do not use the new provider: every existing text and check is unchanged.
+
+- **protocol-swap2-core (minor):** the engine can pay a swap with a Permit2 signature transfer
+  (`txRequest.permit2Transfer`, used by the new 0x provider). It reads the provider's EIP-712 `PermitTransferFrom`
+  strictly, holds it to the swap (Permit2's domain on the source chain, the source token, exactly the input, the
+  called contract as the only spender, a deadline at most an hour away, no witness), rebuilds it from local
+  constants and signs that — typed data only, before the exact approval to Permit2 goes out. The signature is
+  appended to the calldata, the signed call is estimated once the allowance is in place, and it is broadcast with
+  the account's own gas estimate, never the quoted limit. A dry run that reverts is `simulation_failed`; one the
+  account's RPC does not answer is retried once, then `upstream_unavailable`. A permit never rides with native value
+  (`policy_refused`). Its refusals are classified like the others.
+- **Custom providers (`CrossChainProvider.ownGasEstimate`):** a provider may declare that its EVM calls (a native-coin
+  sale included) go out like a Permit2 call — dry-run from the account right before the broadcast and sent with the
+  account's own gas estimate, the quoted limit neither sent nor shown in the plan. 0x does. A custom router or a
+  wrapper that copies a provider's members must copy this flag too (protocol-swap2-router does).
+- **A custom review screen (`reviewExecution`):** a `call` source may now carry `permit2Transfer`, the JSON typed
+  data the account signs right before the call (whose calldata then ends with `uint256(length)` and the signature).
+  Show it; `extension-kit`'s `swapApprovalPayload` does (`source.permit2Transfer`). Apps with their own gate that
+  pre-approves the reviewed operations must match the permit by its EIP-712 digest and the call by its signed
+  structure, not by the unsigned calldata (`extension-kit` `planMatchers` / `evmSignedCallMatcher` do).
+- **Accounts:** a Permit2 swap needs an account with `signTypedData`. One without it is refused before anything is
+  approved.
+- **A swap2 server and its clients:** bump them together before enabling 0x. `createSwap2Handler` keeps
+  `permit2Transfer` through the seal, `build` and `preflight` only from this release; a client facing an older
+  server refuses the build fail-closed.
+- **Signing policies (kit `allowlist`, `knownSpenders`):** the engine's permit is described as a Permit2 transfer to
+  the 0x Settler, which rotates. `await zeroExKnownSpenders(zeroex, chainId)` gives `{ [settler]: "0x Settler" }`
+  from the resolver your 0x provider reads through: pass it as `knownSpenders` to `describeTypedData` and list its
+  keys in the allowlist next to Permit2 and the token, not a fixed address.
+- **New package `@anywalletkit/protocol-swap2-0x`:** `zeroExProvider({ apiKey, rpcUrls })` on your server only (under
+  React Native it refuses a key), `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app (see
+  [0x](/guides/swaps/#0x)). Conventional flags: `ZEROEX_ENABLED` (dark unless set) and `ZEROEX_API_KEY`. The chain
+  table pins, per chain, the Settler deployments the registry named as current and previous when it was pinned
+  (`newestLiveNonce`, `previousLiveNonce`): native-coin sales go only to those two, token sales also to the next two
+  once they hold code. A custom `chains` entry must name both; update the package (or raise both pins) when 0x
+  deploys a new Settler, or native sales on that chain are refused.
+- **extension-kit (minor), conformance (minor):** the Permit2 swap is one sheet and three pre-approved operations;
+  the behaviour suite runs Permit2 swaps (`createMockAccount({ signTypedData: true })`).
+
+## 2026-11-13: refusal reasons
 
 Not breaking: every refusal text is unchanged. A classified refusal now also carries `reason`, one of the 17
 `Swap2RefusalReason` values (see [Refusal reasons](/guides/swaps/#refusal-reasons)).

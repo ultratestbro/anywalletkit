@@ -266,6 +266,9 @@ importers:
       '@anywalletkit/protocol-staking-tonstakers-ton':
         specifier: workspace:*
         version: link:../../packages/protocol-staking-tonstakers-ton
+      '@anywalletkit/protocol-swap2-0x':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-0x
       '@anywalletkit/protocol-swap2-cctp':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-cctp
@@ -1234,6 +1237,34 @@ importers:
       vitest:
         specifier: ^5.1.0
         version: 5.1.0(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/protocol-swap2-0x:
+    dependencies:
+      '@anywalletkit/protocol-swap2-core':
+        specifier: workspace:*
+        version: link:../protocol-swap2-core
+      viem:
+        specifier: ^2.57.2
+        version: 2.57.16(typescript@5.9.3)(zod@4.6.7)
+    devDependencies:
+      '@anywalletkit/conformance':
+        specifier: workspace:*
+        version: link:../conformance
+      '@anywalletkit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anywalletkit/protocol-swap2-router':
+        specifier: workspace:*
+        version: link:../protocol-swap2-router
+      '@anywalletkit/wallet-evm':
+        specifier: workspace:*
+        version: link:../wallet-evm
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
   packages/protocol-swap2-balancer:
     dependencies:

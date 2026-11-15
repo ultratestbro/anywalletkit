@@ -1,0 +1,320 @@
+{
+  "module": "@anywalletkit/protocol-swap2-0x",
+  "sources": [
+    {
+      "id": "settler-actions",
+      "type": "github-file",
+      "repo": "0xProject/0x-settler",
+      "path": "src/ISettlerActions.sol",
+      "label": "0x Settler action ABI (the Permit2 actions this module recognizes as a swap's first action)"
+    },
+    {
+      "id": "settler-taker-submitted",
+      "type": "github-file",
+      "repo": "0xProject/0x-settler",
+      "path": "src/Settler.sol",
+      "label": "0x taker-submitted Settler (execute, slippage check, signature placement)"
+    },
+    {
+      "id": "settler-deployer",
+      "type": "github-file",
+      "repo": "0xProject/0x-settler",
+      "path": "src/deployer/Deployer.sol",
+      "label": "0x Settler deployer/registry (ownerOf / prev by feature)"
+    },
+    {
+      "id": "registry-ethereum",
+      "type": "evm-proxy",
+      "chainId": 1,
+      "address": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "label": "0x Settler registry (ERC-1967 proxy: implementation and code) \u00b7 Ethereum"
+    },
+    {
+      "id": "registry-owner-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "0x Settler registry owner() \u00b7 Ethereum (who can deploy, pause and upgrade the registry this module trusts)"
+    },
+    {
+      "id": "settler-in-force-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "ownerOf(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Ethereum \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "permit2-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "label": "Permit2 \u00b7 Ethereum"
+    },
+    {
+      "id": "wrapped-native-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 Ethereum"
+    },
+    {
+      "id": "registry-optimism",
+      "type": "evm-proxy",
+      "chainId": 10,
+      "address": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "label": "0x Settler registry (ERC-1967 proxy: implementation and code) \u00b7 Optimism"
+    },
+    {
+      "id": "registry-owner-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "0x Settler registry owner() \u00b7 Optimism (who can deploy, pause and upgrade the registry this module trusts)"
+    },
+    {
+      "id": "settler-in-force-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "ownerOf(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Optimism \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "permit2-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "label": "Permit2 \u00b7 Optimism"
+    },
+    {
+      "id": "wrapped-native-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x4200000000000000000000000000000000000006",
+      "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 Optimism"
+    },
+    {
+      "id": "registry-bsc",
+      "type": "evm-proxy",
+      "chainId": 56,
+      "address": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "label": "0x Settler registry (ERC-1967 proxy: implementation and code) \u00b7 BNB Smart Chain"
+    },
+    {
+      "id": "registry-owner-bsc",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "0x Settler registry owner() \u00b7 BNB Smart Chain (who can deploy, pause and upgrade the registry this module trusts)"
+    },
+    {
+      "id": "settler-in-force-bsc",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "ownerOf(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 BNB Smart Chain \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "permit2-bsc",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "label": "Permit2 \u00b7 BNB Smart Chain"
+    },
+    {
+      "id": "wrapped-native-bsc",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+      "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 BNB Smart Chain"
+    },
+    {
+      "id": "registry-polygon",
+      "type": "evm-proxy",
+      "chainId": 137,
+      "address": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "label": "0x Settler registry (ERC-1967 proxy: implementation and code) \u00b7 Polygon"
+    },
+    {
+      "id": "registry-owner-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "0x Settler registry owner() \u00b7 Polygon (who can deploy, pause and upgrade the registry this module trusts)"
+    },
+    {
+      "id": "settler-in-force-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "ownerOf(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Polygon \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "permit2-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "label": "Permit2 \u00b7 Polygon"
+    },
+    {
+      "id": "wrapped-native-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+      "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 Polygon"
+    },
+    {
+      "id": "registry-base",
+      "type": "evm-proxy",
+      "chainId": 8453,
+      "address": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "label": "0x Settler registry (ERC-1967 proxy: implementation and code) \u00b7 Base"
+    },
+    {
+      "id": "registry-owner-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "0x Settler registry owner() \u00b7 Base (who can deploy, pause and upgrade the registry this module trusts)"
+    },
+    {
+      "id": "settler-in-force-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "ownerOf(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Base \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "permit2-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "label": "Permit2 \u00b7 Base"
+    },
+    {
+      "id": "wrapped-native-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x4200000000000000000000000000000000000006",
+      "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 Base"
+    },
+    {
+      "id": "registry-arbitrum",
+      "type": "evm-proxy",
+      "chainId": 42161,
+      "address": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "label": "0x Settler registry (ERC-1967 proxy: implementation and code) \u00b7 Arbitrum"
+    },
+    {
+      "id": "registry-owner-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "0x Settler registry owner() \u00b7 Arbitrum (who can deploy, pause and upgrade the registry this module trusts)"
+    },
+    {
+      "id": "settler-in-force-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "ownerOf(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Arbitrum \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "permit2-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "label": "Permit2 \u00b7 Arbitrum"
+    },
+    {
+      "id": "wrapped-native-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+      "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 Arbitrum"
+    },
+    {
+      "id": "registry-avalanche",
+      "type": "evm-proxy",
+      "chainId": 43114,
+      "address": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "label": "0x Settler registry (ERC-1967 proxy: implementation and code) \u00b7 Avalanche"
+    },
+    {
+      "id": "registry-owner-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "0x Settler registry owner() \u00b7 Avalanche (who can deploy, pause and upgrade the registry this module trusts)"
+    },
+    {
+      "id": "settler-in-force-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "ownerOf(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Avalanche \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "permit2-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "label": "Permit2 \u00b7 Avalanche"
+    },
+    {
+      "id": "wrapped-native-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
+      "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 Avalanche"
+    }
+  ]
+}

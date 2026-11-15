@@ -1,0 +1,25 @@
+{
+ "note": "Real 0x Swap API v2 answer (/swap/permit2/quote), Avalanche USDC->JOE, recorded 2026-11-15 from api.0x.org with a throwaway taker that holds nothing. Response body as 0x sent it; request rebuilt from the recorded query (no headers, no key). registry = what ownerOf(2) / prev(2) answered on that chain.",
+ "request": {
+  "endpoint": "/swap/permit2/quote",
+  "sourceChain": "eip155:43114",
+  "sourceToken": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
+  "sourceDecimals": 6,
+  "destToken": "0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd",
+  "amountIn": "50000000000000",
+  "slippageBps": 50,
+  "destAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "refundAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "dry": false,
+  "nowMs": 1794690566000
+ },
+ "registry": {
+  "current": "0x584A4e93F11331D318165B04099e53708b1FA915",
+  "prev": "0x5fD781C190Aa767F97298cf3F53f9Aa9823d9599"
+ },
+ "refusal": "zeroex: no liquidity for this pair and amount",
+ "response": {
+  "liquidityAvailable": false,
+  "zid": "0x933e081bc87631f0616595c0"
+ }
+}

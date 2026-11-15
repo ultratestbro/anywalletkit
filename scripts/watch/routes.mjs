@@ -75,6 +75,9 @@ if (want("balancer")) providers.balancer = (await dist("protocol-swap2-balancer"
 if (want("curve")) providers.curve = (await dist("protocol-swap2-curve", "provider.js")).curveProvider({enabled: true, rpcUrls: venueRpc, onWarning: () => {}});
 if (want("relay")) providers.relay = (await dist("protocol-swap2-relay", "provider.js")).relayProvider({enabled: true, ...(env.RELAY_API_KEY ? {apiKey: env.RELAY_API_KEY} : {})});
 if (want("fynd") && env.FYND_API_KEY) providers.fynd = (await dist("protocol-swap2-fynd", "provider.js")).fyndProvider({enabled: true, apiKey: env.FYND_API_KEY});
+// 0x needs a key on every request: without ZEROEX_API_KEY the provider is not built, so its corridors are not probed and
+// nothing transitions (a dry /price quote needs no RPC). The key travels only in the request header.
+if (want("zeroex") && env.ZEROEX_API_KEY) providers.zeroex = (await dist("protocol-swap2-0x", "provider.js")).zeroExProvider({enabled: true, apiKey: () => env.ZEROEX_API_KEY});
 
 // ── one dry quote per corridor ───────────────────────────────────────────────
 const parse = (s) => { const i = s.lastIndexOf(":"); return {chain: s.slice(0, i), symbol: s.slice(i + 1)}; };

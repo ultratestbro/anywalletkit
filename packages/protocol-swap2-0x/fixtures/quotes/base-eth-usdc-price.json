@@ -1,0 +1,86 @@
+{
+ "note": "Real 0x Swap API v2 answer (/swap/permit2/price), Base ETH->USDC, recorded 2026-11-15 from api.0x.org with a throwaway taker that holds nothing. Response body as 0x sent it; request rebuilt from the recorded query (no headers, no key). registry = what ownerOf(2) / prev(2) answered on that chain.",
+ "request": {
+  "endpoint": "/swap/permit2/price",
+  "sourceChain": "eip155:8453",
+  "sourceToken": "0x0000000000000000000000000000000000000000",
+  "destToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "amountIn": "8000000000000000",
+  "slippageBps": 50,
+  "destAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "refundAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "dry": true,
+  "nowMs": 1794690644000
+ },
+ "registry": {
+  "current": "0x103502909141F7025a94b7b99A276dCD128e21a8",
+  "prev": "0x7d6839415693801E94cDC4A7d732C9a3FDBbd1D7"
+ },
+ "response": {
+  "allowanceTarget": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  "blockNumber": "57501646",
+  "buyAmount": "14164402",
+  "buyToken": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  "fees": {
+   "integratorFee": null,
+   "integratorFees": null,
+   "zeroExFee": {
+    "amount": "21279",
+    "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "type": "volume"
+   },
+   "gasFee": null
+  },
+  "issues": {
+   "allowance": null,
+   "balance": {
+    "token": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "actual": "0",
+    "expected": "8000000000000000"
+   },
+   "simulationIncomplete": false,
+   "invalidSourcesPassed": []
+  },
+  "liquidityAvailable": true,
+  "minBuyAmount": "14093580",
+  "mode": "exact-in",
+  "route": {
+   "fills": [
+    {
+     "from": "0x4200000000000000000000000000000000000006",
+     "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+     "source": "Uniswap_V3",
+     "proportionBps": "10000"
+    }
+   ],
+   "tokens": [
+    {
+     "address": "0x4200000000000000000000000000000000000006",
+     "symbol": "WETH"
+    },
+    {
+     "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+     "symbol": "USDC"
+    }
+   ]
+  },
+  "sellAmount": "8000000000000000",
+  "sellToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "tokenMetadata": {
+   "buyToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   },
+   "sellToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   }
+  },
+  "totalNetworkFee": "7094174664170",
+  "zid": "0xae307fd609a6170caec9eda4",
+  "gas": "250311",
+  "gasPrice": "27908743"
+ }
+}

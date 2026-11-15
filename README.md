@@ -82,6 +82,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/protocol-swap2-curve` | Curve same-chain swaps straight from the contracts on Router NG (18 EVM chains pinned; pools today on Ethereum, Arbitrum, Base, OP Mainnet, Gnosis, Monad, Plasma and X Layer): the router's `get_dy` quotes and explicit-receiver `exchange`, 1–2 pools per route from a curated allowlist generated and checked on-chain (code hash, coins, TVL, age) and pinned in the package, hops between pools only through catalog tokens, fake / drained pools denied; router code hash and version checked once per chain, preflight re-reads pools and a fresh `get_dy`, a remote build's minimum held to the device's own `get_dy`; no API, no key, no fee |
 | `@anywalletkit/protocol-swap2-fynd` | Fynd (Propeller Heads) same-chain swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain: routes over the pools Tycho indexes, settled through TychoRouterV3; router, method, tokens, amount, receiver and minimum are decoded and checked before signing. Fynd outputs are under the Fynd License (see the package README) |
 | `@anywalletkit/protocol-swap2-relay` | Relay (relay.link) EVM → EVM bridging and cross-chain swaps through the RelayDepository on 29 pinned chains, quoted from Relay's own API and verified on the device: the order behind the deposit id is hashed here (EIP-712 `hashStruct`) and held to the calldata, the solver's signature must recover to the pinned signer, recipient, chains, tokens, amounts, minimum, deadlines and every refund recipient are held to the request, and the deposit and the exact approval are built locally for the pinned depository; named refusals, no provider SDK, no key |
+| `@anywalletkit/protocol-swap2-0x` | 0x Swap API v2 same-chain swaps (Permit2 flow) on Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche and BNB Smart Chain: the Settler is read from 0x's on-chain registry and must be one of its CREATE3 deployments; the Permit2 payload is rebuilt on the device and signed as typed data, and target, value, first action, recipient, buy token and minimum are checked before signing; classified refusals; tested on recorded real answers from all seven chains. Needs a 0x API key, kept on a backend (the app re-checks everything on the device) |
 | `@anywalletkit/protocol-swap2-jupiter` | Jupiter same-chain Solana swaps through Swap API V2's Router path (`/build`, Metis routing, no Jupiter fee, keyless or `x-api-key`): every instruction vetted and the swap arguments decoded (amount, quoted out, slippage, zero platform fee) before the v0 transaction is assembled locally; compute budget re-set (simulated limit, capped price); the wallet's serialized guard proves programs and balances before signing |
 | `@anywalletkit/kit` | orchestrator: register chain wallets + protocol modules, accounts by CAIP-2 chain, policies (fee cap, allow/block lists, confirm) on every write — sends, transfers, `signTransaction`, message signatures; the activity feed (`history()`) |
 | `@anywalletkit/keyring` | many accounts from one seed plus imported seeds / private keys / Tonkeeper words, one `AccountMeta` list across chains, per-execution accounts that dispose the key after use |
@@ -106,7 +107,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/extension-kit` | Chromium (MV3) wallet-extension core: scrypt vault with passkey (PRF) unlock, auto-locking session, dApp request router + per-origin permissions + approval queue, signing checks (SIWE, EIP-7702, address poisoning, phishing list), swap / Earn plan review, TON Connect data, chrome adapters; no UI — the extension itself is the wallet's own product |
 
 Every protocol module ships a `module.json`; `pnpm registry` builds
-[registry/modules.json](registry/modules.json) from them (31 modules today). See
+[registry/modules.json](registry/modules.json) from them (32 modules today). See
 [registry/README.md](registry/README.md) for tiers and how to list an external module.
 
 User documentation: [docs.anywallet.tech](https://docs.anywallet.tech) (sources in `apps/docs`).
@@ -126,7 +127,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 | Area | Next | Later |
 |---|---|---|
-| Swap & bridge | 0x Swap API v2, Symbiosis, Jupiter `/order` + `/execute` (USDT0 + Chainflip shipped 2026-10-20, Jupiter `/build` 2026-10-23, Curve 2026-11-07) | rhino.fi, swapdk, BOB Gateway, Velora, Orchestra; Uniswap v4 / v2 + LP positions; Balancer v3 |
+| Swap & bridge | Jupiter `/order` + `/execute` (USDT0 + Chainflip shipped 2026-10-20, Jupiter `/build` 2026-10-23, Curve 2026-11-07, Symbiosis + Relay 2026-11-10, 0x 2026-11-15) | rhino.fi, swapdk, BOB Gateway, Velora, Orchestra; Uniswap v4 / v2 + LP positions; Balancer v3 |
 | Earn | Sky (sUSDS / SKY), Ethena (USDe → sUSDe), Euler v2, Morpho fixed-rate markets (native SOL + MON staking shipped 2026-10-26, Curve scrvUSD 2026-11-07, native NEAR + LiNEAR / rNEAR staking 2026-11-08) | Hyperliquid exit, fiat on/off-ramp (MoonPay, Transak) |
 | Safety | `@anywalletkit/receive` (quarantine receive addresses on a separate seed branch) + `@anywalletkit/screening` (risk signals from shipped lists + on-device 2-hop tracing, two privacy modes); outbound recipient check + address-poisoning detector | tx-preview for Solana / TON / Tron; wallet-btc PSBT partial signing + BIP-322 |
 | Accounts | multisig: Safe (EVM), Squads (Solana), multisig-v2 (TON), account permissions (Tron), multisig2 / Sputnik (NEAR) | gasless sends (EIP-7702 + paymaster, GasFree on Tron, TON paymaster, Solana fee payer) |
@@ -135,7 +136,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 6,600+ tests across 54 packages (Node); `pnpm test:hermes` runs 478
+`pnpm test` runs 7,100+ tests across 55 packages (Node); `pnpm test:hermes` runs 495
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
 checked against live providers (running totals, November 2026): 149,728 quote checks
 (13 providers, up to 36 chains, 398 assets), 65,481 builds simulated to the
