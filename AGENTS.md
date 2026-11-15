@@ -317,14 +317,17 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   Settler call. Every call goes out with the account's own gas estimate (`ownGasEstimate`). A review screen shows
   `plan.source.permit2Transfer` — what the account signs; signing policies get the Settlers as `knownSpenders` from
   `await zeroExKnownSpenders(provider, chainId)`. Every refusal is classified (`onRefusal(text, info)`, `zeroExPins.reasonOf`).
-- Across (`acrossProvider({ apiKey, rpcUrls })` on your server, `acrossRemoteProvider({ baseUrl, maxFeeBps?, rpcUrls? })`
+- Across (`acrossProvider({ apiKey, rpcUrls })` on your server, `acrossRemoteProvider({ baseUrl, maxFeeBps?, rpcUrls?, suggestedFeesUrl? })`
   in the app; conventional env names `ACROSS_ENABLED` / `ACROSS_API_KEY` — the V5 key; Across's integrator id and V4
   key are not used): EVM → EVM, the same asset (USDC, USDT / USDT0, ETH / WETH, WBTC) between 17 pinned chains, through
   a plain `deposit` on the source SpokePool built on the device — depositor = the signing account (`QuoteParams.sender`),
   recipient, tokens, amounts, destination, empty message, a two-hour fill deadline, no exclusivity, and a per-asset fee
-  floor (stables 1 bp, ETH from Ethereum 0.7, ETH from an L2 4.5, WBTC 2.5) held to the request before signing. Price:
-  `max(V5's fee minus its own origin execution gas, Across's /suggested-fees relayer fee)` (a pinned floor when
-  /suggested-fees is gone, which needs `rpcUrls` for Ethereum and the source chain); V5's `nextActions` are never run.
+  floor (stables 1 bp, ETH from Ethereum 0.7, ETH from Optimism / Base / Arbitrum 4.5, from another L2 0.7, WBTC 2.5)
+  held to the request before signing; the quote's `fees` / `feeUsd` must be the deposit's (engine fee caps read them).
+  Price: `max(V5's fee minus its own origin execution gas, Across's /suggested-fees relayer fee)` — the relayer fee alone
+  when V5's fill estimate is over a minute (another rail); a pinned floor when /suggested-fees is gone, which needs
+  `rpcUrls` for Ethereum and the source chain; V5's `nextActions` are never run. The remote provider reads
+  /suggested-fees itself (keyless; CSP `connect-src` app.across.to) and refuses a fee >10 % under it.
   Ethereum as the destination is not priced (refused, `route-unpriced`). An unfilled deposit is refunded on the source
   chain after its deadline (hours). Under React Native an `apiKey` throws. Refusals: `across: … [code]` with a reason.
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`

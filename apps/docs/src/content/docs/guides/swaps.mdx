@@ -192,14 +192,25 @@ const across = acrossRemoteProvider({ baseUrl: 'https://your-backend.example/swa
   is refused), the recipient, both tokens, the exact input, the destination chain, an empty message
   (nothing runs on arrival), a fill deadline two hours after the quote time, no exclusive relayer,
   the fee within your cap (`maxFeeBps`, default 10 %) and at least what relayers take on that asset
-  (stablecoins 1 bp, ETH from Ethereum 0.7 bp, ETH from an L2 4.5 bps, WBTC 2.5 bps). An ERC-20 is
-  approved for exactly the input, to the SpokePool. A backend can choose only the output amount
-  inside those bounds.
+  (stablecoins 1 bp, ETH from Ethereum 0.7 bp, ETH from Optimism, Base or Arbitrum 4.5 bps, ETH from
+  another L2 0.7 bp, WBTC 2.5 bps), and the fees the quote shows (which your engine's
+  `maxProtocolFeeBps` adds up) equal to the deposit's. An ERC-20 is approved for exactly the input,
+  to the SpokePool. A backend can choose only the output amount inside those bounds.
+- **The app reads Across's relayer fee itself.** For every quote the backend sends,
+  `acrossRemoteProvider` asks Across's keyless `/suggested-fees` (from the app: allow
+  `https://app.across.to` in a browser's CSP `connect-src`) and refuses a deposit that leaves
+  relayers more than 10 % under it, so a backend cannot get a deposit signed that nobody would fill,
+  or win the comparison of routes with one. Without an answer only Ethereum, Optimism, Base and
+  Arbitrum to Optimism, Base and Arbitrum stand, on the per-asset floor; `suggestedFeesUrl: null`
+  turns the read off with the same fallback. Right before signing the deposit is checked again by
+  the device's clock.
 - **Where the price comes from.** Across API V5 quotes its own route (an execution step on the
   origin chain, sometimes another rail), which a direct deposit does not take: its `nextActions`
   are never run. The module asks V5 for the price and Across's relayer fee quote
   (`/suggested-fees`, keyless) for what a relayer needs, and leaves relayers the larger of V5's fee
-  net of its origin step and that relayer fee. If `/suggested-fees` stops answering, a floor pinned
+  net of its origin step and that relayer fee — the relayer fee alone when V5 prices another rail
+  (a fill estimate over a minute: its price is that rail's, not a direct deposit's). If
+  `/suggested-fees` stops answering, a floor pinned
   from the fills of plain deposits stands in on Ethereum, Optimism, Base and Arbitrum (the server
   then needs `rpcUrls` for Ethereum and the source chain, for the quote time); other routes are
   refused rather than priced on a guess. Ethereum as a destination is not priced yet.

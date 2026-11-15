@@ -54,7 +54,7 @@ import relayNativeLive from '../../packages/protocol-swap2-relay/fixtures/quotes
 import { AcrossSwap2Protocol } from '@anywalletkit/protocol-swap2-across/protocol'
 import { acrossProvider } from '@anywalletkit/protocol-swap2-across/provider'
 import { acrossRemoteProvider } from '@anywalletkit/protocol-swap2-across/remote'
-import { acrossFloorFee, acrossPlainFee } from '@anywalletkit/protocol-swap2-across/pricing'
+import { acrossCheckRelayerFee, acrossFloorFee, acrossPlainFee } from '@anywalletkit/protocol-swap2-across/pricing'
 import { parseAcrossV5Error, readAcrossSuggestedFees, readAcrossV5Quote } from '@anywalletkit/protocol-swap2-across/api'
 import { acrossQuoteOf } from '@anywalletkit/protocol-swap2-across/build'
 import { acrossRouteOf } from '@anywalletkit/protocol-swap2-across/config'
@@ -600,6 +600,15 @@ export async function smokeProtocols(check: Check): Promise<void> {
       let floorRefused = ''
       try { verifyAcrossDeposit(request, { ...q.txRequest, data: encodeAcrossDeposit({ ...ok.args, outputAmount: request.amount - 1n }) }) } catch (e) { floorRefused = e instanceof Error ? e.message : '' }
       check(`across: a deposit that leaves relayers less than they take is refused (${label})`, /\[tx-fee\]$/.test(floorRefused))
+      // The remote provider's own read of Across's relayer fee: the recorded deposit passes it, one 11 % under it does not.
+      let honestPasses = true
+      try { acrossCheckRelayerFee(route, request.amount, fee.fee, fees) } catch { honestPasses = false }
+      let underRefused = ''
+      try { acrossCheckRelayerFee(route, request.amount, (fees.totalRelayFee * 89n) / 100n, fees) } catch (e) { underRefused = e instanceof Error ? e.message : '' }
+      check(`across: the device's relayer-fee check passes the deposit and refuses one 11 % under Across's fee (${label})`, honestPasses && /\[relayer-price\]$/.test(underRefused))
+      let feesRefused = ''
+      try { checkAcrossQuote(request, { ...q, fees: [] }) } catch (e) { feesRefused = e instanceof Error ? e.message : '' }
+      check(`across: a quote whose fee list is not the deposit's is refused (engine fee caps read it) (${label})`, /\[quote-amounts\]$/.test(feesRefused))
     }
     check('across: V5 fee-cap refusal with amountLimits.side min reads as amount_too_small', parseAcrossV5Error(400, { error: { code: 'policy.amount_out_of_range', message: 'raise the amount above 1 base units', details: { amountLimits: { side: 'min', amount: '1' } } } }).info?.reason === 'amount_too_small')
     const ap = new AcrossSwap2Protocol(evm, { ...swap2Cfg })

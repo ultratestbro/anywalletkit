@@ -17,8 +17,10 @@ Not breaking for existing providers.
 - **New package, protocol-swap2-across:** Across Protocol as a swap2 provider — EVM → EVM bridging of the same asset
   (USDC, USDT / USDT0, ETH / WETH, WBTC) between 17 chains through a plain SpokePool `deposit` built and verified on
   the device. It needs an Across API V5 key, kept on a server: run `acrossProvider({ apiKey, rpcUrls })` behind
-  `createSwap2Handler` and `acrossRemoteProvider({ baseUrl, maxFeeBps?, rpcUrls? })` in the app (under React Native a
-  provider built with `apiKey` throws). Conventional env names: `ACROSS_ENABLED`, `ACROSS_API_KEY` (the V5 key;
+  `createSwap2Handler` and `acrossRemoteProvider({ baseUrl, maxFeeBps?, rpcUrls?, suggestedFeesUrl? })` in the app (under
+  React Native a provider built with `apiKey` throws). The remote provider reads Across's keyless relayer fee from the
+  app itself: a browser app's CSP must allow `https://app.across.to` in `connect-src` (or pass `suggestedFeesUrl: null`,
+  which leaves only Ethereum, Optimism, Base and Arbitrum to Optimism, Base and Arbitrum). Conventional env names: `ACROSS_ENABLED`, `ACROSS_API_KEY` (the V5 key;
   Across's integrator id and V4 key are not used). Without a key the provider reports itself disabled and quotes
   nothing. Ethereum as a destination is not served yet. See [Across](/guides/swaps/#across).
 - **protocol-swap2-core, `QuoteParams.sender`:** the account that signs the source transaction. The engine sets it on
