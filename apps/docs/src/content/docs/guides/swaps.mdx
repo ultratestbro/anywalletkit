@@ -285,6 +285,8 @@ A route that fails any check is refused, and nothing is sent. ERC-20 approvals a
 exact amount, never unlimited, and are revoked again if the swap fails after approving. On
 Ethereum, USDT is reset to zero first, as that token requires.
 
+A relayer pays exactly the deposit's `outputAmount`, so an Across quote's minimum equals its output. The engine quotes again at execution: pass `minAmountOut` a few bps under the quote (`suggestSlippage` gives at least 5), or a re-quote a few base units lower refuses the swap.
+
 ### Show a review screen
 
 <Snippet file="swap/src/swap.ts" region="review" />

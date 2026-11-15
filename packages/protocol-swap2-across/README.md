@@ -162,6 +162,7 @@ Not pinned: Scroll (deposits paused on chain), BNB Chain (Across moves its 18-de
 - The device bounds the price, it cannot verify it: the fee cap (`maxFeeBps`, and the app's `acrossPinsWith({maxFeeBps})`) and the per-asset floor. The floors are today's relayer market (2026-11-14); if relayers' prices rise past them a server could still name a fee no relayer takes, which ends in a refund after the fill deadline.
 - Stablecoin transfers cost a few cents more than the relayer market (V5's own fixed overhead stands in F5); large ETH L2 → L2 transfers cost ~2.7 bps more than V5's own route, whose auction relayers take less than direct deposits are filled at. A funded test of a direct ETH deposit at V5's price would show whether that gap can close.
 - `/suggested-fees` is Across's legacy relayer-fee quote; without it the pinned floor prices only the studied chains.
+- A quote's minimum is its output: a relayer pays exactly `outputAmount`, so `toTokenAmountMin` equals `toTokenAmount`. The engine quotes again when it executes, so pass `minAmountOut` a few bps under the quote (`suggestSlippage` gives at least 5): with the quoted minimum itself, a new price a few base units lower refuses the swap (`tx-output-amount`). On 2026-11-15 a 1.9 USDC Base → Arbitrum quote came back 15 base units lower (0.8 bps) at execution.
 
 ## Checks
 
