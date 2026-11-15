@@ -127,7 +127,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 | Area | Next | Later |
 |---|---|---|
-| Swap & bridge | Jupiter `/order` + `/execute` (USDT0 + Chainflip shipped 2026-10-20, Jupiter `/build` 2026-10-23, Curve 2026-11-07, 0x 2026-11-15) | rhino.fi, swapdk, BOB Gateway, Velora, Orchestra; Uniswap v4 / v2 + LP positions; Balancer v3 |
+| Swap & bridge | Jupiter `/order` + `/execute` (USDT0 + Chainflip shipped 2026-10-20, Jupiter `/build` 2026-10-23, Curve 2026-11-07, Symbiosis + Relay 2026-11-10, 0x 2026-11-15) | rhino.fi, swapdk, BOB Gateway, Velora, Orchestra; Uniswap v4 / v2 + LP positions; Balancer v3 |
 | Earn | Sky (sUSDS / SKY), Ethena (USDe → sUSDe), Euler v2, Morpho fixed-rate markets (native SOL + MON staking shipped 2026-10-26, Curve scrvUSD 2026-11-07, native NEAR + LiNEAR / rNEAR staking 2026-11-08) | Hyperliquid exit, fiat on/off-ramp (MoonPay, Transak) |
 | Safety | `@anywalletkit/receive` (quarantine receive addresses on a separate seed branch) + `@anywalletkit/screening` (risk signals from shipped lists + on-device 2-hop tracing, two privacy modes); outbound recipient check + address-poisoning detector | tx-preview for Solana / TON / Tron; wallet-btc PSBT partial signing + BIP-322 |
 | Accounts | multisig: Safe (EVM), Squads (Solana), multisig-v2 (TON), account permissions (Tron), multisig2 / Sputnik (NEAR) | gasless sends (EIP-7702 + paymaster, GasFree on Tron, TON paymaster, Solana fee payer) |

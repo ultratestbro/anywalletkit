@@ -7,7 +7,7 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
 import {describeZeroExActivity} from "./activity.js";
 import {ZEROEX_NATIVE, ZEROEX_PERMIT2, zeroExChain, zeroExChainId, zeroExChains, type ZeroExChain} from "./chains.js";
 import {rpcRequest, rpcUrlsFor, type RpcUrls} from "./rpc.js";
-import {ZEROEX_MAX_NATIVE_QUOTE_SECONDS, checkZeroExTransaction, createSettlerResolver, isZeroExNative, type SettlerResolver, type ZeroExExpectation} from "./settler.js";
+import {ZEROEX_MAX_NATIVE_QUOTE_SECONDS, ZEROEX_NATIVE_QUOTE_SKEW_SECONDS, checkZeroExTransaction, createSettlerResolver, isZeroExNative, type SettlerResolver, type ZeroExExpectation} from "./settler.js";
 
 /**
  * 0x Swap API v2 (docs.0x.org) as a same-chain swap2 provider, Permit2 flow: `/swap/permit2/price` for
@@ -449,8 +449,8 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
         const permit = own(r, "permit2");
         if (nativeSell) {
           if (permit !== null && permit !== undefined) return refuse("the API asks for a Permit2 signature on a native-coin sale", "policy_refused");
-          // A native sale signs nothing that would lapse: its quote is bounded here (the app's verifier holds it to the same).
-          validUntilMs = Math.min(validUntilMs, now + ZEROEX_MAX_NATIVE_QUOTE_SECONDS * 1000);
+          // A native sale signs nothing that would lapse: its quote is bounded here, inside the app verifier's bound by the clock-skew allowance.
+          validUntilMs = Math.min(validUntilMs, now + (ZEROEX_MAX_NATIVE_QUOTE_SECONDS - ZEROEX_NATIVE_QUOTE_SKEW_SECONDS) * 1000);
         } else {
           const eip712 = plain(permit) ? own(permit, "eip712") : undefined;
           if (!plain(permit) || !plain(eip712)) return refuse("the quote carries no Permit2 payload to sign", "policy_refused");

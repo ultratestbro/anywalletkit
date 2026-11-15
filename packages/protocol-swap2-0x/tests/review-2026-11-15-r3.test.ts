@@ -237,11 +237,19 @@ describe("2. zeroExRemoteProvider re-reads the registry on the device before bro
     vi.stubGlobal("fetch", stub({out: 2_500_000n}));
     const p = zeroExProvider({apiKey: getKey, rpcUrls: RPC, quoteTtlMs: 3_600_000});
     const native = await p.getQuote(nativeParams());
-    expect(native!.validUntilMs).toBe(Date.now() + 120_000);
+    expect(native!.validUntilMs).toBe(Date.now() + 90_000);
     vi.stubGlobal("fetch", stub());
     const token = await p.getQuote(tokenParams());
     expect(token!.validUntilMs).toBe(Date.now() + 300_000 - 20_000);
     expect(zeroExVerifyQuote(tokenParams(), token!, {chains: ZEROEX_CHAINS, settlers: () => [SETTLER, PREV_SETTLER]})).toBeNull();
+  });
+
+  it("a backend with a long quoteTtlMs and a clock up to 30 s ahead of the app still gets its native quote accepted", async () => {
+    vi.useFakeTimers({toFake: ["Date"]}); vi.setSystemTime(1_794_690_361_000);
+    vi.stubGlobal("fetch", stub({out: 2_500_000n}));
+    const native = await zeroExProvider({apiKey: getKey, rpcUrls: RPC, quoteTtlMs: 300_000}).getQuote(nativeParams());
+    const ctx = {chains: ZEROEX_CHAINS, settlers: () => [SETTLER, PREV_SETTLER]};
+    for (const behind of [0, 500, 29_000]) expect(zeroExVerifyQuote(nativeParams(), native!, {...ctx, nowMs: Date.now() - behind}), String(behind)).toBeNull();
   });
 });
 

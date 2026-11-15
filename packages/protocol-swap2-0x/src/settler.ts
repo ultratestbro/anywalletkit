@@ -54,6 +54,9 @@ export const ZEROEX_MAX_PERMIT_SECONDS = 600;
  */
 export const ZEROEX_MAX_NATIVE_QUOTE_SECONDS = 120;
 
+/** How far inside {@link ZEROEX_MAX_NATIVE_QUOTE_SECONDS} a backend ends a native sale's quote, so an app whose clock runs behind the backend's still accepts it. */
+export const ZEROEX_NATIVE_QUOTE_SKEW_SECONDS = 30;
+
 const PERMIT = "((address,uint256),uint256,uint256)";
 /**
  * Settler actions through which a taker-submitted swap spends a Permit2 signature (`ISettlerActions.sol`), by
