@@ -15,10 +15,10 @@
  *   nothing sent (`ReviewDeclined`, 4001).
  */
 import type { CrossChainProvider, Quote, QuoteParams, Swap2ExecutionPlan } from '@anywalletkit/protocol-swap2-core'
-import { slippageFloor, validQuote } from '@anywalletkit/protocol-swap2-core'
+import { PERMIT2_ADDRESS, slippageFloor, validQuote } from '@anywalletkit/protocol-swap2-core'
 import { typedDataHash } from '@anywalletkit/wallet-evm'
 import { ApprovalQueue } from './approvals.js'
-import { ReviewGate, chainTxMatcher, evmCallMatcher, typedDataMatcher, type GateMatcher } from './gate.js'
+import { ReviewGate, chainTxMatcher, evmCallMatcher, evmSignedCallMatcher, typedDataMatcher, type GateMatcher } from './gate.js'
 import type { TypedData } from './signing.js'
 
 export interface RouteView {
@@ -248,7 +248,16 @@ export interface SwapApproval {
   validUntilMs: number
   approvals: { token: string; spender: string; amount: string }[]
   source:
-    | { kind: 'call'; to: string; data?: string; value: string; deposit?: string }
+    | {
+        kind: 'call'; to: string; data?: string; value: string; deposit?: string
+        /**
+         * Permit2 signature-transfer swaps (0x): the EIP-712 `PermitTransferFrom` the account signs for this swap,
+         * rebuilt by the engine from checked values — `typedData` to render, `text` pretty JSON, and its fields read
+         * out (token, exact amount, the one contract that may use it, deadline in unix seconds). The call then goes
+         * out as `data` followed by the signature.
+         */
+        permit2Transfer?: { typedData: TypedData; text: string; token: string; amount: string; spender: string; deadline: number }
+      }
     | { kind: 'token-transfer'; token: string; recipient: string; amount: string; memo?: string }
     | { kind: 'serialized' }
     /** The EIP-712 order the account signs (gasless routes): `typedData` to render, `text` pretty JSON. */
@@ -288,8 +297,16 @@ export function swapApprovalPayload(plan: Swap2ExecutionPlan, meta: SwapReviewMe
   let source: SwapApproval['source']
   if (s.kind === 'call') {
     const deposit = depositOf(s, plan.approvals.length)
-    source = { kind: 'call', to: s.to, ...(s.data ? { data: s.data } : {}), value: s.value.toString(), ...(deposit ? { deposit } : {}) }
+    const permit = s.permit2Transfer !== undefined ? parsePermit2Transfer(s.permit2Transfer) : undefined
+    source = { kind: 'call', to: s.to, ...(s.data ? { data: s.data } : {}), value: s.value.toString(), ...(deposit ? { deposit } : {}), ...(permit ? { permit2Transfer: permit } : {}) }
     checks.push(deposit || assigned ? depositCheck : { status: 'ok', label: `Calls the ${meta.providerLabel} contract` })
+    if (permit) {
+      const exact = BigInt(permit.amount) === plan.sourceAmount && lc(permit.spender) === lc(s.to)
+      const minutes = Math.max(0, Math.ceil((permit.deadline * 1000 - Date.now()) / 60_000))
+      checks.push(exact
+        ? { status: 'ok', label: `Permit2 signature: exactly the amount sold, usable only by ${s.to.slice(0, 6)}…${s.to.slice(-4)} in this swap, expires in ${minutes} min` }
+        : { status: 'warn', label: 'Permit2 signature does not match this swap (amount or contract)' })
+    }
   } else if (s.kind === 'token-transfer') {
     source = { kind: 'token-transfer', token: s.token, recipient: s.recipient, amount: s.amount.toString(), ...(s.memo ? { memo: s.memo } : {}) }
     checks.push(depositCheck)
@@ -302,6 +319,7 @@ export function swapApprovalPayload(plan: Swap2ExecutionPlan, meta: SwapReviewMe
     checks.push({ status: 'ok', label: 'Signed order — no transaction is sent from your wallet' })
   }
   for (const a of plan.approvals) checks.push(a.amount > plan.sourceAmount ? { status: 'warn', label: 'Approval is larger than this swap needs' } : { status: 'ok', label: 'Approval is exactly the amount needed' })
+  if (plan.approvals.some((a) => a.amount > 0n && lc(a.spender) === lc(PERMIT2_ADDRESS))) checks.push({ status: 'ok', label: 'Approval goes to Permit2 (shared by many apps): only the signed permit decides who can use it' })
   if (plan.approvals.length > 1) checks.push({ status: 'ok', label: `${plan.approvals.length} approvals (reset to 0 first)` })
   // A deposit-address leg does not carry the recipient: "your address" is only the provider server's promise.
   checks.push(!isOwn
@@ -330,18 +348,43 @@ export function swapApprovalPayload(plan: Swap2ExecutionPlan, meta: SwapReviewMe
   }
 }
 
+/** The plan's Permit2 transfer, read for the sheet. Throws on anything that is not a `PermitTransferFrom` (refused before the sheet). */
+function parsePermit2Transfer(json: string): NonNullable<Extract<SwapApproval['source'], { kind: 'call' }>['permit2Transfer']> {
+  const typedData = parseTypedOrder(json)
+  const m = typedData.message as { permitted?: { token?: unknown; amount?: unknown }; spender?: unknown; deadline?: unknown }
+  const token = m.permitted?.token
+  const amount = m.permitted?.amount
+  const deadline = m.deadline
+  if (typedData.primaryType !== 'PermitTransferFrom' || typeof token !== 'string' || typeof amount !== 'string' || !/^[0-9]{1,78}$/.test(amount) ||
+    typeof m.spender !== 'string' || typeof deadline !== 'string' || !/^[0-9]{1,12}$/.test(deadline)) {
+    throw new Error('The swap\'s Permit2 transfer is not a PermitTransferFrom.')
+  }
+  return { typedData, text: JSON.stringify(typedData, null, 2), token, amount, spender: m.spender, deadline: Number(deadline) }
+}
+
 function parseTypedOrder(json: string): TypedData {
   const t = JSON.parse(json) as TypedData
   if (!t || typeof t !== 'object' || !t.domain || typeof t.domain !== 'object' || !t.types || typeof t.types !== 'object' || !t.message || typeof t.message !== 'object') throw new Error('The swap order is not EIP-712 typed data.')
   return t
 }
 
-/** Matchers for exactly the operations the plan will perform, in the engine's order. */
+/**
+ * Matchers for exactly the operations the plan will perform, in the engine's order. A Permit2 signature-transfer swap
+ * is three operations: the permit (signed first, matched by its EIP-712 digest), the approvals, then the call carrying
+ * the signature (matched by its exact structure, see {@link evmSignedCallMatcher}).
+ */
 export function planMatchers(plan: Swap2ExecutionPlan): GateMatcher[] {
-  const m: GateMatcher[] = plan.approvals.map((a) => evmCallMatcher({ caip2: plan.fromChain, to: a.token, data: encodeApproveCalldata(a.spender, a.amount), value: 0n }))
+  const m: GateMatcher[] = []
   const s = plan.source
+  const permit = s.kind === 'call' && s.permit2Transfer !== undefined && plan.fromChain.startsWith('eip155:')
+  if (permit) {
+    if (!s.data) throw new Error('A Permit2 swap plan carries no calldata.')
+    m.push(typedDataMatcher({ caip2: plan.fromChain, typedDataHash: typedDataHash(parsePermit2Transfer(s.permit2Transfer!).typedData as Parameters<typeof typedDataHash>[0]) }))
+  }
+  m.push(...plan.approvals.map((a) => evmCallMatcher({ caip2: plan.fromChain, to: a.token, data: encodeApproveCalldata(a.spender, a.amount), value: 0n })))
   if (s.kind === 'call') {
-    if (plan.fromChain.startsWith('eip155:')) m.push(evmCallMatcher({ caip2: plan.fromChain, to: s.to, data: s.data, value: s.value }))
+    if (permit) m.push(evmSignedCallMatcher({ caip2: plan.fromChain, to: s.to, data: s.data!, value: s.value }))
+    else if (plan.fromChain.startsWith('eip155:')) m.push(evmCallMatcher({ caip2: plan.fromChain, to: s.to, data: s.data, value: s.value }))
     else if (plan.fromChain.startsWith('solana:')) m.push((op) => op.kind === 'solana-tx' && op.to === s.to && op.value === s.value)
     else m.push(chainTxMatcher({ chain: plan.fromChain, to: s.to, amount: s.value, memo: s.memo }))
   } else if (s.kind === 'token-transfer') {

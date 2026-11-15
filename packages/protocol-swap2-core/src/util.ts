@@ -136,3 +136,5 @@ export function tonRawAddress(address: unknown): string | null {
   const wc = bytes[1] === 0xff ? -1 : bytes[1]!;
   return `${wc}:${Array.from(bytes.subarray(2, 34), (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
+
+export {PERMIT2_ADDRESS, PERMIT2_MAX_DEADLINE_SECONDS, PERMIT2_TRANSFER_TYPES, appendPermit2Signature, permit2TransferJson, readPermit2Transfer, type Permit2Transfer, type Permit2TransferExpectation} from "./permit2.js";

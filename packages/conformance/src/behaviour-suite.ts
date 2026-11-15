@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { checksFor, decodeCall, type PreviewCall } from '@anywalletkit/tx-preview-evm'
 import type { IWalletAccount } from '@anywalletkit/core'
-import { createMockAccount, type MockAccountOptions } from './mock-account.js'
+import { MOCK_TYPED_DATA_SIGNATURE, createMockAccount, type MockAccountOptions } from './mock-account.js'
 import type { WriteProtocolCtor as Ctor } from './ctor.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -13,7 +13,11 @@ export interface Swap2BehaviourPlan {
   sourceAmount: bigint
   approvals: { token: string; spender: string; amount: bigint }[]
   source:
-    | { kind: 'call'; to: string; data?: string; value: bigint }
+    /**
+     * `permit2Transfer`: a Permit2 signature-transfer swap — the EIP-712 `PermitTransferFrom` the account signs, sent as
+     * `data ++ uint256(signature length) ++ signature`.
+     */
+    | { kind: 'call'; to: string; data?: string; value: bigint; permit2Transfer?: string }
     | { kind: 'token-transfer'; token: string; recipient: string; amount: bigint }
     | { kind: 'serialized'; serializedTx: string }
     | { kind: 'typed-order'; typedData: string }
@@ -27,7 +31,7 @@ export interface Swap2BehaviourFixture {
   options: Record<string, unknown>
   /** Recorded/mocked network for this fixture, installed as the global `fetch`. */
   fetch: typeof fetch
-  /** Signing mock account (address/chain must match what the recorded quote binds). */
+  /** Signing mock account (address/chain must match what the recorded quote binds). A Permit2 swap needs `signTypedData: true`. */
   account?: MockAccountOptions
   /** The user's other addresses (e.g. the destination-chain recipient). The signing account is always own. */
   own?: string[]
@@ -90,6 +94,8 @@ function account20(address: string): string | null {
   return full.startsWith('41') ? full.slice(2, 42) : null
 }
 const word = (hex: string) => hex.replace(/^0x/, '').toLowerCase().padStart(64, '0')
+/** Canonical Permit2, the only verifying contract a swap's permit may name. */
+const PERMIT2 = '0x000000000022D473030F116dDEE9F6B43aC78BA3'
 const approveData = (spender: string, amount: bigint) => `0x095ea7b3${word(spender)}${word(amount.toString(16))}`
 
 /**
@@ -143,6 +149,16 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
         if (s.kind === 'token-transfer') {
           expect({ token: lc(s.token), to: declared.has(lc(s.recipient)), amount: s.amount }).toEqual({ token: src, to: true, amount: plan!.sourceAmount })
         } else if (s.kind === 'call' && s.to.startsWith('0x')) {
+          if (s.permit2Transfer !== undefined) {
+            // What the account will sign: Permit2's own transfer of exactly the input of the source token, usable only
+            // by the contract the plan calls — which must be declared.
+            const t = JSON.parse(s.permit2Transfer) as { primaryType?: unknown; domain?: { verifyingContract?: unknown }; message?: { permitted?: { token?: unknown; amount?: unknown }; spender?: unknown } }
+            expect(t.primaryType, 'permit2Transfer is not a PermitTransferFrom').toBe('PermitTransferFrom')
+            expect(lc(String(t.domain?.verifyingContract)), 'permit2Transfer is not for canonical Permit2').toBe(lc(PERMIT2))
+            expect({ token: lc(String(t.message?.permitted?.token)), amount: String(t.message?.permitted?.amount) }, 'permit2Transfer permits another token or amount').toEqual({ token: src, amount: plan!.sourceAmount.toString() })
+            expect(lc(String(t.message?.spender)), 'permit2Transfer names another spender than the contract the plan calls').toBe(lc(s.to))
+            expect((f.callTargets ?? []).map(lc), `the permit's spender ${s.to} is not declared (callTargets)`).toContain(lc(s.to))
+          }
           const d = decodeCall(s)
           if (d.transfer) expect({ token: d.transfer.token, to: declared.has(d.transfer.to), amount: d.transfer.amount }).toEqual({ token: src, to: true, amount: plan!.sourceAmount })
           else if (!d.selector) expect({ to: declared.has(d.to), enough: s.value >= plan!.sourceAmount }).toEqual({ to: true, enough: true })
@@ -193,7 +209,19 @@ export function describeProtocolBehaviour<P extends object>(name: string, o: Pro
         plan!.approvals.forEach((a, i) => expect(lc(sent[i]!.data ?? '')).toBe(approveData(a.spender, a.amount)))
         const leg = sent.at(-1)!
         const s = plan!.source
-        if (s.kind === 'call') expect({ to: leg.to, data: leg.data, value: leg.value }).toEqual({ to: s.to, data: s.data, value: s.value })
+        const typed = account.calls.filter((c) => c.method === 'signTypedData')
+        if (s.kind === 'call' && s.permit2Transfer !== undefined) {
+          // Exactly one signature, over the reviewed permit, appended once to the reviewed calldata.
+          expect(typed, 'a Permit2 swap signs its permit exactly once').toHaveLength(1)
+          const reviewed = JSON.parse(s.permit2Transfer) as { domain: unknown; primaryType: unknown; message: unknown }
+          const signed = typed[0]!.args[0] as { domain: unknown; primaryType: unknown; message: unknown }
+          expect({ domain: signed.domain, primaryType: signed.primaryType, message: signed.message }, 'the account signed other typed data than was reviewed').toEqual({ domain: reviewed.domain, primaryType: reviewed.primaryType, message: reviewed.message })
+          const sig = MOCK_TYPED_DATA_SIGNATURE.slice(2)
+          expect({ to: leg.to, data: leg.data, value: leg.value }).toEqual({ to: s.to, data: `${s.data}${word((sig.length / 2).toString(16))}${sig}`, value: s.value })
+        } else {
+          if (s.kind !== 'typed-order') expect(typed, 'typed data signed outside a Permit2 swap').toHaveLength(0)
+          if (s.kind === 'call') expect({ to: leg.to, data: leg.data, value: leg.value }).toEqual({ to: s.to, data: s.data, value: s.value })
+        }
         if (s.kind === 'token-transfer') expect({ token: leg.token, recipient: leg.recipient, amount: leg.amount }).toEqual({ token: s.token, recipient: s.recipient, amount: s.amount })
         if (s.kind === 'serialized') {
           const l = leg as { serializedTx?: string; expect?: { maxValueOut?: string } }

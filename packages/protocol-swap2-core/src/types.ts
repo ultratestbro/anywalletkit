@@ -70,6 +70,11 @@ export interface TxRequest {
   nativeFee?: string;
   /** Solana: base64-serialized transaction to sign & broadcast as-is. */
   serializedTx?: string;
+  /**
+   * Permit2 signature-transfer execution (a 0x Settler swap): the JSON EIP-712 `PermitTransferFrom`
+   * the account signs right before `data` is sent — see {@link UnsignedTx.permit2Transfer}.
+   */
+  permit2Transfer?: string;
 }
 
 /** A normalized quote from one provider. */
@@ -196,6 +201,16 @@ export interface UnsignedTx {
    */
   typedData?: string;
   /**
+   * Permit2 signature-transfer execution (a 0x Settler swap): the JSON EIP-712 `PermitTransferFrom`
+   * the account signs right before the calldata is sent. NOT a typed order: there is a source
+   * transaction, and the signature is only usable inside it (Permit2 takes the token from
+   * `msg.sender` of the spender's call). The engine binds the payload to the swap before any
+   * approval — Permit2 itself as the verifying contract and as `approvalAddress`, the source token,
+   * exactly the input amount, `to` as the Permit2 spender, a near deadline — signs it as typed
+   * data (never as a raw hash) and sends `data ++ uint256(signature length) ++ signature`.
+   */
+  permit2Transfer?: string;
+  /**
    * Typed-order execution: the order extension (0x-hex) the order's salt commits to — a 1inch Limit Order Protocol
    * order's amount getters and post-interaction, where an HTLC order's escrow terms live. Carried so an app can open
    * a remote build on the client (`omnistonVerifyBuild`, scan 2026-10-28 F6); the signature covers it through the salt.
@@ -297,6 +312,15 @@ export interface CrossChainProvider {
    * its backend names. Without it the engine refuses a remote stub's deposit-address and plain-value builds.
    */
   readonly depositAddressRoutes?: boolean;
+  /**
+   * The engine sends this provider's EVM calls (a native-coin sale, a token sale's call) with the account's own gas
+   * estimate of exactly that call, dry-run from the account right before broadcast — never with the quoted gas limit,
+   * which is the venue's (or a backend's) word: a limit below what the call needs would pass a fee check and then
+   * revert on-chain out of gas, after the account paid for it. A dry run that reverts refuses the swap
+   * (`simulation_failed`); an RPC that does not answer it is asked once more, then refuses it (`upstream_unavailable`).
+   * A Permit2 signature transfer always goes out this way. Set by the 0x provider; the router's snapshot carries it.
+   */
+  readonly ownGasEstimate?: boolean;
   /** Remote stubs: the contracts this provider's EVM swaps may call on `chain` (the app's list, e.g. `lifiPins`). */
   callTargets?(chain: string): readonly string[];
   /** Remote stubs: the spenders this provider's EVM swaps may be approved for on `chain` (the app's list). */

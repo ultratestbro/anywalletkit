@@ -12,7 +12,15 @@ export interface MockAccountOptions {
   receipt?: Receipt | undefined
   /** Also expose swap2's `sendSerializedTransaction` hook (Solana aggregator legs), recorded in `sent` with its expectation. */
   serialized?: boolean
+  /**
+   * Also expose `signTypedData` (EVM), recorded in `calls` as `signTypedData` with the typed data it was given; it
+   * answers {@link MOCK_TYPED_DATA_SIGNATURE}. Permit2 signature-transfer swaps need it.
+   */
+  signTypedData?: boolean
 }
+
+/** What a mock account's `signTypedData` answers: 65 bytes, the length of an EOA signature. */
+export const MOCK_TYPED_DATA_SIGNATURE = `0x${'5a'.repeat(65)}`
 
 /**
  * An account that records every call. Protocol module unit tests use it to
@@ -47,6 +55,11 @@ export function createMockAccount(opts: MockAccountOptions = {}): IWalletAccount
     transfer: async (o): Promise<TransferResult> => { sent.push(o); return rec('transfer', [o], { hash: nextHash(), fee }) },
     toReadOnlyAccount: () => readOnly,
     dispose: () => { rec('dispose', [], undefined) },
+  }
+  if (opts.signTypedData) {
+    Object.assign(account, {
+      signTypedData: async (typed: unknown): Promise<string> => rec('signTypedData', [typed], MOCK_TYPED_DATA_SIGNATURE),
+    })
   }
   if (opts.serialized) {
     Object.assign(account, {

@@ -164,6 +164,9 @@ export class CrossChainRouter {
       ...(provider.verifiesBuilds === true ? {verifiesBuilds: true} : {}),
       ...(provider.verifiesQuotes === true ? {verifiesQuotes: true} : {}),
       ...(provider.depositAddressRoutes === true ? {depositAddressRoutes: true} : {}),
+      // The account's own gas estimate for this provider's calls (0x): dropped here, the engine would broadcast the
+      // venue's quoted gas limit again.
+      ...(provider.ownGasEstimate === true ? {ownGasEstimate: true} : {}),
       ...(provider.callTargets ? {callTargets: provider.callTargets.bind(provider)} : {}),
       ...(provider.spenders ? {spenders: provider.spenders.bind(provider)} : {}),
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),

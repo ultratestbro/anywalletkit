@@ -427,6 +427,7 @@ function txRequest(v: unknown): TxRequest {
   if (t.approvalAddress !== undefined) out.approvalAddress = str(t.approvalAddress, "quote.txRequest.approvalAddress", 200);
   if (t.serializedTx !== undefined) out.serializedTx = str(t.serializedTx, "quote.txRequest.serializedTx", 2_000_000);
   if (t.nativeFee !== undefined) out.nativeFee = digits(t.nativeFee, "quote.txRequest.nativeFee", 80);
+  if (t.permit2Transfer !== undefined) out.permit2Transfer = str(t.permit2Transfer, "quote.txRequest.permit2Transfer", 20_000);
   return out;
 }
 
@@ -434,7 +435,7 @@ function txRequest(v: unknown): TxRequest {
 function unsignedTx(v: unknown): UnsignedTx {
   const t = record(v, "tx");
   const out: UnsignedTx = {chain: str(t.chain, "tx.chain", 64), to: str(t.to, "tx.to", 200), value: digits(t.value, "tx.value", 80)};
-  const optional: [keyof UnsignedTx, number][] = [["data", 1_000_000], ["gasLimit", 80], ["approvalAddress", 200], ["serializedTx", 2_000_000], ["memo", 2_000], ["bodyBoc", 200_000], ["stateInitBoc", 200_000], ["typedData", 200_000]];
+  const optional: [keyof UnsignedTx, number][] = [["data", 1_000_000], ["gasLimit", 80], ["approvalAddress", 200], ["serializedTx", 2_000_000], ["memo", 2_000], ["bodyBoc", 200_000], ["stateInitBoc", 200_000], ["typedData", 200_000], ["permit2Transfer", 20_000]];
   for (const [k, max] of optional) if (t[k] !== undefined) (out as unknown as Record<string, unknown>)[k] = k === "gasLimit" ? digits(t[k], `tx.${k}`, max) : str(t[k], `tx.${k}`, max);
   if (t.memoEncoding !== undefined) {
     if (t.memoEncoding !== "utf8" && t.memoEncoding !== "hex") bad("tx.memoEncoding", "expected utf8 or hex");
