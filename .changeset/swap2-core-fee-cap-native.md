@@ -1,7 +1,0 @@
----
-"@anywalletkit/protocol-swap2-core": patch
----
-
-Fee caps no longer refuse every native-coin input (SDK-318). The engine keyed a native source by its catalog asset id (`nep141:eth.omft.near`, or `""` where 1Click lists no native coin), while providers itemize the native coin as the zero address (Relay, Across), `"native"` (0x, Jupiter) or `0xEeee…EEeE`. So under any `maxNetworkFeeBps` / `maxProtocolFeeBps` every honest native-coin quote was refused with "cannot apply … fee cap across different fee tokens" (nothing was signed, but native routes disappeared for apps that set a cap). When the source is the chain's native coin, those spellings now count as the source: `"native"` on any chain, the zero address and `0xEeee…EEeE` on EVM chains, in any case. Their amounts are added up and held to the cap like any other fee in the source token.
-
-Nothing else is loosened. For an ERC-20 or unlisted source the match is still the exact contract (any case), so a fee named `"native"` or the zero address is another token there. A fee in any other token (an ERC-20, WETH, a bare symbol such as `ETH`, another chain's asset id, Chainflip's `Chain:ASSET`) is still refused, and so is a quote with no itemized fees. Error texts and the `policy_refused` reason are unchanged. `assertFeeCaps` takes an optional fifth argument, `sourceNative`, for subclasses that call it directly. Without it the check is as strict as before.

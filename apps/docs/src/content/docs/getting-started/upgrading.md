@@ -10,7 +10,7 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## Next release: Across, `QuoteParams.sender`
+## 2026-11-15: Across, `QuoteParams.sender`
 
 Not breaking for existing providers.
 

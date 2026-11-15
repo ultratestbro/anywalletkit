@@ -1,5 +1,14 @@
 # @anywalletkit/protocol-swap2-relay
 
+## 0.1.4
+
+### Patch Changes
+
+- f3eb549: Relay's fee is itemized only when Relay prices it in a currency of the source chain (`fees.relayer.currency.chainId`). A fee token carries no chain and the zero address names the native coin of every EVM chain, so with the engine's fee caps now counting native fees against a native input (SDK-318), a fee priced on another chain must not be summed as source wei. Honest quotes are unchanged: Relay prices its fee on the source chain.
+- Updated dependencies [3bf525f]
+- Updated dependencies [b7cf66d]
+  - @anywalletkit/protocol-swap2-core@0.14.0
+
 ## 0.1.3
 
 ### Patch Changes
