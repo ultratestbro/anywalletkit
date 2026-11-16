@@ -4,7 +4,9 @@ Work for [SDK-330](https://megabunny.xyz/b/SDK/t/330) and
 [SDK-331](https://megabunny.xyz/b/SDK/t/331). This package provides public discovery
 and a separate server-only transport for requesting quotes and status evidence.
 It does not yet provide an executable swap2 provider, wallet steps or signature submission.
-Direct Stargate Taxi/Bus is implemented separately in `protocol-swap2-stargate`.
+Direct Stargate Taxi and historical Bus tracking/recovery are implemented separately
+in `protocol-swap2-stargate`. New Bus transfers are refused following the
+[October 1, 2026 retirement](https://layerzero.network/blog/ecosystem-update-september-2026).
 
 ```ts
 import {createLayerZeroDiscovery} from '@anywalletkit/protocol-swap2-layerzero'
@@ -79,6 +81,19 @@ to finish schema validation and route adapters. SDK-330 remains open. SDK-331 st
 validated multicall/delegate calls, EIP-712 domains/signers, fresh Solana builds and
 durable ordered step checkpoints before those routes can enter the router. Every other
 VM or unknown step must be refused until its wallet operation has a reviewed validator.
+
+| Capability | Implemented evidence / behavior | Remaining requirement |
+| --- | --- | --- |
+| Chains, metadata, destination tokens | Public API fixtures and paginated discovery | Discovery never grants execution permission |
+| Authenticated quotes/status | Server transport, synthetic envelope tests | Issued API key and recorded real responses |
+| EVM transactions/multicalls | Not admitted to the router | Exact target/value/spender/recipient/minimum validation for each supported step |
+| EIP-712 or other signatures | Not admitted | Reviewed domains, signers, payload semantics and replay protection |
+| Solana or other VM steps | Not admitted | Fresh transaction construction and wallet-specific validators |
+| Ordered userSteps/resume | Not implemented | Validated step types, durable checkpoints and maybe-sent reconciliation |
+| LI.FI Ethereum compose | Separate read-only receipt adapter; narrow 1inch unoswap2/V3 validator | Executable route integration, reviewed recovery and controlled end-to-end validation |
+
+The missing key blocks authenticated evidence collection, not direct Taxi or public
+historical research. No synthetic response is a substitute for a verified API contract.
 
 References: [API authentication](https://docs.layerzero.network/v2/developers/value-transfer-api/api-reference/overview),
 [chains](https://docs.layerzero.network/v2/developers/value-transfer-api/api-reference/chains),

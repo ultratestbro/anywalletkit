@@ -6,6 +6,7 @@ import {STARGATE_BUS_RETIRED, stargateChainActive, stargateChainCutoff} from "./
 import type {StargateDeployment, StargateRegistry} from "./registry.js";
 import {assertNotAborted, assertStargate, nonzeroAddress, safeReadError, stargateRpc, type StargateBlock, type StargateRpcConfig} from "./rpc.js";
 
+/** Bus is retained for historical intents; new quotes accept Taxi only. */
 export type StargateMode = "taxi" | "bus";
 export interface StargateQuoteRequest {
   sourceChain: string;
@@ -20,7 +21,7 @@ export interface StargateQuoteRequest {
   /** Defaults to zero: the entire expected output is protected. */
   slippageBps?: number;
   mode: StargateMode;
-  /** Taxi specifies a uint128 amount; Bus requests the pathway's fixed current drop. */
+  /** Taxi specifies a uint128 amount. The legacy Bus option is refused for new quotes. */
   nativeDrop?: {amount: bigint} | {bus: true};
 }
 export interface StargateSendParam {

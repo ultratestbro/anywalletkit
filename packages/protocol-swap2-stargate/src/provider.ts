@@ -13,14 +13,14 @@ import {describeStargateActivity} from "./activity.js";
 export interface StargateProviderConfig extends StargatePinsConfig, StargateTrackingConfig {
   /** Explicit opt-in until funded end-to-end validation is complete. Default false. */
   enabled?: boolean;
-  /** Default taxi. A selected routeId always takes precedence, without fallback. */
+  /** Taxi only for new transfers. A retired Bus selector is refused, without fallback. */
   defaultMode?: StargateMode;
-  /** Native drop is opt-in and bound to each quote and its tracking identity. */
+  /** Taxi native drop is opt-in. The legacy bus field cannot enable retired Bus quotes. */
   nativeDrop?: {taxi?: bigint; bus?: boolean};
 }
 const PREVIEW_ACTOR = "0x1111111111111111111111111111111111111111";
 
-/** Direct Stargate transport. Compose and Value Transfer API use separate validated adapters. */
+/** Direct Taxi transport; historical Bus tracking. API/compose execution is not admitted. */
 export function stargateProvider(config: StargateProviderConfig): CrossChainProvider {
   const registry = config.registry ?? stargateRegistry;
   const quoter = createStargateQuoter(config);

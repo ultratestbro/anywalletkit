@@ -52,7 +52,7 @@ const importedPackages = (dir, acc = new Set()) => {
   return acc
 }
 
-for (const dir of readdirSync(join(root, 'packages')).sort()) {
+for (const dir of readdirSync(join(root, 'packages'), {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name).sort()) {
   const pkgDir = join(root, 'packages', dir)
   const src = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'))
   const where = `${src.name} (packages/${dir})`

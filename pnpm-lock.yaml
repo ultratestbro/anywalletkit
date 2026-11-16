@@ -513,6 +513,9 @@ importers:
 
   examples/server:
     dependencies:
+      '@anywalletkit/protocol-swap2-stargate':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-stargate
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -581,6 +584,9 @@ importers:
 
   examples/swap:
     dependencies:
+      '@anywalletkit/protocol-swap2-stargate':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-stargate
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../../packages/core

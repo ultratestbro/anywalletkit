@@ -3,16 +3,30 @@
 Work for [SDK-321](https://megabunny.xyz/b/SDK/t/321), starting with
 [SDK-322](https://megabunny.xyz/b/SDK/t/322) and
 [SDK-323](https://megabunny.xyz/b/SDK/t/323). This private package contains interfaces,
-amount accounting, a reviewed deployment registry, direct quotes, execution/client
-pins, Taxi/Bus passenger tracking and destination recovery. `stargateProvider` and
+amount accounting, a reviewed deployment registry, direct Taxi quotes, execution/client
+pins, historical Taxi/Bus passenger tracking and destination recovery. `stargateProvider` and
 `StargateSwap2Protocol` are disabled by default (`enabled: true` is an explicit opt-in).
 The package remains private and absent from the module registry while
 API routes and additional evidence are implemented. No funded send has been performed.
 
-The full scope includes direct Stargate Taxi/Bus, verified deployments, tracking,
-recovery and gas drop. The separate planned `protocol-swap2-layerzero` package covers
+The full scope includes new Taxi transfers, historical Bus recovery, verified deployments, tracking,
+recovery and gas drop. The separate `protocol-swap2-layerzero` package covers
 Value Transfer API routes. Composer support requires an explicit adapter for a
 verified deployment; a new universal Solidity composer is a separate project.
+
+## Current service availability
+
+New transfers use Taxi only. Bus was retired on **October 1, 2026**, per the
+[LayerZero announcement](https://layerzero.network/blog/ecosystem-update-september-2026).
+Bus quotes, selected Bus routes and source builds are refused, including client-side
+validation of remote quotes. Historical Bus tracking and recovery remain available.
+
+Scroll is the only pinned chain in the current Stargate sunset list. New transfers
+involving Scroll are refused from **2026-12-08 00:00 UTC**; quote expiry is capped at
+that boundary. Historical deployment identities remain available for tracking.
+This is a conservative interpretation of the effective date in the
+[updated support announcement](https://layerzero.network/blog/support-update-july-24-2026).
+A configured peer is not a promise of continued service.
 
 ## Run the foundation checks
 
@@ -31,6 +45,7 @@ pnpm --filter @anywalletkit/protocol-swap2-stargate registry:capture
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:receipts
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:bus
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:recovery
+pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:compose
 ```
 
 `fixtures:upstream` retrieves only interfaces from deployment artifacts at the
@@ -51,7 +66,7 @@ production allowlist or proof that deployed bytecode matches the source commit**
 The quote caller/recipient is a public placeholder; quotes do not simulate delivery.
 
 The current fixture has four successful Taxi quotes and four Bus refusals with
-`Bus_InvalidFare(false)` (the no-native-drop mode). This is an observation at the recorded blocks, not a permanent
+`Bus_InvalidFare(false)` (the no-native-drop mode). This is a historical observation at the recorded blocks, not a permanent
 statement about the protocol. A transport failure aborts capture; an observed quote
 revert is retained as an unavailable route. Failed capture preserves the previous
 snapshot. Refreshes require review, including changes to availability assertions.
@@ -163,12 +178,83 @@ There is no USD oracle in this provider (`feeUsdKnown: "false"`); applications c
 use the router's valuation callback with their own prices.
 
 Taxi native drop uses a type-3 executor option addressed to the transfer recipient.
-Bus uses the pathway's current fixed drop amount; that setting can change before
-the bus is driven. `nativeDrop: {taxi: amount, bus: true}` opts into either mode on
-the provider and its client pins. Arbitrary options and compose bytes are refused.
+`nativeDrop: {taxi: amount}` opts in on the provider and client pins. Historical Bus
+recovery uses its recorded batch drop parameters. Arbitrary options and compose
+bytes do not enter the direct executable provider.
 
 References: [StargateBase](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/StargateBase.sol),
 [native pool](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/StargatePoolNative.sol).
+
+## Compose evidence adapter
+
+The `./compose` entry point provides a **read-only** adapter for the Ethereum LI.FI
+`ReceiverStargateV2` and its Executor. Receiver and Executor runtime bytecode hashes
+are pinned against fully verified non-proxy contracts. Official deployment/source
+URLs, explorer verification digests, historical identity reads and both code snapshots
+are recorded in `tests/fixtures/compose.json`.
+
+`proveLifiStargateCompose` binds the source pool event and Endpoint packet to the exact
+compose sender/payload, bridge asset, composer, final recipient and expected output
+asset. It checks the composer received the bridged tokens and the exact `ComposeSent`
+message. Inputs must come from independently verified canonical finalized blocks;
+passing an API's receipt JSON is not independent chain verification.
+
+`lifiStargateComposeOutcome` returns:
+
+| Outcome | Required evidence |
+| --- | --- |
+| `completed` | Matching Endpoint delivery, executor swap/completion events and actual final ERC20 payment meeting the caller's minimum |
+| `intermediate-refunded` | Matching Endpoint delivery, pinned receiver recovery event and payment of the bridged asset to the final recipient |
+| `unverified` | Missing/mismatched evidence, ambiguous batches or final native-coin output without independent payment proof |
+
+The recorded success is Arbitrum USDC → Ethereum → WLFI via a LI.FI/1inch call. The
+second case returns bridged USDT after the destination swap fails, even though Scan
+reports compose `SUCCEEDED`. This is a destination fallback, not a refund on the source
+chain. Executor `LiFiTransferCompleted` names the input asset and can report a gross
+balance: the adapter counts final-token transfers instead.
+
+`stargateComposeQueueState` distinguishes absent (`0`), pending (exact message hash),
+consumed (`1`) and foreign commitments. Consumed messages cannot be replayed. Successful
+fallback consumes the queue too; it cannot be fixed by replaying `lzCompose`.
+`stargateComposeOptions` encodes positive uint128 gas for index zero with no native value.
+
+The separate `./compose-dex` entry point exports `validateLifiUnoswap2Compose` for one
+narrow operation: Ethereum 1inch V6 `unoswap2`, two canonical Uniswap V3 pools, ERC20
+input/output. It checks pinned router/factory/composer code at one block, exact input,
+encoded minimum, spender, recipient, pool directions and factory `getPool` identities,
+then rechecks the block hash. Permit2, native unwrap, unknown flags, other selectors
+and arbitrary trailing bytes are refused. The only accepted suffix is the observed
+four bytes `2a94d114` (or no suffix); the pinned router's reviewed `unoswap2` path does
+not read trailing calldata. No ownership or authorization is inferred from that marker.
+
+The fixture records raw pool reads and exact runtime hashes. The router is fully
+verified on Blockscout. The factory has **partial** source verification there; its
+runtime hash is pinned separately, and its address matches the
+[official Uniswap Ethereum deployment](https://developers.uniswap.org/docs/protocols/v3/deployments/v3-ethereum-deployments).
+This is not a claim of a reproducible factory source build. The success fixture passes
+the DEX validator; the opaque aggregator call in the fallback fixture is refused.
+
+Every proof and DEX validation result has `executionSupported: false`. Outcome checks
+establish observed payment; DEX validation establishes this narrow call's constraints,
+not price availability or execution authorization. Source compose quotes, arbitrary
+DEX calldata, automatic retry and wallet execution remain disabled pending executable
+route admission and durable step integration. Read-only proof support must not be
+used as a spender or contract allowlist. API access is not needed to refresh these
+historical fixtures. The receiver may return the intermediate asset on insufficient
+compose gas or swap failure; successful queue consumption does not guarantee a swap.
+
+## Server and mobile examples
+
+Workspace examples: `examples/server/src/stargate.ts`
+and `examples/swap/src/stargate.ts`. The backend
+holds RPC credentials and quote sealing secrets. The mobile client uses its own pins
+and independent/public or application-proxied RPCs, requires execution review and a
+durable operation store. No LayerZero API key is needed for direct Taxi. React Native
+must install the normal Hermes polyfills before importing wallet/protocol packages.
+
+`module.draft.json` is a release preparation artifact, deliberately excluded from the
+public registry. The separate LayerZero discovery transport is not an executable
+protocol module and has no module registration yet. Both packages remain private.
 
 ## Execution and tracking contract
 
@@ -234,7 +320,7 @@ registry. It verifies the entire canonical `sendToken` calldata, including mode,
 recipient, amount, minimum, refund address, options, native value and spender.
 Remote builds additionally recheck current chain state and fees on the client,
 including after the backend's preflight. A backend cannot substitute that check.
-`getQuotes` enumerates Taxi/Bus only for previews; execution keeps the selected mode.
+`getQuotes` enumerates Taxi only for previews; an explicit retired Bus selector is refused without fallback.
 
 Bus acceleration assembles the valid current queue prefix through the user's ticket,
 checks its hash chain and obtains `quoteDriveBus`. It reviews a separate source-chain
@@ -273,8 +359,8 @@ be labelled without fabricating successful asset movements.
   `getQuote`, `using(provider)` and tracking IDs remain compatible. Stargate's
   provider now implements these hooks.
 - SDK-325: core now provides application-owned atomic journals, read-only reconciliation
-  and a separate reviewed/value-bounded EVM recovery path. Stargate must supply the
-  on-chain validators and recovery offers in SDK-328/329. Old `awk1` IDs and zero-value
+  and a separate reviewed/value-bounded EVM recovery path. Stargate supplies the
+  on-chain validators and recovery offers described under SDK-328/329. Old `awk1` IDs and zero-value
   claims retain their existing contracts.
 - SDK-326/327: direct quoting, execution and client pins are implemented and tested.
   SDK-328: Taxi payout tracking, cached-token recovery and native-drop evidence are
@@ -285,7 +371,10 @@ be labelled without fabricating successful asset movements.
 - SDK-330/SDK-331: API discovery and resumable steps, key held server-side. Include only
   routes for which every wallet operation has a validator. EVM multicall, signatures
   and fresh Solana transactions need separate adapters. Unknown VM steps fail closed.
-- SDK-332: select a verified composer deployment and validate success and recovery.
+- SDK-332: Ethereum LI.FI composer evidence adapter and real success/fallback fixtures
+  implemented, with a narrow 1inch `unoswap2`/Uniswap V3 calldata validator.
+  Other DEX variants, executable route admission and reviewed
+  compose retry remain open; the evidence adapter cannot authorize a transaction.
 - SDK-333: history, documentation, package exports, module registry, changesets,
   conformance, regressions, Hermes and controlled end-to-end validation.
   Receipt-backed local history and its recorded conformance cases are implemented;
@@ -293,7 +382,8 @@ be labelled without fabricating successful asset movements.
 
 The shared `pnpm test:hermes` smoke includes Stargate bigint/dust and uint72 ticket
 handling, recorded cached-token recovery receipts, native-drop tuple decoding and
-LayerZero public discovery. It passed 365 checks in the React Native 0.81.5 Hermes VM.
+LayerZero public discovery, compose success/fallback and canonical DEX pool validation.
+It passed 370 checks in the React Native 0.81.5 Hermes VM.
 This offline VM check does not replace a mobile end-to-end transfer.
 
 Stage 1 remains open for API contract fixtures/access and the complete API/compose
