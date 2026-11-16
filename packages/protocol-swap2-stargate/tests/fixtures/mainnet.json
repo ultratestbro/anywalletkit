@@ -1,0 +1,1352 @@
+{
+  "schemaVersion": 1,
+  "kind": "mainnet-read-only",
+  "capturedAt": "2026-11-16T14:19:22.314Z",
+  "account": "0x0000000000000000000000000000000000000001",
+  "upstreamCommit": "414f47412123d7737520c6ba331c1376ec874a88",
+  "metadata": {
+    "url": "https://mainnet.stargate-api.com/v1/metadata?version=v2",
+    "sha256": "a5f95fbd8d0c5ab71208c66d811bf2fc5876b779662fcae2e1a419cd682432b0",
+    "deploymentsDiscovered": 117,
+    "chainsDiscovered": 55
+  },
+  "blocks": {
+    "base": {
+      "chainId": 8453,
+      "eid": 30184,
+      "number": "58241885",
+      "hash": "0xc60e78ce8f10de262bde41bb30112d1c283e39a5ae18dc78f61f27de81d841cb",
+      "timestamp": "1794838752"
+    },
+    "arbitrum": {
+      "chainId": 42161,
+      "eid": 30110,
+      "number": "524770980",
+      "hash": "0x09e7026402fcf36192c0aadeb64b03bd2fa77a32fff1d1388e0194b82b77105c",
+      "timestamp": "1794838751"
+    },
+    "bsc": {
+      "chainId": 56,
+      "eid": 30102,
+      "number": "133942355",
+      "hash": "0xb7b95722c8054a573d720acb23ab3b8b0ecc99cbb867e7aee1002f26be868c82",
+      "timestamp": "1794838747"
+    }
+  },
+  "deployments": {
+    "base:1": {
+      "chain": "base",
+      "chainId": 8453,
+      "eid": 30184,
+      "assetId": "1",
+      "address": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "localDecimals": 6,
+      "sharedDecimals": 6,
+      "native": false,
+      "approvalRequired": true,
+      "tokenMessaging": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+      "stargateType": 0,
+      "status": 1,
+      "codeHash": "0x83de1e54132ca87de00ada47aa052886e592f06b099de27a51bb34b3172ad2d0",
+      "metadata": {
+        "stargateType": "POOL",
+        "address": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+        "token": {
+          "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          "decimals": 6,
+          "symbol": "USDC"
+        },
+        "lpToken": {
+          "address": "0x53983F31E8E0D0c3Fd0b8d85654989A1336317d7",
+          "decimals": 6,
+          "symbol": "S*USDC"
+        },
+        "farm": {
+          "stargateStaking": {
+            "address": "0xDFc47DCeF7e8f9Ab19a1b8Af3eeCF000C7ea0B80",
+            "rewardTokens": [
+              {
+                "address": "0xE3B53AF74a4BF62Ae5511055290838050bf764Df",
+                "decimals": 18,
+                "symbol": "STG"
+              }
+            ]
+          }
+        },
+        "id": "base:1:v2",
+        "assetId": "1",
+        "chainKey": "base",
+        "chainName": "base",
+        "tokenMessaging": "0x5634c4a5fed09819e3c46d86a965dd9447d86e47",
+        "sharedDecimals": 6
+      }
+    },
+    "arbitrum:1": {
+      "chain": "arbitrum",
+      "chainId": 42161,
+      "eid": 30110,
+      "assetId": "1",
+      "address": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "token": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "localDecimals": 6,
+      "sharedDecimals": 6,
+      "native": false,
+      "approvalRequired": true,
+      "tokenMessaging": "0x19cFCE47eD54a88614648DC3f19A5980097007dD",
+      "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+      "stargateType": 0,
+      "status": 1,
+      "codeHash": "0x3c7642aec61389f8cf5c96f6fcd821ed40bf9016285c20fb7710ef908855f4e5",
+      "metadata": {
+        "stargateType": "POOL",
+        "address": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+        "token": {
+          "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+          "decimals": 6,
+          "symbol": "USDC"
+        },
+        "lpToken": {
+          "address": "0x6Ea313859A5D9F6fF2a68f529e6361174bFD2225",
+          "decimals": 6,
+          "symbol": "S*USDC"
+        },
+        "farm": {
+          "stargateStaking": {
+            "address": "0x3da4f8E456AC648c489c286B99Ca37B666be7C4C",
+            "rewardTokens": [
+              {
+                "address": "0x6694340fc020c5E6B96567843da2df01b2CE1eb6",
+                "decimals": 18,
+                "symbol": "STG"
+              },
+              {
+                "address": "0x912CE59144191C1204E64559FE8253a0e49E6548",
+                "decimals": 18,
+                "symbol": "ARB"
+              }
+            ]
+          }
+        },
+        "id": "arbitrum:1:v2",
+        "assetId": "1",
+        "chainKey": "arbitrum",
+        "chainName": "arbitrum",
+        "tokenMessaging": "0x19cfce47ed54a88614648dc3f19a5980097007dd",
+        "sharedDecimals": 6
+      }
+    },
+    "base:13": {
+      "chain": "base",
+      "chainId": 8453,
+      "eid": 30184,
+      "assetId": "13",
+      "address": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "token": "0x0000000000000000000000000000000000000000",
+      "localDecimals": 18,
+      "sharedDecimals": 6,
+      "native": true,
+      "approvalRequired": true,
+      "tokenMessaging": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+      "stargateType": 0,
+      "status": 1,
+      "codeHash": "0xc2021862bb6d1b44c6f4ec866c51979e9f95dfc4afd77e0ece9215bb38deff84",
+      "metadata": {
+        "stargateType": "NATIVE",
+        "address": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+        "token": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "decimals": 18,
+          "symbol": "ETH"
+        },
+        "lpToken": {
+          "address": "0x98fB8522d891F43B771e2d27367b41Ba138D0B80",
+          "decimals": 18,
+          "symbol": "S*ETH"
+        },
+        "farm": {
+          "stargateStaking": {
+            "address": "0xDFc47DCeF7e8f9Ab19a1b8Af3eeCF000C7ea0B80",
+            "rewardTokens": [
+              {
+                "address": "0xE3B53AF74a4BF62Ae5511055290838050bf764Df",
+                "decimals": 18,
+                "symbol": "STG"
+              }
+            ]
+          }
+        },
+        "id": "base:13:v2",
+        "assetId": "13",
+        "chainKey": "base",
+        "chainName": "base",
+        "tokenMessaging": "0x5634c4a5fed09819e3c46d86a965dd9447d86e47",
+        "sharedDecimals": 6
+      }
+    },
+    "arbitrum:13": {
+      "chain": "arbitrum",
+      "chainId": 42161,
+      "eid": 30110,
+      "assetId": "13",
+      "address": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "token": "0x0000000000000000000000000000000000000000",
+      "localDecimals": 18,
+      "sharedDecimals": 6,
+      "native": true,
+      "approvalRequired": true,
+      "tokenMessaging": "0x19cFCE47eD54a88614648DC3f19A5980097007dD",
+      "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+      "stargateType": 0,
+      "status": 1,
+      "codeHash": "0xb94c3fe833707b180e0525858434a5594c5ecd0ada9d4fd651b511b0747d588e",
+      "metadata": {
+        "stargateType": "NATIVE",
+        "address": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+        "token": {
+          "address": "0x0000000000000000000000000000000000000000",
+          "decimals": 18,
+          "symbol": "ETH"
+        },
+        "lpToken": {
+          "address": "0x993614e1c8c9C5AbE49462Ce5702431978Fd767F",
+          "decimals": 18,
+          "symbol": "S*ETH"
+        },
+        "farm": {
+          "stargateStaking": {
+            "address": "0x3da4f8E456AC648c489c286B99Ca37B666be7C4C",
+            "rewardTokens": [
+              {
+                "address": "0x6694340fc020c5E6B96567843da2df01b2CE1eb6",
+                "decimals": 18,
+                "symbol": "STG"
+              },
+              {
+                "address": "0x912CE59144191C1204E64559FE8253a0e49E6548",
+                "decimals": 18,
+                "symbol": "ARB"
+              }
+            ]
+          }
+        },
+        "id": "arbitrum:13:v2",
+        "assetId": "13",
+        "chainKey": "arbitrum",
+        "chainName": "arbitrum",
+        "tokenMessaging": "0x19cfce47ed54a88614648dc3f19a5980097007dd",
+        "sharedDecimals": 6
+      }
+    },
+    "bsc:1": {
+      "chain": "bsc",
+      "chainId": 56,
+      "eid": 30102,
+      "assetId": "1",
+      "address": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "token": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+      "localDecimals": 18,
+      "sharedDecimals": 6,
+      "native": false,
+      "approvalRequired": true,
+      "tokenMessaging": "0x6E3d884C96d640526F273C61dfcF08915eBd7e2B",
+      "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+      "stargateType": 0,
+      "status": 1,
+      "codeHash": "0x1ba97a11dbc4bcd72bc24e09dc37c525c0ebe936211e99d6b84a4f0f2242c0e2",
+      "metadata": {
+        "stargateType": "POOL",
+        "address": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+        "token": {
+          "address": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+          "decimals": 18,
+          "symbol": "USDC"
+        },
+        "lpToken": {
+          "address": "0xd5a9B8b07e9bA3D492b801c84B69E292476805B3",
+          "decimals": 18,
+          "symbol": "S*USDC"
+        },
+        "farm": {
+          "stargateStaking": {
+            "address": "0x26727C78B0209d9E787b2f9ac8f0238B122a3098",
+            "rewardTokens": [
+              {
+                "address": "0xB0D502E938ed5f4df2E681fE6E419ff29631d62b",
+                "decimals": 18,
+                "symbol": "STG"
+              }
+            ]
+          }
+        },
+        "id": "bsc:1:v2",
+        "assetId": "1",
+        "chainKey": "bsc",
+        "chainName": "bsc",
+        "tokenMessaging": "0x6e3d884c96d640526f273c61dfcf08915ebd7e2b",
+        "sharedDecimals": 6
+      }
+    }
+  },
+  "routes": [
+    {
+      "source": "base",
+      "destination": "arbitrum",
+      "assetId": "1",
+      "amountLD": "10000000",
+      "mode": "taxi",
+      "sourceDeployment": "base:1",
+      "destinationDeployment": "arbitrum:1",
+      "creditSD": "48166765232",
+      "sendParam": {
+        "dstEid": 30110,
+        "to": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "amountLD": "10000000",
+        "minAmountLD": "9993929",
+        "extraOptions": "0x",
+        "composeMsg": "0x",
+        "oftCmd": "0x"
+      },
+      "limit": {
+        "minAmountLD": "1",
+        "maxAmountLD": "48166765232"
+      },
+      "feeDetails": [
+        {
+          "feeAmountLD": "-6071",
+          "description": "protocol fee"
+        }
+      ],
+      "receipt": {
+        "amountSentLD": "10000000",
+        "amountReceivedLD": "9993929"
+      },
+      "fee": {
+        "nativeFee": "738574993541732",
+        "lzTokenFee": "0"
+      },
+      "destinationAmountLD": "9993929"
+    },
+    {
+      "source": "base",
+      "destination": "arbitrum",
+      "assetId": "1",
+      "amountLD": "10000000",
+      "mode": "bus",
+      "sourceDeployment": "base:1",
+      "destinationDeployment": "arbitrum:1",
+      "creditSD": "48166765232",
+      "sendParam": {
+        "dstEid": 30110,
+        "to": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "amountLD": "10000000",
+        "minAmountLD": "9993929",
+        "extraOptions": "0x",
+        "composeMsg": "0x",
+        "oftCmd": "0x00"
+      },
+      "unavailable": {
+        "functionName": "quoteSend",
+        "revertData": "0x5bc181900000000000000000000000000000000000000000000000000000000000000000",
+        "errorName": "Bus_InvalidFare",
+        "args": [
+          false
+        ]
+      }
+    },
+    {
+      "source": "base",
+      "destination": "arbitrum",
+      "assetId": "13",
+      "amountLD": "1000000000000000",
+      "mode": "taxi",
+      "sourceDeployment": "base:13",
+      "destinationDeployment": "arbitrum:13",
+      "creditSD": "331236112",
+      "sendParam": {
+        "dstEid": 30110,
+        "to": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "amountLD": "1000000000000000",
+        "minAmountLD": "999000000000000",
+        "extraOptions": "0x",
+        "composeMsg": "0x",
+        "oftCmd": "0x"
+      },
+      "limit": {
+        "minAmountLD": "1000000000000",
+        "maxAmountLD": "331236112000000000000"
+      },
+      "feeDetails": [
+        {
+          "feeAmountLD": "-1000000000000",
+          "description": "protocol fee"
+        }
+      ],
+      "receipt": {
+        "amountSentLD": "1000000000000000",
+        "amountReceivedLD": "999000000000000"
+      },
+      "fee": {
+        "nativeFee": "738574993541732",
+        "lzTokenFee": "0"
+      },
+      "destinationAmountLD": "999000000000000"
+    },
+    {
+      "source": "base",
+      "destination": "arbitrum",
+      "assetId": "13",
+      "amountLD": "1000000000000000",
+      "mode": "bus",
+      "sourceDeployment": "base:13",
+      "destinationDeployment": "arbitrum:13",
+      "creditSD": "331236112",
+      "sendParam": {
+        "dstEid": 30110,
+        "to": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "amountLD": "1000000000000000",
+        "minAmountLD": "999000000000000",
+        "extraOptions": "0x",
+        "composeMsg": "0x",
+        "oftCmd": "0x00"
+      },
+      "unavailable": {
+        "functionName": "quoteSend",
+        "revertData": "0x5bc181900000000000000000000000000000000000000000000000000000000000000000",
+        "errorName": "Bus_InvalidFare",
+        "args": [
+          false
+        ]
+      }
+    },
+    {
+      "source": "bsc",
+      "destination": "base",
+      "assetId": "1",
+      "amountLD": "10000000000000000000",
+      "mode": "taxi",
+      "sourceDeployment": "bsc:1",
+      "destinationDeployment": "base:1",
+      "creditSD": "76587566195",
+      "sendParam": {
+        "dstEid": 30184,
+        "to": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "amountLD": "10000000000000000000",
+        "minAmountLD": "9979999000000000000",
+        "extraOptions": "0x",
+        "composeMsg": "0x",
+        "oftCmd": "0x"
+      },
+      "limit": {
+        "minAmountLD": "1000000000000",
+        "maxAmountLD": "76587566195000000000000"
+      },
+      "feeDetails": [
+        {
+          "feeAmountLD": "-20001000000000000",
+          "description": "protocol fee"
+        }
+      ],
+      "receipt": {
+        "amountSentLD": "10000000000000000000",
+        "amountReceivedLD": "9979999000000000000"
+      },
+      "fee": {
+        "nativeFee": "2034477836896805",
+        "lzTokenFee": "0"
+      },
+      "destinationAmountLD": "9979999"
+    },
+    {
+      "source": "bsc",
+      "destination": "base",
+      "assetId": "1",
+      "amountLD": "10000000000000000000",
+      "mode": "bus",
+      "sourceDeployment": "bsc:1",
+      "destinationDeployment": "base:1",
+      "creditSD": "76587566195",
+      "sendParam": {
+        "dstEid": 30184,
+        "to": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "amountLD": "10000000000000000000",
+        "minAmountLD": "9979999000000000000",
+        "extraOptions": "0x",
+        "composeMsg": "0x",
+        "oftCmd": "0x00"
+      },
+      "unavailable": {
+        "functionName": "quoteSend",
+        "revertData": "0x5bc181900000000000000000000000000000000000000000000000000000000000000000",
+        "errorName": "Bus_InvalidFare",
+        "args": [
+          false
+        ]
+      }
+    },
+    {
+      "source": "base",
+      "destination": "bsc",
+      "assetId": "1",
+      "amountLD": "10000000",
+      "mode": "taxi",
+      "sourceDeployment": "base:1",
+      "destinationDeployment": "bsc:1",
+      "creditSD": "800332571900",
+      "sendParam": {
+        "dstEid": 30102,
+        "to": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "amountLD": "10000000",
+        "minAmountLD": "9979999",
+        "extraOptions": "0x",
+        "composeMsg": "0x",
+        "oftCmd": "0x"
+      },
+      "limit": {
+        "minAmountLD": "1",
+        "maxAmountLD": "800332571900"
+      },
+      "feeDetails": [
+        {
+          "feeAmountLD": "-20001",
+          "description": "protocol fee"
+        }
+      ],
+      "receipt": {
+        "amountSentLD": "10000000",
+        "amountReceivedLD": "9979999"
+      },
+      "fee": {
+        "nativeFee": "731119298719558",
+        "lzTokenFee": "0"
+      },
+      "destinationAmountLD": "9979999000000000000"
+    },
+    {
+      "source": "base",
+      "destination": "bsc",
+      "assetId": "1",
+      "amountLD": "10000000",
+      "mode": "bus",
+      "sourceDeployment": "base:1",
+      "destinationDeployment": "bsc:1",
+      "creditSD": "800332571900",
+      "sendParam": {
+        "dstEid": 30102,
+        "to": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "amountLD": "10000000",
+        "minAmountLD": "9979999",
+        "extraOptions": "0x",
+        "composeMsg": "0x",
+        "oftCmd": "0x00"
+      },
+      "unavailable": {
+        "functionName": "quoteSend",
+        "revertData": "0x5bc181900000000000000000000000000000000000000000000000000000000000000000",
+        "errorName": "Bus_InvalidFare",
+        "args": [
+          false
+        ]
+      }
+    }
+  ],
+  "calls": [
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "approvalRequired",
+      "data": "0x9f68b964",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "status",
+      "data": "0x200d2ed2",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "localEid",
+      "data": "0x72607537",
+      "result": "0x00000000000000000000000000000000000000000000000000000000000075e8"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "getAddressConfig",
+      "data": "0x2bc5114c",
+      "result": "0x00000000000000000000000008ed1d79d509a6f1020685535028ae60c144441e000000000000000000000000e37f7c80ced04c4f243c0fd04a5510d663cb88b5000000000000000000000000d47b03ee6d86cf251ee7860fb2acf9f91b9fd4d70000000000000000000000005634c4a5fed09819e3c46d86a965dd9447d86e4700000000000000000000000012dc9256acc9895b076f6638d628382881e62cee0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateType",
+      "data": "0x16909bca",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "token",
+      "data": "0xfc0c546a",
+      "result": "0x000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "sharedDecimals",
+      "data": "0x857749b0",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "decimals",
+      "data": "0x313ce567",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateImpls",
+      "data": "0x5f6d9ae40000000000000000000000000000000000000000000000000000000000000001",
+      "result": "0x00000000000000000000000027a16dc786820b16e5c9028b75b99f6f604b5d26"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "assetIds",
+      "data": "0xd8e8dbc700000000000000000000000027a16dc786820b16e5c9028b75b99f6f604b5d26",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "eid",
+      "data": "0x416ecebf",
+      "result": "0x00000000000000000000000000000000000000000000000000000000000075e8"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "token",
+      "data": "0xfc0c546a",
+      "result": "0x000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "sharedDecimals",
+      "data": "0x857749b0",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "status",
+      "data": "0x200d2ed2",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateType",
+      "data": "0x16909bca",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "localEid",
+      "data": "0x72607537",
+      "result": "0x000000000000000000000000000000000000000000000000000000000000759e"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "approvalRequired",
+      "data": "0x9f68b964",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xe8CDF27AcD73a434D661C84887215F7598e7d0d3",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "getAddressConfig",
+      "data": "0x2bc5114c",
+      "result": "0x00000000000000000000000080f755e3091b2ad99c08da8d13e9c7635c1b8161000000000000000000000000e37f7c80ced04c4f243c0fd04a5510d663cb88b5000000000000000000000000146c8e409c113ed87c6183f4d25c50251dffbb3a00000000000000000000000019cfce47ed54a88614648dc3f19a5980097007dd000000000000000000000000f1fcb4cbd57b67d683972a59b6a7b1e2e8bf27e60000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "decimals",
+      "data": "0x313ce567",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "eid",
+      "data": "0x416ecebf",
+      "result": "0x000000000000000000000000000000000000000000000000000000000000759e"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0x19cFCE47eD54a88614648DC3f19A5980097007dD",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "assetIds",
+      "data": "0xd8e8dbc7000000000000000000000000e8cdf27acd73a434d661c84887215f7598e7d0d3",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0x19cFCE47eD54a88614648DC3f19A5980097007dD",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0x19cFCE47eD54a88614648DC3f19A5980097007dD",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateImpls",
+      "data": "0x5f6d9ae40000000000000000000000000000000000000000000000000000000000000001",
+      "result": "0x000000000000000000000000e8cdf27acd73a434d661c84887215f7598e7d0d3"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "peers",
+      "data": "0xbb0b6a53000000000000000000000000000000000000000000000000000000000000759e",
+      "result": "0x00000000000000000000000019cfce47ed54a88614648dc3f19a5980097007dd"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "paths",
+      "data": "0x38da6b8e000000000000000000000000000000000000000000000000000000000000759e",
+      "result": "0x0000000000000000000000000000000000000000000000000000000b36f682b0"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteOFT",
+      "data": "0x0d35b4150000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000759e00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000b36f682b000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000009896800000000000000000000000000000000000000000000000000000000000987ec900000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe8490000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000c70726f746f636f6c206665650000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteSend",
+      "data": "0x3b6f743b00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000009896800000000000000000000000000000000000000000000000000000000000987ec900000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x00000000000000000000000000000000000000000000000000029fbae4214a640000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteOFT",
+      "data": "0x0d35b4150000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000759e00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000b36f682b000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000009896800000000000000000000000000000000000000000000000000000000000987ec900000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe8490000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000c70726f746f636f6c206665650000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteSend",
+      "data": "0x3b6f743b00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000009896800000000000000000000000000000000000000000000000000000000000987ec900000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+      "error": {
+        "kind": "reverted",
+        "data": "0x5bc181900000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "sharedDecimals",
+      "data": "0x857749b0",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "localEid",
+      "data": "0x72607537",
+      "result": "0x00000000000000000000000000000000000000000000000000000000000075e8"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "status",
+      "data": "0x200d2ed2",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "token",
+      "data": "0xfc0c546a",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "approvalRequired",
+      "data": "0x9f68b964",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "getAddressConfig",
+      "data": "0x2bc5114c",
+      "result": "0x00000000000000000000000017e450be3ba9557f2378e20d64ad417e59ef9a34000000000000000000000000e37f7c80ced04c4f243c0fd04a5510d663cb88b5000000000000000000000000d47b03ee6d86cf251ee7860fb2acf9f91b9fd4d70000000000000000000000005634c4a5fed09819e3c46d86a965dd9447d86e4700000000000000000000000012dc9256acc9895b076f6638d628382881e62cee0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateType",
+      "data": "0x16909bca",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "eid",
+      "data": "0x416ecebf",
+      "result": "0x00000000000000000000000000000000000000000000000000000000000075e8"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "assetIds",
+      "data": "0xd8e8dbc7000000000000000000000000dc181bd607330aeebef6ea62e03e5e1fb4b6f7c7",
+      "result": "0x000000000000000000000000000000000000000000000000000000000000000d"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateImpls",
+      "data": "0x5f6d9ae4000000000000000000000000000000000000000000000000000000000000000d",
+      "result": "0x000000000000000000000000dc181bd607330aeebef6ea62e03e5e1fb4b6f7c7"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "token",
+      "data": "0xfc0c546a",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "status",
+      "data": "0x200d2ed2",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "sharedDecimals",
+      "data": "0x857749b0",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "approvalRequired",
+      "data": "0x9f68b964",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "localEid",
+      "data": "0x72607537",
+      "result": "0x000000000000000000000000000000000000000000000000000000000000759e"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateType",
+      "data": "0x16909bca",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0xA45B5130f36CDcA45667738e2a258AB09f4A5f7F",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "getAddressConfig",
+      "data": "0x2bc5114c",
+      "result": "0x000000000000000000000000da82a31df339bfdf0123661134b4db63cb1706f5000000000000000000000000e37f7c80ced04c4f243c0fd04a5510d663cb88b5000000000000000000000000146c8e409c113ed87c6183f4d25c50251dffbb3a00000000000000000000000019cfce47ed54a88614648dc3f19a5980097007dd000000000000000000000000f1fcb4cbd57b67d683972a59b6a7b1e2e8bf27e60000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0x19cFCE47eD54a88614648DC3f19A5980097007dD",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "eid",
+      "data": "0x416ecebf",
+      "result": "0x000000000000000000000000000000000000000000000000000000000000759e"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0x19cFCE47eD54a88614648DC3f19A5980097007dD",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "assetIds",
+      "data": "0xd8e8dbc7000000000000000000000000a45b5130f36cdca45667738e2a258ab09f4a5f7f",
+      "result": "0x000000000000000000000000000000000000000000000000000000000000000d"
+    },
+    {
+      "chain": "arbitrum",
+      "blockNumber": "524770980",
+      "to": "0x19cFCE47eD54a88614648DC3f19A5980097007dD",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateImpls",
+      "data": "0x5f6d9ae4000000000000000000000000000000000000000000000000000000000000000d",
+      "result": "0x000000000000000000000000a45b5130f36cdca45667738e2a258ab09f4a5f7f"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "peers",
+      "data": "0xbb0b6a53000000000000000000000000000000000000000000000000000000000000759e",
+      "result": "0x00000000000000000000000019cfce47ed54a88614648dc3f19a5980097007dd"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "paths",
+      "data": "0x38da6b8e000000000000000000000000000000000000000000000000000000000000759e",
+      "result": "0x0000000000000000000000000000000000000000000000000000000013be4310"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteOFT",
+      "data": "0x0d35b4150000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000038d7ea4c68000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x000000000000000000000000000000000000000000000000000000e8d4a51000000000000000000000000000000000000000000000000011f4d310e65d81000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000038d7ea4c6800000000000000000000000000000000000000000000000000000038c95d021700000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffff172b5af0000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000c70726f746f636f6c206665650000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteSend",
+      "data": "0x3b6f743b00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000038d7ea4c6800000000000000000000000000000000000000000000000000000038c95d021700000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x00000000000000000000000000000000000000000000000000029fbae4214a640000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteOFT",
+      "data": "0x0d35b4150000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000038d7ea4c68000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x000000000000000000000000000000000000000000000000000000e8d4a51000000000000000000000000000000000000000000000000011f4d310e65d81000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000038d7ea4c6800000000000000000000000000000000000000000000000000000038c95d021700000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffff172b5af0000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000c70726f746f636f6c206665650000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteSend",
+      "data": "0x3b6f743b00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000038d7ea4c6800000000000000000000000000000000000000000000000000000038c95d021700000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+      "error": {
+        "kind": "reverted",
+        "data": "0x5bc181900000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "sharedDecimals",
+      "data": "0x857749b0",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "token",
+      "data": "0xfc0c546a",
+      "result": "0x0000000000000000000000008ac76a51cc950d9822d68b83fe1ad97b32cd580d"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "localEid",
+      "data": "0x72607537",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000007596"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "getAddressConfig",
+      "data": "0x2bc5114c",
+      "result": "0x000000000000000000000000622244fff1328586d0754d67cc6ab77e7ab38b7d000000000000000000000000e37f7c80ced04c4f243c0fd04a5510d663cb88b50000000000000000000000000a6a15964fee494a881338d65940430797f0d97c0000000000000000000000006e3d884c96d640526f273c61dfcf08915ebd7e2b00000000000000000000000025bbf59ef9246dc65bfac8385d55c5e524a7b9ea0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "approvalRequired",
+      "data": "0x9f68b964",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "status",
+      "data": "0x200d2ed2",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateType",
+      "data": "0x16909bca",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "decimals",
+      "data": "0x313ce567",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000012"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x6E3d884C96d640526F273C61dfcF08915eBd7e2B",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "assetIds",
+      "data": "0xd8e8dbc7000000000000000000000000962bd449e630b0d928f308ce63f1a21f02576057",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x1a44076050125825900e736c501f859c50fE728c",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "eid",
+      "data": "0x416ecebf",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000007596"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x6E3d884C96d640526F273C61dfcF08915eBd7e2B",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "endpoint",
+      "data": "0x5e280f11",
+      "result": "0x0000000000000000000000001a44076050125825900e736c501f859c50fe728c"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x6E3d884C96d640526F273C61dfcF08915eBd7e2B",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "stargateImpls",
+      "data": "0x5f6d9ae40000000000000000000000000000000000000000000000000000000000000001",
+      "result": "0x000000000000000000000000962bd449e630b0d928f308ce63f1a21f02576057"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x6E3d884C96d640526F273C61dfcF08915eBd7e2B",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "peers",
+      "data": "0xbb0b6a5300000000000000000000000000000000000000000000000000000000000075e8",
+      "result": "0x0000000000000000000000005634c4a5fed09819e3c46d86a965dd9447d86e47"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "paths",
+      "data": "0x38da6b8e00000000000000000000000000000000000000000000000000000000000075e8",
+      "result": "0x00000000000000000000000000000000000000000000000000000011d4f98473"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteOFT",
+      "data": "0x0d35b415000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000075e800000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x000000000000000000000000000000000000000000000000000000e8d4a51000000000000000000000000000000000000000000000001037d1fe0c093266300000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000008a801436d5c0f00000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffb8f1324bd8f0000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000c70726f746f636f6c206665650000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteSend",
+      "data": "0x3b6f743b0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000075e800000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000008a801436d5c0f00000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x00000000000000000000000000000000000000000000000000073a58c8c58a250000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteOFT",
+      "data": "0x0d35b415000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000075e800000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x000000000000000000000000000000000000000000000000000000e8d4a51000000000000000000000000000000000000000000000001037d1fe0c093266300000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000008a801436d5c0f00000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffb8f1324bd8f0000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000c70726f746f636f6c206665650000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "bsc",
+      "blockNumber": "133942355",
+      "to": "0x962Bd449E630b0d928f308Ce63f1A21F02576057",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteSend",
+      "data": "0x3b6f743b0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000075e800000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000008a801436d5c0f00000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+      "error": {
+        "kind": "reverted",
+        "data": "0x5bc181900000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x5634c4a5FEd09819E3c46D86A965Dd9447d86e47",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "peers",
+      "data": "0xbb0b6a530000000000000000000000000000000000000000000000000000000000007596",
+      "result": "0x0000000000000000000000006e3d884c96d640526f273c61dfcf08915ebd7e2b"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "paths",
+      "data": "0x38da6b8e0000000000000000000000000000000000000000000000000000000000007596",
+      "result": "0x000000000000000000000000000000000000000000000000000000ba5789e4fc"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteOFT",
+      "data": "0x0d35b4150000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000759600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000ba5789e4fc00000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000098485f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb1df0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000c70726f746f636f6c206665650000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteSend",
+      "data": "0x3b6f743b00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000098485f00000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x000000000000000000000000000000000000000000000000000298f2fa16af460000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteOFT",
+      "data": "0x0d35b4150000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000759600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000ba5789e4fc00000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000098485f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb1df0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000c70726f746f636f6c206665650000000000000000000000000000000000000000"
+    },
+    {
+      "chain": "base",
+      "blockNumber": "58241885",
+      "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+      "from": "0x0000000000000000000000000000000000000001",
+      "functionName": "quoteSend",
+      "data": "0x3b6f743b00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000098485f00000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+      "error": {
+        "kind": "reverted",
+        "data": "0x5bc181900000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ]
+}

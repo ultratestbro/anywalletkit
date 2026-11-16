@@ -1,0 +1,20 @@
+{
+  "name": "@anywalletkit/protocol-swap2-stargate",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Stargate V2 integration foundation: pinned interfaces, amount conversions and read-only fixtures. Provider implementation pending.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "fixtures:upstream": "node scripts/capture-upstream.mjs",
+    "fixtures:live": "node scripts/capture-live.mjs",
+    "fixtures:receipts": "pnpm --filter @anywalletkit/networks build && node scripts/capture-receipts.mjs",
+    "registry:capture": "pnpm --filter @anywalletkit/networks --filter @anywalletkit/swap2-assets build && node scripts/capture-registry.mjs"
+  },
+  "dependencies": { "viem": "^2.57.2" },
+  "devDependencies": { "@anywalletkit/networks": "workspace:*", "@anywalletkit/swap2-assets": "workspace:*", "@types/node": "^22", "vitest": "^5.0.3" }
+}
