@@ -230,6 +230,26 @@ and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412
 
 ## Integration boundaries and remaining work
 
+### Wallet history
+
+The provider's `describeActivity` hook is used by both the standalone protocol and
+the router. Confirmed local legs require the original receipt in
+`ChainTx.raw.tx.receipt`, as supplied by history-evm RPC/Alchemy enrichment. It checks
+receipt/log identity and reads `OFTSent` / `OFTReceived` only from the reviewed pool.
+Bus deposits are labelled queued; incoming payouts are labelled received. A separate
+owned `BusDriven` transaction is shown as a queue payment. These are local history
+items, not an assertion that the full cross-chain intent is complete.
+
+Assets use actual event amounts, excluding messaging fees from the bridged principal.
+The history fee contains the owner's transaction gas when available (plus the attached
+payment for a Bus drive); it does not reconstruct messaging refunds or native drops.
+The destination executor's gas is never charged to the recipient in history. Ordinary
+token movements, cached-token events and confirmed transactions without receipt
+enrichment are left to generic history. Pending/failed direct `sendToken` calls can
+be labelled without fabricating successful asset movements.
+
+### Remaining stages
+
 - SDK-323: implemented reviewed registry and evidence collection for the current
   supported intersection; coverage and explicit exclusions are listed above.
 - SDK-324: core/router now support optional display candidates, stable `routeId`,
@@ -252,6 +272,8 @@ and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412
 - SDK-332: select a verified composer deployment and validate success and recovery.
 - SDK-333: history, documentation, package exports, module registry, changesets,
   conformance, regressions, Hermes and controlled end-to-end validation.
+  Receipt-backed local history and its recorded conformance cases are implemented;
+  release gates remain open while API/composer adapters and additional evidence are missing.
 
 Stage 1 remains open for real failed-delivery/recovery fixtures,
 API contract fixtures/access, and the complete capability matrix. No mainnet sends or

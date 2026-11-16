@@ -7,6 +7,7 @@ import {checkedStargateQuote, stargateFees, stargatePins, type StargatePinsConfi
 import {createStargateQuoter, type StargateMode, type StargateQuoteRequest} from "./quote.js";
 import {assertStargate, safeReadError} from "./rpc.js";
 import {createStargateTracker, type StargateTrackingConfig} from "./tracking.js";
+import {describeStargateActivity} from "./activity.js";
 
 export interface StargateProviderConfig extends StargatePinsConfig, StargateTrackingConfig {
   /** Explicit opt-in until funded end-to-end validation is complete. Default false. */
@@ -74,6 +75,7 @@ export function stargateProvider(config: StargateProviderConfig): CrossChainProv
     supportsChain: (chain) => registry.deployments.some((d) => d.chain === chain) && configuredChains.has(chain),
     supportsChainPair: (from, to) => registry.paths.some((p) => p.source === from && p.destination === to) && configuredChains.has(from) && configuredChains.has(to),
     callTargets: pins.callTargets, spenders: pins.spenders,
+    describeActivity: (tx, ctx) => describeStargateActivity(tx, ctx, registry),
     getQuote,
     async getQuotes(params, signal) {
       assertStargate(params.dry !== false, "candidate enumeration is preview-only");
