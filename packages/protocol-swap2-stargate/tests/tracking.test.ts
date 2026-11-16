@@ -6,6 +6,8 @@ import {destinationAmount} from "../src/amounts.js";
 import {stargateRegistry} from "../src/deployments.js";
 import {parseStargateIntent} from "../src/intent.js";
 import {checkStargateReceipt, createStargateTracker, stargateTaxiPayout, stargateTaxiProof} from "../src/tracking.js";
+import {stargatePins} from "../src/pins.js";
+import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
 
 type Side = {chain: string; chainId: number; block: {number: string; hash: Hex; timestamp: string}; receipt: {transactionHash: Hex; status: string; blockNumber: string; blockHash: Hex; logs: Array<Record<string, unknown>>}};
 type Transfer = {name: string; guid: Hex; assetId: number; discovery: {payload: Hex}; source: Side; destination: Side};
@@ -52,11 +54,38 @@ function server(t: Transfer) {
     } else throw new Error(`unexpected RPC ${body.method}`);
     return Response.json({id: body.id, jsonrpc: "2.0", result});
   };
-  const tracker = createStargateTracker({rpcUrls: {[s.source.chain]: "https://source.test", [s.destination.chain]: "https://destination.test"}, scanUrl: "https://scan.test", fetchImpl});
-  return {...s, tracker, state, cache, payloadHash};
+  const config = {rpcUrls: {[s.source.chain]: "https://source.test", [s.destination.chain]: "https://destination.test"}, scanUrl: "https://scan.test", fetchImpl};
+  const tracker = createStargateTracker(config);
+  return {...s, tracker, config, state, cache, payloadHash};
 }
 
 describe("runtime Taxi tracking replays real receipts", () => {
+  it("ships remote recovery pins that independently refuse changed or consumed commitments", async () => {
+    const s = server(fixture.transfers[0]!);
+    s.state.cached = s.cache;
+    const quote = (await s.tracker.getRecoveryQuotes(s.ref))[0]!;
+    const remote = remoteProvider({name: "stargate", baseUrl: "https://backend.test", ...stargatePins(s.config)});
+    expect(remote.recoveryTargets!(s.destination.chain)).toContain(s.destination.address);
+    expect(await remote.verifyRecovery!(s.ref, quote, actor)).toBeNull();
+    expect(await remote.verifyRecovery!(s.ref, {...quote, tx: {...quote.tx, to: actor}}, actor)).not.toBeNull();
+    s.state.cached = zero;
+    expect(await remote.verifyRecovery!(s.ref, quote, actor)).not.toBeNull();
+  });
+  it("uses client payout evidence even when a backend would claim completion", async () => {
+    const s = server(fixture.transfers[0]!);
+    let backendCalls = 0;
+    const remote = remoteProvider({name: "stargate", baseUrl: "https://backend.test", ...stargatePins(s.config), fetchImpl: async () => {
+      backendCalls++;
+      return Response.json({state: "completed"});
+    }});
+    s.state.indexed = false;
+    expect((await remote.trackIntent(s.ref)).state).toBe("pending");
+    s.state.indexed = true;
+    expect((await remote.trackIntent(s.ref)).state).toBe("completed");
+    s.state.canonical = false;
+    expect((await remote.trackIntent(s.ref)).state).toBe("pending");
+    expect(backendCalls).toBe(0);
+  });
   for (const t of fixture.transfers) it(`${t.name}: proves payout from actual endpoint/pool logs`, async () => {
     const s = server(t);
     expect(await s.tracker.trackIntent(s.ref)).toEqual({state: "completed", depositReceived: true, destTxHash: s.dst.transactionHash});

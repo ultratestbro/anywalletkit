@@ -50,6 +50,8 @@ export interface RemoteProviderOptions {
   /** Paid recovery is opt-in: both pins and a client-side on-chain validator are required. */
   recoveryTargets?: (chain: string) => readonly string[];
   verifyRecovery?: (ref: IntentRef, quote: RecoveryQuote, actor: string) => Promise<string | null>;
+  /** Optional client tracker. When supplied, backend status cannot override local evidence. */
+  trackIntent?: (ref: IntentRef) => Promise<IntentStatus>;
   /**
    * The contracts this provider's EVM swaps may call, and the spenders they may be approved for,
    * per chain — the provider package's pins (`lifiPins`, `fyndPins`, `uniswapPins`…, spread into
@@ -218,6 +220,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
       }
     },
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {
+      if (opts.trackIntent) return opts.trackIntent(ref);
       return call<IntentStatus>("track", {ref});
     },
     async notifyDeposit(intentId: string, txHash: string): Promise<void> {

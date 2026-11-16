@@ -10,8 +10,9 @@ import {parseStargateIntent, stargateToken} from "./intent.js";
 import {createStargateQuoter, taxiNativeDrop, type StargateQuoteConfig, type StargateSendParam} from "./quote.js";
 import type {StargateDeployment, StargateRegistry} from "./registry.js";
 import {assertStargate, sameAddress} from "./rpc.js";
+import {createStargateTracker, type StargateTrackingConfig} from "./tracking.js";
 
-export interface StargatePinsConfig extends StargateQuoteConfig {
+export interface StargatePinsConfig extends StargateQuoteConfig, StargateTrackingConfig {
   nativeDrop?: {taxi?: bigint; bus?: boolean};
 }
 
@@ -65,6 +66,7 @@ export function checkedStargateQuote(q: Quote, registry: StargateRegistry) {
 export function stargatePins(config: StargatePinsConfig): RemotePins {
   const registry = config.registry ?? stargateRegistry;
   const quoter = createStargateQuoter(config);
+  const recovery = createStargateTracker(config);
   const drop = {...config.nativeDrop};
   function verifyQuote(params: QuoteParams, q: Quote): string | null {
     try {
@@ -79,6 +81,9 @@ export function stargatePins(config: StargatePinsConfig): RemotePins {
     } catch { return "stargate: quote does not match client request and deployment pins"; }
   }
   return {
+    recoveryTargets: recovery.recoveryTargets,
+    verifyRecovery: recovery.verifyRecovery,
+    trackIntent: recovery.trackIntent,
     callTargets: (chain) => registry.callTargets(chain),
     spenders: (chain) => registry.spenders(chain),
     verifyQuote,

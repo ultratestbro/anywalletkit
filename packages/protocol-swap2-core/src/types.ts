@@ -214,6 +214,11 @@ export interface UnsignedTx {
 export interface RemotePins {
   callTargets(chain: string): readonly string[];
   spenders(chain: string): readonly string[];
+  /** Paid recovery targets and independent client revalidation, when supported. */
+  recoveryTargets?(chain: string): readonly string[];
+  verifyRecovery?(ref: IntentRef, quote: RecoveryQuote, actor: string): Promise<string | null>;
+  /** Independent client tracking, when completion must be proven locally from chain evidence. */
+  trackIntent?(ref: IntentRef): Promise<IntentStatus>;
   /**
    * A client-side check of a remote quote's transaction against the user's own request — the
    * provider's local validator run again on this side (Fynd: `checkFyndTransaction`): the reason it
