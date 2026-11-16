@@ -1455,6 +1455,15 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
+  packages/protocol-swap2-layerzero:
+    devDependencies:
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@22.20.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
   packages/protocol-swap2-stargate:
     dependencies:
       '@anywalletkit/protocol-swap2-core':
