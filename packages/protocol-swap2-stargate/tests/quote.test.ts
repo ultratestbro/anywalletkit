@@ -87,26 +87,23 @@ describe("Stargate direct quote snapshots", () => {
     for (const bad of [0n, -1n, 99n, amount + 10n ** 12n, 1n << 256n]) await expect(f.quoter.quote({...f.request, amount: bad})).rejects.toThrow();
   });
 
-  it("quotes Taxi native drops with canonical type-3 encoding and Bus with its fixed drop", async () => {
+  it("quotes Taxi native drops with canonical type-3 encoding and refuses retired Bus", async () => {
     const f = setup();
     const taxi = await f.quoter.quote({...f.request, nativeDrop: {amount: 123n}});
     expect(taxi.sendParam.extraOptions).toBe(`0x000301003102${"7b".padStart(32, "0")}${recipient.slice(2).padStart(64, "0")}`);
     expect(taxi.nativeDrop).toBe(123n);
-    const bus = await f.quoter.quote({...f.request, mode: "bus", nativeDrop: {bus: true}});
-    expect(bus.sendParam.oftCmd).toBe("0x00");
-    expect(bus.sendParam.extraOptions).toBe("0x01");
-    expect(bus.nativeDrop).toBe(f.state.nativeDrop);
+    await expect(f.quoter.quote({...f.request, mode: "bus", nativeDrop: {bus: true}})).rejects.toThrow(/retired/);
     for (const bad of [0n, -1n, 1n << 128n]) expect(() => taxiNativeDrop(bad, recipient)).toThrow();
     await expect(f.quoter.quote({...f.request, nativeDrop: {bus: true}})).rejects.toThrow(/Taxi/);
     await expect(f.quoter.quote({...f.request, mode: "bus", nativeDrop: {amount: 1n}})).rejects.toThrow(/Bus/);
     f.state.nativeDrop = 0n;
-    await expect(f.quoter.quote({...f.request, mode: "bus", nativeDrop: {bus: true}})).rejects.toThrow(/unavailable/);
+    await expect(f.quoter.quote({...f.request, mode: "bus", nativeDrop: {bus: true}})).rejects.toThrow(/retired/);
   });
 
   it("does not synthesize a Bus quote when its fare is unavailable", async () => {
     const f = setup();
     f.state.busUnavailable = true;
-    await expect(f.quoter.quote({...f.request, mode: "bus"})).rejects.toThrow(/quote/);
+    await expect(f.quoter.quote({...f.request, mode: "bus"})).rejects.toThrow(/retired/);
     expect((await f.quoter.quote(f.request)).mode).toBe("taxi");
   });
 

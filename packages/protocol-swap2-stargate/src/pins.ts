@@ -2,6 +2,7 @@ import {decodeFunctionData, encodeFunctionData, pad, zeroAddress, type Hex} from
 import {ccAssetByToken} from "@anywalletkit/swap2-assets";
 import type {Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
+import {STARGATE_BUS_RETIRED, stargateChainActive} from "./availability.js";
 import {STARGATE_ABI} from "./abi.js";
 import {destinationAmount, sourceMinimum, splitSourceAmount} from "./amounts.js";
 import {stargateRegistry} from "./deployments.js";
@@ -25,6 +26,8 @@ export function stargateFees(source: StargateDeployment, protocolFee: bigint, ca
 export function checkedStargateQuote(q: Quote, registry: StargateRegistry) {
   const intent = parseStargateIntent(q.intentId, registry);
   const {source, destination, mode, sender, recipient, amount, minimum, nativeDrop} = intent;
+  assertStargate(mode !== "bus", STARGATE_BUS_RETIRED);
+  assertStargate(stargateChainActive(source.chain) && stargateChainActive(destination.chain), "chain support has ended for new transfers");
   const tx = q.txRequest;
   assertStargate(q.provider === "stargate" && q.routeId === mode && tx && tx.to && tx.data, "missing Stargate transaction");
   assertStargate(q.depositAddress === "" && q.depositMemo === null && tx.serializedTx === undefined && tx.gasLimit === undefined, "unexpected transaction fields");

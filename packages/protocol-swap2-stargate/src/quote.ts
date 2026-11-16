@@ -1,7 +1,8 @@
 import {encodePacked, getAddress, pad, type Address, type Hex} from "viem";
-import {STARGATE_ABI, TOKEN_MESSAGING_ABI} from "./abi.js";
+import {STARGATE_ABI} from "./abi.js";
 import {conversionRate, destinationAmount, sourceMinimum, splitFeeDetails, splitSourceAmount} from "./amounts.js";
 import {stargateRegistry} from "./deployments.js";
+import {STARGATE_BUS_RETIRED, stargateChainActive, stargateChainCutoff} from "./availability.js";
 import type {StargateDeployment, StargateRegistry} from "./registry.js";
 import {assertNotAborted, assertStargate, nonzeroAddress, safeReadError, stargateRpc, type StargateBlock, type StargateRpcConfig} from "./rpc.js";
 
@@ -90,7 +91,7 @@ export function createStargateQuoter(config: StargateQuoteConfig) {
   assertStargate(Number.isInteger(headroom) && headroom >= 0 && headroom <= 10_000, "invalid messaging fee headroom");
 
   function supportsRoute(sourceChain: string, sourceToken: string, destinationChain: string, destinationToken: string): boolean {
-    return rpc.has(sourceChain) && rpc.has(destinationChain) && !!registry.route(sourceChain, sourceToken, destinationChain, destinationToken);
+    return stargateChainActive(sourceChain) && stargateChainActive(destinationChain) && rpc.has(sourceChain) && rpc.has(destinationChain) && !!registry.route(sourceChain, sourceToken, destinationChain, destinationToken);
   }
 
   async function quote(input: StargateQuoteRequest, signal?: AbortSignal): Promise<StargateQuote> {
@@ -100,6 +101,8 @@ export function createStargateQuoter(config: StargateQuoteConfig) {
     try {
       assertNotAborted(signal);
       assertStargate(request.mode === "taxi" || request.mode === "bus", "invalid transport mode");
+      assertStargate(request.mode !== "bus", STARGATE_BUS_RETIRED);
+      assertStargate(stargateChainActive(request.sourceChain) && stargateChainActive(request.destinationChain), "chain support has ended for new transfers");
       const route = registry.route(request.sourceChain, request.sourceToken, request.destinationChain, request.destinationToken);
       assertStargate(route, "unsupported token route");
       const {source, destination} = route;
@@ -119,18 +122,11 @@ export function createStargateQuoter(config: StargateQuoteConfig) {
       const creditSD = await src.readContract({...at, functionName: "paths", args: [destination.eid]});
       let extraOptions: Hex = "0x", nativeDrop = 0n;
       if (request.nativeDrop) {
-        if (request.mode === "taxi") {
-          assertStargate("amount" in request.nativeDrop && !("bus" in request.nativeDrop), "Taxi requires an explicit native drop amount");
-          nativeDrop = request.nativeDrop.amount;
-          extraOptions = taxiNativeDrop(nativeDrop, recipient);
-        } else {
-          assertStargate("bus" in request.nativeDrop && request.nativeDrop.bus === true && !("amount" in request.nativeDrop), "Bus only supports the pathway's fixed native drop");
-          nativeDrop = await src.readContract({address: source.tokenMessaging, abi: TOKEN_MESSAGING_ABI, functionName: "nativeDropAmounts", args: [destination.eid], blockNumber: sourceBlock.number});
-          assertStargate(nativeDrop > 0n, "Bus native drop is unavailable");
-          extraOptions = "0x01"; // StargateBase reads only extraOptions.length > 0 in Bus mode.
-        }
+        assertStargate("amount" in request.nativeDrop && !("bus" in request.nativeDrop), "Taxi requires an explicit native drop amount");
+        nativeDrop = request.nativeDrop.amount;
+        extraOptions = taxiNativeDrop(nativeDrop, recipient);
       }
-      const probe: StargateSendParam = {dstEid: destination.eid, to: pad(recipient, {size: 32}), amountLD: request.amount, minAmountLD: 0n, extraOptions, composeMsg: "0x", oftCmd: request.mode === "taxi" ? "0x" : "0x00"};
+      const probe: StargateSendParam = {dstEid: destination.eid, to: pad(recipient, {size: 32}), amountLD: request.amount, minAmountLD: 0n, extraOptions, composeMsg: "0x", oftCmd: "0x"};
       const [limit, details, receipt] = await src.readContract({...at, functionName: "quoteOFT", args: [probe]});
       assertStargate(limit.minAmountLD <= split.sentLD && split.sentLD <= limit.maxAmountLD, "amount exceeds available OFT limits");
       assertStargate(receipt.amountSentLD === split.sentLD, "quote clipped the exact input amount");
@@ -152,8 +148,9 @@ export function createStargateQuoter(config: StargateQuoteConfig) {
       assertStargate(nativeValue <= UINT256_MAX, "native value overflow");
       await Promise.all([rpc.unchanged(src, sourceBlock), rpc.unchanged(dst, destinationBlock)]);
       assertNotAborted(signal);
-      assertStargate(Date.now() < started + ttl, "quote expired during RPC reads");
-      return Object.freeze({mode: request.mode, source, destination, sender, recipient, sourceBlock, destinationBlock, requestedAmount: request.amount, sentAmount: split.sentLD, dust: split.dustLD, destinationAmount: received, minimumDestinationAmount: destinationAmount(minAmountLD, source.localDecimals, destination.localDecimals, source.sharedDecimals), protocolFee: fees.feeLD, protocolReward: fees.rewardLD, messagingFee: fee.nativeFee, messagingFeeCap: cap, nativeValue, nativeDrop, creditSD, sendParam, validUntilMs: started + ttl, liquidityReserved: false, etaSeconds: null, sourceGas: null, approvalGas: null});
+      const validUntilMs = Math.min(started + ttl, stargateChainCutoff(source.chain), stargateChainCutoff(destination.chain));
+      assertStargate(Date.now() < validUntilMs, "quote expired during RPC reads");
+      return Object.freeze({mode: request.mode, source, destination, sender, recipient, sourceBlock, destinationBlock, requestedAmount: request.amount, sentAmount: split.sentLD, dust: split.dustLD, destinationAmount: received, minimumDestinationAmount: destinationAmount(minAmountLD, source.localDecimals, destination.localDecimals, source.sharedDecimals), protocolFee: fees.feeLD, protocolReward: fees.rewardLD, messagingFee: fee.nativeFee, messagingFeeCap: cap, nativeValue, nativeDrop, creditSD, sendParam, validUntilMs, liquidityReserved: false, etaSeconds: null, sourceGas: null, approvalGas: null});
     } catch (error) { throw safeReadError(error); }
   }
   return Object.freeze({supportsRoute, quote});

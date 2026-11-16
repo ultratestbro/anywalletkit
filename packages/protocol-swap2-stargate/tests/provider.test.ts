@@ -21,24 +21,22 @@ function fixture(source = "eip155:56", asset = 1) {
 }
 
 describe("Stargate swap2 candidates and client execution checks", () => {
-  it("preserves Taxi/Bus selection and keeps unknown ETA honest", async () => {
+  it("offers only Taxi after Bus retirement and keeps unknown ETA honest", async () => {
     const f = fixture();
     const candidates = await f.provider.getQuotes!({...f.params, dry: true});
-    expect(candidates.map((q) => q.routeId)).toEqual(["taxi", "bus"]);
+    expect(candidates.map((q) => q.routeId)).toEqual(["taxi"]);
     for (const q of candidates) {
       expect(validQuote(q, f.params, "stargate")).toBe(true);
       expect(q.etaSeconds).toBeNull();
       expect(f.pins.verifyQuote!(f.params, q)).toBeNull();
     }
-    const bus = (await f.provider.getQuote({...f.params, routeId: "bus"}))!;
-    expect(bus.routeId).toBe("bus");
-    const tx = await f.provider.buildDeposit(bus);
-    expect(decodeFunctionData({abi: STARGATE_ABI, data: tx.data as `0x${string}`})).toMatchObject({functionName: "sendToken", args: [{oftCmd: "0x00", composeMsg: "0x"}, {lzTokenFee: 0n}, actor]});
+    expect(await f.provider.getQuote({...f.params, routeId: "bus"})).toBeNull();
+    expect(() => stargateProvider({...f.config, defaultMode: "bus"})).toThrow(/retired/);
     await expect(f.provider.getQuotes!(f.params)).rejects.toThrow(/preview/);
     expect(await f.provider.getQuote({...f.params, routeId: "unknown"})).toBeNull();
     const router = new CrossChainRouter([f.provider]);
     const routes = (await router.getQuotes({...f.params, dry: true}))!;
-    expect(routes.quotes).toHaveLength(2);
+    expect(routes.quotes).toHaveLength(1);
     expect(routes.fastest).toBeNull();
   });
 
@@ -76,10 +74,10 @@ describe("Stargate swap2 candidates and client execution checks", () => {
     f.state.override = (r, value) => r.functionName === "peers" ? `0x${"00".repeat(32)}` : value;
     await expect(f.provider.preflightDeposit!(q, tx)).rejects.toThrow();
     f.state.override = undefined;
-    const bus = stargateProvider({...f.config, nativeDrop: {bus: true}});
-    const bq = (await bus.getQuote({...f.params, routeId: "bus"}))!;
-    f.state.nativeDrop++;
-    await expect(bus.preflightDeposit!(bq, await bus.buildDeposit(bq))).rejects.toThrow();
+    const taxi = stargateProvider({...f.config, nativeDrop: {taxi: 123n}});
+    const tq = (await taxi.getQuote(f.params))!;
+    const changedPins = stargatePins({...f.config, nativeDrop: {taxi: 124n}});
+    expect(changedPins.verifyQuote!(f.params, tq)).not.toBeNull();
   });
 
   it("allows updated output within the sealed minimum without changing the transaction", async () => {
@@ -158,7 +156,7 @@ describe("Stargate swap2 candidates and client execution checks", () => {
     };
     const client = remoteProvider({name: "stargate", baseUrl: "https://backend.test", multiQuotes: true, fetchImpl, ...f.pins});
     const candidates = await client.getQuotes!({...f.params, dry: true});
-    expect(candidates).toHaveLength(2);
+    expect(candidates).toHaveLength(1);
     expect(candidates.every((q) => q.etaSeconds === null)).toBe(true);
     const q = (await client.getQuote({...f.params, routeId: "taxi"}))!;
     const tx = await client.buildDeposit(q);

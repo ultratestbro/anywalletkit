@@ -1,5 +1,6 @@
 import {encodeFunctionData} from "viem";
 import type {CrossChainProvider, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
+import {STARGATE_BUS_RETIRED, stargateChainActive} from "./availability.js";
 import {STARGATE_ABI} from "./abi.js";
 import {stargateRegistry} from "./deployments.js";
 import {stargateIntent, stargateToken} from "./intent.js";
@@ -28,7 +29,7 @@ export function stargateProvider(config: StargateProviderConfig): CrossChainProv
   const enabled = config.enabled ?? false, mode = config.defaultMode ?? "taxi";
   const configuredChains = new Set(Object.keys(config.rpcUrls));
   const drop = Object.freeze({...config.nativeDrop});
-  assertStargate(mode === "taxi" || mode === "bus", "invalid default mode");
+  assertStargate(mode === "taxi", STARGATE_BUS_RETIRED);
   const supports = (src: string, token: string, dst: string, out: string) => {
     const source = stargateToken(src, token), destination = stargateToken(dst, out);
     return !!source && !!destination && quoter.supportsRoute(src, source, dst, destination);
@@ -72,14 +73,14 @@ export function stargateProvider(config: StargateProviderConfig): CrossChainProv
   return {
     name: "stargate", enabled: () => enabled,
     supportsRoute: (from, to) => supports(from.chain, from.token, to.chain, to.token),
-    supportsChain: (chain) => registry.deployments.some((d) => d.chain === chain) && configuredChains.has(chain),
-    supportsChainPair: (from, to) => registry.paths.some((p) => p.source === from && p.destination === to) && configuredChains.has(from) && configuredChains.has(to),
+    supportsChain: (chain) => stargateChainActive(chain) && registry.deployments.some((d) => d.chain === chain) && configuredChains.has(chain),
+    supportsChainPair: (from, to) => stargateChainActive(from) && stargateChainActive(to) && registry.paths.some((p) => p.source === from && p.destination === to) && configuredChains.has(from) && configuredChains.has(to),
     callTargets: pins.callTargets, spenders: pins.spenders,
     describeActivity: (tx, ctx) => describeStargateActivity(tx, ctx, registry),
     getQuote,
     async getQuotes(params, signal) {
       assertStargate(params.dry !== false, "candidate enumeration is preview-only");
-      const modes: StargateMode[] = params.routeId ? [params.routeId as StargateMode] : ["taxi", "bus"];
+      const modes: StargateMode[] = params.routeId ? [params.routeId as StargateMode] : ["taxi"];
       const results = await Promise.all(modes.map((routeId) => getQuote({...params, routeId, dry: true}, signal)));
       return results.filter((q): q is Quote => q !== null);
     },
