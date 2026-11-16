@@ -40,7 +40,7 @@ await swap2.swap2({fromToken: "USDC", toToken, toChain: "eip155:8453", fromToken
 ```
 
 **3. Aggregator with a route picker.** List every route with the best and the fastest tagged, let
-the user choose, then execute exactly that provider.
+the user choose, then execute that provider and route.
 
 ```ts
 const routes = await swap2.quoteSwap2Routes(options, {
@@ -48,11 +48,35 @@ const routes = await swap2.quoteSwap2Routes(options, {
   // a "searching…" hint while `pending` is non-empty.
   onUpdate: (routes, pending) => render(routes, pending),
 });
-// routes[i] = {provider, quote, netValueUsd, relativeValue, tags: ["best"] | ["fastest"] | …}
-await swap2.using(picked.provider).swap2({...options, minAmountOut: picked.quote.toTokenAmountMin});
+// routes[i] = {provider, routeId?, quote, netValueUsd, relativeValue, tags: ["best"] | ["fastest"] | …}
+await swap2.using(picked.provider, picked.routeId).swap2({...options, minAmountOut: picked.quote.toTokenAmountMin});
 ```
 
 The same is available one level down on `CrossChainRouter#getQuotes(params, {onUpdate})`.
+
+A provider can implement optional `getQuotes(params, signal)` to return up to 32
+display candidates with unique, stable `routeId` values (for example, Taxi and Bus).
+Its default `getQuote` answer must also identify its route.
+Each candidate is validated and ranked independently. Missing or duplicate selectors
+are excluded, as are expired quotes and quotes below the caller's floor. Provider
+failures leave other venues available. Progressive snapshots have independent quote
+data, and expired candidates are removed before the final ranking.
+
+Execution calls `getQuote` once per provider with `dry: false`; it never creates live
+quotes for every candidate. A selected `routeId` must be returned unchanged, even if
+the provider's default or cheapest mode changed. A quote that expires during approval
+is refreshed using the same provider, route and caller floor; failure stops the swap
+and attempts to revoke the engine-created allowance. The selected route is included
+in `reviewExecution`. Providers without `getQuotes` and callers using only
+`using(provider)` retain the existing API; choosing a particular candidate requires
+passing its `routeId`.
+
+Remote providers opt in with `remoteProvider({name, baseUrl, multiQuotes: true, ...pins})`
+after their backend supports the `/quotes` action. Omit that flag for older servers.
+The new action requires `dry: true`, applies the same guard, seals each accepted quote
+including its selector, and leaves `/quote` unchanged. Client-side provider validators
+must also bind calldata to the mode represented by `routeId`; string equality alone
+does not validate a transaction's behavior.
 
 ## How the winner is chosen
 

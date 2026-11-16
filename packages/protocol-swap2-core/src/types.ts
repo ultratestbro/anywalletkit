@@ -13,6 +13,8 @@ export interface Asset {
 
 /** What the engine asks a provider to quote. Amounts are base-unit strings; exact input only. */
 export interface QuoteParams {
+  /** Stable provider-scoped route selector (e.g. taxi/bus), never a quote/intent id. */
+  routeId?: string;
   /** Local-only (never serialized): called with the reason when the provider
    *  refuses to quote — a shared-instance "last refusal" field raced under
    *  concurrent quotes, so the reason rides per-call. */
@@ -74,6 +76,8 @@ export interface TxRequest {
 export interface Quote {
   /** Provider name. */
   provider: string;
+  /** Stable route selector, preserved when refreshing price/expiry. */
+  routeId?: string;
   /** Provider's id for this swap; tracked with `trackIntent`. */
   intentId: string;
   depositAddress: string; // where the user sends source funds ("" on dry quotes)
@@ -110,7 +114,7 @@ export interface RoutedQuote extends Quote {
     score: number;
     weights: ScoreWeights;
     /** Every validated route: `score` is its value against the best (0..1). */
-    candidates: {provider: string; sourceAmount: string; etaSeconds: number; score: number; minDestAmount?: string; netValueUsd?: number | null}[];
+    candidates: {provider: string; routeId?: string; sourceAmount: string; etaSeconds: number; score: number; minDestAmount?: string; netValueUsd?: number | null}[];
   };
 }
 
@@ -226,6 +230,10 @@ export interface CrossChainProvider {
   supportsRoute(from: Asset, to: Asset): boolean;
   /** A quote, or `null` with the reason passed to `params.onRefusal`. */
   getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null>;
+  /** Optional display-only candidates, at most 32, each with a unique routeId.
+   * When present, getQuote must also return a routeId, including its default quote.
+   * Execution uses getQuote with the selected routeId and must not substitute it. */
+  getQuotes?(params: QuoteParams, signal?: AbortSignal): Promise<Quote[]>;
   /** The source-leg transaction for a quote. */
   buildDeposit(quote: Quote): Promise<UnsignedTx>;
   /**

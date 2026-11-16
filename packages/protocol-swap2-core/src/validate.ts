@@ -1,8 +1,15 @@
 import type {CrossChainProvider, Quote, QuoteParams} from "./types.js";
 
+/** Bounded opaque ASCII selector; providers define its stable meaning. */
+export function validRouteId(value: unknown): value is string {
+  return typeof value === "string" && /^[\x21-\x7e]{1,256}$/.test(value);
+}
+
 /** Shared quote validator used by both the aggregate and single-provider paths. */
 export function validQuote(q: Quote, params: QuoteParams, provider: string): boolean {
   try {
+    if (q.routeId !== undefined && !validRouteId(q.routeId)) return false;
+    if (params.routeId !== undefined && (!validRouteId(params.routeId) || q.routeId !== params.routeId)) return false;
     if (q.provider !== provider || q.sourceAmount !== params.amountIn) return false;
     if (typeof q.intentId !== "string" || !q.intentId || typeof q.depositAddress !== "string" || (q.depositMemo !== null && typeof q.depositMemo !== "string")) return false;
     if (![q.sourceAmount, q.destAmount, q.minDestAmount].every((value) => /^[0-9]+$/.test(value))) return false;

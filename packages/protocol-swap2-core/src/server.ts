@@ -1,6 +1,6 @@
 import type {Asset, CrossChainProvider, IntentRef, Quote, QuoteParams, TxRequest, UnsignedTx} from "./types.js";
 import {redactUrls} from "./util.js";
-import {validQuote} from "./validate.js";
+import {validQuote, validRouteId} from "./validate.js";
 
 /**
  * The server side of {@link remoteProvider}: runs real providers behind your backend so API
@@ -12,7 +12,7 @@ import {validQuote} from "./validate.js";
  * What it guarantees:
  * - every field of every request is validated (types, lengths, digit-only amounts) before a
  *   provider sees it; unknown actions, providers and malformed bodies are refused;
- * - `quote` answers are sealed with HMAC-SHA256 under `sealSecret`; `build` and `preflight`
+ * - `quote` / `quotes` answers are sealed with HMAC-SHA256 under `sealSecret`; `build` and `preflight`
  *   refuse a quote that was not sealed here, was changed in transit, or has expired — so a
  *   client cannot make your server build a deposit for terms the provider never quoted;
  * - every quote's `intentId` leaves with an intent token appended (`<id>~<tag>`): `track`,
@@ -52,7 +52,7 @@ export type Swap2Request =
   | {intentId: string; signature: string}
   | {from: Asset; to: Asset};
 
-export type Swap2Action = "quote" | "build" | "preflight" | "track" | "claim" | "notify" | "register" | "supports";
+export type Swap2Action = "quote" | "quotes" | "build" | "preflight" | "track" | "claim" | "notify" | "register" | "supports";
 
 export interface Swap2HandlerOptions<C> {
   /** The real providers, by `name` (the same names the app's `remoteProvider`s use). */
@@ -104,7 +104,7 @@ export class Swap2HandlerError extends Error {
   }
 }
 
-const ACTIONS: ReadonlySet<string> = new Set(["quote", "build", "preflight", "track", "claim", "notify", "register", "supports"]);
+const ACTIONS: ReadonlySet<string> = new Set(["quote", "quotes", "build", "preflight", "track", "claim", "notify", "register", "supports"]);
 const SEAL_FIELD = "__remoteSeal";
 const SEAL_PREFIX = "swap2-remote-quote:v1:";
 const INTENT_PREFIX = "swap2-remote-intent:v1";
@@ -179,6 +179,26 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
       if (!provider.enabled()) return fail(403, `provider '${providerName}' is disabled`);
 
       switch (act) {
+        case "quotes": {
+          const {params} = request as {params: QuoteParams};
+          if (params.dry !== true) return fail(400, "candidate quotes are display-only (dry: true)");
+          if (!provider.getQuotes) return fail(400, "provider has no candidate quoting capability");
+          const candidates = await provider.getQuotes(Object.freeze({...params}));
+          if (!Array.isArray(candidates) || candidates.length > 32) return fail(502, "invalid candidate response (maximum 32)");
+          const ids = new Map<string, number>();
+          for (const q of candidates) if (validRouteId(q?.routeId)) ids.set(q.routeId, (ids.get(q.routeId) ?? 0) + 1);
+          const quotes: Quote[] = [];
+          for (const q of candidates) {
+            // Invalid candidates do not hide valid siblings; ambiguous ids are all excluded.
+            if (!validRouteId(q?.routeId) || ids.get(q.routeId) !== 1) continue;
+            let normalized: Quote;
+            try { normalized = normalizeQuote(q, INTENT_MAX); } catch { continue; }
+            if (!validQuote(normalized, params, providerName) || normalized.validUntilMs <= now()) continue;
+            const tokened = {...normalized, intentId: `${normalized.intentId}~${await intentTag(providerName, subject, normalized.intentId)}`};
+            quotes.push(await seal(providerName, subject, tokened));
+          }
+          return ok(quotes);
+        }
         case "quote": {
           const {params} = request as {params: QuoteParams};
           let refusal: string | null = null; // per request: a shared field races under parallel quotes
@@ -188,7 +208,7 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
             try { normalized = normalizeQuote(quote, INTENT_MAX); } catch { return fail(502, `${providerName} returned a quote this server refuses to seal`); }
             // A seal vouches for the quote: hold it to the engine's own checks (provider, input, floor,
             // slippage, expiry) so a client that does not re-validate cannot be handed a bad one.
-            if (!validQuote(normalized, params, providerName) || normalized.validUntilMs <= now()) {
+            if (!validQuote(normalized, params, providerName) || normalized.validUntilMs <= now() || (provider.getQuotes && !validRouteId(normalized.routeId))) {
               return fail(502, `${providerName} returned a quote the swap engine would reject`);
             }
             const tokened = {...normalized, intentId: `${normalized.intentId}~${await intentTag(providerName, subject, normalized.intentId)}`};
@@ -243,7 +263,8 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
 /** Each action's body, validated field by field before anyone (guard, provider) sees it. */
 function validated(action: Swap2Action, b: Record<string, unknown>, allowUnlisted: boolean): Swap2Request {
   switch (action) {
-    case "quote": return {params: quoteParams(b.params, allowUnlisted)};
+    case "quote":
+    case "quotes": return {params: quoteParams(b.params, allowUnlisted)};
     case "build": return {quote: normalizeQuote(b.quote, WIRE_INTENT_MAX)};
     case "preflight": return {quote: normalizeQuote(b.quote, WIRE_INTENT_MAX), tx: unsignedTx(b.tx)};
     case "track":
@@ -330,7 +351,9 @@ function quoteParams(v: unknown, allowUnlisted = false): QuoteParams {
   const minAmountOut = p.minAmountOut === undefined ? undefined : digits(p.minAmountOut, "params.minAmountOut", 60);
   const dry = bool(p.dry, "params.dry");
   const flex = bool(p.flex, "params.flex");
+  if (p.routeId !== undefined && !validRouteId(p.routeId)) bad("params.routeId", "invalid route selector");
   return {
+    ...(p.routeId !== undefined ? {routeId: p.routeId as string} : {}),
     sourceChain: str(p.sourceChain, "params.sourceChain", 64),
     sourceToken: str(p.sourceToken, "params.sourceToken", 64),
     ...(sourceDecimals !== undefined ? {sourceDecimals} : {}),
@@ -351,7 +374,9 @@ const FEE_TYPES = new Set(["network", "protocol", "affiliate", "other"]);
 /** Keeps only the known Quote fields, each checked: what is sealed is exactly what is verified. */
 function normalizeQuote(v: unknown, intentMax: number): Quote {
   const q = record(v, "quote");
+  if (q.routeId !== undefined && !validRouteId(q.routeId)) bad("quote.routeId", "invalid route selector");
   const out: Quote = {
+    ...(q.routeId !== undefined ? {routeId: q.routeId as string} : {}),
     provider: str(q.provider, "quote.provider", 40),
     intentId: str(q.intentId, "quote.intentId", intentMax),
     depositAddress: str(q.depositAddress, "quote.depositAddress", 200),

@@ -165,8 +165,10 @@ and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412
 
 - SDK-323: implemented reviewed registry and evidence collection for the current
   supported intersection; coverage and explicit exclusions are listed above.
-- SDK-324: optional candidate quoting and route identity; preserve `getQuote` and
-  `using(provider)` compatibility. Requote must preserve the selected route/mode.
+- SDK-324: core/router now support optional display candidates, stable `routeId`,
+  `using(provider, routeId)`, sealed remote candidates and pinned requotes. Existing
+  `getQuote`, `using(provider)` and tracking IDs remain compatible. Stargate's
+  provider will implement these hooks in SDK-326.
 - SDK-325: application-owned durable storage and recovery actions; retain `awk1` IDs
   and old zero-value EVM claims. Paid source recovery needs a separate bounded path.
 - SDK-326 through SDK-329: provider quoting, execution/pins, payout tracking, Bus and

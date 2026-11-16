@@ -296,6 +296,7 @@ export interface TonBodySummary {
 /** What `swap2()` is about to sign, handed to {@link Swap2EngineConfig.reviewExecution}. */
 export interface Swap2ExecutionPlan {
   provider: string;
+  routeId?: string;
   fromChain: string;
   destChain: string;
   destToken: string;
@@ -442,6 +443,8 @@ interface Swap2Signer {
  * owns its cleanup; until then the first pass revokes on any failure.
  */
 interface CarriedAllowance {
+  provider: string;
+  routeId?: string;
   token: string;
   spender: string;
   amount: bigint;
@@ -725,7 +728,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
   }
 
   /** Quote the route (single provider, or best across the router). */
-  protected abstract resolveQuote(params: QuoteParams): Promise<Quote | null>;
+  protected abstract resolveQuote(params: QuoteParams, provider?: string): Promise<Quote | null>;
 
   /** Why the last resolveQuote came back empty (venue names + reasons), or "".
    *  Rides inside the no-route error so execution failures are diagnosable
@@ -809,6 +812,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const amountIn = exactPositiveAmount(options.fromTokenAmount, "fromTokenAmount");
     const source = this.sourceAsset(options);
     const params: QuoteParams = {
+      ...(options.routeId !== undefined ? {routeId: options.routeId} : {}),
       sourceChain: this.fromChain,
       sourceToken: isUnlisted(source) ? source.contract : toSymbol(this.fromChain, options.fromToken),
       ...(isUnlisted(source) ? {sourceDecimals: source.decimals} : {}),
@@ -897,6 +901,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       ...(fee.description ? {description: fee.description} : {}),
     }));
     return {
+      ...(q.routeId !== undefined ? {routeId: q.routeId} : {}),
       fromTokenAmount: BigInt(q.sourceAmount),
       toTokenAmount: BigInt(q.destAmount),
       toTokenAmountMin: BigInt(q.minDestAmount),
@@ -986,13 +991,16 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const recipient = blankToUndefined(snapshot.recipient) ?? selfAddress;
     const refundAddress = blankToUndefined(snapshot.refundAddress) ?? selfAddress;
     const executionOptions = await this.prepareOptions(snapshotOptions({...snapshot, recipient, refundAddress}));
-    const params = this.toParams(executionOptions, false);
-    const resolved = await this.resolveQuote(params);
+    const params = {...this.toParams(executionOptions, false), ...(carried?.routeId !== undefined ? {routeId: carried.routeId} : {})};
+    const resolved = await this.resolveQuote(params, carried?.provider);
     if (!resolved) {
       const detail = this.noRouteDetail();
       throw new Swap2QuoteError(`swap2: no route available for the requested pair${detail ? ` :: ${detail}` : ""}`);
     }
     const q = snapshotQuote(resolved);
+    if ((params.routeId !== undefined && q.routeId !== params.routeId) || (carried && (q.provider !== carried.provider || q.routeId !== carried.routeId))) {
+      throw new Swap2QuoteError("swap2: the fresh quote changed the selected provider or route");
+    }
     assertQuoteConstraints(q, executionOptions);
     this.assertQuoteFeeCaps(q, executionOptions, configSnapshot);
 
@@ -1319,6 +1327,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         ({token: source.contract!, spender: unsigned.approvalAddress!, amount, ...chainId}));
       const plan: Swap2ExecutionPlan = {
         provider: q.provider,
+        ...(q.routeId !== undefined ? {routeId: q.routeId} : {}),
         fromChain: this.fromChain,
         destChain: params.destChain,
         destToken: params.destToken,
@@ -1412,7 +1421,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // to the caller's floor like the first, and never re-quotes itself.
       if (!carried && approvalAmounts.length && revokeApproval) {
         this.emitPhase("requoting");
-        const handoff: CarriedAllowance = {token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeApproval, adopted: false, ...(reviewed ? {reviewed} : {})};
+        const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeApproval, adopted: false, ...(reviewed ? {reviewed} : {})};
         try {
           return await this.executeSwap2(signer, snapshot, config, handoff);
         } catch (error) {

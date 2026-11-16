@@ -1,5 +1,6 @@
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "./types.js";
 import {anySignal, timeoutSignal} from "./util.js";
+import {validQuote, validRouteId} from "./validate.js";
 
 /**
  * HTTP-proxied `CrossChainProvider`: forwards every provider call to a backend
@@ -11,6 +12,7 @@ import {anySignal, timeoutSignal} from "./util.js";
  * Wire protocol: POST {baseUrl}/{action} with a JSON body, one action per
  * provider method:
  *   quote  {provider, params: QuoteParams}        → Quote | null
+ *   quotes {provider, params: QuoteParams}        → Quote[] (opt-in, dry only)
  *   build  {provider, quote: Quote}               → UnsignedTx
  *   preflight {provider, quote: Quote, tx: UnsignedTx} → {}
  *   track  {provider, ref: IntentRef}             → IntentStatus
@@ -24,6 +26,8 @@ import {anySignal, timeoutSignal} from "./util.js";
  * allow-and-let-quote-decide behavior (a null quote is a clean miss).
  */
 export interface RemoteProviderOptions {
+  /** Opt into the backend's display-only /quotes action. Omit for older servers. */
+  multiQuotes?: boolean;
   /** Provider name the backend multiplexes on (e.g. "near-intents"). */
   name: string;
   /** Endpoint prefix, e.g. "/api/v2/swap2" (same-origin) or absolute URL. */
@@ -111,9 +115,11 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
 
   // The request each quote answered, for verifyBuild (the build only carries the quote). Bounded: a stub quotes often.
   const requests = new Map<string, QuoteParams>();
-  const remember = (intentId: string, params: QuoteParams) => {
-    requests.delete(intentId);
-    requests.set(intentId, params);
+  const requestKey = (q: Quote) => JSON.stringify([q.intentId, q.routeId ?? null]);
+  const remember = (quote: Quote, params: QuoteParams) => {
+    const key = requestKey(quote);
+    requests.delete(key);
+    requests.set(key, Object.freeze({...params}));
     if (requests.size > 64) requests.delete(requests.keys().next().value!);
   };
 
@@ -138,6 +144,20 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     return (await res.json()) as T;
   }
 
+  function checkRoute(params: QuoteParams, quote: Quote): void {
+    if (((opts.multiQuotes || quote.routeId !== undefined) && !validRouteId(quote.routeId)) || (params.routeId !== undefined && (!validRouteId(params.routeId) || quote.routeId !== params.routeId))) {
+      throw new Error(`${name}: backend changed the selected routeId`);
+    }
+  }
+
+  function checkQuote(params: QuoteParams, quote: Quote): void {
+    checkRoute(params, quote);
+    if (!opts.verifyQuote) return;
+    let refusal: string | null;
+    try { refusal = opts.verifyQuote(params, quote); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
+    if (refusal) throw new Error(`${name}: the quote fails this app's own check — ${refusal.slice(0, 240)}`);
+  }
+
   return {
     name,
     remote: true,
@@ -151,25 +171,36 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
       return supportsRoute ? supportsRoute(from, to) : true;
     },
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const out = await call<Quote | {noQuote: string} | null>("quote", {params}, signal);
+      const snapshot = Object.freeze({...params});
+      const out = await call<Quote | {noQuote: string} | null>("quote", {params: snapshot}, signal);
       if (out && typeof out === "object" && "noQuote" in out) {
         // The backend forwarded the venue's own refusal — throw it so the
         // router records a REASON instead of an anonymous null.
         throw new Error(String((out as {noQuote: unknown}).noQuote).slice(0, 300));
       }
-      if (out && typeof out === "object" && typeof out.intentId === "string") remember(out.intentId, params);
-      if (out && opts.verifyQuote) {
-        let refusal: string | null;
-        try { refusal = opts.verifyQuote(params, out); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
-        if (refusal) throw new Error(`${name}: the quote fails this app's own check — ${refusal.slice(0, 240)}`);
-      }
+      if (out) checkQuote(snapshot, out);
+      if (out && typeof out === "object" && typeof out.intentId === "string") remember(out, snapshot);
       return out;
     },
+    ...(opts.multiQuotes ? {async getQuotes(params: QuoteParams, signal?: AbortSignal): Promise<Quote[]> {
+      if (params.dry === false) throw new Error(`${name}: candidate quotes are display-only`);
+      const snapshot = Object.freeze({...params, dry: true});
+      const out = await call<Quote[]>("quotes", {params: snapshot}, signal);
+      if (!Array.isArray(out) || out.length > 32) throw new Error(`${name}: invalid candidate response`);
+      const ids = new Map<string, number>();
+      for (const q of out) if (validRouteId(q?.routeId)) ids.set(q.routeId, (ids.get(q.routeId) ?? 0) + 1);
+      return out.filter((q) => {
+        if (!validRouteId(q?.routeId) || ids.get(q.routeId) !== 1 || !validQuote(q, snapshot, name)) return false;
+        try { checkQuote(snapshot, q); } catch { return false; }
+        remember(q, {...snapshot, routeId: q.routeId});
+        return true;
+      });
+    }} : {}),
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
       const tx = await call<UnsignedTx>("build", {quote});
       if (opts.verifyBuild) {
         let refusal: string | null;
-        try { refusal = await opts.verifyBuild(quote, tx, requests.get(quote.intentId)); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
+        try { refusal = await opts.verifyBuild(quote, tx, requests.get(requestKey(quote))); } catch (e) { refusal = e instanceof Error ? e.message : String(e); }
         if (refusal) throw new Error(`${name}: the build fails this app's own check — ${refusal.slice(0, 240)}`);
       }
       return tx;

@@ -24,6 +24,29 @@ On npm: [@anywalletkit/protocol-swap2-core](https://www.npmjs.com/package/@anywa
 Providers live in their own packages: `@anywalletkit/protocol-swap2-near-intents`, `-lifi`, `-thorchain`, `-omniston`, `-cctp`, `-usdt0`, `-chainflip`, `-jupiter`, `-uniswap`, `-balancer`, `-wrap`. `@anywalletkit/protocol-swap2-router` auctions several of them.
 
 
+## Multiple routes from one provider
+
+`CrossChainProvider.getQuotes` is an optional display-only hook returning at most 32
+candidates with distinct, stable `routeId` strings. The selector is scoped to that
+provider and describes a path/mode, not a temporary quote or tracking ID. Execution
+still uses `getQuote(params)`, which must honor `params.routeId` or refuse the quote.
+A provider implementing `getQuotes` must identify the route of its default quote too.
+The public `Swap2Quote`, `Swap2Options` and execution review carry the selector.
+The router picker uses `using(provider, routeId)`; `getQuote` and `using(provider)`
+remain supported for existing providers.
+
+When approval mining outlasts a quote, the engine pins the original provider and
+route on refresh and preserves the caller's floor. A substituted or unavailable route
+is refused. `awk1` tracking IDs and provider intent IDs keep their existing format.
+
+For a remote provider, `multiQuotes: true` enables `/quotes`; deploy support for that
+action in the backend and its auth/rate-limit guard first. `/quotes` requires `dry: true`,
+normalizes and validates each candidate, and HMAC-seals the selector with its other
+terms. The client checks the requested selector and runs `verifyQuote` on each
+candidate. The provider's client validator must verify that calldata implements that
+route; an unchanged selector alone is insufficient. Older deployments keep using
+`/quote` when the flag is omitted.
+
 Docs: [Swaps](https://docs.anywallet.tech/guides/swaps/)
 
 Apache-2.0

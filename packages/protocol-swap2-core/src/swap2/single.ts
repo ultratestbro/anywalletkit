@@ -1,7 +1,7 @@
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {BaseSwap2Protocol} from "./base.js";
 import type {CrossChainProvider, Quote, QuoteParams} from "../types.js";
-import {remotePinRefusal, validQuote} from "../validate.js";
+import {remotePinRefusal, validQuote, validRouteId} from "../validate.js";
 
 /** A single-provider swap2: quoting/tracking route through one solver. The
  *  per-provider packages subclass this — the contribution unit shape. */
@@ -27,7 +27,7 @@ export abstract class SingleProviderSwap2 extends BaseSwap2Protocol {
       if (snapshot.sourceChain === snapshot.destChain && this.provider.supportsSameChain !== true) return null;
       const quote = await this.provider.getQuote(snapshot);
       if (!quote) return null;
-      if (!validQuote(quote, snapshot, name)) {
+      if (!validQuote(quote, snapshot, name) || (this.provider.getQuotes && !validRouteId(quote.routeId))) {
         this.lastRefusal ||= `${name}: rejected by validation (minDest=${quote.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"})`;
         return null;
       }
