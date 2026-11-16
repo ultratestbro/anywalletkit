@@ -38,8 +38,10 @@ import {
   type CcAsset,
   type CcChain,
 } from "@anywalletkit/swap2-assets";
-import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx} from "../types.js";
+import type {CrossChainProvider, IntentStatus, QuoteParams, Quote, UnsignedTx, RecoveryQuote} from "../types.js";
+import {validRouteId} from "../validate.js";
 import {tonRawAddress} from "../util.js";
+import {Swap2OperationJournal, loadSwap2Operation, type Swap2OperationStore, type Swap2Operation} from "../operation.js";
 import {
   Swap2ConfigurationError,
   Swap2ExecutionError,
@@ -235,6 +237,8 @@ function assertTypedOrder(typedData: string, approvalAddress: string | undefined
 }
 
 export interface Swap2EngineConfig extends Swap2ProtocolConfig {
+  /** Durable app-owned journal. When configured, each swap must supply a fresh operationId. */
+  operationStore?: Swap2OperationStore;
   /** CAIP-2 of the chain the bound account lives on (the swap2 source). */
   fromChain: string;
   /** Progress observer, see {@link Swap2ExecutionPhase}. */
@@ -322,6 +326,21 @@ export interface Swap2ExecutionPlan {
     | {kind: "token-transfer"; token: string; recipient: string; amount: bigint; memo?: string; memoEncoding?: "utf8" | "hex"}
     | {kind: "serialized"; serializedTx: string}
     | {kind: "typed-order"; typedData: string};
+}
+
+export interface Swap2RecoveryOptions {
+  /** New, app-owned journal key for this explicit recovery attempt. */
+  operationId: string;
+  /** Maximum native value attached to the call; wallet gas policies apply separately. */
+  maxNativeValue: bigint;
+  /** Required review gate. Throw to cancel without a signature. */
+  review: (quote: Readonly<RecoveryQuote>) => Promise<void> | void;
+}
+
+export interface Swap2ResumeResult {
+  operation: Swap2Operation;
+  id?: string;
+  status: IntentStatus | {state: "unknown"};
 }
 
 /**
@@ -443,6 +462,7 @@ interface Swap2Signer {
  * owns its cleanup; until then the first pass revokes on any failure.
  */
 interface CarriedAllowance {
+  journal?: Swap2OperationJournal;
   provider: string;
   routeId?: string;
   token: string;
@@ -956,6 +976,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
    * track `hash`).
    */
   override async swap2(options: Swap2Options, config?: Swap2ProtocolConfig): Promise<Swap2Result> {
+    const store = (this._config as Swap2EngineConfig).operationStore;
+    if (!!store !== (options.operationId !== undefined)) throw new Swap2ConfigurationError("swap2: operationStore and operationId must be used together");
     // Account first: a read-only or missing account is refused before any option is
     // validated or any network call is made (SDK protocol conformance).
     const signerCandidate = this._account as Partial<Swap2Signer> | undefined;
@@ -1006,6 +1028,17 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
 
     const provider = this.providerFor(q.provider);
     if (!provider) throw new Error(`swap2: provider '${q.provider}' is not registered`);
+    let journal = carried?.journal;
+    if (journal) await journal.requote(q.intentId);
+    else if (snapshot.operationId !== undefined) {
+      const store = (this._config as Swap2EngineConfig).operationStore!;
+      journal = await Swap2OperationJournal.create(store, {
+        id: snapshot.operationId, provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}),
+        intentId: q.intentId, sourceChain: this.fromChain, sender: selfAddress,
+        request: {sourceToken: params.sourceToken, destChain: params.destChain, destToken: params.destToken, recipient, refundAddress,
+          amountIn: params.amountIn, minAmountOut: params.minAmountOut ?? "", slippageBps: String(params.slippageBps ?? "")},
+      });
+    }
     let providerEnabled = false;
     try { providerEnabled = provider.enabled(); } catch { /* fail closed below */ }
     if (!providerEnabled) throw new Error(`swap2: provider '${q.provider}' is disabled`);
@@ -1383,13 +1416,18 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
 
     if (approvalAmounts.length) {
-      const approve = async (amount: bigint) => {
-        const sent = await signer.sendTransaction({
-          to: source.contract!,
-          data: approveData(unsigned.approvalAddress!, amount),
-          value: 0n,
-          ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
-        });
+      const approve = async (amount: bigint, kind: "approval" | "revoke" = "approval") => {
+        const send = async () => {
+          const sent = await signer.sendTransaction({
+            to: source.contract!,
+            data: approveData(unsigned.approvalAddress!, amount),
+            value: 0n,
+            ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
+          });
+          if (journal && !sent.hash) throw new Swap2MaybeSentError("swap2: approval returned no hash — reconcile before continuing");
+          return sent;
+        };
+        const sent = journal ? await journal.effect(kind, this.fromChain, send, {hash: (r) => r.hash, ambiguous: maybeSent}) : await send();
         // The next step (a second approve, or the deposit's gas estimate)
         // reads on-chain allowance: it must see this approval mined.
         if (sent.hash && typeof signer.waitForTransaction === "function") await signer.waitForTransaction(sent.hash);
@@ -1398,14 +1436,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // Install cleanup BEFORE broadcasting approval. An RPC can lose the
       // response after the transaction was accepted; treating that exception
       // as "nothing happened" would leave a live allowance with no callback.
-      revokeApproval = async () => { await approve(0n); };
+      revokeApproval = async () => { await approve(0n, "revoke"); };
       try {
         for (const [i, amount] of approvalAmounts.entries()) {
           this.emitPhase("approving", {index: i + 1, total: approvalAmounts.length});
           await approve(amount);
         }
       } catch (error) {
-        await revokeApproval().catch(() => {});
+        if (!journal || journal.snapshot.steps.some((s) => s.kind === "approval" && s.state !== "rejected")) await revokeApproval().catch(() => {});
         throw error;
       }
     }
@@ -1421,7 +1459,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // to the caller's floor like the first, and never re-quotes itself.
       if (!carried && approvalAmounts.length && revokeApproval) {
         this.emitPhase("requoting");
-        const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeApproval, adopted: false, ...(reviewed ? {reviewed} : {})};
+        const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), ...(journal ? {journal} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeApproval, adopted: false, ...(reviewed ? {reviewed} : {})};
         try {
           return await this.executeSwap2(signer, snapshot, config, handoff);
         } catch (error) {
@@ -1469,13 +1507,16 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         // signers that build the EIP712Domain type from value types (viem)
         // would then drop chainId from the domain and produce a signature the
         // verifying contract rejects (Omniston order, 2026-10-16). Sign with a number.
-        const signature = await signer.signTypedData({
+        const sign = () => signer.signTypedData!({
           domain: normalizeTypedDomain(td.domain),
           types,
           ...(td.primaryType ? {primaryType: td.primaryType} : {}),
           message: td.message,
         });
-        await provider.registerSignedOrder(q.intentId, signature);
+        const signature = journal ? await journal.effect("order-sign", this.fromChain, sign, {ambiguous: maybeSent}) : await sign();
+        const register = () => provider.registerSignedOrder!(q.intentId, signature);
+        if (journal) await journal.effect("order-register", this.fromChain, register, {ambiguous: (error) => maybeSent(error) ?? {}});
+        else await register();
         return {
           id: encodeId(q.provider, q.intentId),
           fees: this.toQuote(q, executionOptions).fees,
@@ -1487,6 +1528,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         // Any failed validation/sign/registration must not leave a reusable
         // exact allowance behind. If the RPC response was lost after
         // registration, revocation safely prevents execution.
+        if (journal && maybeSent(error)) throw new Swap2MaybeSentError("swap2: signed order outcome is unknown — reconcile; do not sign again", undefined, encodeId(q.provider, q.intentId), {cause: error});
         await revokeApproval?.().catch(() => {});
         throw error;
       }
@@ -1495,47 +1537,56 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // Execute the source leg through the bound account. Non-EVM token deposits
     // MUST use the account's transfer({token,recipient,amount}); passing token metadata
     // to sendTransaction would be ignored and send native SOL/TON/TRX instead.
-    let sent: {hash?: string};
+    let sent: {hash: string};
     this.emitPhase("signing");
     try {
-      if (serialized) {
-        const allowanceRaw = (this._config as Swap2EngineConfig).serializedNativeAllowance;
-        const allowance = allowanceRaw === undefined ? DEFAULT_SERIALIZED_NATIVE_ALLOWANCE : BigInt(allowanceRaw);
-        if (allowance < 0n) throw new Swap2ConfigurationError("swap2: serializedNativeAllowance must be non-negative");
-        const expect: SerializedExecutionExpectation = {
-          maxValueOut: ((source.contract ? 0n : BigInt(q.sourceAmount)) + allowance).toString(),
-          // Only a same-chain swap lands in this account; a bridge delivers elsewhere.
-          ...(params.destChain === this.fromChain ? {tokenIn: {token: params.destToken, minAmount: q.minDestAmount}} : {}),
-          ...(source.contract ? {source: {token: source.contract, maxAmount: q.sourceAmount}} : {}),
-        };
-        sent = await signer.sendSerializedTransaction!(unsigned.serializedTx!, expect);
-      } else if (tokenId) {
-        if (typeof signer.transfer !== "function") {
-          throw new Swap2ExecutionError(
-            `swap2: ${this.fromChain} token execution requires account.transfer({token, recipient, amount})`,
-          );
+      const sendSource = async () => {
+        if (q.validUntilMs <= Date.now()) throw new Swap2QuoteError("swap2: quote expired before source signature");
+        let sent: {hash?: string};
+        if (serialized) {
+          const allowanceRaw = (this._config as Swap2EngineConfig).serializedNativeAllowance;
+          const allowance = allowanceRaw === undefined ? DEFAULT_SERIALIZED_NATIVE_ALLOWANCE : BigInt(allowanceRaw);
+          if (allowance < 0n) throw new Swap2ConfigurationError("swap2: serializedNativeAllowance must be non-negative");
+          const expect: SerializedExecutionExpectation = {
+            maxValueOut: ((source.contract ? 0n : BigInt(q.sourceAmount)) + allowance).toString(),
+            // Only a same-chain swap lands in this account; a bridge delivers elsewhere.
+            ...(params.destChain === this.fromChain ? {tokenIn: {token: params.destToken, minAmount: q.minDestAmount}} : {}),
+            ...(source.contract ? {source: {token: source.contract, maxAmount: q.sourceAmount}} : {}),
+          };
+          sent = await signer.sendSerializedTransaction!(unsigned.serializedTx!, expect);
+        } else if (tokenId) {
+          if (typeof signer.transfer !== "function") {
+            throw new Swap2ExecutionError(
+              `swap2: ${this.fromChain} token execution requires account.transfer({token, recipient, amount})`,
+            );
+          }
+          sent = await signer.transfer({
+            token: tokenId,
+            recipient: unsigned.to,
+            amount: BigInt(q.sourceAmount),
+            ...((tronSource || nearSource || tonSource) && unsigned.memo ? {memo: unsigned.memo, ...(tronSource && unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
+          });
+        } else {
+          sent = await signer.sendTransaction({
+            to: unsigned.to,
+            ...(unsigned.data ? {data: unsigned.data} : {}),
+            value: BigInt(unsigned.value),
+            ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
+            ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
+            ...(cellBody !== undefined
+              ? {body: cellBody}
+              : unsigned.memo
+                ? (tronSource ? {memo: unsigned.memo, ...(unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : nearSource ? {memo: unsigned.memo} : {body: unsigned.memo})
+                : {}),
+          });
         }
-        sent = await signer.transfer({
-          token: tokenId,
-          recipient: unsigned.to,
-          amount: BigInt(q.sourceAmount),
-          ...((tronSource || nearSource || tonSource) && unsigned.memo ? {memo: unsigned.memo, ...(tronSource && unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : {}),
-        });
-      } else {
-        sent = await signer.sendTransaction({
-          to: unsigned.to,
-          ...(unsigned.data ? {data: unsigned.data} : {}),
-          value: BigInt(unsigned.value),
-          ...(unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {}),
-          ...(unsigned.gasLimit ? {gasLimit: BigInt(unsigned.gasLimit)} : {}),
-          ...(cellBody !== undefined
-            ? {body: cellBody}
-            : unsigned.memo
-              ? (tronSource ? {memo: unsigned.memo, ...(unsigned.memoEncoding ? {memoEncoding: unsigned.memoEncoding} : {})} : nearSource ? {memo: unsigned.memo} : {body: unsigned.memo})
-              : {}),
-        });
-      }
-      if (!sent.hash) throw new Swap2ExecutionError("swap2: account did not return a source transaction hash");
+        if (!sent.hash) {
+          if (journal) throw new Swap2MaybeSentError("swap2: account did not return a source transaction hash — reconcile; do not repeat");
+          throw new Swap2ExecutionError("swap2: account did not return a source transaction hash");
+        }
+        return {...sent, hash: sent.hash};
+      };
+      sent = journal ? await journal.effect("source", this.fromChain, sendSource, {hash: (r) => r.hash, ambiguous: maybeSent}) : await sendSource();
       this.emitPhase("broadcast", {hash: sent.hash});
     } catch (error) {
       // The deposit may be in the mempool: revoking would race it, and a
@@ -1595,6 +1646,104 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     if (balance < need) {
       throw new Swap2InsufficientGasError(`swap2: native balance ${balance} cannot pay this swap's gas: need ${need} (${fees.length} transaction${fees.length === 1 ? "" : "s"}${value ? ` + value ${value}` : ""}) — nothing was signed`);
     }
+  }
+
+  /** Read-only reconciliation. Never signs, re-quotes, repeats an approval or re-sends funds. */
+  async resumeSwap2(operationId: string): Promise<Swap2ResumeResult> {
+    const store = (this._config as Swap2EngineConfig).operationStore;
+    if (!store) throw new Swap2ConfigurationError("swap2: resume requires operationStore");
+    const operation = await loadSwap2Operation(store, operationId);
+    if (!operation) throw new Swap2StatusError("swap2: operation not found");
+    if (operation.sourceChain !== this.fromChain) throw new Swap2ValidationError("swap2: operation belongs to another source chain");
+    const provider = this.providerFor(operation.provider);
+    if (!provider) throw new Swap2StatusError("swap2: operation provider is not installed");
+    const source = operation.steps.find((s) => s.kind === "source");
+    const registration = operation.steps.find((s) => s.kind === "order-register");
+    const recovery = operation.steps.find((s) => s.kind === "recovery");
+    const unknown: Swap2ResumeResult = {operation, status: {state: "unknown"}};
+    if ((!source?.hash && !registration && !recovery?.hash) || source?.state === "rejected" || registration?.state === "rejected" || recovery?.state === "rejected") return unknown;
+    const parent = operation.request.recoveryParent ? decodeId(operation.request.recoveryParent) : undefined;
+    if (parent && (parent.provider !== operation.provider || parent.intentId !== operation.intentId)) throw new Swap2ValidationError("swap2: recovery journal does not match its parent");
+    const id = parent ? operation.request.recoveryParent! : encodeId(operation.provider, operation.intentId, source?.hash);
+    try {
+      const status = await provider.trackIntent({intentId: operation.intentId,
+        ...(source?.hash ? {sourceTxHash: source.hash} : parent?.sourceTxHash ? {sourceTxHash: parent.sourceTxHash} : {}),
+        ...(parent?.destTxHash ? {destTxHash: parent.destTxHash} : {}),
+        ...(recovery?.hash ? {recoveryTxHash: recovery.hash, recoveryChain: recovery.chain, ...(recovery.actionId ? {recoveryActionId: recovery.actionId} : {})} : {}),
+      });
+      if (!status || !["pending", "action-required", "refund-pending", "partial", "completed", "failed", "refunded", "cancelled", "expired"].includes(status.state)) return {...unknown, id};
+      const uncertain = operation.steps.some((s) => s.state === "pending" || s.state === "unknown");
+      // An absent/unknown broadcast is not evidence of a failed delivery or a refund.
+      if (uncertain && ["failed", "refunded", "cancelled", "expired"].includes(status.state)) return {...unknown, id};
+      return {operation, id, status};
+    } catch { return {...unknown, id}; }
+  }
+
+  /** Recovery discovery. Execution refreshes the selected offer and requires an explicit review. */
+  async getSwap2RecoveryQuotes(id: string): Promise<readonly RecoveryQuote[]> {
+    const {provider: name, ...ref} = decodeId(id);
+    const provider = this.providerFor(name);
+    if (!provider?.getRecoveryQuotes || !provider.enabled()) throw new Swap2UnsupportedOperationError("swap2: provider has no enabled recovery support");
+    const quotes = await provider.getRecoveryQuotes(ref);
+    if (!Array.isArray(quotes) || quotes.length > 32) throw new Swap2ValidationError("swap2: malformed recovery offers");
+    const ids = new Set<string>();
+    for (const q of quotes) {
+      if (!q || !validRouteId(q.id) || ids.has(q.id) || !["claim", "retry-token", "retry-message", "drive-bus", "compose"].includes(q.kind) || typeof q.description !== "string" || !q.description || q.description.length > 1000 || !q.tx || !Number.isFinite(q.validUntilMs) || q.validUntilMs <= Date.now()) throw new Swap2ValidationError("swap2: malformed or expired recovery offer");
+      ids.add(q.id);
+    }
+    return Object.freeze(quotes.map((q) => Object.freeze({...q, tx: Object.freeze({...q.tx})})));
+  }
+
+  /** A separately reviewed, bounded EVM recovery. Legacy claimSwap2 remains zero-value. */
+  async recoverSwap2(id: string, actionId: string, account: Swap2Account, options: Swap2RecoveryOptions): Promise<{hash: string; chain: string; operationId: string}> {
+    const opts = Object.freeze({...options});
+    const store = (this._config as Swap2EngineConfig).operationStore;
+    if (!store || typeof opts.operationId !== "string" || !opts.operationId || typeof opts.review !== "function" || typeof opts.maxNativeValue !== "bigint" || opts.maxNativeValue < 0n) throw new Swap2ConfigurationError("swap2: recovery requires storage, operationId, native value cap and review");
+    const {provider: name, ...ref} = decodeId(id);
+    const provider = this.providerFor(name);
+    if (!provider?.verifyRecovery || !provider.recoveryTargets) throw new Swap2UnsupportedOperationError("swap2: recovery needs client-side targets and a calldata validator");
+    const q = (await this.getSwap2RecoveryQuotes(id)).find((q) => q.id === actionId);
+    if (!q) throw new Swap2StatusError("swap2: recovery action is no longer available");
+    const tx = q.tx;
+    if (!/^eip155:[1-9][0-9]*$/.test(tx.chain)) throw new Swap2UnsupportedOperationError("swap2: recovery execution currently requires EVM");
+    const chainId = Number(tx.chain.slice(7));
+    if (!Number.isSafeInteger(chainId) || (tx.chainId !== undefined && tx.chainId !== chainId)) throw new Swap2ValidationError("swap2: invalid recovery chainId");
+    if (!/^0x[0-9a-fA-F]{40}$/.test(tx.to) || !/^0x(?:[0-9a-fA-F]{2}){4,}$/.test(tx.data ?? "") || !/^[0-9]{1,78}$/.test(tx.value) || BigInt(tx.value) > opts.maxNativeValue || BigInt(tx.value) > (1n << 256n) - 1n) throw new Swap2ValidationError("swap2: recovery target/calldata/value is invalid or exceeds the cap");
+    if (tx.gasLimit !== undefined && (!/^[0-9]{1,78}$/.test(tx.gasLimit) || BigInt(tx.gasLimit) <= 0n || BigInt(tx.gasLimit) > (1n << 256n) - 1n)) throw new Swap2ValidationError("swap2: malformed recovery gas limit");
+    if ([tx.serializedTx, tx.typedData, tx.bodyBoc, tx.stateInitBoc, tx.memo, tx.memoEncoding, tx.approvalAddress, tx.orderExtension].some((v) => v !== undefined)) throw new Swap2ValidationError("swap2: recovery must be plain EVM calldata");
+    if (!provider.recoveryTargets(tx.chain).some((a) => a.toLowerCase() === tx.to.toLowerCase())) throw new Swap2ValidationError("swap2: unpinned recovery target");
+    const call = decodeCall({to: tx.to, data: tx.data!, value: BigInt(tx.value)});
+    if (call.undecodable || call.approval || call.transfer) throw new Swap2ValidationError("swap2: recovery cannot grant allowances or transfer this account's tokens");
+    const signer = account as Partial<Swap2Signer>;
+    if (typeof signer.sendTransaction !== "function" || typeof signer.getAddress !== "function") throw new Swap2ExecutionError("swap2: recovery needs a signing account");
+    const actor = await signer.getAddress();
+    const assertChain = async () => {
+      const actual = await readAccountChain(signer as Swap2Signer);
+      const normalized = actual == null ? "" : String(actual).replace(/^eip155:/, "");
+      if (normalized !== String(chainId)) throw new Swap2ValidationError("swap2: recovery account is on the wrong chain");
+    };
+    await assertChain();
+    const validate = async () => {
+      if (!provider.enabled() || q.validUntilMs <= Date.now()) throw new Swap2StatusError("swap2: recovery is disabled or expired");
+      const refusal = await provider.verifyRecovery!(ref, q, actor);
+      if (refusal !== null) throw new Swap2ValidationError(`swap2: recovery refused: ${String(refusal).slice(0, 300)}`);
+    };
+    await validate();
+    const journal = await Swap2OperationJournal.create(store, {id: opts.operationId, provider: name, intentId: ref.intentId, sourceChain: this.fromChain, sender: actor,
+      request: {recoveryParent: id, actionId, kind: q.kind, chain: tx.chain, target: tx.to, value: tx.value}});
+    await opts.review(q);
+    await assertChain();
+    if ((await signer.getAddress()).toLowerCase() !== actor.toLowerCase()) throw new Swap2ValidationError("swap2: recovery account changed during review");
+    await validate();
+    if (q.validUntilMs <= Date.now()) throw new Swap2StatusError("swap2: recovery expired during validation");
+    const sent = await journal.effect("recovery", tx.chain, async () => {
+      await assertChain();
+      if (q.validUntilMs <= Date.now() || (await signer.getAddress!()).toLowerCase() !== actor.toLowerCase()) throw new Swap2StatusError("swap2: recovery expired or account changed before signature");
+      const sent = await signer.sendTransaction!({to: tx.to, data: tx.data!, value: BigInt(tx.value), chainId, ...(tx.gasLimit ? {gasLimit: BigInt(tx.gasLimit)} : {})});
+      if (!sent.hash) throw new Swap2MaybeSentError("swap2: recovery returned no hash — reconcile; do not repeat");
+      return sent;
+    }, {actionId, hash: (r) => r.hash, ambiguous: maybeSent});
+    return {hash: sent.hash!, chain: tx.chain, operationId: opts.operationId};
   }
 
   /** Status of a swap by the id `swap2()` returned, asked from the provider that executed it. */

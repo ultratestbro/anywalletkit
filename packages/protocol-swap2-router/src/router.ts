@@ -137,6 +137,9 @@ export class CrossChainRouter {
       // Two-phase routes (CCTP): the destination claim. Missing here, the engine
       // and the server both reported "provider 'cctp' has no claim step" (2026-10-13).
       ...(provider.buildClaim ? {buildClaim: provider.buildClaim.bind(provider)} : {}),
+      ...(provider.getRecoveryQuotes ? {getRecoveryQuotes: provider.getRecoveryQuotes.bind(provider)} : {}),
+      ...(provider.recoveryTargets ? {recoveryTargets: provider.recoveryTargets.bind(provider)} : {}),
+      ...(provider.verifyRecovery ? {verifyRecovery: provider.verifyRecovery.bind(provider)} : {}),
       ...(provider.claimTargets ? {claimTargets: provider.claimTargets.bind(provider)} : {}),
       // A remote stub's marker and the app's pins (scan 2026-10-27 modules, F8/F9/F16): dropped here, the engine took a
       // remote provider for a local one and checked its calldata against the backend's own addresses.

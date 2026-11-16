@@ -52,7 +52,7 @@ export type Swap2Request =
   | {intentId: string; signature: string}
   | {from: Asset; to: Asset};
 
-export type Swap2Action = "quote" | "quotes" | "build" | "preflight" | "track" | "claim" | "notify" | "register" | "supports";
+export type Swap2Action = "quote" | "quotes" | "build" | "preflight" | "track" | "claim" | "recoveries" | "notify" | "register" | "supports";
 
 export interface Swap2HandlerOptions<C> {
   /** The real providers, by `name` (the same names the app's `remoteProvider`s use). */
@@ -104,7 +104,7 @@ export class Swap2HandlerError extends Error {
   }
 }
 
-const ACTIONS: ReadonlySet<string> = new Set(["quote", "quotes", "build", "preflight", "track", "claim", "notify", "register", "supports"]);
+const ACTIONS: ReadonlySet<string> = new Set(["quote", "quotes", "build", "preflight", "track", "claim", "recoveries", "notify", "register", "supports"]);
 const SEAL_FIELD = "__remoteSeal";
 const SEAL_PREFIX = "swap2-remote-quote:v1:";
 const INTENT_PREFIX = "swap2-remote-intent:v1";
@@ -230,10 +230,16 @@ export function createSwap2Handler<C = unknown>(opts: Swap2HandlerOptions<C>): (
           return ok({});
         }
         case "track":
-        case "claim": {
+        case "claim":
+        case "recoveries": {
           const {ref} = request as {ref: IntentRef};
           const own = {...ref, intentId: await untoken(providerName, subject, ref.intentId, act)};
           if (act === "track") return ok(await provider.trackIntent(own));
+          if (act === "recoveries") {
+            const quotes = await provider.getRecoveryQuotes?.(own) ?? [];
+            if (!Array.isArray(quotes) || quotes.length > 32) return fail(502, "invalid recovery offers");
+            return ok(quotes);
+          }
           if (!provider.buildClaim) return ok({});
           return ok(await refused(() => provider.buildClaim!(own)));
         }
@@ -268,7 +274,8 @@ function validated(action: Swap2Action, b: Record<string, unknown>, allowUnliste
     case "build": return {quote: normalizeQuote(b.quote, WIRE_INTENT_MAX)};
     case "preflight": return {quote: normalizeQuote(b.quote, WIRE_INTENT_MAX), tx: unsignedTx(b.tx)};
     case "track":
-    case "claim": return {ref: intentRef(b.ref)};
+    case "claim":
+    case "recoveries": return {ref: intentRef(b.ref)};
     case "notify": return {intentId: str(b.intentId, "intentId", WIRE_INTENT_MAX), txHash: str(b.txHash, "txHash", 200)};
     case "register": {
       const signature = str(b.signature, "signature", 302);
@@ -454,10 +461,16 @@ function intentRef(v: unknown): IntentRef {
   const nullable = (x: unknown, f: string) => (x === null || x === undefined ? undefined : str(x, f, 200));
   const sourceTxHash = nullable(r.sourceTxHash, "ref.sourceTxHash");
   const destTxHash = nullable(r.destTxHash, "ref.destTxHash");
+  const recoveryTxHash = optStr(r.recoveryTxHash, "ref.recoveryTxHash", 256);
+  const recoveryChain = optStr(r.recoveryChain, "ref.recoveryChain", 64);
+  const recoveryActionId = optStr(r.recoveryActionId, "ref.recoveryActionId", 256);
   return {
     intentId: str(r.intentId, "ref.intentId", WIRE_INTENT_MAX),
     ...(sourceTxHash !== undefined ? {sourceTxHash} : {}),
     ...(destTxHash !== undefined ? {destTxHash} : {}),
+    ...(recoveryTxHash !== undefined ? {recoveryTxHash} : {}),
+    ...(recoveryChain !== undefined ? {recoveryChain} : {}),
+    ...(recoveryActionId !== undefined ? {recoveryActionId} : {}),
   };
 }
 

@@ -51,6 +51,8 @@ export interface Swap2CommonOptions {
   refundAddress?: string
   /** Stable route selector within the chosen provider; preserves the chosen mode on requote. */
   routeId?: string
+  /** Application-chosen idempotency key; requires the engine's durable operation store. */
+  operationId?: string
   /** Decimal, 0.01 = 1 %. */
   slippage?: number
   /** Minimum acceptable destination amount, base units (overrides slippage when set). */

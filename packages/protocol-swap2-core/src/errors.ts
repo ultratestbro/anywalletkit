@@ -50,5 +50,6 @@ export class Swap2InsufficientGasError extends Swap2ExecutionError {}
  * chain for `hash`. The approval is left in place (the deposit may spend it).
  */
 export class Swap2MaybeSentError extends Swap2ExecutionError {
+  readonly maybeSent = true;
   constructor(message: string, readonly hash?: string, readonly id?: string, options?: ErrorOptions) { super(message, options); }
 }

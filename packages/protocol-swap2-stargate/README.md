@@ -169,8 +169,10 @@ and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412
   `using(provider, routeId)`, sealed remote candidates and pinned requotes. Existing
   `getQuote`, `using(provider)` and tracking IDs remain compatible. Stargate's
   provider will implement these hooks in SDK-326.
-- SDK-325: application-owned durable storage and recovery actions; retain `awk1` IDs
-  and old zero-value EVM claims. Paid source recovery needs a separate bounded path.
+- SDK-325: core now provides application-owned atomic journals, read-only reconciliation
+  and a separate reviewed/value-bounded EVM recovery path. Stargate must supply the
+  on-chain validators and recovery offers in SDK-328/329. Old `awk1` IDs and zero-value
+  claims retain their existing contracts.
 - SDK-326 through SDK-329: provider quoting, execution/pins, payout tracking, Bus and
   recovery. These are not implemented by the current helpers or fixtures.
 - SDK-330/SDK-331: API discovery and resumable steps, key held server-side. Include only

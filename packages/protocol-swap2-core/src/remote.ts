@@ -1,4 +1,4 @@
-import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "./types.js";
+import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx, RecoveryQuote} from "./types.js";
 import {anySignal, timeoutSignal} from "./util.js";
 import {validQuote, validRouteId} from "./validate.js";
 
@@ -47,6 +47,9 @@ export interface RemoteProviderOptions {
    * refuses claims from this stub (round 3, M24).
    */
   claimTargets?: (chain: string) => readonly string[];
+  /** Paid recovery is opt-in: both pins and a client-side on-chain validator are required. */
+  recoveryTargets?: (chain: string) => readonly string[];
+  verifyRecovery?: (ref: IntentRef, quote: RecoveryQuote, actor: string) => Promise<string | null>;
   /**
    * The contracts this provider's EVM swaps may call, and the spenders they may be approved for,
    * per chain — the provider package's pins (`lifiPins`, `fyndPins`, `uniswapPins`…, spread into
@@ -227,6 +230,11 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     ...(opts.supportsChainPair ? {supportsChainPair: opts.supportsChainPair.bind(opts)} : {}),
     ...(opts.supportsSameChain !== undefined ? {supportsSameChain: opts.supportsSameChain} : {}),
     ...(opts.claimTargets ? {claimTargets: opts.claimTargets} : {}),
+    ...(opts.recoveryTargets && opts.verifyRecovery ? {
+      recoveryTargets: opts.recoveryTargets,
+      verifyRecovery: opts.verifyRecovery,
+      getRecoveryQuotes: (ref: IntentRef) => call<RecoveryQuote[]>("recoveries", {ref}),
+    } : {}),
     ...(opts.callTargets ? {callTargets: opts.callTargets} : {}),
     ...(opts.spenders ? {spenders: opts.spenders} : {}),
   };

@@ -106,6 +106,19 @@ export interface IntentRef {
   sourceTxHash?: string | null;
   /** Two-phase routes: the destination-chain claim transaction, once sent. */
   destTxHash?: string | null;
+  /** A separately reviewed recovery transaction; never replaces the original source hash. */
+  recoveryTxHash?: string;
+  recoveryChain?: string;
+  recoveryActionId?: string;
+}
+
+/** A fresh, explicitly priced recovery call. Calldata must be checked on the signing client. */
+export interface RecoveryQuote {
+  id: string;
+  kind: "claim" | "retry-token" | "retry-message" | "drive-bus" | "compose";
+  description: string;
+  validUntilMs: number;
+  tx: UnsignedTx;
 }
 
 /** The router's chosen quote, tagged with how it scored. */
@@ -259,6 +272,13 @@ export interface CrossChainProvider {
    * destination-chain account (`claimSwap2`); `tx.chain` names that chain.
    */
   buildClaim?(ref: IntentRef): Promise<UnsignedTx | null>;
+  /** Fresh recovery offers, on the source or destination; no signing or side effects. */
+  getRecoveryQuotes?(ref: IntentRef): Promise<RecoveryQuote[]>;
+  /** Local/client pins, never addresses supplied by a backend response. */
+  recoveryTargets?(chain: string): readonly string[];
+  /** Required client validator: bind calldata/value/recipient to on-chain intent evidence,
+   * and recheck current recoverability. Called again after review, before signature. */
+  verifyRecovery?(ref: IntentRef, quote: RecoveryQuote, actor: string): Promise<string | null>;
   /**
    * The contracts a claim from {@link buildClaim} may call on `chain` (CAIP-2) — CCTP's
    * MessageTransmitter. `claimSwap2` refuses a claim to anything else, and a provider with a claim
