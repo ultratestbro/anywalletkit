@@ -53,8 +53,8 @@ export interface RouteSet {
   quotes: RankedQuote[];
   /** Most delivered value (net of fees when priced) within the tie band. */
   best: RankedQuote;
-  /** Lowest ETA. */
-  fastest: RankedQuote;
+  /** Lowest known ETA, or null when every route has an unknown ETA. */
+  fastest: RankedQuote | null;
   /** Providers still quoting (only non-empty in progressive `onUpdate` snapshots). */
   pending: string[];
   /** Why the venues that sat out did (same as `lastRejections`). */
@@ -224,7 +224,7 @@ export class CrossChainRouter {
   ): Promise<RoutedQuote | null> {
     const set = await this.getQuotes(params, options);
     if (!set) return null;
-    const pick = options?.prefer === "fastest" ? set.fastest : set.best;
+    const pick = options?.prefer === "fastest" ? set.fastest ?? set.best : set.best;
     const {netValueUsd: _n, relativeValue: _r, tags: _t, ...quote} = pick;
     return {
       ...quote,
@@ -403,22 +403,22 @@ export class CrossChainRouter {
     }));
 
     const tier = ranked.filter((q) => q.relativeValue >= 1 - this.tieBand - 1e-12);
-    const etas = tier.map((q) => q.etaSeconds);
+    const etas = tier.flatMap((q) => q.etaSeconds === null ? [] : [q.etaSeconds]);
     const minEta = Math.min(...etas);
     const maxEta = Math.max(...etas);
     const w = this.weights;
     const tieScore = (q: RankedQuote) =>
       w.price * q.relativeValue +
-      w.speed * (maxEta === minEta ? 1 : (maxEta - q.etaSeconds) / (maxEta - minEta)) +
+      w.speed * (q.etaSeconds === null ? 0 : maxEta === minEta ? 1 : (maxEta - q.etaSeconds) / (maxEta - minEta)) +
       w.reliability * q.reliability;
     const best = tier.reduce((a, b) => (tieScore(b) > tieScore(a) ? b : a));
-    const fastest = ranked.reduce((a, b) =>
-      b.etaSeconds < a.etaSeconds || (b.etaSeconds === a.etaSeconds && b.relativeValue > a.relativeValue) ? b : a);
+    const fastest = ranked.reduce<RankedQuote | null>((a, b) => b.etaSeconds === null ? a :
+      a === null || b.etaSeconds < a.etaSeconds! || (b.etaSeconds === a.etaSeconds && b.relativeValue > a.relativeValue) ? b : a, null);
     best.tags.push("best");
-    fastest.tags.push("fastest");
+    fastest?.tags.push("fastest");
 
     // The list reads top-down by value; the pick leads its price tier.
-    ranked.sort((a, b) => (a === best ? -1 : b === best ? 1 : b.relativeValue - a.relativeValue || a.etaSeconds - b.etaSeconds));
+    ranked.sort((a, b) => (a === best ? -1 : b === best ? 1 : b.relativeValue - a.relativeValue || (a.etaSeconds ?? Infinity) - (b.etaSeconds ?? Infinity)));
     return {quotes: ranked, best, fastest, pending, rejections: [...rejections]};
   }
 }

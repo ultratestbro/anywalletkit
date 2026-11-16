@@ -90,8 +90,8 @@ export interface Quote {
   feeUsd: number; // normalized fee for scoring
   /** Honest itemized fees when the provider exposes base-unit amounts. */
   fees?: {type: "network" | "protocol" | "affiliate" | "other"; amount: string; token: string; included: boolean; description?: string}[];
-  /** Estimated time to delivery. */
-  etaSeconds: number; // estimated settlement time
+  /** Estimated time to delivery, or null when no defensible estimate is available. */
+  etaSeconds: number | null;
   /** Provider's reliability hint, 0 to 1. */
   reliability: number; // 0..1 provider/route reliability hint
   /** Quote expiry, unix milliseconds. */
@@ -127,7 +127,7 @@ export interface RoutedQuote extends Quote {
     score: number;
     weights: ScoreWeights;
     /** Every validated route: `score` is its value against the best (0..1). */
-    candidates: {provider: string; routeId?: string; sourceAmount: string; etaSeconds: number; score: number; minDestAmount?: string; netValueUsd?: number | null}[];
+    candidates: {provider: string; routeId?: string; sourceAmount: string; etaSeconds: number | null; score: number; minDestAmount?: string; netValueUsd?: number | null}[];
   };
 }
 
@@ -220,7 +220,8 @@ export interface RemotePins {
    * fails, or null.
    */
   verifyQuote?(params: QuoteParams, quote: Quote): string | null;
-  /** A client-side check of a remote build (typed order, cell body) against its quote: the reason it fails, or null. */
+  /** Read-only client check of a remote build against its quote: reason or null.
+   * May run repeatedly, including after preflight immediately before signing. */
   verifyBuild?(quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null | Promise<string | null>;
   /**
    * The provider's routes pay an address the backend names — a deposit address, or a plain value send — instead of

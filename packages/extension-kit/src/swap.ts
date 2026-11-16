@@ -28,7 +28,7 @@ export interface RouteView {
   feeUsd: number
   /** On-chain pool venues take the fee inside the output; "$0.00" would mislead. */
   feeNote?: string
-  etaSeconds: number
+  etaSeconds: number | null
   validUntilMs: number
   tags: ('best' | 'fastest')[]
 }
@@ -101,14 +101,14 @@ export async function quoteRoutes(providers: readonly CrossChainProvider[], para
 
 /** Highest output first (same destination token for every quote); FASTEST = lowest ETA among them. */
 export function rank(quotes: Quote[]): RouteView[] {
-  const sorted = [...quotes].sort((a, b) => (BigInt(b.destAmount) > BigInt(a.destAmount) ? 1 : BigInt(b.destAmount) < BigInt(a.destAmount) ? -1 : a.feeUsd - b.feeUsd || a.etaSeconds - b.etaSeconds))
-  const fastest = sorted.length ? sorted.reduce((f, q) => (q.etaSeconds < f.etaSeconds ? q : f)) : null
+  const sorted = [...quotes].sort((a, b) => (BigInt(b.destAmount) > BigInt(a.destAmount) ? 1 : BigInt(b.destAmount) < BigInt(a.destAmount) ? -1 : a.feeUsd - b.feeUsd || (a.etaSeconds ?? Infinity) - (b.etaSeconds ?? Infinity)))
+  const fastest = sorted.reduce<Quote | null>((f, q) => q.etaSeconds === null ? f : !f || q.etaSeconds < f.etaSeconds! ? q : f, null)
   return sorted.map((q, i) => {
     const poolFee = q.providerData?.poolFee
     const feeNote = typeof poolFee === 'string' && poolFee && q.feeUsd === 0 ? (poolFee === 'pools' ? 'pool fees in price' : `pool ${poolFee} in price`) : undefined
     const tags: RouteView['tags'] = []
     if (i === 0) tags.push('best')
-    if (fastest && q.provider === fastest.provider) tags.push('fastest')
+    if (q === fastest) tags.push('fastest')
     return { provider: q.provider, destAmount: q.destAmount, minDestAmount: q.minDestAmount, feeUsd: q.feeUsd, etaSeconds: q.etaSeconds, validUntilMs: q.validUntilMs, tags, ...(feeNote ? { feeNote } : {}) }
   })
 }
@@ -151,7 +151,7 @@ export interface SwapApproval {
   recipient: { address: string; isOwn: boolean }
   refundAddress: string
   feeUsd: number
-  etaSeconds: number
+  etaSeconds: number | null
   validUntilMs: number
   approvals: { token: string; spender: string; amount: string }[]
   source:

@@ -392,7 +392,7 @@ function normalizeQuote(v: unknown, intentMax: number): Quote {
     destAmount: digits(q.destAmount, "quote.destAmount", 60),
     minDestAmount: digits(q.minDestAmount, "quote.minDestAmount", 60),
     feeUsd: num(q.feeUsd, "quote.feeUsd"),
-    etaSeconds: num(q.etaSeconds, "quote.etaSeconds"),
+    etaSeconds: q.etaSeconds === null ? null : num(q.etaSeconds, "quote.etaSeconds"),
     reliability: num(q.reliability, "quote.reliability", 0, 1),
     validUntilMs: num(q.validUntilMs, "quote.validUntilMs"),
   };

@@ -23,7 +23,7 @@ describe("multiple candidates from one provider", () => {
   it("ranks both modes and exposes stable selectors through the public picker", async () => {
     const p = provider();
     const set = (await new CrossChainRouter([p]).getQuotes(params))!;
-    expect(set.best.routeId).toBe("bus"); expect(set.fastest.routeId).toBe("taxi");
+    expect(set.best.routeId).toBe("bus"); expect(set.fastest!.routeId).toBe("taxi");
     const api = new RouterSwap2Protocol(undefined, {fromChain: "eip155:1", providers: [p]});
     const routes = await api.quoteSwap2Routes(options);
     expect(routes.map((r) => [r.provider, r.routeId, r.quote.routeId])).toEqual([["multi", "bus", "bus"], ["multi", "taxi", "taxi"]]);

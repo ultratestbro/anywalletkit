@@ -210,6 +210,12 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     },
     async preflightDeposit(quote: Quote, tx: UnsignedTx): Promise<void> {
       await call<Record<string, never>>("preflight", {quote, tx});
+      // Approval/review may take time. A backend response cannot stand in for
+      // the client's own current network evidence immediately before signing.
+      if (opts.verifyBuild) {
+        const refusal = await opts.verifyBuild(quote, tx, requests.get(requestKey(quote)));
+        if (refusal) throw new Error(`${name}: preflight fails this app's own check — ${refusal.slice(0, 240)}`);
+      }
     },
     async trackIntent(ref: IntentRef): Promise<IntentStatus> {
       return call<IntentStatus>("track", {ref});

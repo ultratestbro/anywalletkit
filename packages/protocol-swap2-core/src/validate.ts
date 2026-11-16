@@ -27,7 +27,7 @@ export function validQuote(q: Quote, params: QuoteParams, provider: string): boo
       const required = (dest * BigInt(10_000 - params.slippageBps)) / 10_000n;
       if (min < required) return false;
     }
-    if (!Number.isFinite(q.etaSeconds) || q.etaSeconds < 0) return false;
+    if (q.etaSeconds !== null && (!Number.isFinite(q.etaSeconds) || q.etaSeconds < 0)) return false;
     if (!Number.isFinite(q.reliability) || q.reliability < 0 || q.reliability > 1) return false;
     if (!Number.isFinite(q.feeUsd) || q.feeUsd < 0) return false;
     if (q.fees && (!Array.isArray(q.fees) || !q.fees.every((fee) =>

@@ -1,5 +1,12 @@
 import {parseAbi} from "viem";
 
+export const ENDPOINT_ABI = parseAbi([
+  "struct Origin { uint32 srcEid; bytes32 sender; uint64 nonce; }",
+  "function inboundPayloadHash(address receiver, uint32 srcEid, bytes32 sender, uint64 nonce) view returns (bytes32)",
+  "function lzReceive(Origin origin, address receiver, bytes32 guid, bytes message, bytes extraData) payable",
+  "event PacketSent(bytes encodedPayload, bytes options, address sendLibrary)",
+]);
+
 // SDK-322: checked against pinned upstream deployment ABI by abi.test.ts.
 // Provenance: tests/fixtures/upstream.json. This is an interface, not a deployment allowlist.
 export const STARGATE_ABI = parseAbi([

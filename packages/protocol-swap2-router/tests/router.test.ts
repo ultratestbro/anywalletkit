@@ -221,7 +221,7 @@ describe("ranking, route picker, progressive quotes", () => {
     const router = new CrossChainRouter([q("slow", "99950000", 1200), q("fast", "99900000", 60)]);
     const set = (await router.getQuotes(PARAMS))!;
     expect(set.best.provider).toBe("fast"); // 0.05% apart: the same price, the faster wins
-    expect(set.fastest.provider).toBe("fast");
+    expect(set.fastest!.provider).toBe("fast");
     expect(set.quotes.map((x) => x.provider)).toEqual(["fast", "slow"]);
   });
 
@@ -230,9 +230,22 @@ describe("ranking, route picker, progressive quotes", () => {
     const set = (await router.getQuotes(PARAMS))!;
     expect(set.best.provider).toBe("slow");
     expect(set.best.tags).toEqual(["best"]);
-    expect(set.fastest.provider).toBe("fast");
-    expect(set.fastest.tags).toEqual(["fastest"]);
+    expect(set.fastest!.provider).toBe("fast");
+    expect(set.fastest!.tags).toEqual(["fastest"]);
     expect((await router.getBestQuote(PARAMS, {prefer: "fastest"}))!.provider).toBe("fast");
+  });
+
+  it("does not award fastest or a speed bonus to an unknown ETA", async () => {
+    const unknown = q("unknown", "99900000", 0, {etaSeconds: null});
+    const known = q("known", "99900000", 600);
+    const mixed = (await new CrossChainRouter([unknown, known]).getQuotes(PARAMS))!;
+    expect(mixed.best.provider).toBe("known");
+    expect(mixed.fastest?.provider).toBe("known");
+    const router = new CrossChainRouter([unknown]);
+    const only = (await router.getQuotes(PARAMS))!;
+    expect(only.fastest).toBeNull();
+    expect(only.best.tags).toEqual(["best"]);
+    expect((await router.getBestQuote(PARAMS, {prefer: "fastest"}))?.etaSeconds).toBeNull();
   });
 
   it("nets a native bridge fee out of the route's value (usdValue)", async () => {

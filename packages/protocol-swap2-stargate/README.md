@@ -1,10 +1,13 @@
-# Stargate integration foundation
+# Stargate integration (in development)
 
 Work for [SDK-321](https://megabunny.xyz/b/SDK/t/321), starting with
 [SDK-322](https://megabunny.xyz/b/SDK/t/322) and
 [SDK-323](https://megabunny.xyz/b/SDK/t/323). This private package contains interfaces,
-amount accounting, a reviewed deployment registry and reproducible read-only evidence. It does not yet expose a swap
-provider, sign transactions or appear in the module registry.
+amount accounting, a reviewed deployment registry, direct quotes, execution/client
+pins, Taxi payout tracking and destination recovery. `stargateProvider` and
+`StargateSwap2Protocol` are disabled by default (`enabled: true` is an explicit opt-in).
+The package remains private and absent from the module registry while Bus tracking,
+API routes and additional evidence are implemented. No funded send has been performed.
 
 The full scope includes direct Stargate Taxi/Bus, verified deployments, tracking,
 recovery and gas drop. The separate planned `protocol-swap2-layerzero` package covers
@@ -51,10 +54,9 @@ statement about the protocol. A transport failure aborts capture; an observed qu
 revert is retained as an unavailable route. Failed capture preserves the previous
 snapshot. Refreshes require review, including changes to availability assertions.
 
-The deployment artifact and observed revert use `Bus_InvalidFare(bool)`, whereas
-`src/libs/Bus.sol` at the pinned revision declares a `uint80` parameter. This proves
-why the deployment ABI and raw responses must be checked independently of current
-source signatures. The collector decodes the deployed form.
+The deployment artifact, pinned `src/libs/Bus.sol` and observed revert use
+`Bus_InvalidFare(bool)`. The collector preserves and decodes the raw revert, rather
+than assuming Bus is available whenever TokenMessaging peers are configured.
 
 ## Reviewed registry and coverage
 
@@ -133,11 +135,35 @@ the user's destination floor upward to a representable shared amount before enco
 it in source units. Negative signed fee details are charges; positive details are
 rewards. A reward must not be rejected merely because output exceeds input.
 
-The provider must additionally reject zero effective input/output, enforce route
-limits and caller slippage, expose actual debit/dust, and account for messaging and
-execution gas without double counting fees already included in the output. Native
+`createStargateQuoter` and `stargateProvider` reject zero effective input/output,
+clipped exact-input receipts, inconsistent signed fees and insufficient output
+credits (including rewards). Caller floors and slippage floors are rounded upward
+to shared precision. Native
 assets are identified by `token() == address(0)`: the captured native pool reports
 `approvalRequired() == true`, so this flag alone must not trigger an ERC20 approve.
+
+Quotes verify both chains, deployment identities, reciprocal messaging peers and
+active status at fixed blocks, then recheck block hashes. Nodes more than five
+minutes behind are refused. Credits are not reserved. `etaSeconds`, source gas
+and approval gas are explicitly unknown; the signing wallet estimates execution
+gas. `Quote.etaSeconds` is nullable throughout swap2, its API, router and extension
+view. Unknown ETA receives no speed bonus or fastest tag.
+
+The low-level quote separates requested input, actual sent input, dust, protocol
+fee/reward, current messaging fee and its cap (25% default headroom, rounded up).
+ERC20 dust remains in the wallet; native dust is attached with the original input
+and becomes surplus messaging payment sent to the sender as a refund. Native
+refunds depend on the recipient accepting them. `sourceAmount` remains the user's
+requested maximum, while `providerData.sentAmount` and `dust` disclose the wire
+amount. Protocol charges are already deducted from output. Messaging cap is
+additional; neither its unused headroom nor rewards are counted as protocol fees.
+There is no USD oracle in this provider (`feeUsdKnown: "false"`); applications can
+use the router's valuation callback with their own prices.
+
+Taxi native drop uses a type-3 executor option addressed to the transfer recipient.
+Bus uses the pathway's current fixed drop amount; that setting can change before
+the bus is driven. `nativeDrop: {taxi: amount, bus: true}` opts into either mode on
+the provider and its client pins. Arbitrary options and compose bytes are refused.
 
 References: [StargateBase](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/StargateBase.sol),
 [native pool](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/StargatePoolNative.sol).
@@ -152,9 +178,30 @@ References: [StargateBase](https://github.com/stargate-protocol/stargate-v2/blob
 | Undelivered LayerZero message | Verified endpoint packet/pathway and current execution state | Separate endpoint retry; do not confuse it with cached-token recovery |
 | Compose | Bridge delivery plus adapter-specific final action evidence | Final swap completes only after the requested action; recovery depends on the actual composer |
 
-Runtime tracking and recovery are pending. Five historical plain-Taxi transfers are
-recorded; real Bus and recovery receipts remain to be collected. The Bus event codec
-test is explicitly synthetic, not a completed mainnet transfer.
+Taxi runtime tracking replays all five historical mainnet transfers. It verifies
+source sender/amount, endpoint packet/pathway, GUID, asset and receiver, then checks
+the destination pool's payout and canonical receipt/log identities. Scan supplies
+candidate transaction hashes only. By default receipts must be below the RPC's
+`finalized` head; `confirmations[chain]` explicitly substitutes an app's chosen
+confirmation depth. RPC outages, unindexed messages and reorgs remain pending.
+A finalized reverted direct source call is failed, never refunded.
+
+Cached-token recovery requires the exact `unreceivedTokens` commitment. Endpoint
+retry separately requires the exact `inboundPayloadHash` of GUID + message; cleared
+or nilified payloads are refused. Both quote a distinct destination transaction
+with zero attached value and separately paid wallet gas. Client validation rereads
+the commitment after review. They integrate with the durable `recoverSwap2` flow,
+whose operation ID and transaction hash are separate from the original source.
+Native-drop delivery is not yet independently proved: token payout with a requested
+drop reports `partial`, not full completion. Real Bus/recovery receipts and drop
+delivery evidence remain to be collected; synthetic cases are labelled as such.
+
+`stargatePins(config)` requires the client's own source/destination RPCs and reviewed
+registry. It verifies the entire canonical `sendToken` calldata, including mode,
+recipient, amount, minimum, refund address, options, native value and spender.
+Remote builds additionally recheck current chain state and fees on the client,
+including after the backend's preflight. A backend cannot substitute that check.
+`getQuotes` enumerates Taxi/Bus only for previews; execution keeps the selected mode.
 
 Bus acceleration must assemble the valid current queue prefix, obtain `quoteDriveBus`,
 and review a separate source-chain payment. Revalidate after any competing drive.
@@ -168,12 +215,15 @@ and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412
 - SDK-324: core/router now support optional display candidates, stable `routeId`,
   `using(provider, routeId)`, sealed remote candidates and pinned requotes. Existing
   `getQuote`, `using(provider)` and tracking IDs remain compatible. Stargate's
-  provider will implement these hooks in SDK-326.
+  provider now implements these hooks.
 - SDK-325: core now provides application-owned atomic journals, read-only reconciliation
   and a separate reviewed/value-bounded EVM recovery path. Stargate must supply the
   on-chain validators and recovery offers in SDK-328/329. Old `awk1` IDs and zero-value
   claims retain their existing contracts.
-- SDK-326 through SDK-329: provider quoting, execution/pins, payout tracking, Bus and
+- SDK-326/327: direct quoting, execution and client pins are implemented and tested.
+  SDK-328: Taxi payout tracking and destination recovery are implemented; historical
+  failed-delivery/retry evidence remains outstanding.
+- SDK-329: Bus tracking and
   recovery. These are not implemented by the current helpers or fixtures.
 - SDK-330/SDK-331: API discovery and resumable steps, key held server-side. Include only
   routes for which every wallet operation has a validator. EVM multicall, signatures

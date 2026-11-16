@@ -88,7 +88,9 @@ does not validate a transaction's behavior.
    route wins (`weights`, default `price:0.6,speed:0.3,reliability:0.1`). A sliver of extra output no
    longer beats a route that lands twenty times faster; a real price gap still wins.
 
-`fastest` is always the lowest ETA. Every quote passes the engine's checks before it is ranked, and
+`fastest` is the lowest known ETA, or `null` when all ETAs are unknown. Unknown
+`etaSeconds: null` gets no speed bonus or fastest tag; `prefer: "fastest"` falls back
+to the best route when no estimate exists. Every quote passes the engine's checks before it is ranked, and
 the executed route is re-validated against its sealed quote before anything is signed.
 
 ## Activity

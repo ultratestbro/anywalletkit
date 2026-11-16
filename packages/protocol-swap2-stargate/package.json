@@ -2,9 +2,11 @@
   "name": "@anywalletkit/protocol-swap2-stargate",
   "version": "0.0.0",
   "private": true,
-  "description": "Stargate V2 integration foundation: pinned interfaces, amount conversions and read-only fixtures. Provider implementation pending.",
+  "description": "Stargate V2 direct Taxi/Bus quotes, pinned execution and receipt-verified Taxi recovery. Private integration in development.",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
@@ -15,6 +17,81 @@
     "fixtures:receipts": "pnpm --filter @anywalletkit/networks build && node scripts/capture-receipts.mjs",
     "registry:capture": "pnpm --filter @anywalletkit/networks --filter @anywalletkit/swap2-assets build && node scripts/capture-registry.mjs"
   },
-  "dependencies": { "viem": "^2.57.2" },
-  "devDependencies": { "@anywalletkit/networks": "workspace:*", "@anywalletkit/swap2-assets": "workspace:*", "@types/node": "^22", "vitest": "^5.0.3" }
+  "dependencies": {
+    "viem": "^2.57.2",
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*"
+  },
+  "devDependencies": {
+    "@anywalletkit/networks": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.0.3",
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/protocol-swap2-router": "workspace:*"
+  },
+  "peerDependencies": {
+    "@anywalletkit/core": "workspace:*"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./provider": {
+      "types": "./dist/provider.d.ts",
+      "import": "./dist/provider.js",
+      "require": "./dist/provider.cjs"
+    },
+    "./pins": {
+      "types": "./dist/pins.d.ts",
+      "import": "./dist/pins.js",
+      "require": "./dist/pins.cjs"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js",
+      "require": "./dist/protocol.cjs"
+    },
+    "./quote": {
+      "types": "./dist/quote.d.ts",
+      "import": "./dist/quote.js",
+      "require": "./dist/quote.cjs"
+    },
+    "./tracking": {
+      "types": "./dist/tracking.d.ts",
+      "import": "./dist/tracking.js",
+      "require": "./dist/tracking.cjs"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "import": "./dist/registry.js",
+      "require": "./dist/registry.cjs"
+    },
+    "./deployments": {
+      "types": "./dist/deployments.d.ts",
+      "import": "./dist/deployments.js",
+      "require": "./dist/deployments.cjs"
+    },
+    "./amounts": {
+      "types": "./dist/amounts.d.ts",
+      "import": "./dist/amounts.js",
+      "require": "./dist/amounts.cjs"
+    },
+    "./abi": {
+      "types": "./dist/abi.d.ts",
+      "import": "./dist/abi.js",
+      "require": "./dist/abi.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
 }

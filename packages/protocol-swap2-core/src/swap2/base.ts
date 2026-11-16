@@ -310,7 +310,7 @@ export interface Swap2ExecutionPlan {
   destAmount: bigint;
   minDestAmount: bigint;
   feeUsd: number;
-  etaSeconds: number;
+  etaSeconds: number | null;
   validUntilMs: number;
   /** ERC-20 approvals sent first, in order (USDT on Ethereum resets to 0 first). */
   approvals: {token: string; spender: string; amount: bigint; chainId?: number}[];
