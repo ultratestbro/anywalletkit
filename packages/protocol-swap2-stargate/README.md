@@ -6,8 +6,10 @@ Work for [SDK-321](https://megabunny.xyz/b/SDK/t/321), starting with
 amount accounting, a reviewed deployment registry, direct Taxi quotes, execution/client
 pins, historical Taxi/Bus passenger tracking and destination recovery. `stargateProvider` and
 `StargateSwap2Protocol` are disabled by default (`enabled: true` is an explicit opt-in).
-The package remains private and absent from the module registry while
-API routes and additional evidence are implemented. No funded send has been performed.
+The package remains private and absent from the module registry pending controlled
+Taxi validation and release preparation. Taxi can ship separately from the unfinished
+API/compose routes; a LayerZero API key is not a Taxi release prerequisite.
+No funded public-network send has been performed.
 
 The full scope includes new Taxi transfers, historical Bus recovery, verified deployments, tracking,
 recovery and gas drop. The separate `protocol-swap2-layerzero` package covers
@@ -47,6 +49,34 @@ pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:bus
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:recovery
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:compose
 ```
+
+### Local mainnet fork integration
+
+With Anvil installed and the workspace dependencies built:
+
+```sh
+pnpm --filter @anywalletkit/protocol-swap2-stargate verify:fork
+```
+
+This starts owned Base/Arbitrum forks on loopback. Public upstreams sit behind a
+read-only RPC proxy; transaction submission goes only to the local nodes. Optional
+`RPC_8453`, `RPC_42161` and `ANVIL_BIN` select upstreams/the executable. It uses public
+test derivation vectors, rejects test addresses with existing delegated/deployed code,
+and does not load a real signer or private credentials for signing.
+
+Three scenarios execute the SDK wallet/router through an HTTP quote backend with
+client pins: ETH, USDC with a lost broadcast reply, and ETH with a recipient that
+temporarily rejects payment. They verify exact approvals, zero residual allowance,
+source dust/messaging refunds, destination balance deltas, reviewed endpoint/token
+recovery, refusal of consumed-message replay, and resuming a SQLite journal in a
+fresh read-only Node process without another source transaction.
+
+`tests/fixtures/fork.json` records the upstream block identities, local transaction
+hashes, reviews, journal steps and observed balances. **These are local fork hashes,
+not public explorer transactions.** Funding, receive-library/DVN verification and
+any nonce-gap alignment are simulated; the cached-token case injects a local reverting
+receiver. This does not establish real DVN delivery, public-network finality, latency
+or operation on a mobile device. The report is replaced only after every case passes.
 
 `fixtures:upstream` retrieves only interfaces from deployment artifacts at the
 immutable commit recorded in `tests/fixtures/upstream.json`. Artifact URLs and SHA-256
@@ -251,6 +281,9 @@ holds RPC credentials and quote sealing secrets. The mobile client uses its own 
 and independent/public or application-proxied RPCs, requires execution review and a
 durable operation store. No LayerZero API key is needed for direct Taxi. React Native
 must install the normal Hermes polyfills before importing wallet/protocol packages.
+`stargatePins` also supplies independent client tracking and recovery validation:
+backend status cannot substitute for verified payout, and each recovery offer is
+checked against the client's current on-chain commitment before signing.
 
 `module.draft.json` is a release preparation artifact, deliberately excluded from the
 public registry. The separate LayerZero discovery transport is not an executable
@@ -378,7 +411,9 @@ be labelled without fabricating successful asset movements.
 - SDK-333: history, documentation, package exports, module registry, changesets,
   conformance, regressions, Hermes and controlled end-to-end validation.
   Receipt-backed local history and its recorded conformance cases are implemented;
-  release gates remain open while API/composer adapters and additional evidence are missing.
+  local mainnet-fork execution, remote recovery and process-restart checks are implemented.
+  A separate Taxi release still needs a bounded funded transfer and mobile/device
+  validation. API/composer adapters remain separate unfinished capabilities.
 
 The shared `pnpm test:hermes` smoke includes Stargate bigint/dust and uint72 ticket
 handling, recorded cached-token recovery receipts, native-drop tuple decoding and

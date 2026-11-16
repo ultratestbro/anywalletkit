@@ -18,7 +18,8 @@
     "fixtures:bus": "pnpm build && node scripts/capture-bus.mjs",
     "fixtures:recovery": "pnpm build && node scripts/capture-recovery.mjs",
     "registry:capture": "pnpm --filter @anywalletkit/networks --filter @anywalletkit/swap2-assets build && node scripts/capture-registry.mjs",
-    "fixtures:compose": "pnpm build && node scripts/capture-compose.mjs"
+    "fixtures:compose": "pnpm build && node scripts/capture-compose.mjs",
+    "verify:fork": "node scripts/verify-fork.mjs"
   },
   "dependencies": {
     "viem": "^2.57.2",
@@ -31,7 +32,8 @@
     "vitest": "^5.0.3",
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/conformance": "workspace:*",
-    "@anywalletkit/protocol-swap2-router": "workspace:*"
+    "@anywalletkit/protocol-swap2-router": "workspace:*",
+    "@anywalletkit/wallet-evm": "workspace:*"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"
