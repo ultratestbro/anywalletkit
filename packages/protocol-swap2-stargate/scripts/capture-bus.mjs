@@ -1,15 +1,16 @@
 // Read-only historical Bus evidence. Scan finds the drive; receipts authenticate each rider and payout.
 import {writeFile, rename} from "node:fs/promises";
-import {parseEventLogs, slice} from "viem";
+import {parseEventLogs, slice, encodeFunctionData, decodeFunctionResult, encodePacked, keccak256, pad} from "viem";
 import {builtinNetwork} from "@anywalletkit/networks";
-import {STARGATE_ABI, TOKEN_MESSAGING_ABI} from "../dist/abi.js";
+import {ENDPOINT_ABI, STARGATE_ABI, TOKEN_MESSAGING_ABI} from "../dist/abi.js";
 import {stargateRegistry} from "../dist/deployments.js";
 import {destinationAmount} from "../dist/amounts.js";
 import {stargateBusTicket, stargateBusProof, stargateBusPayout, stargateBusNativeDrop} from "../dist/bus.js";
 import {checkStargateReceipt} from "../dist/tracking.js";
 import {context, stringify, EvidenceError} from "./evidence.mjs";
 
-const GUIDS = ["0x6b89bbfdfe8945badc273588d413a6488f3ae6a7d75ca402c537280298fdbfd1", "0xd4ef1d2b531961334427a7577ce5fbf6f776759fa548158d5b0d40cd7cc849b9", "0xa1d5f3b4efe3d1909faf138ffa583fceaaf6d802530a231d61e242425af20691"];
+const MANUAL_GUID = "0x8035e1da73782f22294f7759e1522f98b5f1190ced0400d548e64ba0508217b5";
+const GUIDS = ["0x6b89bbfdfe8945badc273588d413a6488f3ae6a7d75ca402c537280298fdbfd1", "0xd4ef1d2b531961334427a7577ce5fbf6f776759fa548158d5b0d40cd7cc849b9", "0xa1d5f3b4efe3d1909faf138ffa583fceaaf6d802530a231d61e242425af20691", MANUAL_GUID];
 const assert = (condition, code) => {if (!condition) throw new EvidenceError(code);};
 const same = (a, b) => a?.toLowerCase() === b?.toLowerCase();
 let stage = "initialization";
@@ -79,10 +80,39 @@ async function capture() {
       if (intent.nativeDrop > 0n) assert(stargateBusNativeDrop(proof, destination.receipt), "bus-native-drop-proof-failed");
       riders.push({ticketId: ticket.ticketId, seat, assetId, intent, source});
     }
+    let manualExecution;
+    if (guid === MANUAL_GUID) {
+      stage = "manual endpoint execution and historical payload commitment";
+      const c = (await network(dst)).client;
+      const before = await c.getBlock({blockNumber: destination.block.number - 1n});
+      const rider = riders[0], proof = stargateBusProof(stargateBusTicket(rider.intent, rider.source.receipt), drive.receipt);
+      const origin = {srcEid: src.eid, sender: pad(src.tokenMessaging, {size: 32}), nonce: proof.nonce};
+      const data = encodeFunctionData({abi: ENDPOINT_ABI, functionName: "lzReceive", args: [origin, dst.tokenMessaging, guid, proof.message, "0x"]});
+      assert(same(destination.transaction.to, dst.endpoint) && same(destination.transaction.input, data) && destination.transaction.value === proof.totalNativeDrops * proof.nativeDropAmount, "manual-execution-call-mismatch");
+      const calls = [];
+      async function read(address, abi, functionName, args, blockNumber) {
+        const data = encodeFunctionData({abi, functionName, args});
+        const result = await c.call({to: address, data, blockNumber});
+        assert(result.data, "empty-historical-state");
+        const decoded = decodeFunctionResult({abi, functionName, data: result.data});
+        calls.push({chain: dst.chain, blockNumber, to: address, functionName, data, result: result.data, decoded});
+        return decoded;
+      }
+      const payloadArgs = [dst.tokenMessaging, src.eid, origin.sender, proof.nonce];
+      const expected = keccak256(encodePacked(["bytes32", "bytes"], [guid, proof.message]));
+      assert(await read(dst.endpoint, ENDPOINT_ABI, "inboundPayloadHash", payloadArgs, before.number) === expected, "missing-before-execution-payload");
+      assert(await read(dst.endpoint, ENDPOINT_ABI, "inboundPayloadHash", payloadArgs, destination.block.number) === `0x${"00".repeat(32)}`, "payload-not-cleared-after-execution");
+      for (const r of riders) {
+        assert(await read(r.intent.destination.address, STARGATE_ABI, "unreceivedTokens", [guid, r.seat], before.number) === `0x${"00".repeat(32)}`, "unexpected-token-cache-before-message");
+      }
+      for (const address of new Set(riders.map((r) => r.intent.destination.address))) assert(await read(address, STARGATE_ABI, "status", [], before.number) === 1, "pool-not-operational-before-message");
+      assert((await c.getBlock({blockNumber: before.number})).hash === before.hash, "historical-before-block-changed");
+      manualExecution = {beforeBlock: {number: before.number, hash: before.hash, timestamp: before.timestamp}, calls};
+    }
     for (const side of [drive, destination, ...riders.map((r) => r.source)]) {
       assert((await contexts.get(side.chain).client.getBlock({blockNumber: side.block.number})).hash === side.block.hash, "historical-block-changed");
     }
-    buses.push({guid, discovery: {url}, drive, destination, riders});
+    buses.push({guid, discovery: {url}, drive, destination, riders, ...(manualExecution ? {manualExecution} : {})});
     console.log(`Verified historical Bus with ${riders.length} riders: queue ticket -> drive packet -> each payout.`);
   }
   const file = new URL("../tests/fixtures/bus-receipts.json", import.meta.url), temp = new URL("../tests/fixtures/bus-receipts.json.tmp", import.meta.url);

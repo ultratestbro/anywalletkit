@@ -30,6 +30,7 @@ pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:live
 pnpm --filter @anywalletkit/protocol-swap2-stargate registry:capture
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:receipts
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:bus
+pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:recovery
 ```
 
 `fixtures:upstream` retrieves only interfaces from deployment artifacts at the
@@ -194,14 +195,29 @@ with separately paid wallet gas. Token retries and plain Taxi message retries at
 zero value; Bus message retries fund native drops for the entire batch. Client validation rereads
 the commitment after review. They integrate with the durable `recoverSwap2` flow,
 whose operation ID and transaction hash are separate from the original source.
-Taxi native-drop delivery is not yet independently proved: token payout with a requested
-drop reports `partial`. Bus native drops require matching TokenMessaging drop events
+Taxi native drops require a successful `NativeDropApplied` from a reviewed Executor,
+matching source/destination EIDs, TokenMessaging peers, message nonce, recipient and
+successfully paid amount. The built-in executor pin currently covers Base; other chains
+remain `partial` unless the app supplies explicitly reviewed `taxiExecutors` pins.
+The pinned Base address is backed by official metadata, historical endpoint/EID reads,
+code hash and immutable upstream Executor/IExecutor sources in `fixtures/recovery.json`.
+Native drop and token payout may occur in different transactions; each receipt is
+verified independently. Scan supplies hashes only, never payout authority.
+Bus native drops require matching TokenMessaging drop events
 and one authenticated Endpoint `PacketDelivered` in the destination receipt. Ambiguous
 batch attribution or failed drops remain `partial` even when the token was paid.
-Real failed-delivery/retry receipts remain outstanding; synthetic cases are labelled.
+`fixtures/recovery.json` includes a real Arbitrum → Ethereum cached native-token
+delivery and its later `retryReceiveToken` payout, with historical commitment reads
+before/after the retry. It also includes an Arbitrum → Base Taxi transfer whose token
+and native-drop payouts are independently checked. Synthetic mutations are labelled.
 
-Bus tracking replays three historical Base → Arbitrum batches containing ten passengers,
-including mixed ETH/USDC assets and one native drop, from `fixtures/bus-receipts.json`.
+Bus tracking replays four historical batches containing twelve passengers: three
+Base → Arbitrum batches (mixed ETH/USDC and one native drop), plus a Base → Ethereum
+batch delivered by a direct permissionless `Endpoint.lzReceive` call. The latter records
+the pending payload commitment before execution and its clearing afterwards, and replays
+the actual recovery calldata through both passengers' tracker/recovery paths. It proves
+manual execution of a verified pending message; it does not claim an earlier reverted
+execution attempt. These records are in `fixtures/bus-receipts.json`.
 `fixtures:bus` refreshes these fixed GUIDs with read-only receipt, block and log queries.
 The runtime links the source `BusRode` ticket to its exact seat in the driven packet.
 Because `OFTReceived` omits the seat, it checks the complete ordered payout/cache sequence
@@ -261,11 +277,11 @@ be labelled without fabricating successful asset movements.
   on-chain validators and recovery offers in SDK-328/329. Old `awk1` IDs and zero-value
   claims retain their existing contracts.
 - SDK-326/327: direct quoting, execution and client pins are implemented and tested.
-  SDK-328: Taxi payout tracking and destination recovery are implemented; historical
-  failed-delivery/retry evidence remains outstanding.
+  SDK-328: Taxi payout tracking, cached-token recovery and native-drop evidence are
+  implemented, with recorded recovery and Base native-drop receipts/state.
 - SDK-329: Bus ticket/batch/passenger tracking, native-drop evidence and paid queue
-  recovery are implemented. Historical success receipts are replayed; queue races and
-  cached-token recovery are tested with explicitly synthetic evidence.
+  recovery are implemented. Historical batches and manual endpoint execution are replayed;
+  queue races and duplicate-passenger/cache cases also use labelled synthetic evidence.
 - SDK-330/SDK-331: API discovery and resumable steps, key held server-side. Include only
   routes for which every wallet operation has a validator. EVM multicall, signatures
   and fresh Solana transactions need separate adapters. Unknown VM steps fail closed.
@@ -275,8 +291,14 @@ be labelled without fabricating successful asset movements.
   Receipt-backed local history and its recorded conformance cases are implemented;
   release gates remain open while API/composer adapters and additional evidence are missing.
 
-Stage 1 remains open for real failed-delivery/recovery fixtures,
-API contract fixtures/access, and the complete capability matrix. No mainnet sends or
+The shared `pnpm test:hermes` smoke includes Stargate bigint/dust and uint72 ticket
+handling, recorded cached-token recovery receipts, native-drop tuple decoding and
+LayerZero public discovery. It passed 365 checks in the React Native 0.81.5 Hermes VM.
+This offline VM check does not replace a mobile end-to-end transfer.
+
+Stage 1 remains open for API contract fixtures/access and the complete API/compose
+capability matrix. Taxi executor coverage beyond Base requires separately reviewed pins.
+No mainnet sends or
 package publication are part of the collection commands above.
 
 Protocol documentation: [Stargate integration](https://docs.layerzero.network/v2/developers/evm/stargate/overview),

@@ -1,5 +1,14 @@
 import {parseAbi} from "viem";
 
+// LayerZero-v2 592625b9e5967643853476445ffe0e777360b906: historical Executor/IExecutor.
+export const EXECUTOR_ABI = parseAbi([
+  "struct Origin { uint32 srcEid; bytes32 sender; uint64 nonce; }",
+  "struct NativeDropParams { address receiver; uint256 amount; }",
+  "function endpoint() view returns (address)",
+  "function localEid() view returns (uint32)",
+  "event NativeDropApplied(Origin origin, uint32 dstEid, address oapp, NativeDropParams[] params, bool[] success)",
+]);
+
 export const ENDPOINT_ABI = parseAbi([
   "struct Origin { uint32 srcEid; bytes32 sender; uint64 nonce; }",
   "function inboundPayloadHash(address receiver, uint32 srcEid, bytes32 sender, uint64 nonce) view returns (bytes32)",

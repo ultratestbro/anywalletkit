@@ -26,6 +26,13 @@ the normalized catalog. Token identity uses chain key and address, not symbol.
 
 On a Node backend only:
 
+Obtain a **Value Transfer API key from LayerZero**, as required by the
+[quickstart](https://docs.layerzero.network/v2/developers/value-transfer-api/quickstart).
+That page does not provide a self-service key issuance link; ask for API access through
+the [official support channels](https://docs.layerzero.network/community).
+`LAYERZERO_API_KEY` is a suggested server secret name, not an automatically loaded SDK
+setting: pass its value as `apiKey`. Direct Stargate does not need this key.
+
 ```ts
 import {createLayerZeroServerApi} from '@anywalletkit/protocol-swap2-layerzero/server'
 

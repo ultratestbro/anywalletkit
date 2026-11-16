@@ -4,6 +4,7 @@ export {StargateSwap2Protocol, type StargateSwap2Config} from "./protocol.js";
 export {StargateSwap2Protocol as default} from "./protocol.js";
 export {createStargateQuoter, type StargateQuoteConfig, type StargateQuote, type StargateQuoteRequest, type StargateMode} from "./quote.js";
 export {createStargateTracker, type StargateTrackingConfig} from "./tracking.js";
+export {STARGATE_TAXI_EXECUTORS} from "./native-drop.js";
 export {describeStargateActivity, STARGATE_MODULE} from "./activity.js";
 export {stargateRegistry, STARGATE_REGISTRY_EVIDENCE} from "./deployments.js";
 export {createStargateRegistry, type StargateDeployment, type StargatePath, type StargateRegistry} from "./registry.js";

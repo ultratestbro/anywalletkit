@@ -198,6 +198,12 @@ importers:
 
   examples/hermes-smoke:
     dependencies:
+      '@anywalletkit/protocol-swap2-stargate':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-stargate
+      '@anywalletkit/protocol-swap2-layerzero':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-layerzero
       '@anywalletkit/conformance':
         specifier: workspace:*
         version: link:../../packages/conformance

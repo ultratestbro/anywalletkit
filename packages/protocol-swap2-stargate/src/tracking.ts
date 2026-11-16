@@ -8,12 +8,15 @@ import {parseStargateIntent, type StargateIntent} from "./intent.js";
 import type {StargateRegistry} from "./registry.js";
 import {assertStargate, nonzeroAddress, sameAddress, stargateRpc, type StargateRpcConfig} from "./rpc.js";
 import {busDriveData, busPassengerPrefix, stargateBusNativeDrop, stargateBusPayout, stargateBusProof, stargateBusTicket, type StargateBusProof, type StargateBusTicket} from "./bus.js";
+import {STARGATE_TAXI_EXECUTORS, stargateTaxiNativeDrop} from "./native-drop.js";
 
 export interface StargateTrackingConfig extends StargateRpcConfig {
   registry?: StargateRegistry;
   scanUrl?: string;
   /** Default: RPC finalized block. Explicit depths are an app finality policy, not universal finality. */
   confirmations?: Readonly<Record<string, number>>;
+  /** Explicit reviewed executor pins for Taxi native-drop evidence. Default: verified Base executor only. */
+  taxiExecutors?: Readonly<Record<string, readonly Hex[]>>;
   /** Bounded default log discovery. Older queues can use the indexer callbacks below. */
   busLogPageSize?: number;
   busLogPages?: number;
@@ -79,6 +82,10 @@ export function createStargateTracker(config: StargateTrackingConfig) {
   const registry = config.registry ?? stargateRegistry;
   const rpc = stargateRpc(config);
   const confirmations = {...config.confirmations};
+  const taxiExecutors = Object.fromEntries(Object.entries(config.taxiExecutors ?? STARGATE_TAXI_EXECUTORS).map(([chain, addresses]) => {
+    assertStargate(/^eip155:[1-9][0-9]*$/.test(chain) && addresses.length <= 32 && addresses.every(nonzeroAddress), "invalid Taxi executor pins");
+    return [chain, [...addresses]];
+  }));
   assertStargate(Object.values(confirmations).every((n) => Number.isSafeInteger(n) && n >= 1 && n <= 100_000), "invalid finality policy");
   const scan = (config.scanUrl ?? "https://scan.layerzero-api.com").replace(/\/+$/, "");
   assertStargate(/^https?:\/\//.test(scan), "invalid Scan URL");
@@ -158,8 +165,11 @@ export function createStargateTracker(config: StargateTrackingConfig) {
       const data = (json as {data?: unknown})?.data;
       if (!Array.isArray(data)) return provided;
       for (const item of data.slice(0, 32)) {
-        const m = item as {guid?: string; destination?: {tx?: {txHash?: string}}};
-        if (typeof m.guid === "string" && sameAddress(m.guid, p.guid) && hash(m.destination?.tx?.txHash)) provided.push(m.destination.tx.txHash);
+        const m = item as {guid?: string; destination?: {tx?: {txHash?: string}; nativeDrop?: {tx?: {txHash?: string}}}};
+        if (typeof m.guid === "string" && sameAddress(m.guid, p.guid)) {
+          if (hash(m.destination?.tx?.txHash)) provided.push(m.destination.tx.txHash);
+          if (hash(m.destination?.nativeDrop?.tx?.txHash)) provided.push(m.destination.nativeDrop.tx.txHash);
+        }
       }
     } catch { /* Scan is discovery only; caller-supplied hashes still need receipt verification. */ }
     return [...new Set(provided)];
@@ -179,6 +189,7 @@ export function createStargateTracker(config: StargateTrackingConfig) {
           const r = await receipt(c, d.chain, d.chainId, txHash);
           if (r) {
             if ("seat" in p && stargateBusNativeDrop(p, r)) nativeDropProved = true;
+            if (!("seat" in p) && stargateTaxiNativeDrop(p, r, taxiExecutors[d.chain] ?? [])) nativeDropProved = true;
             let paid = "seat" in p ? stargateBusPayout(p, r) === "paid" : stargateTaxiPayout(p, r);
             if (!paid && "seat" in p && stargateTaxiPayout({...p, packet: "0x"}, r)) {
               // A later retry has one payout event, without the original batch sequence.

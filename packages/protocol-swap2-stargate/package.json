@@ -16,6 +16,7 @@
     "fixtures:live": "node scripts/capture-live.mjs",
     "fixtures:receipts": "pnpm --filter @anywalletkit/networks build && node scripts/capture-receipts.mjs",
     "fixtures:bus": "pnpm build && node scripts/capture-bus.mjs",
+    "fixtures:recovery": "pnpm build && node scripts/capture-recovery.mjs",
     "registry:capture": "pnpm --filter @anywalletkit/networks --filter @anywalletkit/swap2-assets build && node scripts/capture-registry.mjs"
   },
   "dependencies": {
