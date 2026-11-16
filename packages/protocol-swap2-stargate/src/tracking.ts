@@ -43,6 +43,16 @@ const seatOf = (p: TransferProof) => "seat" in p ? p.seat : 0;
 
 /** Source pool + endpoint packet, independent of Scan. Plain Taxi only. */
 export function stargateTaxiProof(i: StargateIntent, receipt: TransactionReceipt): StargateTaxiProof {
+  return taxiProof(i, receipt);
+}
+
+/** Read-only packet evidence. This does not approve the destination call for execution. */
+export function stargateComposedTaxiProof(i: StargateIntent, receipt: TransactionReceipt, composeFrom: Hex, composeMsg: Hex): StargateTaxiProof {
+  assertStargate(nonzeroAddress(composeFrom) && /^0x(?:[0-9a-f]{2}){1,16384}$/i.test(composeMsg), "invalid expected compose payload");
+  return taxiProof(i, receipt, `${pad(composeFrom, {size: 32})}${composeMsg.slice(2)}` as Hex);
+}
+
+function taxiProof(i: StargateIntent, receipt: TransactionReceipt, expectedCompose?: Hex): StargateTaxiProof {
   assertStargate(i.mode === "taxi" && receipt.status === "success", "not a successful Taxi source receipt");
   const sent = parseEventLogs({abi: STARGATE_ABI, eventName: "OFTSent", logs: receipt.logs.filter((l) => sameAddress(l.address, i.source.address)), strict: true})
     .filter((l) => sameAddress(l.args.fromAddress, i.sender) && l.args.dstEid === i.destination.eid);
@@ -58,7 +68,7 @@ export function stargateTaxiProof(i: StargateIntent, receipt: TransactionReceipt
   assertStargate(slice(packet, 0, 1) === "0x01" && BigInt(slice(packet, 9, 13)) === BigInt(i.source.eid) && BigInt(slice(packet, 45, 49)) === BigInt(i.destination.eid), "packet pathway mismatch");
   assertStargate(sameAddress(slice(packet, 13, 45), pad(i.source.tokenMessaging, {size: 32})) && sameAddress(slice(packet, 49, 81), pad(i.destination.tokenMessaging, {size: 32})), "packet messaging contracts mismatch");
   const message = slice(packet, 113);
-  assertStargate(/^0x01[0-9a-f]{84}$/i.test(message), "unsupported Taxi compose payload");
+  assertStargate(expectedCompose === undefined ? /^0x01[0-9a-f]{84}$/i.test(message) : /^0x01[0-9a-f]+$/i.test(message) && sameAddress(slice(message, 43), expectedCompose), "unsupported Taxi compose payload");
   assertStargate(BigInt(slice(message, 1, 3)) === BigInt(i.source.assetId) && sameAddress(slice(message, 3, 35), pad(i.recipient, {size: 32})) && BigInt(slice(message, 35, 43)) * conversionRate(i.destination.localDecimals, i.destination.sharedDecimals) === amount, "Taxi passenger mismatch");
   return {intent: i, guid: event.guid, amount, packet, message, nonce: BigInt(slice(packet, 1, 9)), sourceHash: receipt.transactionHash};
 }

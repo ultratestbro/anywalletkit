@@ -2,7 +2,7 @@
   "name": "@anywalletkit/protocol-swap2-stargate",
   "version": "0.0.0",
   "private": true,
-  "description": "Stargate V2 direct Taxi/Bus quotes, pinned execution and receipt-verified Taxi recovery. Private integration in development.",
+  "description": "Stargate V2 Taxi quotes and execution, historical Taxi/Bus recovery, and read-only compose evidence. Private integration in development.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -17,7 +17,8 @@
     "fixtures:receipts": "pnpm --filter @anywalletkit/networks build && node scripts/capture-receipts.mjs",
     "fixtures:bus": "pnpm build && node scripts/capture-bus.mjs",
     "fixtures:recovery": "pnpm build && node scripts/capture-recovery.mjs",
-    "registry:capture": "pnpm --filter @anywalletkit/networks --filter @anywalletkit/swap2-assets build && node scripts/capture-registry.mjs"
+    "registry:capture": "pnpm --filter @anywalletkit/networks --filter @anywalletkit/swap2-assets build && node scripts/capture-registry.mjs",
+    "fixtures:compose": "pnpm build && node scripts/capture-compose.mjs"
   },
   "dependencies": {
     "viem": "^2.57.2",
@@ -90,10 +91,41 @@
       "import": "./dist/abi.js",
       "require": "./dist/abi.cjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./compose": {
+      "types": "./dist/compose.d.ts",
+      "import": "./dist/compose.js",
+      "require": "./dist/compose.cjs"
+    },
+    "./compose-dex": {
+      "types": "./dist/compose-dex.d.ts",
+      "import": "./dist/compose-dex.js",
+      "require": "./dist/compose-dex.cjs"
+    }
   },
   "files": [
     "dist",
-    "README.md"
-  ]
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ultratestbro/anywalletkit.git",
+    "directory": "packages/protocol-swap2-stargate"
+  },
+  "bugs": {
+    "url": "https://github.com/ultratestbro/anywalletkit/issues"
+  },
+  "keywords": [
+    "anywalletkit",
+    "wallet",
+    "layerzero",
+    "stargate"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }
