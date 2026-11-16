@@ -888,6 +888,82 @@
           "type": "function"
         },
         {
+          "inputs": [],
+          "name": "queueCapacity",
+          "outputs": [
+            {
+              "internalType": "uint16",
+              "name": "",
+              "type": "uint16"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint32",
+              "name": "dstEid",
+              "type": "uint32"
+            }
+          ],
+          "name": "busQueues",
+          "outputs": [
+            {
+              "internalType": "uint8",
+              "name": "maxNumPassengers",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint80",
+              "name": "busFare",
+              "type": "uint80"
+            },
+            {
+              "internalType": "uint80",
+              "name": "busAndNativeDropFare",
+              "type": "uint80"
+            },
+            {
+              "internalType": "uint16",
+              "name": "qLength",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint72",
+              "name": "nextTicketId",
+              "type": "uint72"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint32",
+              "name": "_dstEid",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint16",
+              "name": "_index",
+              "type": "uint16"
+            }
+          ],
+          "name": "getPassengerHash",
+          "outputs": [
+            {
+              "internalType": "bytes32",
+              "name": "hash",
+              "type": "bytes32"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
           "inputs": [
             {
               "internalType": "uint32",
@@ -1036,6 +1112,44 @@
             }
           ],
           "name": "BusDriven",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "address",
+              "name": "receiver",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint128",
+              "name": "amount",
+              "type": "uint128"
+            }
+          ],
+          "name": "NativeDropApplied",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "address",
+              "name": "receiver",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint128",
+              "name": "amount",
+              "type": "uint128"
+            }
+          ],
+          "name": "NativeDropFailed",
           "type": "event"
         }
       ]

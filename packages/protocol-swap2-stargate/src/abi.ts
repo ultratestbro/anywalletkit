@@ -5,6 +5,7 @@ export const ENDPOINT_ABI = parseAbi([
   "function inboundPayloadHash(address receiver, uint32 srcEid, bytes32 sender, uint64 nonce) view returns (bytes32)",
   "function lzReceive(Origin origin, address receiver, bytes32 guid, bytes message, bytes extraData) payable",
   "event PacketSent(bytes encodedPayload, bytes options, address sendLibrary)",
+  "event PacketDelivered(Origin origin, address receiver)",
 ]);
 
 // SDK-322: checked against pinned upstream deployment ABI by abi.test.ts.
@@ -47,8 +48,13 @@ export const TOKEN_MESSAGING_ABI = parseAbi([
   "function peers(uint32 eid) view returns (bytes32)",
   "function endpoint() view returns (address)",
   "function nativeDropAmounts(uint32 eid) view returns (uint128)",
+  "function queueCapacity() view returns (uint16)",
+  "function busQueues(uint32 eid) view returns (uint8 maxNumPassengers, uint80 busFare, uint80 busAndNativeDropFare, uint16 qLength, uint72 nextTicketId)",
+  "function getPassengerHash(uint32 eid, uint16 index) view returns (bytes32)",
   "function quoteDriveBus(uint32 dstEid, bytes passengers) view returns (MessagingFee fee)",
   "function driveBus(uint32 dstEid, bytes passengers) payable returns (MessagingReceipt receipt)",
   "event BusRode(uint32 dstEid, uint72 ticketId, uint80 fare, bytes passenger)",
   "event BusDriven(uint32 dstEid, uint72 startTicketId, uint8 numPassengers, bytes32 guid)",
+  "event NativeDropApplied(address receiver, uint128 amount)",
+  "event NativeDropFailed(address receiver, uint128 amount)",
 ]);

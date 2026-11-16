@@ -43,7 +43,7 @@ function server(t: Transfer) {
     let result: unknown;
     if (body.method === "eth_chainId") result = toHex(state.wrongChain ? 999 : side.chainId);
     else if (body.method === "eth_getBlockByNumber") result = {hash: state.canonical ? side.block.hash : wrong, number: toHex(BigInt(side.block.number) + (body.params[0] === "finalized" ? state.finalized ? 100n : -1n : 0n)), timestamp: toHex(BigInt(side.block.timestamp)), transactions: []};
-    else if (body.method === "eth_getTransactionReceipt") result = {...receipt, status: receipt.status === "success" ? "0x1" : "0x0", blockNumber: toHex(receipt.blockNumber), logs: receipt.logs.map((l) => ({...l, blockNumber: toHex(l.blockNumber!)}))};
+    else if (body.method === "eth_getTransactionReceipt") result = {...receipt, status: receipt.status === "success" ? "0x1" : "0x0", blockNumber: toHex(receipt.blockNumber), logs: receipt.logs.map((l) => ({...l, blockNumber: toHex(l.blockNumber!), logIndex: toHex(l.logIndex!), transactionIndex: toHex(l.transactionIndex!)}))};
     else if (body.method === "eth_call") {
       const decoded = decodeFunctionData({abi: [...STARGATE_ABI, ...ENDPOINT_ABI], data: (body.params[0] as {data: Hex}).data});
       const value = decoded.functionName === "unreceivedTokens" ? state.cached : decoded.functionName === "inboundPayloadHash" ? state.payload : decoded.functionName === "status" ? state.paused ? 3 : 1 : undefined;

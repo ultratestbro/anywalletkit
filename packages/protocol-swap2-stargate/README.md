@@ -4,9 +4,9 @@ Work for [SDK-321](https://megabunny.xyz/b/SDK/t/321), starting with
 [SDK-322](https://megabunny.xyz/b/SDK/t/322) and
 [SDK-323](https://megabunny.xyz/b/SDK/t/323). This private package contains interfaces,
 amount accounting, a reviewed deployment registry, direct quotes, execution/client
-pins, Taxi payout tracking and destination recovery. `stargateProvider` and
+pins, Taxi/Bus passenger tracking and destination recovery. `stargateProvider` and
 `StargateSwap2Protocol` are disabled by default (`enabled: true` is an explicit opt-in).
-The package remains private and absent from the module registry while Bus tracking,
+The package remains private and absent from the module registry while
 API routes and additional evidence are implemented. No funded send has been performed.
 
 The full scope includes direct Stargate Taxi/Bus, verified deployments, tracking,
@@ -29,6 +29,7 @@ pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:upstream
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:live
 pnpm --filter @anywalletkit/protocol-swap2-stargate registry:capture
 pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:receipts
+pnpm --filter @anywalletkit/protocol-swap2-stargate fixtures:bus
 ```
 
 `fixtures:upstream` retrieves only interfaces from deployment artifacts at the
@@ -189,12 +190,28 @@ A finalized reverted direct source call is failed, never refunded.
 Cached-token recovery requires the exact `unreceivedTokens` commitment. Endpoint
 retry separately requires the exact `inboundPayloadHash` of GUID + message; cleared
 or nilified payloads are refused. Both quote a distinct destination transaction
-with zero attached value and separately paid wallet gas. Client validation rereads
+with separately paid wallet gas. Token retries and plain Taxi message retries attach
+zero value; Bus message retries fund native drops for the entire batch. Client validation rereads
 the commitment after review. They integrate with the durable `recoverSwap2` flow,
 whose operation ID and transaction hash are separate from the original source.
-Native-drop delivery is not yet independently proved: token payout with a requested
-drop reports `partial`, not full completion. Real Bus/recovery receipts and drop
-delivery evidence remain to be collected; synthetic cases are labelled as such.
+Taxi native-drop delivery is not yet independently proved: token payout with a requested
+drop reports `partial`. Bus native drops require matching TokenMessaging drop events
+and one authenticated Endpoint `PacketDelivered` in the destination receipt. Ambiguous
+batch attribution or failed drops remain `partial` even when the token was paid.
+Real failed-delivery/retry receipts remain outstanding; synthetic cases are labelled.
+
+Bus tracking replays three historical Base → Arbitrum batches containing ten passengers,
+including mixed ETH/USDC assets and one native drop, from `fixtures/bus-receipts.json`.
+`fixtures:bus` refreshes these fixed GUIDs with read-only receipt, block and log queries.
+The runtime links the source `BusRode` ticket to its exact seat in the driven packet.
+Because `OFTReceived` omits the seat, it checks the complete ordered payout/cache sequence
+for that asset; two identical passengers cannot claim each other's payment. Later cached
+token retries must also match the exact pool calldata and seat.
+
+Default Bus discovery scans at most eight pages of 2,000 blocks. Apps can configure
+`busLogPageSize`/`busLogPages` or supply `findBusDrive` and `queuedBusPassengers` indexer
+callbacks for older queues. Hints never replace receipt verification or the current
+on-chain queue hash-chain commitment. Queue wait time remains unknown.
 
 `stargatePins(config)` requires the client's own source/destination RPCs and reviewed
 registry. It verifies the entire canonical `sendToken` calldata, including mode,
@@ -203,8 +220,11 @@ Remote builds additionally recheck current chain state and fees on the client,
 including after the backend's preflight. A backend cannot substitute that check.
 `getQuotes` enumerates Taxi/Bus only for previews; execution keeps the selected mode.
 
-Bus acceleration must assemble the valid current queue prefix, obtain `quoteDriveBus`,
-and review a separate source-chain payment. Revalidate after any competing drive.
+Bus acceleration assembles the valid current queue prefix through the user's ticket,
+checks its hash chain and obtains `quoteDriveBus`. It reviews a separate source-chain
+payment for the entire prefix, with gas additional. The current queue and exact fee are
+revalidated after review, including competing drives. No offer is returned if the ticket
+cannot fit in the next permitted batch or indexed passenger bytes are incomplete.
 See [TokenMessaging](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/messaging/TokenMessaging.sol)
 and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/libs/Bus.sol).
 
@@ -223,8 +243,9 @@ and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412
 - SDK-326/327: direct quoting, execution and client pins are implemented and tested.
   SDK-328: Taxi payout tracking and destination recovery are implemented; historical
   failed-delivery/retry evidence remains outstanding.
-- SDK-329: Bus tracking and
-  recovery. These are not implemented by the current helpers or fixtures.
+- SDK-329: Bus ticket/batch/passenger tracking, native-drop evidence and paid queue
+  recovery are implemented. Historical success receipts are replayed; queue races and
+  cached-token recovery are tested with explicitly synthetic evidence.
 - SDK-330/SDK-331: API discovery and resumable steps, key held server-side. Include only
   routes for which every wallet operation has a validator. EVM multicall, signatures
   and fresh Solana transactions need separate adapters. Unknown VM steps fail closed.
@@ -232,7 +253,7 @@ and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412
 - SDK-333: history, documentation, package exports, module registry, changesets,
   conformance, regressions, Hermes and controlled end-to-end validation.
 
-Stage 1 remains open for real Bus delivery and recovery fixtures,
+Stage 1 remains open for real failed-delivery/recovery fixtures,
 API contract fixtures/access, and the complete capability matrix. No mainnet sends or
 package publication are part of the collection commands above.
 
