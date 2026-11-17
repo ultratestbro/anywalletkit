@@ -11,6 +11,7 @@
 import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import {refusalNotes, refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
+import {ccAssetByToken} from "@anywalletkit/swap2-assets";
 import {decodeFunctionData, getAddress, parseAbi, toFunctionSelector, type Hex} from "viem";
 
 /**
@@ -19,7 +20,10 @@ import {decodeFunctionData, getAddress, parseAbi, toFunctionSelector, type Hex} 
  * every earlier router on 2026-11-16 (a router-vault vulnerability; this module
  * never uses the vault) and redeployed TychoRouterV3 on every chain the same day
  * (registry commit 8aab890). Quotes and approvals accept only these; the paused
- * routers are known to activity.ts alone, to read past swaps.
+ * routers are known to activity.ts alone, to read past swaps. Arc and Elysium
+ * joined after that redeploy (the registry's `arc` and `elysium`, the hosted
+ * API's `/v1/arc` and `/v1/elysium`); this module never pinned their paused
+ * routers, so history knows none.
  */
 export const FYND_CHAINS: Readonly<Record<number, {slug: string; name: string; router: `0x${string}`}>> = Object.freeze({
   1: {slug: "ethereum", name: "Ethereum", router: "0xe41c726421007e133a59365432fE886a73B45126"},
@@ -29,7 +33,20 @@ export const FYND_CHAINS: Readonly<Record<number, {slug: string; name: string; r
   137: {slug: "polygon", name: "Polygon", router: "0x4dB0B661dc706f7e09e54273028B22f61f8F94C2"},
   130: {slug: "unichain", name: "Unichain", router: "0x556dff14e4A42259ebCE4fa087323c1047e9a55A"},
   4663: {slug: "robinhood", name: "Robinhood Chain", router: "0x6F460540B03651d2Ad0ec28f777e4A0480A756a5"},
+  5042: {slug: "arc", name: "Arc", router: "0x52A1BC20F2B78461D7a03c32f6c7388D4587980f"},
+  99901: {slug: "elysium", name: "Elysium", router: "0x643577F3b0cB8CE1b1b73C6E872b907aCACD2662"},
 });
+
+/**
+ * Whether a swap may take or pay the chain's native coin: only where the token catalog lists one.
+ * Arc's gas token is USDC with 18-decimal native accounting, and the catalog lists USDC only through
+ * its 6-decimal ERC-20 interface (0x3600…) — every venue addresses it that way. Fynd prices a native
+ * leg on Arc in the 18-decimal units (2026-11-17: 10 USDC in = `value` 10^19), so a native swap there
+ * would carry amounts 10^12 off the catalog's USDC; it is refused, and the ERC-20 swaps instead.
+ */
+export function fyndNativeSwaps(chainId: number): boolean {
+  return !!ccAssetByToken(`eip155:${chainId}`, ZERO);
+}
 
 /** The router's native-coin sentinel (lib/NativeETH.sol); Fynd's API uses the zero address instead. */
 export const ROUTER_NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -107,6 +124,9 @@ export function checkFyndTransaction(tx: EncodedTx, expected: ExpectedSwap): {me
   // `tx.to` is the API's: named in the refusal only when it is an address (scan 2026-10-27 modules, F34).
   if (!sameAddress(tx.to, chain.router)) throw fail(`the transaction targets ${/^0x[0-9a-fA-F]{40}$/.test(tx.to) ? tx.to : "something that is not an address"}, not the Tycho router on ${chain.name}`, "vault_mismatch");
   if (sameAddress(expected.receiver, ZERO) || sameAddress(expected.receiver, chain.router)) throw fail("invalid receiver", "recipient_mismatch");
+  if ((sameAddress(routerToken(expected.tokenIn), ROUTER_NATIVE) || sameAddress(routerToken(expected.tokenOut), ROUTER_NATIVE)) && !fyndNativeSwaps(expected.chainId)) {
+    throw fail(`the native coin on ${chain.name} is not a catalog asset here; swap its ERC-20 instead`, "unsupported_pair");
+  }
   if (expected.amountIn <= 0n || expected.minAmountOut <= 0n || expected.minAmountOut > expected.expectedAmountOut) {
     throw fail("invalid quote amounts", "price_check_failed");
   }

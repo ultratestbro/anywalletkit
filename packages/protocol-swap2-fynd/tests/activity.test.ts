@@ -40,6 +40,15 @@ describe("describeFyndActivity", () => {
     expect(describeFyndActivity(tx(FYND_PREVIOUS_ROUTERS[1]![0]!), {own})).toBeNull();
   });
 
+  it("a swap through the Arc or Elysium router; another chain's router there is not Fynd", () => {
+    expect(describeFyndActivity(tx(FYND_CHAINS[5042]!.router, data, "eip155:5042"), {own})).toMatchObject({kind: "swap", subtitle: "Fynd · Arc"});
+    expect(describeFyndActivity(tx(FYND_CHAINS[99901]!.router, data, "eip155:99901"), {own})).toMatchObject({kind: "swap", subtitle: "Fynd · Elysium"});
+    expect(describeFyndActivity(tx(FYND_CHAINS[8453]!.router, data, "eip155:5042"), {own})).toBeNull();
+    // the pre-redeploy routers there were never pinned by this module
+    expect(describeFyndActivity(tx("0x72C452506a551C7fe069f1F66Beb671AC58909E9", data, "eip155:5042"), {own})).toBeNull();
+    expect(describeFyndActivity(tx("0xf7d2Ec960Cb9714C97897Db395Ff7f0a11de1060", data, "eip155:99901"), {own})).toBeNull();
+  });
+
   it("not Fynd: another contract, another selector, a chain the module does not serve", () => {
     expect(describeFyndActivity(tx("0x2222222222222222222222222222222222222222"), {own})).toBeNull();
     expect(describeFyndActivity(tx(FYND_CHAINS[8453]!.router, "0x095ea7b3" + "00".repeat(64)), {own})).toBeNull();

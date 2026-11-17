@@ -136,6 +136,51 @@ describe("fyndProvider.getQuote", () => {
   });
 });
 
+describe("fyndProvider on Arc and Elysium", () => {
+  const ARC_USDC = "0x3600000000000000000000000000000000000000";
+  const ARC_EURC = "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1";
+  const ELYSIUM_USDC = "0xb47c4C8F73F009CC0C0d3f92B388d13E293F0B65";
+  const on = (id: number) => ({tamper: (tx: {to: string; value: string; data: string}) => ({...tx, to: FYND_CHAINS[id]!.router})});
+
+  it("quotes through /v1/arc and /v1/elysium and checks each chain's own router", async () => {
+    const calls: NonNullable<Stub["calls"]> = [];
+    vi.stubGlobal("fetch", stub({calls, out: 9_000_000n, ...on(5042)}));
+    const arc = await fyndProvider({apiKey: "k"}).getQuote(params({sourceChain: "eip155:5042", destChain: "eip155:5042", sourceToken: "USDC", destToken: ARC_EURC, amountIn: "10000000"}) as never);
+    expect(calls[0]!.url).toBe("https://fynd-api.propellerheads.xyz/v1/arc/quote");
+    expect(calls[0]!.body).toMatchObject({orders: [{token_in: ARC_USDC, token_out: ARC_EURC}]});
+    expect(arc!.txRequest).toMatchObject({to: FYND_CHAINS[5042]!.router, chainId: 5042, value: "0", approvalAddress: FYND_CHAINS[5042]!.router});
+
+    // Elysium: native HYPE in, simulated against the chain's RPC before the quote enters the auction.
+    calls.length = 0;
+    vi.stubGlobal("fetch", stub({calls, out: 68_000_000n, ...on(99901)}));
+    const elysium = await fyndProvider({apiKey: "k", rpcUrls: {99901: ["https://rpc.test"]}}).getQuote(params({sourceChain: "eip155:99901", destChain: "eip155:99901", sourceToken: "HYPE", destToken: ELYSIUM_USDC, amountIn: "1000000000000000000"}) as never);
+    expect(calls[0]!.url).toBe("https://fynd-api.propellerheads.xyz/v1/elysium/quote");
+    expect(calls[1]!.body).toMatchObject({method: "eth_call"});
+    expect(elysium!.txRequest).toMatchObject({to: FYND_CHAINS[99901]!.router, chainId: 99901, value: "1000000000000000000"});
+    expect(elysium!.txRequest!.approvalAddress).toBeUndefined();
+  });
+
+  it("refuses a quote on Arc or Elysium built to another chain's router", async () => {
+    for (const [chain, src, dest] of [["eip155:5042", "USDC", ARC_EURC], ["eip155:99901", "USDC.e", ZERO]] as const) {
+      vi.stubGlobal("fetch", stub());
+      const reasons: string[] = [];
+      expect(await fyndProvider({apiKey: "k"}).getQuote(params({sourceChain: chain, destChain: chain, sourceToken: src, destToken: dest, amountIn: "10000000", onRefusal: (r: string) => reasons.push(r)}) as never)).toBeNull();
+      expect(reasons.join()).toMatch(/not the Tycho router on (Arc|Elysium)/);
+    }
+  });
+
+  it("refuses Arc's native coin on either side before asking the API (USDC in 18-decimal units is not a catalog asset)", async () => {
+    for (const over of [{destToken: ZERO}, {destToken: ROUTER_NATIVE}, {sourceToken: "", destToken: ARC_EURC, amountIn: "10000000000000000000"}]) {
+      const calls: NonNullable<Stub["calls"]> = [];
+      vi.stubGlobal("fetch", stub({calls, ...on(5042)}));
+      const reasons: string[] = [];
+      expect(await fyndProvider({apiKey: "k"}).getQuote(params({sourceChain: "eip155:5042", destChain: "eip155:5042", sourceToken: "USDC", amountIn: "10000000", ...over, onRefusal: (r: string) => reasons.push(r)}) as never)).toBeNull();
+      expect(calls).toHaveLength(0);
+      expect(reasons.join()).toMatch(/native coin on Arc is not a catalog asset|unknown source token/);
+    }
+  });
+});
+
 describe("fyndProvider quote-time simulation (native input)", () => {
   it("refuses a native-input route whose exact transaction reverts now, and keeps one that executes", async () => {
     const reasons: string[] = [];

@@ -3,13 +3,13 @@ import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protoco
 import {httpRefusal, refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {describeFyndActivity} from "./activity.js";
-import {FYND_CHAINS, ROUTER_NATIVE, TYCHO_ROUTER_ABI, checkFyndTransaction} from "./router.js";
+import {FYND_CHAINS, ROUTER_NATIVE, TYCHO_ROUTER_ABI, checkFyndTransaction, fyndNativeSwaps} from "./router.js";
 
 /**
  * Fynd — Propeller Heads' DEX aggregator (docs.fynd.xyz) as a same-chain
  * swap2 provider: exact-input swaps on Ethereum, Base, Arbitrum, BNB Chain,
- * Polygon, Unichain and Robinhood Chain, priced over the pools Tycho indexes
- * and settled through TychoRouterV3.
+ * Polygon, Unichain, Robinhood Chain, Arc and Elysium, priced over the pools
+ * Tycho indexes and settled through TychoRouterV3.
  *
  * Fynd outputs are licensed under the Fynd License: a swap built from a Fynd
  * quote must settle through the Tycho router with its fees intact — which is
@@ -242,6 +242,10 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
       if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address", "unsupported_pair");
       const tokenOut = nativeOut ? ZERO : getAddress(params.destToken);
       if (tokenIn === tokenOut) return refuse("same token in and out", "unsupported_pair");
+      // Arc: the native coin is USDC in 18-decimal units, which the catalog does not list (see fyndNativeSwaps).
+      if ((tokenIn === ZERO || tokenOut === ZERO || tokenOut === getAddress(ROUTER_NATIVE)) && !fyndNativeSwaps(chainId)) {
+        return refuse(`the native coin on ${FYND_CHAINS[chainId]!.name} is not a catalog asset here; swap its ERC-20 instead`, "unsupported_pair");
+      }
       if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address", "recipient_mismatch");
       const receiver = getAddress(params.destAddress);
       const sender = getAddress(params.refundAddress && /^0x[0-9a-fA-F]{40}$/.test(params.refundAddress) ? params.refundAddress : params.destAddress);
