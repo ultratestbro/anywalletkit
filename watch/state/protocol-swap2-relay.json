@@ -12,7 +12,7 @@
     "codeHash": "c1897f573dc70ee2",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:16.936Z",
+   "seenAt": "2026-11-17T15:59:09.508Z",
    "changedAt": "2026-11-11T14:18:14.027Z"
   },
   "allocator-ethereum": {
@@ -28,7 +28,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.097Z",
+   "seenAt": "2026-11-17T15:59:09.584Z",
    "changedAt": "2026-11-11T14:18:14.029Z"
   },
   "owner-ethereum": {
@@ -44,7 +44,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:16.987Z",
+   "seenAt": "2026-11-17T15:59:09.625Z",
    "changedAt": "2026-11-11T14:18:14.033Z"
   },
   "allocator-optimism": {
@@ -60,7 +60,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.129Z",
+   "seenAt": "2026-11-17T15:59:09.573Z",
    "changedAt": "2026-11-11T14:18:14.077Z"
   },
   "depository-optimism": {
@@ -74,7 +74,7 @@
     "codeHash": "6ebc132d774633ef",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.027Z",
+   "seenAt": "2026-11-17T15:59:09.543Z",
    "changedAt": "2026-11-11T14:18:14.080Z"
   },
   "owner-optimism": {
@@ -90,7 +90,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.060Z",
+   "seenAt": "2026-11-17T15:59:09.665Z",
    "changedAt": "2026-11-11T14:18:14.106Z"
   },
   "depository-bnb": {
@@ -104,7 +104,7 @@
     "codeHash": "b174e6dd543815be",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.067Z",
+   "seenAt": "2026-11-17T15:59:09.617Z",
    "changedAt": "2026-11-11T14:18:14.113Z"
   },
   "owner-bnb": {
@@ -120,7 +120,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.140Z",
+   "seenAt": "2026-11-17T15:59:09.646Z",
    "changedAt": "2026-11-11T14:18:14.122Z"
   },
   "docs-input-validation": {
@@ -133,7 +133,7 @@
     "hash": "4050635ea9b2bece",
     "chars": 13868
    },
-   "seenAt": "2026-11-16T15:41:17.042Z",
+   "seenAt": "2026-11-17T15:59:09.599Z",
    "changedAt": "2026-11-11T14:18:14.124Z"
   },
   "allocator-bnb": {
@@ -149,7 +149,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.149Z",
+   "seenAt": "2026-11-17T15:59:09.693Z",
    "changedAt": "2026-11-11T14:18:14.145Z"
   },
   "depository-source": {
@@ -163,7 +163,7 @@
     "sha": "80b2a1dddd",
     "url": "https://github.com/relayprotocol/relay-depository/blob/main/packages/ethereum-vm/src/RelayDepository.sol"
    },
-   "seenAt": "2026-11-16T15:41:17.052Z",
+   "seenAt": "2026-11-17T15:59:09.680Z",
    "changedAt": "2026-11-11T14:18:14.155Z"
   },
   "order-source": {
@@ -177,7 +177,7 @@
     "sha": "9d7dc0075e",
     "url": "https://github.com/relayprotocol/relay-protocol-sdk/blob/main/src/order/index.ts"
    },
-   "seenAt": "2026-11-16T15:41:17.025Z",
+   "seenAt": "2026-11-17T15:59:09.692Z",
    "changedAt": "2026-11-11T14:18:14.204Z"
   },
   "allocator-gnosis": {
@@ -193,7 +193,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.173Z",
+   "seenAt": "2026-11-17T15:59:09.804Z",
    "changedAt": "2026-11-11T14:18:14.256Z"
   },
   "owner-gnosis": {
@@ -209,7 +209,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.227Z",
+   "seenAt": "2026-11-17T15:59:09.796Z",
    "changedAt": "2026-11-11T14:18:14.267Z"
   },
   "depository-gnosis": {
@@ -223,7 +223,7 @@
     "codeHash": "a1c36765a0ab2fc6",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.167Z",
+   "seenAt": "2026-11-17T15:59:09.831Z",
    "changedAt": "2026-11-11T14:18:14.295Z"
   },
   "allocator-unichain": {
@@ -239,7 +239,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.270Z",
+   "seenAt": "2026-11-17T15:59:09.835Z",
    "changedAt": "2026-11-11T14:18:14.330Z"
   },
   "depository-unichain": {
@@ -253,7 +253,7 @@
     "codeHash": "deb002751326fe30",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.233Z",
+   "seenAt": "2026-11-17T15:59:09.883Z",
    "changedAt": "2026-11-11T14:18:14.340Z"
   },
   "owner-unichain": {
@@ -269,7 +269,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.254Z",
+   "seenAt": "2026-11-17T15:59:09.885Z",
    "changedAt": "2026-11-11T14:18:14.388Z"
   },
   "depository-polygon": {
@@ -283,7 +283,7 @@
     "codeHash": "c7986b86ba3c650e",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.201Z",
+   "seenAt": "2026-11-17T15:59:09.888Z",
    "changedAt": "2026-11-11T14:18:14.434Z"
   },
   "allocator-polygon": {
@@ -299,7 +299,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.274Z",
+   "seenAt": "2026-11-17T15:59:09.899Z",
    "changedAt": "2026-11-11T14:18:14.460Z"
   },
   "chains": {
@@ -372,7 +372,7 @@
      "99901"
     ]
    },
-   "seenAt": "2026-11-16T15:41:17.029Z",
+   "seenAt": "2026-11-17T15:59:09.501Z",
    "changedAt": "2026-11-13T14:33:41.672Z"
   },
   "depository-monad": {
@@ -386,7 +386,7 @@
     "codeHash": "eab6087ee5353879",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.293Z",
+   "seenAt": "2026-11-17T15:59:09.927Z",
    "changedAt": "2026-11-11T14:18:14.463Z"
   },
   "owner-polygon": {
@@ -402,7 +402,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.231Z",
+   "seenAt": "2026-11-17T15:59:09.926Z",
    "changedAt": "2026-11-11T14:18:14.494Z"
   },
   "allocator-monad": {
@@ -418,7 +418,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.338Z",
+   "seenAt": "2026-11-17T15:59:10.011Z",
    "changedAt": "2026-11-11T14:18:14.508Z"
   },
   "owner-monad": {
@@ -434,7 +434,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.360Z",
+   "seenAt": "2026-11-17T15:59:09.990Z",
    "changedAt": "2026-11-11T14:18:14.534Z"
   },
   "allocator-xlayer": {
@@ -450,7 +450,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.593Z",
+   "seenAt": "2026-11-17T15:59:10.196Z",
    "changedAt": "2026-11-11T14:18:14.737Z"
   },
   "depository-xlayer": {
@@ -464,7 +464,7 @@
     "codeHash": "7169d4b81106bdb8",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.868Z",
+   "seenAt": "2026-11-17T15:59:10.120Z",
    "changedAt": "2026-11-11T14:18:14.742Z"
   },
   "depository-zksync": {
@@ -478,7 +478,7 @@
     "codeHash": "1066a89487233cd8",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.190Z",
+   "seenAt": "2026-11-17T15:59:10.126Z",
    "changedAt": "2026-11-11T14:18:14.800Z"
   },
   "allocator-zksync": {
@@ -494,7 +494,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.693Z",
+   "seenAt": "2026-11-17T15:59:10.227Z",
    "changedAt": "2026-11-11T14:18:14.827Z"
   },
   "owner-zksync": {
@@ -510,7 +510,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.770Z",
+   "seenAt": "2026-11-17T15:59:10.201Z",
    "changedAt": "2026-11-11T14:18:14.858Z"
   },
   "depository-sonic": {
@@ -524,7 +524,7 @@
     "codeHash": "d1e05d5545b94f3a",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.396Z",
+   "seenAt": "2026-11-17T15:59:10.072Z",
    "changedAt": "2026-11-11T14:18:14.946Z"
   },
   "allocator-sonic": {
@@ -540,7 +540,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.769Z",
+   "seenAt": "2026-11-17T15:59:10.429Z",
    "changedAt": "2026-11-11T14:18:14.948Z"
   },
   "depository-worldchain": {
@@ -554,7 +554,7 @@
     "codeHash": "c8a1a19032c5178e",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.727Z",
+   "seenAt": "2026-11-17T15:59:10.228Z",
    "changedAt": "2026-11-11T14:18:14.951Z"
   },
   "owner-xlayer": {
@@ -570,7 +570,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.590Z",
+   "seenAt": "2026-11-17T15:59:10.219Z",
    "changedAt": "2026-11-11T14:18:14.955Z"
   },
   "owner-sonic": {
@@ -586,7 +586,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.781Z",
+   "seenAt": "2026-11-17T15:59:10.456Z",
    "changedAt": "2026-11-11T14:18:14.965Z"
   },
   "allocator-worldchain": {
@@ -602,7 +602,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.759Z",
+   "seenAt": "2026-11-17T15:59:10.229Z",
    "changedAt": "2026-11-11T14:18:14.969Z"
   },
   "owner-worldchain": {
@@ -618,7 +618,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.793Z",
+   "seenAt": "2026-11-17T15:59:10.248Z",
    "changedAt": "2026-11-11T14:18:15.047Z"
   },
   "allocator-hyperevm": {
@@ -634,7 +634,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:17.969Z",
+   "seenAt": "2026-11-17T15:59:10.350Z",
    "changedAt": "2026-11-11T14:18:15.083Z"
   },
   "depository-morph": {
@@ -648,7 +648,7 @@
     "codeHash": "0cefe3dd6311da01",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:17.972Z",
+   "seenAt": "2026-11-17T15:59:10.495Z",
    "changedAt": "2026-11-11T14:18:15.116Z"
   },
   "allocator-morph": {
@@ -664,7 +664,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.146Z",
+   "seenAt": "2026-11-17T15:59:10.503Z",
    "changedAt": "2026-11-11T14:18:15.141Z"
   },
   "depository-megaeth": {
@@ -678,7 +678,7 @@
     "codeHash": "48f012d761a3d57a",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.062Z",
+   "seenAt": "2026-11-17T15:59:10.486Z",
    "changedAt": "2026-11-11T14:18:15.176Z"
   },
   "allocator-megaeth": {
@@ -694,7 +694,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.079Z",
+   "seenAt": "2026-11-17T15:59:10.500Z",
    "changedAt": "2026-11-11T14:18:15.195Z"
   },
   "owner-hyperevm": {
@@ -710,7 +710,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:17.972Z",
+   "seenAt": "2026-11-17T15:59:10.348Z",
    "changedAt": "2026-11-11T14:18:15.198Z"
   },
   "depository-hyperevm": {
@@ -724,7 +724,7 @@
     "codeHash": "87e2afc72addb7ce",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.041Z",
+   "seenAt": "2026-11-17T15:59:10.441Z",
    "changedAt": "2026-11-11T14:18:15.199Z"
   },
   "owner-morph": {
@@ -740,7 +740,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.271Z",
+   "seenAt": "2026-11-17T15:59:10.497Z",
    "changedAt": "2026-11-11T14:18:15.207Z"
   },
   "owner-megaeth": {
@@ -756,7 +756,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.153Z",
+   "seenAt": "2026-11-17T15:59:10.515Z",
    "changedAt": "2026-11-11T14:18:15.225Z"
   },
   "depository-robinhood": {
@@ -770,7 +770,7 @@
     "codeHash": "3bec33d24a944af6",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.167Z",
+   "seenAt": "2026-11-17T15:59:10.711Z",
    "changedAt": "2026-11-11T14:18:15.283Z"
   },
   "allocator-robinhood": {
@@ -786,7 +786,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.182Z",
+   "seenAt": "2026-11-17T15:59:10.757Z",
    "changedAt": "2026-11-11T14:18:15.299Z"
   },
   "owner-robinhood": {
@@ -802,7 +802,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.230Z",
+   "seenAt": "2026-11-17T15:59:10.758Z",
    "changedAt": "2026-11-11T14:18:15.323Z"
   },
   "depository-arc": {
@@ -816,7 +816,7 @@
     "codeHash": "ab7a8d3c866ec76f",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.230Z",
+   "seenAt": "2026-11-17T15:59:10.725Z",
    "changedAt": "2026-11-11T14:18:15.355Z"
   },
   "allocator-arc": {
@@ -832,7 +832,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.272Z",
+   "seenAt": "2026-11-17T15:59:10.749Z",
    "changedAt": "2026-11-11T14:18:15.370Z"
   },
   "depository-base": {
@@ -846,7 +846,7 @@
     "codeHash": "4107bc5d1a28f08e",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.398Z",
+   "seenAt": "2026-11-17T15:59:10.805Z",
    "changedAt": "2026-11-11T14:18:15.388Z"
   },
   "owner-arc": {
@@ -862,7 +862,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.297Z",
+   "seenAt": "2026-11-17T15:59:10.750Z",
    "changedAt": "2026-11-11T14:18:15.393Z"
   },
   "owner-base": {
@@ -878,7 +878,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.434Z",
+   "seenAt": "2026-11-17T15:59:10.840Z",
    "changedAt": "2026-11-11T14:18:15.397Z"
   },
   "allocator-base": {
@@ -894,7 +894,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.400Z",
+   "seenAt": "2026-11-17T15:59:10.818Z",
    "changedAt": "2026-11-11T14:18:15.400Z"
   },
   "allocator-plasma": {
@@ -910,7 +910,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.504Z",
+   "seenAt": "2026-11-17T15:59:11.002Z",
    "changedAt": "2026-11-11T14:18:15.559Z"
   },
   "depository-plasma": {
@@ -924,7 +924,7 @@
     "codeHash": "c1b952020c22707e",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.493Z",
+   "seenAt": "2026-11-17T15:59:10.988Z",
    "changedAt": "2026-11-11T14:18:15.560Z"
   },
   "owner-plasma": {
@@ -940,7 +940,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.520Z",
+   "seenAt": "2026-11-17T15:59:11.001Z",
    "changedAt": "2026-11-11T14:18:15.571Z"
   },
   "depository-arbitrum": {
@@ -954,7 +954,7 @@
     "codeHash": "84d8b699bf4a3604",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.529Z",
+   "seenAt": "2026-11-17T15:59:10.885Z",
    "changedAt": "2026-11-11T14:18:15.601Z"
   },
   "allocator-arbitrum": {
@@ -970,7 +970,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.547Z",
+   "seenAt": "2026-11-17T15:59:10.891Z",
    "changedAt": "2026-11-11T14:18:15.601Z"
   },
   "owner-arbitrum": {
@@ -986,7 +986,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.575Z",
+   "seenAt": "2026-11-17T15:59:10.916Z",
    "changedAt": "2026-11-11T14:18:15.612Z"
   },
   "depository-celo": {
@@ -1000,7 +1000,7 @@
     "codeHash": "f289b2c0acb5ed9d",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.644Z",
+   "seenAt": "2026-11-17T15:59:10.960Z",
    "changedAt": "2026-11-11T14:18:15.674Z"
   },
   "allocator-celo": {
@@ -1016,7 +1016,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.676Z",
+   "seenAt": "2026-11-17T15:59:10.955Z",
    "changedAt": "2026-11-11T14:18:15.675Z"
   },
   "owner-celo": {
@@ -1032,7 +1032,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.707Z",
+   "seenAt": "2026-11-17T15:59:10.997Z",
    "changedAt": "2026-11-11T14:18:15.682Z"
   },
   "allocator-mantle": {
@@ -1048,7 +1048,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.433Z",
+   "seenAt": "2026-11-17T15:59:10.681Z",
    "changedAt": "2026-11-11T14:18:15.774Z"
   },
   "allocator-avalanche": {
@@ -1064,7 +1064,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.658Z",
+   "seenAt": "2026-11-17T15:59:11.136Z",
    "changedAt": "2026-11-11T14:18:15.788Z"
   },
   "owner-avalanche": {
@@ -1080,7 +1080,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.674Z",
+   "seenAt": "2026-11-17T15:59:11.124Z",
    "changedAt": "2026-11-11T14:18:15.810Z"
   },
   "owner-mantle": {
@@ -1096,7 +1096,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.425Z",
+   "seenAt": "2026-11-17T15:59:10.697Z",
    "changedAt": "2026-11-11T14:18:15.828Z"
   },
   "depository-avalanche": {
@@ -1110,7 +1110,7 @@
     "codeHash": "f2dae426de97f142",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.659Z",
+   "seenAt": "2026-11-17T15:59:11.180Z",
    "changedAt": "2026-11-11T14:18:15.860Z"
   },
   "depository-linea": {
@@ -1124,7 +1124,7 @@
     "codeHash": "46dac807551adb4a",
     "bytes": 8777
    },
-   "seenAt": "2026-11-16T15:41:18.766Z",
+   "seenAt": "2026-11-17T15:59:11.251Z",
    "changedAt": "2026-11-11T14:18:15.954Z"
   },
   "depository-mantle": {
@@ -1138,7 +1138,7 @@
     "codeHash": "627e518013c39bd6",
     "bytes": 8777
    },
-   "seenAt": "2026-11-16T15:41:18.382Z",
+   "seenAt": "2026-11-17T15:59:10.670Z",
    "changedAt": "2026-11-11T14:18:15.956Z"
   },
   "allocator-linea": {
@@ -1154,7 +1154,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:18.803Z",
+   "seenAt": "2026-11-17T15:59:11.253Z",
    "changedAt": "2026-11-11T14:18:15.993Z"
   },
   "owner-linea": {
@@ -1170,7 +1170,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:18.799Z",
+   "seenAt": "2026-11-17T15:59:11.314Z",
    "changedAt": "2026-11-11T14:18:16.054Z"
   },
   "allocator-ink": {
@@ -1186,7 +1186,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:19.012Z",
+   "seenAt": "2026-11-17T15:59:11.492Z",
    "changedAt": "2026-11-11T14:18:16.216Z"
   },
   "owner-ink": {
@@ -1202,7 +1202,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:19.050Z",
+   "seenAt": "2026-11-17T15:59:11.496Z",
    "changedAt": "2026-11-11T14:18:16.241Z"
   },
   "depository-berachain": {
@@ -1216,7 +1216,7 @@
     "codeHash": "e1fa2cb1da2d8625",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:18.958Z",
+   "seenAt": "2026-11-17T15:59:11.523Z",
    "changedAt": "2026-11-11T14:18:16.245Z"
   },
   "depository-ink": {
@@ -1230,7 +1230,7 @@
     "codeHash": "d9761980d9d6428e",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:19.046Z",
+   "seenAt": "2026-11-17T15:59:11.535Z",
    "changedAt": "2026-11-11T14:18:16.263Z"
   },
   "allocator-berachain": {
@@ -1246,7 +1246,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:19.031Z",
+   "seenAt": "2026-11-17T15:59:11.524Z",
    "changedAt": "2026-11-11T14:18:16.270Z"
   },
   "depository-plume": {
@@ -1260,7 +1260,7 @@
     "codeHash": "8f621e057ea0fba8",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:19.147Z",
+   "seenAt": "2026-11-17T15:59:11.556Z",
    "changedAt": "2026-11-11T14:18:16.311Z"
   },
   "allocator-plume": {
@@ -1276,7 +1276,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:19.140Z",
+   "seenAt": "2026-11-17T15:59:11.545Z",
    "changedAt": "2026-11-11T14:18:16.314Z"
   },
   "owner-plume": {
@@ -1292,7 +1292,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:19.144Z",
+   "seenAt": "2026-11-17T15:59:11.571Z",
    "changedAt": "2026-11-11T14:18:16.315Z"
   },
   "owner-berachain": {
@@ -1308,7 +1308,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:19.028Z",
+   "seenAt": "2026-11-17T15:59:11.587Z",
    "changedAt": "2026-11-11T14:18:16.328Z"
   },
   "allocator-scroll": {
@@ -1324,7 +1324,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:19.305Z",
+   "seenAt": "2026-11-17T15:59:11.757Z",
    "changedAt": "2026-11-11T14:18:16.496Z"
   },
   "allocator-elysium": {
@@ -1340,7 +1340,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:19.267Z",
+   "seenAt": "2026-11-17T15:59:11.672Z",
    "changedAt": "2026-11-11T14:18:16.500Z"
   },
   "depository-scroll": {
@@ -1354,7 +1354,7 @@
     "codeHash": "eba7f8bd0fe6f4f9",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:19.314Z",
+   "seenAt": "2026-11-17T15:59:11.753Z",
    "changedAt": "2026-11-11T14:18:16.502Z"
   },
   "owner-scroll": {
@@ -1370,7 +1370,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:19.343Z",
+   "seenAt": "2026-11-17T15:59:11.783Z",
    "changedAt": "2026-11-11T14:18:16.504Z"
   },
   "owner-elysium": {
@@ -1386,7 +1386,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:19.270Z",
+   "seenAt": "2026-11-17T15:59:11.699Z",
    "changedAt": "2026-11-11T14:18:16.537Z"
   },
   "allocator-katana": {
@@ -1402,7 +1402,7 @@
     "call": "allocator()",
     "result": "0x63c1d3e9c646184529c5694630a01c00df171b56"
    },
-   "seenAt": "2026-11-16T15:41:19.388Z",
+   "seenAt": "2026-11-17T15:59:11.758Z",
    "changedAt": "2026-11-11T14:18:16.574Z"
   },
   "depository-katana": {
@@ -1416,7 +1416,7 @@
     "codeHash": "d0a4148cb583d8f3",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:19.440Z",
+   "seenAt": "2026-11-17T15:59:11.738Z",
    "changedAt": "2026-11-11T14:18:16.595Z"
   },
   "owner-katana": {
@@ -1432,7 +1432,7 @@
     "call": "owner()",
     "result": "0xf61a305199fa1135d76ffab3752d42f55cbd775a"
    },
-   "seenAt": "2026-11-16T15:41:19.428Z",
+   "seenAt": "2026-11-17T15:59:11.767Z",
    "changedAt": "2026-11-11T14:18:16.632Z"
   },
   "depository-elysium": {
@@ -1446,7 +1446,7 @@
     "codeHash": "9bde975fa8a38ae7",
     "bytes": 8628
    },
-   "seenAt": "2026-11-16T15:41:19.380Z",
+   "seenAt": "2026-11-17T15:59:11.773Z",
    "changedAt": "2026-11-11T14:18:16.671Z"
   }
  }
