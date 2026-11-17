@@ -15,7 +15,7 @@
   When a remote provider receives a local tracker, it uses that tracker without falling
   back to backend status. Existing providers retain their current tracking behavior.
   
-  Stargate's private integration now supplies these hooks together with its source-call
+  Stargate's integration now supplies these hooks together with its source-call
   pins, so server/mobile clients can verify payouts and recover pending transfers using
   their own RPC evidence.
 - 0d51c25: Add opt-in durable swap operation journals with application-owned atomic storage,

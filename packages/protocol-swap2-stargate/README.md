@@ -486,8 +486,8 @@ be labelled without fabricating successful asset movements.
   and composers remain out of scope.
 - SDK-333: history, documentation, exports, module registry entry, changeset and conformance
   are in place. Funded Taxi transfers passed in both directions (Arbitrum ⇄ Base USDC) with a
-  fresh-process resume; native ETH and mobile/device validation of the persistent journal are
-  still owed before publishing.
+  fresh-process resume. Published as 0.1.0 on 2026-11-17; a funded native ETH transfer and
+  validation of the persistent journal on a mobile device are still owed.
 
 The shared `pnpm test:hermes` smoke includes Stargate bigint/dust and uint72 ticket
 handling, recorded cached-token recovery receipts, native-drop tuple decoding and

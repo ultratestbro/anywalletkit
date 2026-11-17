@@ -25,6 +25,7 @@ checks every quote: amounts, recipient, refund address, fee caps. The full flow 
 | 0x | API key on every request: server only (the app uses `zeroExRemoteProvider`, which re-checks everything on the device); conventional env names `ZEROEX_ENABLED` / `ZEROEX_API_KEY` | [dashboard.0x.org](https://dashboard.0x.org) |
 | Across | API V5 key: server only (the app uses `acrossRemoteProvider`, which re-checks every deposit on the device); conventional env names `ACROSS_ENABLED` / `ACROSS_API_KEY`. Across's integrator id and V4 key are not used | [dashboard.across.to](https://dashboard.across.to) |
 | THORChain, Chainflip, CCTP, USDT0, Uniswap, Balancer, Curve, Wrap, Relay | None | — |
+| Stargate | None; RPCs for both chains on the server and in the app (the app proves delivery from finalized receipts itself), and a durable `operationStore` | [docs.stargate.finance](https://docs.stargate.finance) |
 | STON.fi Omniston | None; EVM orders keep an HTLC secret until delivery, so a serverless backend needs a durable store | See the module README |
 
 - **Secrets stay on a server.** The router can reach providers through your backend (the

@@ -21,7 +21,8 @@ npm install @anywalletkit/protocol-swap2-router \
   @anywalletkit/protocol-swap2-cctp \
   @anywalletkit/protocol-swap2-usdt0 \
   @anywalletkit/protocol-swap2-uniswap @anywalletkit/protocol-swap2-wrap \
-  @anywalletkit/protocol-swap2-jupiter @anywalletkit/protocol-swap2-0x @anywalletkit/protocol-swap2-across
+  @anywalletkit/protocol-swap2-jupiter @anywalletkit/protocol-swap2-0x @anywalletkit/protocol-swap2-across \
+  @anywalletkit/protocol-swap2-stargate
 ```
 
 The router bundles no provider. Only the providers you install and pass in end up in your
@@ -43,7 +44,7 @@ app, and each provider also works on its own without the router.
 | `omniston` | STON.fi | TON swaps, TON ↔ EVM and EVM ↔ EVM stablecoin orders |
 | `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage |
 | `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 16 EVM chains in one transaction; the direct USDT path into HyperEVM; USDT from Ethereum / Arbitrum / Celo into TON through the Legacy Mesh (destinations only); Tron opt-in (`meshDestinations`): its LayerZero fee is above the engine's native-fee ceiling today |
-| `stargate` | Stargate V2 Taxi (LayerZero) | USDC, USDT and ETH between 15 EVM chains from the pools, no API key; delivery and paid recovery checked against the chain. Opt-in `compose` route swaps into another ERC-20 on Ethereum. Off until `enabled: true` |
+| `stargate` | Stargate V2 Taxi (LayerZero) | USDC, USDT and ETH between 15 EVM chains from the pools, no API key; delivery and paid recovery checked against the chain. Opt-in `compose` route swaps into another ERC-20 on Ethereum. Off until `enabled: true` ([below](#stargate)) |
 | `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |
 | `curve` | On-chain DEX (Curve Router NG) | Same-chain stablecoin, ETH ↔ LST and crvUSD swaps from the contracts over a pinned pool allowlist; no API, no key, no fee ([below](#curve)) |
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
@@ -224,6 +225,42 @@ const across = acrossRemoteProvider({ baseUrl: 'https://your-backend.example/swa
 - **Named refusals.** `across: <what was found> [<code>]`, each with a reason (`route-unpriced`,
   `relayer-price`, `api-error`, `tx-fee`, …).
 
+### Stargate
+
+`@anywalletkit/protocol-swap2-stargate` moves USDC, USDT and ETH (and the OFT assets pinned in the
+package) between 15 EVM chains with Stargate V2 **Taxi**: one `sendToken` call on the source chain,
+priced straight from the pinned pools, no API key. It is off until `enabled: true`. New transfers use
+Taxi only (Stargate retired Bus on October 1, 2026), and transfers involving Scroll are refused from
+2026-12-08, Stargate's sunset date for that chain.
+
+```ts
+// On your server, behind createSwap2Handler (RPCs for the source AND the destination chain):
+import { stargateProvider } from '@anywalletkit/protocol-swap2-stargate/provider'
+const stargate = stargateProvider({ enabled: true, rpcUrls: { 'eip155:42161': ARBITRUM_RPC, 'eip155:8453': BASE_RPC } })
+
+// In the app: the pins check every build and prove delivery with the app's own RPCs.
+import { remoteProvider } from '@anywalletkit/protocol-swap2-core/remote'
+import { stargatePins } from '@anywalletkit/protocol-swap2-stargate/pins'
+const providers = [remoteProvider({ name: 'stargate', baseUrl, headers, ...stargatePins({ rpcUrls }) })]
+// new RouterSwap2Protocol(account, { fromChain, providers, reviewExecution, operationStore })
+```
+
+- **What is verified.** The device rebuilds the whole `sendToken` calldata from the quote's intent
+  (pool, destination, recipient, amount, minimum, messaging-fee cap) and refuses any byte of
+  difference. ERC-20s are approved for exactly the input; native pools are never approved.
+- **Delivery is proven, not reported.** A transfer is `completed` only when the destination pool's
+  payout is read from finalized receipts on both chains with the app's RPCs; the backend's status
+  cannot stand in for it. Quotes carry no ETA (`etaSeconds: null`), so Stargate is never tagged
+  `fastest`.
+- **Keep a journal.** Pass an `operationStore` and pass the reviewed `toTokenAmountMin` as
+  `minAmountOut`. On `Swap2MaybeSentError`, resume the operation id; never send again. Cached tokens
+  and undelivered LayerZero messages are recovered by a separate, reviewed and paid action
+  (`recoverSwap2`).
+- **Compose (opt-in).** With `compose: { enabled: true }` on both the provider and the pins, a USDC or
+  USDT source can deliver another ERC-20 on Ethereum (`routeId: 'compose'`): Taxi into the pinned
+  LI.FI receiver plus one Uniswap V3 swap the SDK encodes itself. If the swap does not run, the
+  bridged stablecoin is paid to the recipient on Ethereum and the route reports `partial`.
+
 ## 2. Create the router
 
 The router is bound to one account: the source of the swap. Its chain is the source chain.
@@ -259,7 +296,8 @@ Routes come back ranked by value. Two of them are tagged:
 
 - **`best`**: the highest value. Routes within 0.2% of each other count as the same price;
   inside that band the faster and more reliable route wins.
-- **`fastest`**: the lowest estimated time.
+- **`fastest`**: the lowest estimated time. A route without an estimate (Stargate's, for one) is never
+  `fastest`; when no route has one, `routes.fastest` is `null`.
 
 For a real USDC Ethereum → Base quote on 100 USDC, this returned four routes: CCTP
 tagged `best` (99.989 USDC guaranteed, ~3 minutes), LI.FI tagged `fastest` (99.735 USDC,

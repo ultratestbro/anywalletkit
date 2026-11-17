@@ -291,7 +291,7 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   or a string) on a server only — under React Native a provider with a key throws; the app runs
   `zeroExRemoteProvider` (with its own `rpcUrls`). Across needs its API V5 key
   (`apiKey`, a getter or a string): keep it on a server, the app runs `acrossRemoteProvider`. Chainflip, Uniswap,
-  Balancer, Curve, Wrap, CCTP, USDT0 need no key; on-chain venues need `rpcUrls`.
+  Balancer, Curve, Wrap, CCTP, USDT0, Stargate need no key; on-chain venues need `rpcUrls`.
 - Curve (`curveProvider({ rpcUrls: { 1: [url] } })`, chain ids as keys): same-chain Router NG over a pool allowlist
   pinned in the package (1–2 pools; between them only catalog tokens); no gas limit in the quote (the wallet
   estimates at broadcast); Ethereum swaps belong on an MEV-protected RPC. Behind a backend use
@@ -330,6 +330,15 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   /suggested-fees itself (keyless; CSP `connect-src` app.across.to) and refuses a fee >10 % under it.
   Ethereum as the destination is not priced (refused, `route-unpriced`). An unfilled deposit is refunded on the source
   chain after its deadline (hours). Under React Native an `apiKey` throws. Refusals: `across: … [code]` with a reason.
+- Stargate (`stargateProvider({ enabled: true, rpcUrls })` from `/provider` on your server — RPCs for the source AND the
+  destination; in the app `remoteProvider({ name: 'stargate', baseUrl, ...stargatePins({ rpcUrls }) })` from `/pins`, with
+  `reviewExecution` and an `operationStore`): V2 Taxi of USDC / USDT / ETH between 15 EVM chains, no API key, off until
+  `enabled`. The device rebuilds the `sendToken` calldata and refuses any difference; `completed` only from finalized
+  destination receipts read by the app; `etaSeconds: null` (never `fastest`; `RouteSet.fastest` can be `null`). On
+  `Swap2MaybeSentError` resume the operation id, never resend; cached tokens / stuck messages: `recoverSwap2` (reviewed,
+  paid). Bus retired (refused); Scroll refused from 2026-12-08. Opt-in `compose: { enabled: true }` on provider AND pins:
+  USDC / USDT → another ERC-20 on Ethereum (`routeId: 'compose'`, LI.FI receiver + one Uniswap V3 swap; `partial` = the
+  bridged stablecoin paid on Ethereum).
 - Also via the kit: `wallet.registerProtocol('swap', RouterSwap2Protocol, { chain, config: { fromChain: chain, providers } })`
   then `await wallet.getProtocol<RouterSwap2Protocol>('swap')` — policies then wrap the router's account.
 

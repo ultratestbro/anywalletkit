@@ -10,6 +10,38 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## 2026-11-17: Stargate, Fynd's redeployed router, routes per provider
+
+Bump `protocol-swap2-fynd` now: 0.2.12 and older refuse every Fynd quote. Code that reads an ETA must accept `null`.
+
+- **protocol-swap2-fynd 0.3.0, bump required:** Tycho redeployed TychoRouterV3 on every chain on 2026-11-16 and
+  Fynd's API builds every transaction to the new routers, so older versions refuse each quote ("the transaction
+  targets 0xe41c…5126, not the Tycho router on Ethereum"). `FYND_CHAINS`, `fyndPins.callTargets` and
+  `fyndPins.spenders` now hold only the redeployed routers. A signing allowlist or `knownSpenders` map with a
+  hard-coded router address must take the new one (spread `fyndPins` rather than copying addresses). Fynd also runs
+  on Arc (5042) and Elysium (99901); a swap with a chain's native coin on either side is refused where the token
+  catalog lists no native coin (Arc).
+- **protocol-swap2-core 0.15.0, protocol-swap2-router 0.7.0, extension-kit 0.7.0, Breaking (types):** a quote's
+  `etaSeconds` may be `null` (no defensible delivery estimate; Stargate quotes carry none), and `RouteSet.fastest` is
+  `RankedQuote | null`: `null` when no route has a known ETA. A route list that reads `routes.fastest.…` must check
+  it first. A route with an unknown ETA gets no speed bonus and never the `fastest` tag.
+- **New package, protocol-swap2-stargate:** Stargate V2 Taxi transfers of USDC, USDT and ETH (and the pinned OFT
+  assets) between 15 EVM chains, quoted from the pools, no API key. Off until `enabled: true`. Delivery counts only
+  when the destination payout is proven from finalized receipts; cached tokens and undelivered messages get a
+  separately reviewed, paid recovery. An opt-in `compose` route bridges into the pinned Ethereum LI.FI receiver and
+  swaps into another ERC-20 there. See [Stargate](/guides/swaps/#stargate).
+- **Several routes per provider (opt-in):** a provider may return more than one route through `getQuotes`; each
+  carries a stable `routeId`, and `using(route.provider, route.routeId)` executes exactly that route (the router keeps
+  the provider, path and your `minAmountOut` when it re-quotes an expired quote). Behind a backend, `remoteProvider`
+  asks the server's new `quotes` action only with `multiQuotes: true`; a `createSwap2Handler` `guard` that lists the
+  actions it allows must add `quotes` for that. Existing single-route providers and `awk1` status ids are unchanged.
+- **Durable swap journal (opt-in):** with `operationStore` in the engine config (and a fresh `operationId` per swap:
+  both or neither), every step around a signature or a broadcast is written ahead to your storage. After a crash or a
+  `Swap2MaybeSentError`, `resumeSwap2(operationId)` reconciles from the journal instead of sending again;
+  `recoverSwap2` runs a provider's reviewed, value-bounded recovery (Stargate today).
+- **Remote providers:** the client-side build check now runs again after the backend's preflight, so an approval or a
+  slow review cannot let a stale build through unchecked. Nothing to change.
+
 ## 2026-11-15: Across, `QuoteParams.sender`
 
 Not breaking for existing providers.
