@@ -1,4 +1,4 @@
-// Private workspace integration example. Not included in the public default provider list.
+// Stargate is opt-in: not part of the default provider list in examples/swap/src/swap.ts.
 // Install runtime-hermes polyfills before importing providers in React Native.
 import type {IWalletAccount} from '@anywalletkit/core'
 import type {Swap2EngineConfig} from '@anywalletkit/protocol-swap2-core/swap2/base'

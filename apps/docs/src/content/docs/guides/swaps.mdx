@@ -42,6 +42,7 @@ app, and each provider also works on its own without the router.
 | `omniston` | STON.fi | TON swaps, TON ↔ EVM and EVM ↔ EVM stablecoin orders |
 | `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage |
 | `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 16 EVM chains in one transaction; the direct USDT path into HyperEVM |
+| `stargate` | Stargate V2 Taxi (LayerZero) | USDC, USDT and ETH between 15 EVM chains from the pools, no API key; delivery and paid recovery checked against the chain. Opt-in `compose` route swaps into another ERC-20 on Ethereum. Off until `enabled: true` |
 | `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
 | `jupiter` | Solana aggregator (Metis) | Same-chain Solana swaps; instructions from Jupiter's `/build`, checked and assembled locally, no Jupiter fee; key optional |

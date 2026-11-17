@@ -1,4 +1,4 @@
-// Private workspace example; mount behind application authentication/rate limiting.
+// Mount behind application authentication/rate limiting.
 import {createSwap2Handler} from '@anywalletkit/protocol-swap2-core/server'
 import {stargateProvider, type StargateProviderConfig} from '@anywalletkit/protocol-swap2-stargate/provider'
 

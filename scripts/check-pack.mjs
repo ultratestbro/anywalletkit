@@ -24,6 +24,10 @@ const REPO = 'git+https://github.com/ultratestbro/anywalletkit.git'
 const out = mkdtempSync(join(tmpdir(), 'awk-pack-'))
 const problems = []
 let packed = 0
+// Unfinished packages that stay private on purpose; publish.mjs skips them. Each entry names its blocker.
+const UNRELEASED = new Map([
+  ['@anywalletkit/protocol-swap2-layerzero', 'SDK-330/331: authenticated Value Transfer API responses and userSteps execution'],
+])
 
 const targets = (node, acc = []) => {
   if (typeof node === 'string') acc.push(node)
@@ -77,7 +81,8 @@ for (const dir of readdirSync(join(root, 'packages'), {withFileTypes: true}).fil
   if (pkg.repository?.url !== REPO) bad.push(`repository.url = ${pkg.repository?.url}`)
   if (pkg.repository?.directory !== `packages/${dir}`) bad.push(`repository.directory = ${pkg.repository?.directory}`)
   if (pkg.publishConfig?.access !== 'public' || pkg.publishConfig?.provenance !== true) bad.push('publishConfig must be { access: public, provenance: true }')
-  if (pkg.private) bad.push('private: true')
+  if (pkg.private && !UNRELEASED.has(pkg.name)) bad.push('private: true')
+  if (!pkg.private && UNRELEASED.has(pkg.name)) bad.push('listed as unreleased but not private')
   // npm shows the README's first line (a badge) when description is empty, and
   // `keywords:anywalletkit` is how the packages are found on npm.
   if (!pkg.description?.trim()) bad.push('empty description')

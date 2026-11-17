@@ -1,8 +1,7 @@
 {
   "name": "@anywalletkit/protocol-swap2-stargate",
   "version": "0.0.0",
-  "private": true,
-  "description": "Stargate V2 Taxi quotes and execution, historical Taxi/Bus recovery, and read-only compose evidence. Private integration in development.",
+  "description": "Stargate V2 Taxi cross-chain transfers with client-verified calldata, finalized payout tracking and reviewed recovery; opt-in Ethereum compose swap through the LI.FI receiver and Uniswap V3.",
   "type": "module",
   "engines": {
     "node": ">=22"
