@@ -1,5 +1,42 @@
 # @anywalletkit/protocol-swap2-router
 
+## 0.7.0
+
+### Minor Changes
+
+- a096145: Allow `etaSeconds: null` for routes without a defensible delivery estimate. Preserve
+  it through remote quote sealing, execution reviews and extension views. The router
+  does not award a speed bonus or fastest tag to an unknown ETA; `RouteSet.fastest`
+  is nullable and fastest preference falls back to best when every ETA is unknown.
+  
+  Run the remote provider's client-side build validator again after backend preflight,
+  so approvals or review delays cannot bypass fresh client checks before signing.
+- 0d51c25: Add opt-in durable swap operation journals with application-owned atomic storage,
+  write-ahead markers around signatures/broadcasts, and read-only reconciliation.
+  Ambiguous sends and post-send storage failures cannot authorize automatic retries.
+  
+  Add separately reviewed, value-bounded EVM recovery with client-side contract pins,
+  current on-chain calldata validation and independent recovery transaction tracking.
+  Keep existing `awk1` status IDs and zero-value claims compatible.
+- fb01615: Support multiple display routes per provider through optional `getQuotes`, stable
+  `routeId` selectors, and `using(provider, routeId)`. Validate and rank candidates
+  independently while preserving the selected provider, path and caller floor when
+  refreshing an expired quote after approval.
+  
+  Add opt-in remote `/quotes` support (`multiQuotes: true`) with per-candidate validation,
+  client checks and sealed route identity. Existing single-quote providers and `awk1`
+  tracking IDs remain compatible.
+
+### Patch Changes
+
+- Updated dependencies [a096145]
+- Updated dependencies [eba96eb]
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/protocol-swap2-core@0.15.0
+  - @anywalletkit/core@0.9.0
+  - @anywalletkit/swap2-assets@0.3.0
+
 ## 0.6.2
 
 ### Patch Changes

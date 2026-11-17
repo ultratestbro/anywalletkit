@@ -1,5 +1,14 @@
 # @anywalletkit/kit
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/core@0.9.0
+  - @anywalletkit/swap2-assets@0.3.0
+
 ## 0.9.0
 
 ### Minor Changes

@@ -1,5 +1,14 @@
 # @anywalletkit/protocol-staking-native-near
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/core@0.9.0
+  - @anywalletkit/wallet-near@0.4.3
+
 ## 0.2.1
 
 ### Patch Changes

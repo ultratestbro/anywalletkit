@@ -1,5 +1,13 @@
 # @anywalletkit/protocol-lending-morpho-evm
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/core@0.9.0
+
 ## 0.4.0
 
 ### Minor Changes

@@ -1,5 +1,30 @@
 # @anywalletkit/extension-kit
 
+## 0.7.0
+
+### Minor Changes
+
+- a096145: Allow `etaSeconds: null` for routes without a defensible delivery estimate. Preserve
+  it through remote quote sealing, execution reviews and extension views. The router
+  does not award a speed bonus or fastest tag to an unknown ETA; `RouteSet.fastest`
+  is nullable and fastest preference falls back to best when every ETA is unknown.
+  
+  Run the remote provider's client-side build validator again after backend preflight,
+  so approvals or review delays cannot bypass fresh client checks before signing.
+
+### Patch Changes
+
+- Updated dependencies [a096145]
+- Updated dependencies [eba96eb]
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/protocol-swap2-core@0.15.0
+  - @anywalletkit/core@0.9.0
+  - @anywalletkit/keyring@0.3.11
+  - @anywalletkit/wallet-evm@0.8.1
+  - @anywalletkit/wallet-ton@0.8.2
+  - @anywalletkit/swap2-assets@0.3.0
+
 ## 0.6.1
 
 ### Patch Changes

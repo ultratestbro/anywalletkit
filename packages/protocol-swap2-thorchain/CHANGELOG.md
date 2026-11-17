@@ -1,5 +1,17 @@
 # @anywalletkit/protocol-swap2-thorchain
 
+## 0.4.4
+
+### Patch Changes
+
+- Updated dependencies [a096145]
+- Updated dependencies [eba96eb]
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/protocol-swap2-core@0.15.0
+  - @anywalletkit/core@0.9.0
+  - @anywalletkit/swap2-assets@0.3.0
+
 ## 0.4.3
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @anywalletkit/protocol-staking-native-solana
 
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/core@0.9.0
+
 ## 0.1.5
 
 ### Patch Changes

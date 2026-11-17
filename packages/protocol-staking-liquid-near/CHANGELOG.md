@@ -1,5 +1,14 @@
 # @anywalletkit/protocol-staking-liquid-near
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/core@0.9.0
+  - @anywalletkit/wallet-near@0.4.3
+
 ## 0.1.2
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @anywalletkit/protocol-swap2-0x
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [a096145]
+- Updated dependencies [eba96eb]
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/protocol-swap2-core@0.15.0
+  - @anywalletkit/core@0.9.0
+
 ## 0.1.1
 
 ### Patch Changes

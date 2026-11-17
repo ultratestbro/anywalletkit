@@ -1,5 +1,13 @@
 # @anywalletkit/wallet-zcash
 
+## 0.5.4
+
+### Patch Changes
+
+- Updated dependencies [0d51c25]
+- Updated dependencies [fb01615]
+  - @anywalletkit/core@0.9.0
+
 ## 0.5.3
 
 ### Patch Changes

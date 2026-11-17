@@ -1,5 +1,25 @@
 # @anywalletkit/core
 
+## 0.9.0
+
+### Minor Changes
+
+- 0d51c25: Add opt-in durable swap operation journals with application-owned atomic storage,
+  write-ahead markers around signatures/broadcasts, and read-only reconciliation.
+  Ambiguous sends and post-send storage failures cannot authorize automatic retries.
+  
+  Add separately reviewed, value-bounded EVM recovery with client-side contract pins,
+  current on-chain calldata validation and independent recovery transaction tracking.
+  Keep existing `awk1` status IDs and zero-value claims compatible.
+- fb01615: Support multiple display routes per provider through optional `getQuotes`, stable
+  `routeId` selectors, and `using(provider, routeId)`. Validate and rank candidates
+  independently while preserving the selected provider, path and caller floor when
+  refreshing an expired quote after approval.
+  
+  Add opt-in remote `/quotes` support (`multiQuotes: true`) with per-candidate validation,
+  client checks and sealed route identity. Existing single-quote providers and `awk1`
+  tracking IDs remain compatible.
+
 ## 0.8.0
 
 ### Minor Changes
