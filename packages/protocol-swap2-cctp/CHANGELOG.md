@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-cctp
 
+## 0.5.9
+
+### Patch Changes
+
+- Updated dependencies [90eebd0]
+  - @anywalletkit/protocol-swap2-core@0.15.1
+
 ## 0.5.8
 
 ### Patch Changes

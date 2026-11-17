@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-stargate
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [90eebd0]
+  - @anywalletkit/protocol-swap2-core@0.15.1
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-stargate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Stargate V2 Taxi cross-chain transfers with client-verified calldata, finalized payout tracking and reviewed recovery; opt-in Ethereum compose swap through the LI.FI receiver and Uniswap V3.",
   "type": "module",
   "engines": {

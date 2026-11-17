@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-router
 
+## 0.7.1
+
+### Patch Changes
+
+- Updated dependencies [90eebd0]
+  - @anywalletkit/protocol-swap2-core@0.15.1
+
 ## 0.7.0
 
 ### Minor Changes

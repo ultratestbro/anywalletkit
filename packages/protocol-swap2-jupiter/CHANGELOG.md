@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-jupiter
 
+## 0.3.12
+
+### Patch Changes
+
+- Updated dependencies [90eebd0]
+  - @anywalletkit/protocol-swap2-core@0.15.1
+
 ## 0.3.11
 
 ### Patch Changes

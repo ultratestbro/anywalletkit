@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-curve
 
+## 0.1.8
+
+### Patch Changes
+
+- Updated dependencies [90eebd0]
+  - @anywalletkit/protocol-swap2-core@0.15.1
+
 ## 0.1.7
 
 ### Patch Changes
