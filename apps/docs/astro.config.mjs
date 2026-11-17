@@ -4,6 +4,20 @@ import starlight from '@astrojs/starlight';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
 import starlightLinksValidator from 'starlight-links-validator';
+import { readdirSync, readFileSync } from 'node:fs';
+
+// Only packages published on npm get an API page: a private one ("private": true in its
+// package.json) is still in development and cannot be installed.
+const publicPackages = readdirSync(new URL('../../packages/', import.meta.url), { withFileTypes: true })
+  .filter((d) => d.isDirectory())
+  .filter((d) => {
+    try {
+      return !JSON.parse(readFileSync(new URL(`../../packages/${d.name}/package.json`, import.meta.url), 'utf8')).private;
+    } catch {
+      return false;
+    }
+  })
+  .map((d) => `../../packages/${d.name}`);
 
 export default defineConfig({
   site: 'https://docs.anywallet.tech',
@@ -49,7 +63,7 @@ export default defineConfig({
         // API reference: TypeDoc over every package's public entry point, written to
         // src/content/docs/api at build time (generated, not committed).
         starlightTypeDoc({
-          entryPoints: ['../../packages/*'],
+          entryPoints: publicPackages,
           output: 'api',
           sidebar: { label: 'API reference', collapsed: true },
           typeDoc: {
