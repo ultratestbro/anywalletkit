@@ -33,8 +33,12 @@ import {ZEROEX_MAX_NATIVE_QUOTE_SECONDS, ZEROEX_NATIVE_QUOTE_SKEW_SECONDS, check
 export const ZEROEX_PROVIDER = "zeroex";
 export const ZEROEX_DEFAULT_BASE_URL = "https://api.0x.org";
 const DEFAULT_SLIPPAGE_BPS = 50;
-/** A firm 0x quote is priced at one block; the Settler enforces the minimum, the engine re-checks this TTL before broadcast. */
-const DEFAULT_TTL_MS = 45_000;
+/**
+ * A firm 0x quote is priced at one block; the Settler enforces the minimum, the engine re-checks this TTL before broadcast.
+ * Two minutes so a mainnet approval (Ethereum: often past 45 s) still lands inside the quote; a token sale's TTL is cut to
+ * the Permit2 deadline (quote + 300 s) − 20 s, a native sale's to 90 s.
+ */
+const DEFAULT_TTL_MS = 120_000;
 const DEFAULT_TIMEOUT_MS = 10_000;
 /** The Permit2 deadline must outlive the quote by this much, so a signature is never made seconds before it lapses. */
 const DEADLINE_MARGIN_MS = 20_000;
@@ -59,7 +63,7 @@ export interface ZeroExProviderConfig {
   rpcUrls?: RpcUrls | undefined;
   /** Slippage when the request names none, bps. Default 50. */
   defaultSlippageBps?: number | undefined;
-  /** How long a quote is offered, ms. Default 45 s; never past the Permit2 deadline, and a native-coin sale's never past {@link ZEROEX_MAX_NATIVE_QUOTE_SECONDS}. */
+  /** How long a quote is offered, ms. Default 120 s; never past the Permit2 deadline, and a native-coin sale's never past {@link ZEROEX_MAX_NATIVE_QUOTE_SECONDS}. */
   quoteTtlMs?: number | undefined;
   timeoutMs?: number | undefined;
   /** Liquidity sources 0x must not route through (its `excludedSources` names). */

@@ -174,8 +174,8 @@ describe("zeroExProvider — indicative quote", () => {
       {type: "protocol", amount: "600000000000", token: "native", included: true, description: "0x fee (taken on-chain, already out of the quoted amount)"},
       {type: "network", amount: "3150000000000", token: "native", included: false, description: "Estimated network fee (gas × gas price, as 0x reports it)"},
     ]);
-    expect(q.validUntilMs).toBeGreaterThan(Date.now() + 40_000);
-    expect(q.validUntilMs).toBeLessThanOrEqual(Date.now() + 45_000);
+    expect(q.validUntilMs).toBeGreaterThan(Date.now() + 115_000);
+    expect(q.validUntilMs).toBeLessThanOrEqual(Date.now() + 120_000);
     expect(q.providerData).not.toHaveProperty("settler");
   });
 

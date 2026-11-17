@@ -158,9 +158,9 @@ describe("ZeroExSwap2Protocol — local mode", () => {
     world({onRegistryRead: (n) => (n === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: PREV_SETTLER, prev: OLDER_SETTLER})});
     const log = fresh();
     await expect(local(account(log)).swap2(options)).rejects.toThrow(/the quoted 0x Settler is no longer in the on-chain registry/);
-    // the engine signs the permit before the approval, runs the provider's preflight after it, and never sends the signed call
+    // the engine approves, runs the provider's preflight, and asks for the permit only after it passed: nothing is signed
     expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
-    expect(log.signed).toHaveLength(1);
+    expect(log.signed).toHaveLength(0);
     // only the gas pre-check (the unsigned call at its quoted limit) touched the Settler call: the signed one was not even dry-run
     expect(log.estimated.filter((e) => e.to === SETTLER).every((e) => e.gasLimit !== undefined)).toBe(true);
   });

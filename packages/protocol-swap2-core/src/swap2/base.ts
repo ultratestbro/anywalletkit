@@ -1683,21 +1683,30 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
 
     // Permit2 signature transfer: the locally rebuilt typed data is signed (never a raw hash) and the signature
-    // appended where the calldata expects it BEFORE any approval goes out — a signature needs no allowance, so an
-    // account that cannot or will not sign (no signTypedData, a declined prompt, a policy that refuses the spender)
-    // costs no approve-and-revoke. The signature stays in memory: the signed call is dry-run, after the approvals,
-    // right before its broadcast, and is never sent anywhere else.
+    // appended where the calldata expects it. The signature stays in memory: the signed call is dry-run right before
+    // its broadcast and is never sent anywhere else. When the Permit2 allowance is already in place (or adopted by a
+    // re-quote pass) the permit is signed here, before anything else — a signature needs no allowance, so an account
+    // that will not sign costs nothing. When approvals are needed it is signed only after them, once the quote is
+    // known to be still live (re-quoted otherwise) and the provider's preflight passed: the approvals can outlive the
+    // quote, and a permit signed before them would be thrown away with it and asked for again (2026-11-17, 0x on
+    // Ethereum: permit → approve → permit). The trade-off: a permit declined after the approvals costs a revoke. An
+    // account with no signTypedData at all is refused here, before any approval.
     let signedData: string | undefined;
-    if (permit2) {
+    const signPermit2 = async (): Promise<void> => {
       this.emitPhase("signing");
       try {
-        signedData = await this.signPermit2Transfer(signer, unsigned, permit2);
+        signedData = await this.signPermit2Transfer(signer, unsigned, permit2!, !!revokeApproval);
       } catch (error) {
-        // Only a re-quote pass holds an allowance here (the one it adopted): nobody else revokes it.
+        // The allowance this swap created, or the one a re-quote pass adopted: nobody else revokes it.
         await revokeApproval?.().catch(() => {});
         throw error;
       }
+    };
+    if (permit2 && !signer.signTypedData) {
+      await revokeApproval?.().catch(() => {});
+      throw new Swap2ExecutionError("swap2: a Permit2 swap needs an account with signTypedData");
     }
+    if (permit2 && !approvalAmounts.length) await signPermit2();
 
     if (approvalAmounts.length) {
       const approve = async (amount: bigint, kind: "approval" | "revoke" = "approval") => {
@@ -1765,6 +1774,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       throw error;
     }
 
+    // Permit2 after the approvals: the one signature this swap asks for (see above).
+    const permitAfterApprovals = !!permit2 && !signedData;
+    if (permitAfterApprovals) await signPermit2();
+
     // GASLESS typed-order execution (Omniston EVM-source): sign the EIP-712
     // payload and register it with the provider — there is no source tx.
     if (unsigned.typedData) {
@@ -1822,7 +1835,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // MUST use the account's transfer({token,recipient,amount}); passing token metadata
     // to sendTransaction would be ignored and send native SOL/TON/TRX instead.
     let sent: {hash: string};
-    this.emitPhase("signing");
+    if (!permitAfterApprovals) this.emitPhase("signing"); // the permit's "signing" covers the send
     // Dry-run the exact call (a Permit2 call with its signature, now that the allowance is in place). Nothing is
     // broadcast yet, so a failure here is a clean one: the allowance this swap created is revoked.
     if (ownGas) {
@@ -1921,11 +1934,12 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
 
   /**
    * Permit2 signature transfer: the account signs the rebuilt `PermitTransferFrom` as EIP-712 typed data and the
-   * signature is appended to the calldata. Runs before the approvals; nothing leaves the device here.
+   * signature is appended to the calldata. Runs before the approvals when none are needed, after them otherwise
+   * (`approved`: an allowance this swap holds is revoked on failure); nothing leaves the device here.
    */
-  private async signPermit2Transfer(signer: Swap2Signer, unsigned: UnsignedTx, permit2: Permit2Transfer): Promise<string> {
+  private async signPermit2Transfer(signer: Swap2Signer, unsigned: UnsignedTx, permit2: Permit2Transfer, approved = false): Promise<string> {
     if (!signer.signTypedData) throw new Swap2ExecutionError("swap2: a Permit2 swap needs an account with signTypedData");
-    if (permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError("swap2: the Permit2 signature deadline passed before signing — nothing was sent", {reason: "quote_expired"});
+    if (permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError(`swap2: the Permit2 signature deadline passed before signing — ${approved ? "the swap was not sent and the allowance was revoked" : "nothing was sent"}`, {reason: "quote_expired"});
     const signature = await signer.signTypedData({domain: permit2.domain, types: permit2.types, primaryType: permit2.primaryType, message: permit2.message});
     return appendPermit2Signature(unsigned.data!, signature);
   }

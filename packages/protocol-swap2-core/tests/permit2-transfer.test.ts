@@ -1,4 +1,4 @@
-import {describe, expect, it} from "vitest";
+import {afterEach, describe, expect, it, vi} from "vitest";
 import {refusalOf, type Swap2RefusalReason} from "../src/errors.js";
 import {SingleProviderSwap2} from "../src/swap2/single.js";
 import type {Swap2ExecutionPlan} from "../src/swap2/base.js";
@@ -193,12 +193,51 @@ describe("Permit2 signature-transfer execution", () => {
     expect(result.hash).toBe("0x2");
   });
 
-  it("signs before any approval goes out, and dry-runs the signed call only once the allowance is in place", async () => {
+  const ordered = (log: Log, over: Record<string, unknown> = {}) => account(log, {
+    quoteSendTransaction: async (t: {data?: string; gasLimit?: bigint}) => { log.estimated.push(t); log.order!.push(`${t.gasLimit ? "fee-check" : "estimate"}:${t.data?.slice(0, 10)}${t.data && t.data.length > DATA.length ? "+sig" : ""}`); return {fee: 1n}; },
+    ...over,
+  });
+
+  it("with an approval to send, signs only once it is mined and the provider's preflight passed, then dry-runs the signed call", async () => {
     const log: Log = {...fresh(), order: []};
-    const acc = account(log, {quoteSendTransaction: async (t: {data?: string; gasLimit?: bigint}) => { log.estimated.push(t); log.order!.push(`${t.gasLimit ? "fee-check" : "estimate"}:${t.data?.slice(0, 10)}${t.data && t.data.length > DATA.length ? "+sig" : ""}`); return {fee: 1n}; }});
-    await protocol(provider(tx()), acc).swap2(options);
+    const phases: string[] = [];
+    const p = provider(tx(), {preflightDeposit: async () => { log.order!.push("preflight"); }});
+    class P extends SingleProviderSwap2 {
+      protected readonly provider = p;
+      protected chainSupported(): boolean { return true; }
+    }
+    await new P(ordered(log) as never, {fromChain: "eip155:8453", onExecutionPhase: (phase) => { phases.push(phase); }}).swap2(options);
     // The gas pre-check prices the approval and the unsigned call (at its quoted limit, so it is not estimated unsigned).
-    expect(log.order).toEqual(["estimate:0x095ea7b3", "fee-check:0x1fff991f", "sign", "send:0x095ea7b3", "estimate:0x1fff991f+sig", "send:0x1fff991f"]);
+    expect(log.order).toEqual(["estimate:0x095ea7b3", "fee-check:0x1fff991f", "send:0x095ea7b3", "preflight", "sign", "estimate:0x1fff991f+sig", "send:0x1fff991f"]);
+    // One "signing" phase covers the permit and the transaction (SDK-319).
+    expect(phases).toEqual(["approving", "preflight", "signing", "broadcast"]);
+  });
+
+  it("with the Permit2 allowance already in place, signs first, as before", async () => {
+    const log: Log = {...fresh(), order: []};
+    await protocol(provider(tx()), ordered(log, {getAllowance: async () => AMOUNT})).swap2(options);
+    expect(log.order).toEqual(["fee-check:0x1fff991f", "sign", "estimate:0x1fff991f+sig", "send:0x1fff991f"]);
+    expect(log.signed).toHaveLength(1);
+  });
+
+  describe("an approval mined after the quote expired (2026-11-17, 0x on Ethereum: permit → approve → permit)", () => {
+    afterEach(() => { vi.useRealTimers(); });
+
+    it("re-quotes and asks for the permit once: approve → sign → send", async () => {
+      vi.useFakeTimers({toFake: ["Date"]});
+      const log: Log = {...fresh(), order: []};
+      let quotes = 0;
+      const base = provider(tx());
+      const p = provider(tx(), {getQuote: async (params) => { quotes++; log.order!.push("quote"); return base.getQuote(params); }});
+      // The approval takes a minute to mine: the 30 s quote is gone by then.
+      const acc = ordered(log, {waitForTransaction: async () => { vi.setSystemTime(Date.now() + 60_000); }});
+      const result = await protocol(p, acc).swap2(options);
+      expect(quotes).toBe(2);
+      expect(log.signed).toHaveLength(1);
+      expect(log.order!.filter((o) => !o.startsWith("estimate") && !o.startsWith("fee-check"))).toEqual(["quote", "send:0x095ea7b3", "quote", "sign", "send:0x1fff991f"]);
+      expect(log.sent.map((s) => s.to?.toLowerCase())).toEqual([USDC.toLowerCase(), SETTLER.toLowerCase()]);
+      expect(result.hash).toBe("0x2");
+    });
   });
 
   it("a quoted gas limit far below what the call needs is not used: the broadcast carries the account's estimate", async () => {
@@ -232,16 +271,25 @@ describe("Permit2 signature-transfer execution", () => {
     expect(log.sent).toEqual([]);
   });
 
-  it("a declined signature sends nothing, not even the approval", async () => {
+  it("a signature declined with the allowance already in place sends nothing", async () => {
     const log = fresh();
-    await expect(protocol(provider(tx()), account(log, {signTypedData: async () => { throw new Error("User rejected the request"); }})).swap2(options)).rejects.toThrow(/User rejected the request/);
+    await expect(protocol(provider(tx()), account(log, {getAllowance: async () => AMOUNT, signTypedData: async () => { throw new Error("User rejected the request"); }})).swap2(options)).rejects.toThrow(/User rejected the request/);
     expect(log.sent).toEqual([]);
   });
 
-  it("a signature the account returns malformed is refused before anything is sent", async () => {
+  it("a signature declined after the approval: the swap is not sent and the allowance is revoked", async () => {
     const log = fresh();
-    await expect(protocol(provider(tx()), account(log, {signTypedData: async () => "0x1234"})).swap2(options)).rejects.toThrow(/no usable signature/);
-    expect(log.sent).toEqual([]);
+    await expect(protocol(provider(tx()), account(log, {signTypedData: async () => { throw new Error("User rejected the request"); }})).swap2(options)).rejects.toThrow(/User rejected the request/);
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+  });
+
+  it("a signature the account returns malformed is refused: nothing is sent, or the approval is revoked", async () => {
+    const standing = fresh();
+    await expect(protocol(provider(tx()), account(standing, {getAllowance: async () => AMOUNT, signTypedData: async () => "0x1234"})).swap2(options)).rejects.toThrow(/no usable signature/);
+    expect(standing.sent).toEqual([]);
+    const approved = fresh();
+    await expect(protocol(provider(tx()), account(approved, {signTypedData: async () => "0x1234"})).swap2(options)).rejects.toThrow(/no usable signature/);
+    expect(approved.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
   });
 
   it("a deadline that passes between the quote and the signature is quote_expired, with nothing sent", async () => {
@@ -249,7 +297,7 @@ describe("Permit2 signature-transfer execution", () => {
     // The quote itself may not outlive the permit, so the clock is moved past the deadline right before signing.
     const deadline = now() + 120;
     const realNow = Date.now;
-    const acc = account(log, {getBalance: async () => { Date.now = () => (deadline + 1) * 1000; return 10n ** 18n; }});
+    const acc = account(log, {getAllowance: async () => AMOUNT, getBalance: async () => { Date.now = () => (deadline + 1) * 1000; return 10n ** 18n; }});
     try {
       const err = await protocol(provider(tx({permit2Transfer: typed((t) => { t.message.deadline = String(deadline); })})), acc).swap2(options).catch((e: unknown) => e);
       expect((err as Error).message).toBe("swap2: the Permit2 signature deadline passed before signing — nothing was sent");
@@ -259,6 +307,22 @@ describe("Permit2 signature-transfer execution", () => {
     }
     expect(log.sent).toEqual([]);
     expect(log.signed).toEqual([]);
+  });
+
+  it("a deadline that passes after the approval (during the provider's preflight) is quote_expired, and the allowance is revoked", async () => {
+    const log = fresh();
+    const deadline = now() + 120;
+    const realNow = Date.now;
+    const p = provider(tx({permit2Transfer: typed((t) => { t.message.deadline = String(deadline); })}), {preflightDeposit: async () => { Date.now = () => (deadline + 1) * 1000; }});
+    try {
+      const err = await protocol(p, account(log)).swap2(options).catch((e: unknown) => e);
+      expect((err as Error).message).toBe("swap2: the Permit2 signature deadline passed before signing — the swap was not sent and the allowance was revoked");
+      expect(refusalOf(err)?.reason).toBe("quote_expired");
+    } finally {
+      Date.now = realNow;
+    }
+    expect(log.signed).toEqual([]);
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
   });
 
   const refused: [string, TxRequest, RegExp, Swap2RefusalReason][] = [

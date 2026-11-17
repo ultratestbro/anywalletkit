@@ -67,7 +67,7 @@ class Swap extends SingleProviderSwap2 {
   protected chainSupported(): boolean { return true }
 }
 
-describe('Permit2 swap: one sheet, then the permit, the approval and the signed call pass without a second window', () => {
+describe('Permit2 swap: one sheet, then the approval, the permit and the signed call pass without a second window', () => {
   it('the real engine run through reviewSwapPlan: every operation is pre-approved, none is left over', async () => {
     const window = memoryApprovalWindow()
     const approvals = new ApprovalQueue(window)
@@ -79,7 +79,7 @@ describe('Permit2 swap: one sheet, then the permit, the approval and the signed 
     approvals.resolve(window.opened[0]!.id, null)
     await run
     expect(g.stopped).toEqual([])
-    expect(g.passed).toEqual(['permit', 'approve', 'swap'])
+    expect(g.passed).toEqual(['approve', 'permit', 'swap'])
     expect(gate.pending).toBe(0)
   })
 
