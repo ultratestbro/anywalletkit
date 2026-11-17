@@ -88,6 +88,7 @@ inside the router.
 | Package | What it does |
 |---|---|
 | `@anywalletkit/tx-preview-evm` | What an EVM transaction will do before it is signed: decoded calls, approvals, simulated balance changes, a verdict |
+| `@anywalletkit/shutter-api` | Seal a message until a time with Shutter's threshold encryption and open it after (beta): on-device encryption in pure TypeScript, decryption keys checked by pairing, registration through the API or from the user's own account on Gnosis |
 | `@anywalletkit/tx-preview-solana` | What a Solana transaction will do before it is signed (beta): every instruction decoded through a pluggable registry (official programs, Token-2022 with all extensions, Stake, SPL Stake Pool, Jupiter, Kamino), lookup tables resolved, simulated SOL and token balance changes |
 | `@anywalletkit/protocol-approvals-evm` | Discover token approvals (ERC-20 / 721 / 1155 / Permit2 / EIP-7702), flag risky ones, revoke |
 | `@anywalletkit/history-evm` | Activity history for every supported EVM chain |

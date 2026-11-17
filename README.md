@@ -91,6 +91,7 @@ Building with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and the
 | `@anywalletkit/names-ens` | ENS names on the core `NameResolver`: `vitalik.eth` / `name.base.eth` / `alice.cb.id` → the address for one chain (ENSIP-9/11 multichain, wildcard + CCIP-Read), verified primary names, avatars, look-alike warnings |
 | `@anywalletkit/history-evm` | activity history (`HistorySource`) for every EVM chain the SDK supports: Etherscan v2, Blockscout PRO and Alchemy Transfers (API keys) with Blockscout and Routescan keyless fallbacks, merged into one `ChainTx` per hash with a documented spam heuristic |
 | `@anywalletkit/tx-preview-evm` | pre-sign review for EVM: decode (recipient, approvals, contract), simulate balance changes at a pinned block, verdict + refusal reasons for the review sheet |
+| `@anywalletkit/shutter-api` | Shutter threshold encryption for wallets (beta): seal a message until a time and open it after (commit-reveal) — encryption and decryption on the device in pure TypeScript (BLS12-381 IBE, byte-compatible with Shutter's own vectors), decryption keys checked by pairing, identities registered through the Shutter API or from the user's own account on Gnosis; React Native (Hermes) ready |
 | `@anywalletkit/tx-preview-solana` | pre-sign review for Solana (beta): every instruction decoded through a pluggable decoder registry — System, SPL Token, Token-2022 with all extensions, ATA, Compute Budget, Stake, lookup tables, Memo, SPL Stake Pool, Jupiter v6, Kamino Lend; legacy, v0 and v1 messages, lookup tables resolved; `simulateTransaction` → the signer's SOL and token balance changes and decoded inner instructions |
 | `@anywalletkit/protocol-staking-lido-evm`, `-ssv-evm`, `-tonstakers-ton`, `-spl-stake-pool-solana` | `StakingProtocol` modules (two-phase withdrawals): Lido, SSV Network, Tonstakers, Jito / SPL stake pools; the EVM two on viem |
 | `@anywalletkit/protocol-staking-native-solana` | native SOL staking through the Stake program to the validators the app lists (fail-closed: no list, no module; commission cap and delinquency checked at every delegation); seed-derived stake accounts only the wallet signs, statuses computed from StakeHistory like the program, partial unstake by split, claim, re-delegate, merge |
@@ -139,7 +140,7 @@ Tracked on the SDK board; each lands as its own package behind the conformance g
 
 ## Tests
 
-`pnpm test` runs 8,100+ tests across 59 packages (Node); `pnpm test:hermes` runs 544
+`pnpm test` runs 8,200+ tests across 60 packages (Node); `pnpm test:hermes` runs 557
 checks in the Hermes VM React Native ships. Beyond unit tests the swap layer is
 checked against live providers (running totals, November 2026): 149,728 quote checks
 (13 providers, up to 36 chains, 398 assets), 65,481 builds simulated to the

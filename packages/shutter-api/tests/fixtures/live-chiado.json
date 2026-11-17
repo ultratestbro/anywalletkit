@@ -1,0 +1,32 @@
+[
+  {
+    "at": "2026-11-17T19:28:06.581Z",
+    "network": "chiado",
+    "registration": {
+      "by": "api",
+      "txHash": "0x9d53ba6e8de6c39382524b7ceed54390112bb12619c13b42863bfcf1835e8782"
+    },
+    "registrant": "0xd150bbf86C686de1a25820A94c2C2397e0bC54ab",
+    "identity": "0xc41cd6067bc7b5c48daf829cf7bb5015a1f57c41039c4a1ce2f01111954ee355",
+    "eon": 16,
+    "revealAt": 1794943681,
+    "block": 24047619,
+    "openedSecondsAfterReveal": 6,
+    "sealed": {
+      "version": 1,
+      "network": "chiado",
+      "chainId": 10200,
+      "eon": 16,
+      "identity": "0xc41cd6067bc7b5c48daf829cf7bb5015a1f57c41039c4a1ce2f01111954ee355",
+      "identityPrefix": "0x7ca0ab6d947dbc6823a7aee0c391025676249783038b66078fd9e588db9d1054",
+      "registrant": "0xd150bbf86C686de1a25820A94c2C2397e0bC54ab",
+      "eonKey": "0x8675347b53e2b1f0941b7ea6f0f89f6d3118deaf7452fd90a9d17fa6b4469d80895ba035420c2e19b7c5a95788ed23670dda180842f56c49690e8114a3bfd56d2b0d5e9e89568442902464fb2e44176629c0abea9d18d3142913ba607b0c6b7c",
+      "revealAt": 1794943681,
+      "ciphertext": "0x039078087f60ca188249abe3d3e863b802995f9556fc226850024828d2d65bf1edf29de6a10fa7bc4514343cd65895f5ef0af5efda03d426a8a6cdb9047d9dacfdee4ac0478db725549f2cfa8a0997c36e45af77064cdf3857b26d0f0fadfea4d247354defc4d54cd41696d56317da18d3985c275e1aa4273da74024af7d7fcec3b761cb0894f34014c09d4dbc35c91c504f8f2b28c48baa0457d9a38f80e94b3b19d4d67543c4d7e0bfb49a28a9eee87d5057b2e7a211dbe9db97643dc5da7216",
+      "registration": {
+        "by": "api",
+        "txHash": "0x9d53ba6e8de6c39382524b7ceed54390112bb12619c13b42863bfcf1835e8782"
+      }
+    }
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "at": "2026-11-17T19:29:16.572Z",
+    "network": "gnosis",
+    "registration": {
+      "by": "api",
+      "txHash": "0x30aa0406f2040b280f18d362e41e33446ffa65f32fccaa4c2b2e5d35b3568fe0"
+    },
+    "registrant": "0x228DefCF37Da29475F0EE2B9E4dfAeDc3b0746bc",
+    "identity": "0xbff85bac88dbd717453d65a9fe3c2f44d04f941eacd1a38a94c7f4efdf09afcf",
+    "eon": 1,
+    "revealAt": 1794943751,
+    "block": 49331139,
+    "openedSecondsAfterReveal": 6,
+    "sealed": {
+      "version": 1,
+      "network": "gnosis",
+      "chainId": 100,
+      "eon": 1,
+      "identity": "0xbff85bac88dbd717453d65a9fe3c2f44d04f941eacd1a38a94c7f4efdf09afcf",
+      "identityPrefix": "0xcb3932fb519fdfbbcdff629e0c692529e4ef58b24369ffbb1e6e4f09519b0fc2",
+      "registrant": "0x228DefCF37Da29475F0EE2B9E4dfAeDc3b0746bc",
+      "eonKey": "0xa4ce51d427803fa4744c3ca8bfa9576083537ba7a22311ea58c8762b362a022a5ff0b0e3b5daf61584bfede16cedc7c80a4c422da7e5ac3179e280a3277ac5c20138d94ef3cbfbdb713c8ee235242e802f6363b93c0932a8127598f03279fc4b",
+      "revealAt": 1794943751,
+      "ciphertext": "0x03b6e6170c2b314822188d91c60c10415326f1cdaa3c3bcbcd6f2aa47c1cdb0ba751f6b1f1da4c524da3139e406b28e4ac102d23158cc0b9523a32f96b85a913ecfae17e750d1eca9d7d5a50b4cb3a1e38330bf6296a94c74ffc4080c6d8b2387fa94dce4f488726736b0cfb0c55dd1923bc5cb6d47af6cfb2afbc6819150b9921a149b89e15a282283a7187a672e4de8b472a21dda61cbc97c4ed68729b5e5894fe9ff14841195e964acf69b0c170e8ce12938c7d0e9debccacce02d266670b1a",
+      "registration": {
+        "by": "api",
+        "txHash": "0x30aa0406f2040b280f18d362e41e33446ffa65f32fccaa4c2b2e5d35b3568fe0"
+      }
+    }
+  }
+]
