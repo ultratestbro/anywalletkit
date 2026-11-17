@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "kind": "public-mainnet-funded",
+  "limitations": [
+    "Small capped transfers from one test wallet; not a load or latency study"
+  ],
+  "cases": [
+    {
+      "operationId": "mainnet-arb-base-usdc-1794906559553",
+      "case": "arb-base-usdc",
+      "actor": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "source": "eip155:42161",
+      "destination": "eip155:8453",
+      "symbol": "USDC",
+      "amount": "2000000",
+      "sourceHash": "0x6463c1b1f01c774d581b2c616ddfc9450c0da01cd1f60f734d662ad9a4cf5f10",
+      "guid": "0xfd2717a14b4cc25c84af5a87dd4819d24bbe807f9bb634f3f7d440632c24f79e",
+      "amountReceivedLD": "1998793",
+      "quotedMin": "1988800",
+      "nativeFeeCap": "849764928049802",
+      "sourceValue": "849764928049802",
+      "sourceNativeSpent": "688344739681841",
+      "sourceGasReceipts": "8532797242000",
+      "steps": [
+        {
+          "kind": "approval",
+          "state": "submitted",
+          "hash": "0x6f010387bc0448ed7554a7e26213c43bcfa4bd0c179c9cb6f02af82d9834f57d"
+        },
+        {
+          "kind": "source",
+          "state": "submitted",
+          "hash": "0x6463c1b1f01c774d581b2c616ddfc9450c0da01cd1f60f734d662ad9a4cf5f10"
+        }
+      ],
+      "sentAt": "2026-11-17T09:09:31Z",
+      "status": {
+        "state": "completed",
+        "depositReceived": true,
+        "destTxHash": "0x4bdf60409ec176974fbbacc05394253d18b6a4558b89b854d17fa648011eaae7"
+      },
+      "destinationBalanceDelta": "1998793",
+      "completedAt": "2026-11-17T09:27:18Z",
+      "resume": {
+        "readOnlyProcess": true,
+        "status": {
+          "state": "completed",
+          "depositReceived": true,
+          "destTxHash": "0x4bdf60409ec176974fbbacc05394253d18b6a4558b89b854d17fa648011eaae7"
+        },
+        "sourceSteps": 1,
+        "checkedAt": "2026-11-17T09:27:47.694Z"
+      }
+    }
+  ],
+  "updatedAt": "2026-11-17T09:27:47.695Z"
+}
