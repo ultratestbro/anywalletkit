@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/tx-preview-solana",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "What a Solana transaction will do before it is signed: every instruction decoded (System, SPL Token, Token-2022 with all extensions, Associated Token, Compute Budget, Stake, Address Lookup Table, Memo, SPL Stake Pool, Jupiter, Kamino) through a pluggable decoder registry, lookup tables resolved, and the signer's SOL and token balance changes from simulateTransaction.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
