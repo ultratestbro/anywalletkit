@@ -8,6 +8,7 @@ import {SingleProviderSwap2} from "@anywalletkit/protocol-swap2-core/swap2/singl
 import type {CrossChainProvider, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {fyndProvider} from "../src/provider.js";
 import {FYND_CHAINS, ROUTER_NATIVE, TYCHO_ROUTER_ABI, checkFyndTransaction, fyndPins, fyndVerifyQuote} from "../src/router.js";
+import {FYND_PREVIOUS_ROUTERS} from "../src/activity.js";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -74,11 +75,18 @@ describe("Fynd behind remoteProvider (scan 2026-10-27 modules, F9)", () => {
   it("fyndPins pin the router per chain and nothing elsewhere; fyndVerifyQuote names what is wrong", () => {
     expect(fyndPins.callTargets("eip155:8453")).toEqual([ROUTER]);
     expect(fyndPins.spenders("eip155:1")).toEqual([FYND_CHAINS[1]!.router]);
+    // Only the active router: the ones paused and replaced on 2026-11-16 are history, never a target or a spender.
+    for (const [id, previous] of Object.entries(FYND_PREVIOUS_ROUTERS)) {
+      const pinned = [...fyndPins.callTargets(`eip155:${id}`), ...fyndPins.spenders(`eip155:${id}`)].map((a) => a.toLowerCase());
+      expect(pinned).toEqual([FYND_CHAINS[Number(id)]!.router.toLowerCase(), FYND_CHAINS[Number(id)]!.router.toLowerCase()]);
+      for (const old of previous) expect(pinned).not.toContain(old.toLowerCase());
+    }
     expect(fyndPins.callTargets("eip155:10")).toEqual([]);
     expect(fyndPins.callTargets("solana:mainnet")).toEqual([]);
     const params = {sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:8453", destToken: WETH, amountIn: "1000000", destAddress: USER, dry: false} as QuoteParams;
     expect(fyndVerifyQuote(params, quoteFor(params, {to: ROUTER, data: single()}))).toBeNull();
     expect(fyndVerifyQuote({...params, amountIn: "2000000"}, quoteFor(params, {to: ROUTER, data: single()}))).toMatch(/spends 1000000, not 2000000/);
+    expect(fyndVerifyQuote(params, quoteFor(params, {to: FYND_PREVIOUS_ROUTERS[8453]![0]!, data: single()}))).toMatch(/not the Tycho router on Base/);
   });
 });
 

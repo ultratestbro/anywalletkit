@@ -36,6 +36,7 @@ import { assembleTransaction as jupAssemble } from '@anywalletkit/protocol-swap2
 import { fyndProvider } from '@anywalletkit/protocol-swap2-fynd/provider'
 import { FyndSwap2Protocol } from '@anywalletkit/protocol-swap2-fynd/protocol'
 import { FYND_CHAINS, TYCHO_ROUTER_ABI, checkFyndTransaction } from '@anywalletkit/protocol-swap2-fynd/router'
+import { FYND_PREVIOUS_ROUTERS } from '@anywalletkit/protocol-swap2-fynd/activity'
 import { zeroExProvider } from '@anywalletkit/protocol-swap2-0x/provider'
 import { ZeroExSwap2Protocol } from '@anywalletkit/protocol-swap2-0x/protocol'
 import { SETTLER_NATIVE_CHECK_SELECTOR, checkZeroExTransaction, decodeSettlerExecute, zeroExSettlerAddress, zeroExSettlerNonce } from '@anywalletkit/protocol-swap2-0x/settler'
@@ -450,6 +451,10 @@ export async function smokeProtocols(check: Check): Promise<void> {
   let fyndRefused = false
   try { checkFyndTransaction({ to: FYND_CHAINS[8453]!.router, value: 0n, data: fyndData }, { ...fyndExpected, receiver: '0x1111111111111111111111111111111111111111' }) } catch { fyndRefused = true }
   check('fynd: refuses calldata paying someone else', fyndRefused)
+  // 2026-11-16: every earlier TychoRouterV3 was paused and redeployed; the pinned router is the new one, the paused one is refused.
+  let fyndOldRefused = false
+  try { checkFyndTransaction({ to: FYND_PREVIOUS_ROUTERS[8453]![0]!, value: 0n, data: fyndData }, fyndExpected) } catch { fyndOldRefused = true }
+  check('fynd: pins the redeployed Base router and refuses the paused one', FYND_CHAINS[8453]!.router === '0xd374c00614f95492D816b5957E3797ce3f0c445C' && fyndOldRefused)
   {
     // 0x Settler: the word-level execute decoder and the pre-signing check run under Hermes (bigint words, checksums).
     const dead = '0x000000000000000000000000000000000000dEaD'

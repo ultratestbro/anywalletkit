@@ -4,6 +4,7 @@ import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/c
 import {fyndProvider} from "../src/provider.js";
 import {FyndSwap2Protocol} from "../src/protocol.js";
 import {FYND_CHAINS, ROUTER_NATIVE, TYCHO_ROUTER_ABI} from "../src/router.js";
+import {FYND_PREVIOUS_ROUTERS} from "../src/activity.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -106,6 +107,7 @@ describe("fyndProvider.getQuote", () => {
   const refusals: [string, Stub, Record<string, unknown>, RegExp][] = [
     ["a transaction paying someone else", {tamper: (tx, order) => ({...tx, data: tx.data.replace(order.receiver!.slice(2).toLowerCase(), "33".repeat(20))})}, {}, /pays 0x3333/],
     ["a transaction to another contract", {tamper: (tx) => ({...tx, to: "0x2222222222222222222222222222222222222222"})}, {}, /not the Tycho router/],
+    ["a transaction to the router paused and replaced on 2026-11-16", {tamper: (tx) => ({...tx, to: FYND_PREVIOUS_ROUTERS[8453]![0]!})}, {}, /not the Tycho router on Base/],
     ["an echoed amount that differs", {amountInEcho: "999"}, {}, /quoted 999/],
     ["a client fee in the breakdown", {clientFee: "1"}, {}, /client fee/],
     ["a solver failure, by name", {status: "insufficient_liquidity"}, {}, /not enough liquidity/],

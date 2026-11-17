@@ -13,15 +13,22 @@ import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import {refusalNotes, refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {decodeFunctionData, getAddress, parseAbi, toFunctionSelector, type Hex} from "viem";
 
-/** Router registry: github.com/propeller-heads/tycho crates/tycho-execution/config/deployment_registry.json (TychoRouterV3, effective 2026-09-01). */
+/**
+ * The active TychoRouterV3 per chain — github.com/propeller-heads/tycho
+ * crates/tycho-execution/config/deployment_registry.json. Propeller Heads paused
+ * every earlier router on 2026-11-16 (a router-vault vulnerability; this module
+ * never uses the vault) and redeployed TychoRouterV3 on every chain the same day
+ * (registry commit 8aab890). Quotes and approvals accept only these; the paused
+ * routers are known to activity.ts alone, to read past swaps.
+ */
 export const FYND_CHAINS: Readonly<Record<number, {slug: string; name: string; router: `0x${string}`}>> = Object.freeze({
-  1: {slug: "ethereum", name: "Ethereum", router: "0x1644D2477f809cc2C71bCCFd6Dc9497E3F83210d"},
-  8453: {slug: "base", name: "Base", router: "0xAbA5B53b03eAfaD1C5fc8BD5Fc765fC85Bb3de67"},
-  42161: {slug: "arbitrum", name: "Arbitrum", router: "0x924F147c50eA59f5180a26031A8b65B2aA1e81Cd"},
-  56: {slug: "bsc", name: "BNB Smart Chain", router: "0x7f3D12BBaFb8955E51B3ab9588b34c8ad95BDA4e"},
-  137: {slug: "polygon", name: "Polygon", router: "0xbd4e6011F03355C2A377Fd9Af939322A7d0A1bC1"},
-  130: {slug: "unichain", name: "Unichain", router: "0xCba5574597Ad00EA250Fd106DAB4Fc7461949635"},
-  4663: {slug: "robinhood", name: "Robinhood Chain", router: "0x09215a470bD585E59EB3F4B612fBD2678131fF9e"},
+  1: {slug: "ethereum", name: "Ethereum", router: "0xe41c726421007e133a59365432fE886a73B45126"},
+  8453: {slug: "base", name: "Base", router: "0xd374c00614f95492D816b5957E3797ce3f0c445C"},
+  42161: {slug: "arbitrum", name: "Arbitrum", router: "0x1B82e8C16Ce8E17535C9B6b8AD107f61b0b192B5"},
+  56: {slug: "bsc", name: "BNB Smart Chain", router: "0xEe7eCe626064BDA1c6aFDb8A281afe44Eabd3242"},
+  137: {slug: "polygon", name: "Polygon", router: "0x4dB0B661dc706f7e09e54273028B22f61f8F94C2"},
+  130: {slug: "unichain", name: "Unichain", router: "0x556dff14e4A42259ebCE4fa087323c1047e9a55A"},
+  4663: {slug: "robinhood", name: "Robinhood Chain", router: "0x6F460540B03651d2Ad0ec28f777e4A0480A756a5"},
 });
 
 /** The router's native-coin sentinel (lib/NativeETH.sol); Fynd's API uses the zero address instead. */
