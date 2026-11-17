@@ -1,9 +1,9 @@
 /**
  * Decoders for the programs that ship an official Codama client (`@solana-program/*`): System, SPL Token,
  * Token-2022 (every instruction of every extension the client knows — 100 at 0.20), Associated Token, Compute
- * Budget, Stake and Address Lookup Table. One adapter reads them all: the client's `identify…Instruction` names
- * the instruction, its data decoder reads the arguments (no accounts needed), and its parser — when the accounts
- * are there — names the accounts by position.
+ * Budget and Address Lookup Table. One adapter reads them all: the client's `identify…Instruction` names the
+ * instruction, its data decoder reads the arguments (no accounts needed), and its parser — when the accounts are
+ * there — names them. Stake uses the same client for the data but names arguments and accounts itself (`stake.ts`).
  */
 import { AccountRole, type Address } from '@solana/kit'
 import * as addressLookupTable from '@solana-program/address-lookup-table'
@@ -12,8 +12,9 @@ import * as stake from '@solana-program/stake'
 import * as system from '@solana-program/system'
 import * as token from '@solana-program/token'
 import * as token2022 from '@solana-program/token-2022'
-import type { DecodedFields, InstructionDecoder, RawInstruction } from '../types.js'
-import { toArgs } from '../values.js'
+import type { DecodedFields, InstructionDecoder, PreviewValue, RawInstruction } from '../types.js'
+import { toArgs, toBase64 } from '../values.js'
+import { stakeDecoder } from './stake.js'
 
 type Module = Record<string, unknown>
 type Parser = (ix: unknown) => { accounts?: Record<string, { address: string } | undefined>; data?: unknown }
@@ -27,21 +28,52 @@ function roleOf(a: RawInstruction['accounts'][number]): AccountRole {
 }
 
 /**
- * Account names from a Codama parser: its `accounts` record lists the instruction's accounts in order. Optional
- * accounts the program omits come back `undefined` and still take their slot, so names are kept only while each
- * named address matches the account at its position; past the record (multisig signers, remaining accounts) slots
- * stay unnamed.
+ * Account names from a Codama parser. Its `accounts` record hands back the very meta objects it was given, so each
+ * name lands on the slot whose meta it returned. Matching by position would be wrong: an optional account omitted
+ * from the list (the `omitted` strategy, Token-2022's confidential proofs) comes back `undefined` without taking a
+ * slot, and every name after it would shift onto the wrong account. An optional account passed as the program id
+ * placeholder comes back `undefined` too and its slot stays unnamed; so do multisig signers and remaining accounts.
  */
-function accountNames(parsed: ReturnType<Parser>, ix: RawInstruction): (string | null)[] {
-  const names: (string | null)[] = ix.accounts.map(() => null)
-  const entries = Object.entries(parsed.accounts ?? {})
-  for (const [i, [name, meta]] of entries.entries()) {
-    if (i >= ix.accounts.length) break
-    const actual = ix.accounts[i]!.address ?? PLACEHOLDER
-    if (meta && meta.address !== actual) return ix.accounts.map(() => null)
-    names[i] = name
+function accountNames(parsed: ReturnType<Parser>, metas: readonly object[]): (string | null)[] {
+  const names: (string | null)[] = metas.map(() => null)
+  for (const [name, meta] of Object.entries(parsed.accounts ?? {})) {
+    const at = meta ? metas.indexOf(meta) : -1
+    if (at >= 0 && names[at] === null) names[at] = name
   }
   return names
+}
+
+const BATCH_TAG = 255
+
+/**
+ * Token and Token-2022 `Batch` (tag 255) runs several instructions of the same program in one, each taking the next
+ * `numberOfAccounts` accounts. A batch can carry an `Approve` or a `SetAuthority` like any other instruction, so it
+ * is opened up: `args.instructions` lists each inner one decoded (name, args, named accounts).
+ */
+function expandBatch(decoder: InstructionDecoder, ix: RawInstruction, entries: unknown): PreviewValue[] {
+  const list = Array.isArray(entries) ? (entries as Array<{ numberOfAccounts?: unknown; instructionData?: unknown }>) : []
+  const out: PreviewValue[] = []
+  let offset = 0
+  for (const e of list) {
+    const count = typeof e.numberOfAccounts === 'number' ? e.numberOfAccounts : 0
+    const data = e.instructionData instanceof Uint8Array ? e.instructionData : new Uint8Array()
+    const accounts = ix.accounts.slice(offset, offset + count)
+    offset += count
+    let fields: DecodedFields | null = null
+    let error: string | undefined
+    // A batch inside a batch is refused by the program; it is not opened again here either.
+    if (data[0] !== BATCH_TAG) {
+      try { fields = decoder.decode({ programAddress: ix.programAddress, accounts, data }) } catch (err) { error = err instanceof Error ? err.message : String(err) }
+    }
+    out.push({
+      name: fields?.name ?? null,
+      args: (fields?.args ?? {}) as PreviewValue,
+      accounts: accounts.map((a, i) => ({ address: a.address, signer: a.signer, writable: a.writable, name: fields?.accountNames?.[i] ?? null })),
+      data: toBase64(data),
+      ...(error ? { error } : {}),
+    })
+  }
+  return out
 }
 
 /** A decoder over one Codama client: `identify` picks the instruction, the client's own codecs do the rest. */
@@ -56,7 +88,7 @@ export function codamaDecoder(options: {
   fallback?: (ix: RawInstruction) => DecodedFields | null
 }): InstructionDecoder {
   const { programAddress, programName, module, instructions, identify, fallback } = options
-  return {
+  const decoder: InstructionDecoder = {
     programAddress,
     programName,
     decode(ix) {
@@ -71,16 +103,14 @@ export function codamaDecoder(options: {
       const dataDecoder = module[`get${name}InstructionDataDecoder`] as (() => DataDecoder) | undefined
       const parse = module[`parse${name}Instruction`] as Parser | undefined
       if (!dataDecoder) return { name }
-      const args = toArgs(dataDecoder().decode(ix.data))
+      const raw = dataDecoder().decode(ix.data)
+      if (name === 'Batch') return { name, args: { instructions: expandBatch(decoder, ix, (raw as { data?: unknown }).data) } }
+      const args = toArgs(raw)
       let names: (string | null)[] | undefined
       if (parse) {
         try {
-          const parsed = parse({
-            programAddress: ix.programAddress as Address,
-            accounts: ix.accounts.map((a) => ({ address: (a.address ?? PLACEHOLDER) as Address, role: roleOf(a) })),
-            data: ix.data,
-          })
-          names = accountNames(parsed, ix)
+          const metas = ix.accounts.map((a) => ({ address: (a.address ?? PLACEHOLDER) as Address, role: roleOf(a) }))
+          names = accountNames(parse({ programAddress: ix.programAddress as Address, accounts: metas, data: ix.data }), metas)
         } catch {
           /* too few accounts: the arguments still stand, the accounts stay unnamed */
         }
@@ -88,6 +118,7 @@ export function codamaDecoder(options: {
       return { name, args, ...(names ? { accountNames: names } : {}) }
     },
   }
+  return decoder
 }
 
 /** Enum value → name for a TypeScript numeric enum. */
@@ -135,10 +166,8 @@ export const computeBudgetDecoder = codamaDecoder({
   instructions: enumNames(computeBudget.ComputeBudgetInstruction as never), identify: (d) => computeBudget.identifyComputeBudgetInstruction(d),
 })
 
-export const stakeDecoder = codamaDecoder({
-  programAddress: STAKE_PROGRAM, programName: 'Stake Program', module: stake as Module,
-  instructions: enumNames(stake.StakeInstruction as never), identify: (d) => stake.identifyStakeInstruction(d),
-})
+// The Stake program has its own decoder (named arguments, both account layouts the program accepts): stake.ts.
+export { stakeDecoder }
 
 export const addressLookupTableDecoder = codamaDecoder({
   programAddress: ADDRESS_LOOKUP_TABLE_PROGRAM, programName: 'Address Lookup Table Program', module: addressLookupTable as Module,

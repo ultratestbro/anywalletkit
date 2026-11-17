@@ -332,6 +332,9 @@ importers:
       '@anywalletkit/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
+      '@anywalletkit/tx-preview-solana':
+        specifier: workspace:*
+        version: link:../../packages/tx-preview-solana
       '@anywalletkit/wallet-btc':
         specifier: workspace:*
         version: link:../../packages/wallet-btc

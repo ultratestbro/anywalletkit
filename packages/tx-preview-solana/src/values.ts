@@ -9,6 +9,38 @@ export function toBase64(bytes: Uint8Array): string {
 }
 
 /**
+ * UTF-8 → string without `TextDecoder` (React Native's Hermes has none unless the app installs a polyfill). Strict:
+ * overlong forms, surrogates and code points past U+10FFFF are invalid, and each invalid byte reads as one U+FFFD,
+ * so data that is not clean text still shows, and shows that it is not.
+ */
+export function utf8ToString(bytes: Uint8Array): string {
+  let out = ''
+  let i = 0
+  while (i < bytes.length) {
+    const b = bytes[i]!
+    let cp = -1
+    let len = 1
+    if (b < 0x80) cp = b
+    else if (b >= 0xc2 && b <= 0xdf) { len = 2; cp = b & 0x1f }
+    else if (b >= 0xe0 && b <= 0xef) { len = 3; cp = b & 0x0f }
+    else if (b >= 0xf0 && b <= 0xf4) { len = 4; cp = b & 0x07 }
+    if (len > 1) {
+      for (let k = 1; k < len; k++) {
+        const c = bytes[i + k]
+        if (c === undefined || (c & 0xc0) !== 0x80) { cp = -1; break }
+        cp = (cp << 6) | (c & 0x3f)
+      }
+      const min = len === 2 ? 0x80 : len === 3 ? 0x800 : 0x10000
+      if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) cp = -1
+    }
+    if (cp < 0) { out += '�'; i += 1; continue }
+    out += String.fromCodePoint(cp)
+    i += len
+  }
+  return out
+}
+
+/**
  * Codama-generated decoders return options as `{__option: 'Some' | 'None'}`, data enums as `{__kind}`, bytes as
  * `Uint8Array` and a `discriminator` field per instruction. A preview wants plain data: options unwrapped (`None` →
  * `null`), `__kind` → `kind`, bytes → base64, discriminators dropped.

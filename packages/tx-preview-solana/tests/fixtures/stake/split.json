@@ -1,0 +1,49 @@
+{
+  "signature": "4KCeYss4dcjT1CTsMbDis1FCtqkrDa5oQ1ao8NwQBehRwvTgYztUeJn9juzbtZk6sZBSRjuB2QfXaLyGVBN9ikLn",
+  "slot": "470611548",
+  "blockTime": "1794935221",
+  "version": "legacy",
+  "note": "Split",
+  "wire": "AaW/JwVTX9B8PpqP74BHEitnZ0G2DM2m27FhpDsjGv21nAytUSgxkkpUJ/J6Xo5Xa2lomvCf02VCBU4TUqKykA8BAAMH+SUkauWeeUefAV3oywJTOj/50kEVW0HjuSTgqE5oq0AtW5h4znf3aNWRh3yow0LpBJgEane/XpD7oeEj3ONAaU9uoRHjoIHWUKU/1u3NGgJlMdF6PXb5ldyGw7HucAFchURzWZvPsd0nBFe797Sfy3zotlX/Jj/TUCFfmxbfQasAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAah2BeRN1QqmDQ3vf4qerJVf1NcinhyK2ikncAAAAAABqfVFxksVo7gioRfc9KXiM8DXDFFshqzRNgGLqlAAADRGZ4OPFuFz3f7DAEShANy+ZXVY4Zk5uTWrYvArJWrPgMEAwIGAAQEAAAABAIBAFUJAAAA+SUkauWeeUefAV3oywJTOj/50kEVW0HjuSTgqE5oq0ABAAAAAAAAADHIAAAAAAAAAAah2BeRN1QqmDQ3vf4qerJVf1NcinhyK2ikncAAAAAABQMDAQAMAwAAAAAyX50IAAAA",
+  "lookupTables": {},
+  "meta": {
+    "err": null,
+    "fee": "5000",
+    "computeUnitsConsumed": "18306",
+    "preBalances": [
+      "240823980",
+      "2282880",
+      "2500000",
+      "38222583600",
+      "1",
+      "1141440",
+      "42706560"
+    ],
+    "postBalances": [
+      "240818980",
+      "37002282880",
+      "2500000",
+      "1222583600",
+      "1",
+      "1141440",
+      "42706560"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: Split",
+      "Program Stake11111111111111111111111111111111111111 consumed 18006 of 205700 compute units",
+      "Program Stake11111111111111111111111111111111111111 success"
+    ]
+  }
+}

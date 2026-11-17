@@ -1,0 +1,52 @@
+{
+  "signature": "4cZ5sUeVckR6Y6PXMg4NQ6Ww3S5hnTmDc7heKiN4VkVB4zqsYawz1oEfaDtknRgHma5Y2ywQ8chcf4tDcVuU26Vg",
+  "slot": "470615112",
+  "blockTime": "1794935988",
+  "version": "legacy",
+  "note": "Merge (legacy layout with sysvars)",
+  "wire": "AbS18IDl3qaqF32OCvMN/AwyoQLsYE84lK1LAEM5vj4tDNm8MUuqf5+q2Mkd084z+hNbKNuHrdOm5kX5OeXaDAsBAAQHQrGGP+06spbxKAemLG9tTCD5Frj+RCg4i3ioLp1Ngbkh6PyGhVY1WvYHuKP2WoOByddWuK4KQ2uXrSwzTjwkNVCUTeOjnQF9mTZyzqvRMGrBfrjl5o4XKnjS25u4sMPjAwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAAAGodgXkTdUKpg0N73+KnqyVX9TXIp4citopJ3AAAAAAAan1RcYx3TJKFZjmGkdXraLXrijm0ttXHNVWyEAAAAABqfVFxk1hND+7ZuzQx0TIGvlRCgbV7hWbMU3X/QAAAAZOIKvGHw5CWlOkwoc3MkYBjQSXnMni0Q5Y18uHgKDCgMDAAkDMFcFAAAAAAADAAUCTGgAAAQFAQIFBgAEBwAAAA==",
+  "lookupTables": {},
+  "meta": {
+    "err": null,
+    "fee": "14345",
+    "computeUnitsConsumed": "18830",
+    "preBalances": [
+      "1222048536",
+      "1250993336303",
+      "749211666240",
+      "1",
+      "1141440",
+      "1169280",
+      "114979200"
+    ],
+    "postBalances": [
+      "1222034191",
+      "2000205002543",
+      "0",
+      "1",
+      "1141440",
+      "1169280",
+      "114979200"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: Merge",
+      "Program log: Checking if destination stake is mergeable",
+      "Program log: Checking if source stake is mergeable",
+      "Program log: Merging stake accounts",
+      "Program Stake11111111111111111111111111111111111111 consumed 18530 of 26400 compute units",
+      "Program Stake11111111111111111111111111111111111111 success"
+    ]
+  }
+}

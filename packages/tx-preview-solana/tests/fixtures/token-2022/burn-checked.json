@@ -1,0 +1,122 @@
+{
+  "signature": "4J8NYPdMgLnY52L9MaXAUcj7rKGx3BEav8SzhyhadKaxvD7NTv4Zr5ZgpU5eTyMbj9kV7cQakNztVYCBzL4GANxi",
+  "slot": "470571484",
+  "blockTime": "1794926596",
+  "version": "legacy",
+  "note": "Token-2022 BurnChecked",
+  "wire": "AqTSHK4MI7cEC/6yGTlGPJV30TsJ//Sh/nfqxqT8Rh+iFcw360LJzk9U1g1jVg65YqsjR6zTG0tIPMH8JIZJ0gu9fVJ86cxwJBQVQY1dcxrhgQvr/24ewmsaabS4BBBg4n0xzu/gMgvvLTXDCNyAwwkQlC0uF0ZSEHOm3tYKTngDAgEBBdy/d/kMgJfbzHXcYGrKUdE6WfxIZIj1bdMdJJhJ622C0zKKVjaqyn34VojkpYmBPsVcwW0At7/40t42qLntMBp37u96rfLUlHZwMBNxCS9JZqzH4hWNDFDyYQhwYZI/twbHFJMI1y5NsaBJjdmQgoM0GWUIX07pqvxG5W0kiUGKBt324e51j94YQl285GzN2rYa/E2DuQ0n/r35KNihi/wlW9c2jcLw5M+4LCHoDb/RyyN3XHQQXkX7nNMo2zQZMAIEAwIDAQoPAQAAAAAAAAAGBAMCAAEBCQ==",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "Fri2hiuuj8TjavnmsNLtTBjugba73T95tbHKA9xp2BAR",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "FDRiu8mUvj4RbTWB9Yv3ayzedLjajCYCnZWtmMCA1mBw",
+      "signer": true,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "95AqF5SoDweTuuCPZDKg4qPbADA1BiiP6PFzdjFCv4mU",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "program": "spl-token",
+      "parsed": {
+        "type": "burnChecked",
+        "info": {
+          "account": "95AqF5SoDweTuuCPZDKg4qPbADA1BiiP6PFzdjFCv4mU",
+          "authority": "FDRiu8mUvj4RbTWB9Yv3ayzedLjajCYCnZWtmMCA1mBw",
+          "mint": "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo",
+          "tokenAmount": {
+            "amount": "1",
+            "decimals": 6,
+            "uiAmount": 0.000001,
+            "uiAmountString": "0.000001"
+          }
+        }
+      }
+    },
+    {
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "program": "spl-token",
+      "parsed": {
+        "type": "closeAccount",
+        "info": {
+          "account": "95AqF5SoDweTuuCPZDKg4qPbADA1BiiP6PFzdjFCv4mU",
+          "destination": "Fri2hiuuj8TjavnmsNLtTBjugba73T95tbHKA9xp2BAR",
+          "owner": "FDRiu8mUvj4RbTWB9Yv3ayzedLjajCYCnZWtmMCA1mBw"
+        }
+      }
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "10000",
+    "computeUnitsConsumed": "5335",
+    "preBalances": [
+      "4945309289",
+      "2000000",
+      "1559560",
+      "7447720",
+      "70228641"
+    ],
+    "postBalances": [
+      "4946858849",
+      "2000000",
+      "0",
+      "7447720",
+      "70228641"
+    ],
+    "preTokenBalances": [
+      {
+        "accountIndex": 2,
+        "mint": "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo",
+        "uiTokenAmount": {
+          "uiAmount": 0.000001,
+          "decimals": 6,
+          "amount": "1",
+          "uiAmountString": "0.000001"
+        },
+        "owner": "FDRiu8mUvj4RbTWB9Yv3ayzedLjajCYCnZWtmMCA1mBw",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+      }
+    ],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+      "Program log: Instruction: BurnChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3308 of 400000 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+      "Program log: Instruction: CloseAccount",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2027 of 396692 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success"
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "signature": "eiVeETNBkhKvR4Xqwbx4hkg3KhuVgjo2TYLfwF6sBRpk3xnhEky16tK6gzV35zQA9ukkgnQDMwuASUiyEWzY5HA",
+  "slot": "470616156",
+  "blockTime": "1794936218",
+  "version": 1,
+  "note": "v1 message without instructions",
+  "wire": "gQEAAA8AAAChAuQx+qCX+wBq5Gf1fHIDKsLJ2fcLyo2Q2MsVEfFOBwABl5rB5q+qMnzi2SjK0T4/UdGOprQJqnZcxgovUNcfUXW4+QIAAAAAAAAAAAAAgAAAIIY7DpcPDUxJzjqKdC6+WBqRXEm8sbiA9TvctIUXe0rMRE45BD+SA6xs28rXYivpIAa/Gr1zKHoDJ1Zs+zxvAQ==",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "BCoRyb1LVb5R3Fz8Gn25ByuPQQ9EhEUgWjsB6h4Vmnct",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [],
+  "meta": {
+    "err": null,
+    "fee": "200000",
+    "computeUnitsConsumed": "0",
+    "preBalances": [
+      "15328808811"
+    ],
+    "postBalances": [
+      "15328608811"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": []
+  }
+}

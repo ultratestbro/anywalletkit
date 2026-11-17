@@ -1,0 +1,74 @@
+{
+  "signature": "619wJpp8jHkursxdyiQyXR1VTb6uRLb7P7LYzQ98BwqgM8Y1Du7EXZ7kNTi5F2GPkd1EZXCDKRsvq2DaTEftm5LX",
+  "slot": "470616156",
+  "blockTime": "1794936218",
+  "version": "legacy",
+  "note": "Compute Budget SetComputeUnitLimit",
+  "wire": "Afo3xa3rM3D95qAq/gBoHBhZvcC96Ib96Dt0mYqwEvRfxXpn/dACTX9NbvHyvCXYUmcAsD5L4vkJrXest2c5FwwBAAIEC+QRjKS7MYT6fZbHHxqIFaw9iHoCS/b30v20LQzDNwoXsczoXlVJCTiTFITOFy4Y4qyQgv/jYDcl2SM5hHv9UwMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAABuFOO7QXSS5pD8ELr856ElZOtT8figarb8WfqMWJqzuADD5WHW2ZXzba3ixM+UcN2sDYCcBw9YHbzkf7SmozwAICAAUC6gcAAAMCAAERAgUAkNADAMBFBABfI4nqoQE=",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "oRC11nW8LAy2ynYgkef76nnpUCfsZdevQYj2zUrBVXF",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "2bVdEJ8LQmhcHsnUxTXxZ8fNhB7nPbU7oNN4FFgXhb7p",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "Tri3NG4HkZ6DddYPKoX2ehgkqFtDuej9Aspw5BmvSo4",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "ComputeBudget111111111111111111111111111111"
+    },
+    {
+      "programId": "Tri3NG4HkZ6DddYPKoX2ehgkqFtDuej9Aspw5BmvSo4"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5000",
+    "computeUnitsConsumed": "768",
+    "preBalances": [
+      "13130380589",
+      "1503680",
+      "1",
+      "1141440"
+    ],
+    "postBalances": [
+      "13130375589",
+      "1503680",
+      "1",
+      "1141440"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program Tri3NG4HkZ6DddYPKoX2ehgkqFtDuej9Aspw5BmvSo4 invoke [1]",
+      "Program Tri3NG4HkZ6DddYPKoX2ehgkqFtDuej9Aspw5BmvSo4 consumed 618 of 1876 compute units",
+      "Program Tri3NG4HkZ6DddYPKoX2ehgkqFtDuej9Aspw5BmvSo4 success"
+    ]
+  }
+}

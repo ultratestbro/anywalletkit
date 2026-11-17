@@ -29,6 +29,11 @@ const fixture = {
     for (const l of lookups) for (const i of l.readonlyIndexes) tables[l.accountKey][i] = m.loadedAddresses.readonly[r++]
     return tables
   })(),
+  // The RPC's own account list (static keys, then the lookups' writable, then readonly entries), with its signer and
+  // writable flags: an independent reading the tests compare the decoder's resolution and balance changes against.
+  accountKeys: parsed.transaction.message.accountKeys.map((k) => ({ pubkey: k.pubkey, signer: k.signer, writable: k.writable, source: k.source })),
+  // The RPC's own reading of the top-level instructions it knows (jsonParsed `type` + `info`), for the same reason.
+  rpcInstructions: parsed.transaction.message.instructions.map((ix) => (ix.parsed ? { programId: ix.programId, program: ix.program, parsed: ix.parsed } : { programId: ix.programId })),
   meta: {
     err: m.err, fee: m.fee, computeUnitsConsumed: m.computeUnitsConsumed,
     preBalances: m.preBalances, postBalances: m.postBalances,

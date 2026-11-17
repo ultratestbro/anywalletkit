@@ -228,6 +228,7 @@ export function decodeInstruction(ix: RawInstruction, index: number, registry: D
       decoded: true,
       args: fields.args ?? {},
       accounts: target.accounts.map((a, i) => ({ ...a, name: names[i] ?? null })),
+      ...(fields.partial ? { partial: fields.partial } : {}),
     }
   } catch (error) {
     return { ...base, name: null, decoded: false, args: {}, accounts: unnamed, error: error instanceof Error ? error.message : String(error) }

@@ -1,0 +1,158 @@
+{
+  "signature": "2NtS3sZAQxjvotC3eyeh6b4TXLvz8W2CuBf4xo5R93kZCriULLxAW7nE8VUZ7gAYiWHmXTddWXmD4husC9MqhDvP",
+  "slot": "470524929",
+  "blockTime": "1794916601",
+  "version": 0,
+  "note": "Token-2022 WithdrawWithheldTokensFromMint",
+  "wire": "AUTkLKqij3z1VHO1t+zKMRQHrvUvJFMDQlnrcZegVyJ+DeiH5HLWf70bMwkxdQvM6Xo/LMcvFlqT8C/gF63wewiAAQAEBzO6mB48XQhVXPwpF3MIyzOpFtEFwk0NeftGOYNA22WIsmCUaRVggqWqFo2rfjDpIeSucRVgm87eNFZvUbi0Ff1WWlDbnrfbZF/lccqPJz08HJXTkpfjqbQtpKBRmKGNpgMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAAjJclj04kifG7PRApFI4NgwtaE5na/xCEBI572Nvp+FkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbd9uHudY/eGEJdvORszdq2GvxNg7kNJ/69+SjYoYv8hDfRwwi0zVFlv+JcxxiI65pJ6mzrxsCsR68aY2ib+4oEAwAFAoAaBgADAAkDoIYBAAAAAAAEBgABAAIFBgEBBgMCAQACGgIA",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "4UvpQukL9gsr6dEBK5MZnTJitwihsFw89rEJysB3QqZH",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "D1JzBEz2dBBmciJ543E6WpU6fKcxtp2Cprfh1XLzzx7E",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "6p5wPmprdM2gATReh9j5JvxJs8U1PcyWD3neuLvr8sGq",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "ComputeBudget111111111111111111111111111111"
+    },
+    {
+      "programId": "ComputeBudget111111111111111111111111111111"
+    },
+    {
+      "programId": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "program": "spl-associated-token-account",
+      "parsed": {
+        "type": "createIdempotent",
+        "info": {
+          "account": "D1JzBEz2dBBmciJ543E6WpU6fKcxtp2Cprfh1XLzzx7E",
+          "mint": "6p5wPmprdM2gATReh9j5JvxJs8U1PcyWD3neuLvr8sGq",
+          "source": "4UvpQukL9gsr6dEBK5MZnTJitwihsFw89rEJysB3QqZH",
+          "systemProgram": "11111111111111111111111111111111",
+          "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "wallet": "4UvpQukL9gsr6dEBK5MZnTJitwihsFw89rEJysB3QqZH"
+        }
+      }
+    },
+    {
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "program": "spl-token",
+      "parsed": {
+        "type": "withdrawWithheldTokensFromMint",
+        "info": {
+          "feeRecipient": "D1JzBEz2dBBmciJ543E6WpU6fKcxtp2Cprfh1XLzzx7E",
+          "mint": "6p5wPmprdM2gATReh9j5JvxJs8U1PcyWD3neuLvr8sGq",
+          "withdrawWithheldAuthority": "4UvpQukL9gsr6dEBK5MZnTJitwihsFw89rEJysB3QqZH"
+        }
+      }
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "45000",
+    "computeUnitsConsumed": "8072",
+    "preBalances": [
+      "110891820",
+      "1574800",
+      "3251200",
+      "1",
+      "3388612899",
+      "1",
+      "70228641"
+    ],
+    "postBalances": [
+      "110846820",
+      "1574800",
+      "3251200",
+      "1",
+      "3388612899",
+      "1",
+      "70228641"
+    ],
+    "preTokenBalances": [
+      {
+        "accountIndex": 1,
+        "mint": "6p5wPmprdM2gATReh9j5JvxJs8U1PcyWD3neuLvr8sGq",
+        "uiTokenAmount": {
+          "uiAmount": 270803.327136,
+          "decimals": 6,
+          "amount": "270803327136",
+          "uiAmountString": "270803.327136"
+        },
+        "owner": "4UvpQukL9gsr6dEBK5MZnTJitwihsFw89rEJysB3QqZH",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+      }
+    ],
+    "postTokenBalances": [
+      {
+        "accountIndex": 1,
+        "mint": "6p5wPmprdM2gATReh9j5JvxJs8U1PcyWD3neuLvr8sGq",
+        "uiTokenAmount": {
+          "uiAmount": 271706.004894,
+          "decimals": 6,
+          "amount": "271706004894",
+          "uiAmountString": "271706.004894"
+        },
+        "owner": "4UvpQukL9gsr6dEBK5MZnTJitwihsFw89rEJysB3QqZH",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+      }
+    ],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 5856 of 399700 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+      "Program log: TransferFeeInstruction: WithdrawWithheldTokensFromMint",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1916 of 393844 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success"
+    ]
+  }
+}

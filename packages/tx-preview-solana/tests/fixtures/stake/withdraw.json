@@ -1,0 +1,51 @@
+{
+  "signature": "1MzRd7MimbuqeCLKAb8RfLDUi2Yy9Bb7b2mEsKH77L5eRgBrwh6ftuywoBcodwBd586XTNWpsYc8cTJFtZXhtzJ",
+  "slot": "470611555",
+  "blockTime": "1794935223",
+  "version": "legacy",
+  "note": "Withdraw from a stake account",
+  "wire": "AQBP5O8rmcWJD5FlTkkbfvlWjEYuEVkfZMCiLbAiJ/6LzlnpC0d/fHa0l+PxQPZY2FKTwd3uwFiKWSILQJaM2AcBAAUJBruVs1b0vQGlF0NertgwhMXrnu3Fxn7o7Q31c5PhgGmP/Wqom7VjLRmBFIXzkFyqfOd1y2nfBY+kFF459jjgL8tCrOEpeTFhDzRp7CoBKdRxJ+9r/Qk4rPJKUlsoKfBszhecFAQsU4aknVtUqKHtOrUjrD7w0b1tuHKymeUrIWgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAah2BeRN1QqmDQ3vf4qerJVf1NcinhyK2ikncAAAAAABqfVFxjHdMkoVmOYaR1etoteuKObS21cc1VbIQAAAAAGp9UXGSxWjuCKhF9z0peIzwNcMUWyGrNE2AYuqUAAAAan1RcZNYTQ/u2bs0MdEyBr5UQoG1e4VmzFN1/0AAAAThTi/XK52WBRxG95tXyBmRHvkQk/6QaRtI79jwOKkM4CBAMDBwAEBAAAAAUFAQIGCAAMBAAAAOtAsgMAAAAA",
+  "lookupTables": {},
+  "meta": {
+    "err": null,
+    "fee": "5000",
+    "computeUnitsConsumed": "7533",
+    "preBalances": [
+      "49760000",
+      "21540997884509",
+      "415511276351",
+      "2500000",
+      "1",
+      "1141440",
+      "1169280",
+      "42706560",
+      "114979200"
+    ],
+    "postBalances": [
+      "49755000",
+      "21540935870834",
+      "415573290026",
+      "2500000",
+      "1",
+      "1141440",
+      "1169280",
+      "42706560",
+      "114979200"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: Withdraw",
+      "Program Stake11111111111111111111111111111111111111 consumed 7383 of 202850 compute units",
+      "Program Stake11111111111111111111111111111111111111 success"
+    ]
+  }
+}

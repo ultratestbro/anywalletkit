@@ -1,0 +1,126 @@
+{
+  "signature": "2Gxhgo1aqUDiZBzWZLPAprKcpnFAMGN6DRKdF9dm5yXQaQEfPtwxRPov3yAW8y2hQKkje7QLbRkiaTZrtNeY7eAC",
+  "slot": "470606147",
+  "blockTime": "1794934061",
+  "version": 1,
+  "note": "System CreateAccountWithSeed",
+  "wire": "gQEABA8AAAARI/LOKq9IJVLkEaRVIhJ03Khidi6qvIdhY09BcIRI5QIG0p/7hGd1vQG2gT9OV2BqGTqNwNnrNJYwnOu7DfhhZNr4AF7XZ/Bh5GJc1+q3UQgPdP38qLvJfCp0Jb6YQm3KlwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABeVni+YuVxg/jZbCkZoSz6Xz7Hjhs7IGQVoCiq7sEs8G3fbh7nWP3hhCXbzkbM3athr8TYO5DSf+vfko2KGL/HuL7XS8Be3e1haE/mriDD354OzJLKJXi+LcpW19Xq3HvAIAAAAAAAD7DQAAAAAzAAIEZAAEAiEAAAEABQMAAADSn/uEZ3W9AbaBP05XYGoZOo3A2es0ljCc67sN+GFk2ggAAAAAAAAAUTF2ZWNFTVEg7CAAAAAAALYAAAAAAAAABt324e51j94YQl285GzN2rYa/E2DuQ0n/r35KNihi/wBAxLSn/uEZ3W9AbaBP05XYGoZOo3A2es0ljCc67sN+GFk2j/H1nMqcwl/nMBYOEPqtiSDGnPUN0ncJukgHBNXLDS4bSKBYDxCAUF1C9PG2WUKdD2UftVIPluLIO21rrd45gk=",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "FBC796RnayiENcQx3pqBeALSbm1vJrRcjUZ7NfWHMAFj",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "Hh6SL3GpeM8LCXW3iue8ZYwEangHJWd8n1WBZAC8Wz7Y",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "Q1vecEMQEgDyrw1txmBgFwUrkeQurqkEe1bGMzFpump",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "9KGuApSJZmxHaFzk7pYM6W3feZvowVT1q6thnEGsTfzv",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "11111111111111111111111111111111",
+      "program": "system",
+      "parsed": {
+        "type": "createAccountWithSeed",
+        "info": {
+          "base": "FBC796RnayiENcQx3pqBeALSbm1vJrRcjUZ7NfWHMAFj",
+          "lamports": 2157600,
+          "newAccount": "Hh6SL3GpeM8LCXW3iue8ZYwEangHJWd8n1WBZAC8Wz7Y",
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "seed": "Q1vecEMQ",
+          "source": "FBC796RnayiENcQx3pqBeALSbm1vJrRcjUZ7NfWHMAFj",
+          "space": 182
+        }
+      }
+    },
+    {
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "program": "spl-token",
+      "parsed": {
+        "type": "initializeAccount3",
+        "info": {
+          "account": "Hh6SL3GpeM8LCXW3iue8ZYwEangHJWd8n1WBZAC8Wz7Y",
+          "mint": "Q1vecEMQEgDyrw1txmBgFwUrkeQurqkEe1bGMzFpump",
+          "owner": "FBC796RnayiENcQx3pqBeALSbm1vJrRcjUZ7NfWHMAFj"
+        }
+      }
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5700",
+    "computeUnitsConsumed": "3253",
+    "preBalances": [
+      "18215819984",
+      "0",
+      "1",
+      "2661920",
+      "70228641",
+      "833120"
+    ],
+    "postBalances": [
+      "18213656684",
+      "2157600",
+      "1",
+      "2661920",
+      "70228641",
+      "833120"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [
+      {
+        "accountIndex": 1,
+        "mint": "Q1vecEMQEgDyrw1txmBgFwUrkeQurqkEe1bGMzFpump",
+        "uiTokenAmount": {
+          "uiAmount": null,
+          "decimals": 6,
+          "amount": "0",
+          "uiAmountString": "0"
+        },
+        "owner": "FBC796RnayiENcQx3pqBeALSbm1vJrRcjUZ7NfWHMAFj",
+        "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+      }
+    ],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+      "Program log: Instruction: InitializeAccount3",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3103 of 3429 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success"
+    ]
+  }
+}

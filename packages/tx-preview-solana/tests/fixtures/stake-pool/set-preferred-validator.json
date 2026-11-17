@@ -1,0 +1,77 @@
+{
+  "signature": "2tJP2B812FwKi5hcaiELcQGvv5TDmFa3cCJX2ZpVsXJSLu87p39EfnPcuMvNrwxCFV9jiy6b3JVQJdvFVpFvk1Vb",
+  "slot": "470551651",
+  "blockTime": "1794922333",
+  "version": "legacy",
+  "note": "SetPreferredValidator",
+  "wire": "AV5BgJvTEh/cz0iR3eTKXptRlx/IJCWgqtwH6f5UgUOKYM6wcrPxfORngR+c498p5H83hSn2eVu7ZMe1PhtOcgIBAAMFDDUaIhwSEnlm1ZW/rCHpC3gqwhXeZLfoLYLpF8UazNsNBRmcZBDxpZa9bkrRC0PJpGLS2A/SzuA3RIrulwdngwMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAABoFO1Mr2ihdGcv2shgMaY+hOoV76HUS3IpP229sAFlAgP2AfqHIqvLeZU/xNVvvZovEdQ7aIa2U++ARBYxuAPoQuzI0Od8AtgLsDeelwCistKfHapsN2DaF9Vf4D5p9xAwIABQIgTgAAAgAJA0BCDwAAAAAAAwMBAAQjBQEBC2vci0NwScWc+IJayH4lqpe0cNScawx6fy5pUriDOoo=",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "perf1AbQC7pDUAAVSN9G5CEyBS2hEkeMc5cpx25aQiE",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "spp1mo6shdcrRyqDK2zdurJ8H5uttZE6H6oVjHxN1QN",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "3At6ZhUsTshb7Nf9Vebf5LTJG49K9X4aqGQ7PEw1NGSq",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "25000",
+    "computeUnitsConsumed": "5102",
+    "preBalances": [
+      "214806896",
+      "205143474",
+      "1",
+      "153141440",
+      "5081753550"
+    ],
+    "postBalances": [
+      "214781896",
+      "205143474",
+      "1",
+      "153141440",
+      "5081753550"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy invoke [1]",
+      "Program log: Instruction: SetPreferredValidator",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy consumed 4802 of 19700 compute units",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy success"
+    ]
+  }
+}

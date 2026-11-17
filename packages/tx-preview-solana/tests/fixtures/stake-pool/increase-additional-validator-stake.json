@@ -1,0 +1,270 @@
+{
+  "signature": "4YuzpXMPn4WMjd9k4J3kHn1E7Rvu3RiXJJ4W86i3YFRRRfsSCZSWYzNchCBbqp5goooxCbWUSt1xvbyY9fdanNkx",
+  "slot": "470581819",
+  "blockTime": "1794928821",
+  "version": 0,
+  "note": "IncreaseAdditionalValidatorStake (staker rebalancing)",
+  "wire": "AbGSezbwkmumnfs4wihHy+9kz0zt5oQRX02eljc9Vqtx8+YgLFQWElVhygDSqw2tC5kly8G0eB965RHTbSxF4QGAAQALEF/+BsXggjIsBLLYuLUrjrgYBfbynFlF/ethx5+uk+dEK8WGsoFWAUlqDI+TSCIF1sswEYSWZ8NkbFpr4Rrkp8emaE1Lel2/vPHMdMOdlmjgcmmcGfRm3StZiZgkmrH8Nzf8QEbs9St96vDuAHGbFGKCQeFIQu1LuMUo7f7gSMdqtN4zo3zyKxqrzx0QafcnmD9cbfXxP3cJyDY1LDCW0Q4DBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAAaBTtTK9ooXRnL9rIYDGmPoTqFe+h1EtyKT9tvbABZQ3V8R8j5DVQrpdi4h2I9Sh0/zkK7CBff6kMXPVS9e3qfoMIxy6c794TmdCluH4n6SVBOuhCzZfBrsVdH+fCqKZRrhV3BP64275eXp5gJWU1VA6ByYySLJ0Q/vi4TBXAdFCeXTpcnAs34bsocCO+NujNyFJXGu7iSjZc2mMASYtqwGp9UXGMd0yShWY5hpHV62i164o5tLbVxzVVshAAAAAAan1RcZNYTQ/u2bs0MdEyBr5UQoG1e4VmzFN1/0AAAABqHYF6UCBQtoB5Hmzm24jh5bcVD2H8Z5Ck600QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAah2BeRN1QqmDQ3vf4qerJVf1NcinhyK2ikncAAAAAAl6wKtMPikJgxNbFheuQBTNyC2Buz948rww4z13VLVjcDBQAFAjotAQAFAAkDECcAAAAAAAAGDgcACAECAwQJCgsMDQ4PGRPBTxzGAAAAADoAAAAAAAAAOwAAAAAAAAAA",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "7TiPpyvDqqdEZtTDZ6QWFVMo5pDx7d6EctJcjTbV6eN7",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "3wsE11pAjCE3sCwokhD5kgi5cjv6hi3DGAkxXB5MMHKL",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "CCavXvmMgfW4Ky2PX3E9Nij8TMxLmSsMZuHUtxXUL1aN",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "4mYWuBj4JqTVnY2agXuoUf1dAZsFxCCZAVe5BSSq2hyK",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "DB2uK4B5AmoW1EdYgXhiykHNiLyHGer3FDRiURg25dws",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "Fu9BYC6tWBo1KMKaP3CFoKfRhqv9akmy3DuYwnCyWiyC",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "GdNXJobf8fbTR5JSE7adxa6niaygjx4EEbnnRaDCHMMW",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "2ovtpFnYaBu5Vkho7eX3PhoV7LyFrqa23nnwWcGABvcc",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "fdvtuDvWJZ89Z7TmeLjCwxgoLcmoEWNxruV48DvJtfm",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SysvarC1ock11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SysvarStakeHistory1111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "StakeConfig11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "Stake11111111111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5772",
+    "computeUnitsConsumed": "74264",
+    "preBalances": [
+      "3036785641",
+      "1499789557",
+      "3822077954",
+      "0",
+      "126727470852",
+      "1",
+      "153141440",
+      "5143440",
+      "2554519295",
+      "4658178801757",
+      "9131807923",
+      "1169280",
+      "114979200",
+      "960480",
+      "1",
+      "1141440"
+    ],
+    "postBalances": [
+      "3036779869",
+      "1499789557",
+      "496667521",
+      "0",
+      "130052881285",
+      "1",
+      "153141440",
+      "5143440",
+      "2554519295",
+      "4658178801757",
+      "9131807923",
+      "1169280",
+      "114979200",
+      "960480",
+      "1",
+      "1141440"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [
+      {
+        "index": 2,
+        "instructions": [
+          {
+            "programId": "Stake11111111111111111111111111111111111111",
+            "accounts": [],
+            "data": "LGqfV",
+            "stackHeight": 2
+          },
+          {
+            "program": "system",
+            "programId": "11111111111111111111111111111111",
+            "parsed": {
+              "type": "allocate",
+              "info": {
+                "account": "4mYWuBj4JqTVnY2agXuoUf1dAZsFxCCZAVe5BSSq2hyK",
+                "space": "200"
+              }
+            },
+            "stackHeight": 2
+          },
+          {
+            "program": "system",
+            "programId": "11111111111111111111111111111111",
+            "parsed": {
+              "type": "assign",
+              "info": {
+                "account": "4mYWuBj4JqTVnY2agXuoUf1dAZsFxCCZAVe5BSSq2hyK",
+                "owner": "Stake11111111111111111111111111111111111111"
+              }
+            },
+            "stackHeight": 2
+          },
+          {
+            "program": "stake",
+            "programId": "Stake11111111111111111111111111111111111111",
+            "parsed": {
+              "type": "split",
+              "info": {
+                "lamports": "3325410433",
+                "newSplitAccount": "4mYWuBj4JqTVnY2agXuoUf1dAZsFxCCZAVe5BSSq2hyK",
+                "stakeAccount": "CCavXvmMgfW4Ky2PX3E9Nij8TMxLmSsMZuHUtxXUL1aN",
+                "stakeAuthority": "GdNXJobf8fbTR5JSE7adxa6niaygjx4EEbnnRaDCHMMW"
+              }
+            },
+            "stackHeight": 2
+          },
+          {
+            "program": "stake",
+            "programId": "Stake11111111111111111111111111111111111111",
+            "parsed": {
+              "type": "delegate",
+              "info": {
+                "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                "stakeAccount": "4mYWuBj4JqTVnY2agXuoUf1dAZsFxCCZAVe5BSSq2hyK",
+                "stakeAuthority": "GdNXJobf8fbTR5JSE7adxa6niaygjx4EEbnnRaDCHMMW",
+                "stakeConfigAccount": "StakeConfig11111111111111111111111111111111",
+                "stakeHistorySysvar": "SysvarStakeHistory1111111111111111111111111",
+                "voteAccount": "fdvtuDvWJZ89Z7TmeLjCwxgoLcmoEWNxruV48DvJtfm"
+              }
+            },
+            "stackHeight": 2
+          },
+          {
+            "program": "stake",
+            "programId": "Stake11111111111111111111111111111111111111",
+            "parsed": {
+              "type": "merge",
+              "info": {
+                "clockSysvar": "SysvarC1ock11111111111111111111111111111111",
+                "destination": "DB2uK4B5AmoW1EdYgXhiykHNiLyHGer3FDRiURg25dws",
+                "source": "4mYWuBj4JqTVnY2agXuoUf1dAZsFxCCZAVe5BSSq2hyK",
+                "stakeAuthority": "GdNXJobf8fbTR5JSE7adxa6niaygjx4EEbnnRaDCHMMW",
+                "stakeHistorySysvar": "SysvarStakeHistory1111111111111111111111111"
+              }
+            },
+            "stackHeight": 2
+          }
+        ]
+      }
+    ],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy invoke [1]",
+      "Program log: Instruction: IncreaseAdditionalValidatorStake",
+      "Program Stake11111111111111111111111111111111111111 invoke [2]",
+      "Program log: Instruction: GetMinimumDelegation",
+      "Program Stake11111111111111111111111111111111111111 consumed 630 of 63964 compute units",
+      "Program return: Stake11111111111111111111111111111111111111 AMqaOwAAAAA=",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program 11111111111111111111111111111111 invoke [2]",
+      "Program 11111111111111111111111111111111 success",
+      "Program 11111111111111111111111111111111 invoke [2]",
+      "Program 11111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [2]",
+      "Program log: Instruction: Split",
+      "Program Stake11111111111111111111111111111111111111 consumed 9810 of 55453 compute units",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [2]",
+      "Program log: Instruction: DelegateStake",
+      "Program Stake11111111111111111111111111111111111111 consumed 16054 of 43393 compute units",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [2]",
+      "Program log: Instruction: Merge",
+      "Program log: Checking if destination stake is mergeable",
+      "Program log: Checking if source stake is mergeable",
+      "Program log: Merging stake accounts",
+      "Program Stake11111111111111111111111111111111111111 consumed 17084 of 20634 compute units",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy consumed 73964 of 76814 compute units",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy success"
+    ]
+  }
+}

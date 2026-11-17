@@ -29,6 +29,8 @@ export interface DecodedFields {
   readonly args?: Readonly<Record<string, PreviewValue>> | undefined
   /** A name per account, by position (`source`, `destination`, `authority`…); `null` or missing for an unnamed slot. */
   readonly accountNames?: readonly (string | null)[] | undefined
+  /** Set when the instruction is recognised but only its leading arguments decode (a layout newer than the decoder): why. The rest are `null`. */
+  readonly partial?: string | undefined
 }
 
 /**
@@ -62,6 +64,8 @@ export interface DecodedInstruction {
   readonly via?: string
   /** Why a known program's instruction did not decode (malformed data, too few accounts). */
   readonly error?: string
+  /** The instruction is recognised but only partly decoded (a layout newer than the decoder): why. Arguments past that point are `null`. */
+  readonly partial?: string
   /**
    * Set on an inner instruction the RPC returned already parsed (its jsonParsed form, raw bytes dropped): `name` and
    * `args` are the RPC's reading (`type` in PascalCase, `info` as is), not this package's.
@@ -76,6 +80,7 @@ export type PreviewWarningCode =
   | 'durable-nonce'
   | 'unknown-program'
   | 'undecoded-instruction'
+  | 'partially-decoded-instruction'
   | 'sets-authority'
   | 'closes-account'
   | 'approves-delegate'

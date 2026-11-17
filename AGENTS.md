@@ -36,7 +36,7 @@ into the app; never install from GitHub.
 | Hermes polyfills | `runtime-hermes` |
 | Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,stargate,uniswap,balancer,curve,wrap,jupiter,omniston,fynd,relay,symbiosis,0x,across}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
 | Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad,native-near,liquid-near}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
-| Safety and data | `tx-preview-evm`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
+| Safety and data | `tx-preview-evm`, `tx-preview-solana`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | dApp connection | `walletconnect-ton` (WalletConnect for TON dApps); `extension-kit` (browser extension) |
 | Testing your own module | `conformance` (Vitest suites) |
 
@@ -357,6 +357,22 @@ preview.simulation  // { status: 'ok', changes: [{ token, symbol, decimals, delt
 Wire it into `policies.confirm` (preview `intent.raw` for `sendTransaction`/`approve` on `eip155:*`) and into a
 swap's `reviewExecution` (`plan.approvals` + `plan.source` when `plan.source.kind === 'call'`). The
 copy and the language of warnings are yours: map codes to text.
+
+## Solana transaction review (`tx-preview-solana`, beta)
+
+```ts
+import { createSolanaRpc } from '@solana/kit'
+import { describeTransaction, decodeTransaction, defaultRegistry } from '@anywalletkit/tx-preview-solana'
+const preview = await describeTransaction(base64Tx, { rpc: createSolanaRpc(url), signer })  // or a kit Transaction / message
+preview.instructions  // [{ programName, name, args, accounts: [{ name, address, signer, writable }], decoded, partial? }]
+preview.warnings      // codes: unknown-program, undecoded-instruction, partially-decoded-instruction, unlimited-approve,
+                      // approves-delegate, sets-authority, closes-account, burn-address, durable-nonce, foreign-fee-payer, …
+preview.simulation    // { ok, error, fee, unitsConsumed, logs, balances: { sol, tokens, signer: { sol, tokens } }, innerInstructions }
+decodeTransaction(base64Tx, { lookupTables })          // offline, no RPC
+defaultRegistry.with([myDecoder])                       // add a program's decoder ({ programAddress, programName, decode })
+```
+
+Facts, not a verdict: map codes to your own copy. Legacy, v0 (lookup tables read via `getMultipleAccounts`) and v1 messages.
 
 ## Earn
 

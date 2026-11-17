@@ -1,0 +1,79 @@
+{
+  "signature": "F1wRDndCDi2LeJZRQD24ZQjQA7co4UQYG12qV9gRmeLBp3Bf8qAeefyNwkLzmdWoqkDoWcLUsCfHaJFdNgwEXpf",
+  "slot": "470616156",
+  "blockTime": "1794936218",
+  "version": "legacy",
+  "note": "Compute Budget SetLoadedAccountsDataSizeLimit",
+  "wire": "AQwWRtjGQNv/zjmipyONdGBve0VAM9NXAodOeQcAU+spggZ5PZovjY2vCKthJWq48pm/XfEGMhQwKJBubY2h3wwBAAIEX+qoG8BzaVEFe/o2jwVznSbOSJ3Xrt+HAM33uV81K/0TwaQE7JV9k/7lX9WFKXHP9nV+HtXECVJ7dGOtYg6bvAMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAAEgcVYhlnB/nyQn7TB7GCnFuDqmN/OvdIfGBFGj7DakTj7sF59PbOz09slywCk57TnxOFHNOm9Hwr4XEM75rLVQMDAgABIQm0DHIR++ToGAAAAAD/bCFc+Q8DAAAAAABbCA0cAAAAAAIABQQA6AMAAgAFAiADAAA=",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "7TRGFC2EcrPWf9SXBzNW5qLXXUvUjyyARp6iJ6uJqkKE",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "2L81BLqLUpF33ABH5GfizcyGiVP5EgWBC1abcEboMbNs",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "2DNbzPochEcyCcWMbL4d9S3u9QqQEj5bbe6cSZFvKsbh",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "2DNbzPochEcyCcWMbL4d9S3u9QqQEj5bbe6cSZFvKsbh"
+    },
+    {
+      "programId": "ComputeBudget111111111111111111111111111111"
+    },
+    {
+      "programId": "ComputeBudget111111111111111111111111111111"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5000",
+    "computeUnitsConsumed": "512",
+    "preBalances": [
+      "8690264477",
+      "11054080",
+      "1",
+      "1241441"
+    ],
+    "postBalances": [
+      "8690259477",
+      "11054080",
+      "1",
+      "1241441"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program 2DNbzPochEcyCcWMbL4d9S3u9QqQEj5bbe6cSZFvKsbh invoke [1]",
+      "Program 2DNbzPochEcyCcWMbL4d9S3u9QqQEj5bbe6cSZFvKsbh consumed 212 of 800 compute units",
+      "Program 2DNbzPochEcyCcWMbL4d9S3u9QqQEj5bbe6cSZFvKsbh success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success"
+    ]
+  }
+}

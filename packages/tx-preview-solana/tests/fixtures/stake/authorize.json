@@ -1,0 +1,63 @@
+{
+  "signature": "3PiWs7eChbQegZjsJjMhDrkRV2E6ZfyB4QGfvJgeoazYWWpndvzJy34v95eYhksqX3eP9kDX2w4akNkNcdHGXh6e",
+  "slot": "470609455",
+  "blockTime": "1794934771",
+  "version": 0,
+  "note": "Authorize staker + withdrawer",
+  "wire": "AnefizhO3chZkm4Li2rDMLc+LKC3QBSiz0cYJ39Gez7/t43ufYxP+QPpD5ClB3LxeXvgDuIPjrWLGWm9cv79XQcdCWwGsDrm/4PltXLlN3a0H0Y/AxN+K+pIXXFqN9opwFmXF9ac5f7kixWRAhblaxh4xkiyt7rmIi0podDs8FEBgAIABAgnZVlu3s5OhjsZA8mPgkQ/AHYjNbaXWEPsWJeW5ADoO0FQzVKO+66VsKAZShvMb8+VpELWtpZssnh9ZKvoThbpTIs0gjCbancsqpzsCpOLh055ciXPYWE6h6aye3xbrSgGp9UXGMd0yShWY5hpHV62i164o5tLbVxzVVshAAAAAAMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAABN+teWL/sd2SXQqftebQDOYZW6i7OpH9B++YYMXpe7gGodgXkTdUKpg0N73+KnqyVX9TXIp4citopJ3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQy7uz7LY5kQy7XEen7cl5JvbiJqoCi/caqdnamiNOrgHBAAJAwA1DAAAAAAABAAFAkBCDwAFAQIQBgUCAEOolmAAAAAABAMEAAUBAhkMBQIBA++H/GoAAAAAAwEEQQQAAAAAAAADBgMCAwAoAQAAAEFQzVKO+66VsKAZShvMb8+VpELWtpZssnh9ZKvoThbpAAAAAAYDAgMAKAEAAABBUM1SjvuulbCgGUobzG/PlaRC1raWbLJ4fWSr6E4W6QEAAAAHAgEADAIAAADHH6heAAAAAAA=",
+  "lookupTables": {},
+  "meta": {
+    "err": null,
+    "fee": "810000",
+    "computeUnitsConsumed": "29640",
+    "preBalances": [
+      "3712471",
+      "27518727056164",
+      "1620486211",
+      "1169280",
+      "1",
+      "2665447",
+      "1141440",
+      "1"
+    ],
+    "postBalances": [
+      "1590978958",
+      "27517138979677",
+      "1620486211",
+      "1169280",
+      "1",
+      "2665447",
+      "1141440",
+      "1"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95 invoke [1]",
+      "Program L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95 consumed 1428 of 999700 compute units",
+      "Program L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95 success",
+      "Program L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95 invoke [1]",
+      "Program L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95 consumed 3404 of 998272 compute units",
+      "Program L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: Authorize",
+      "Program Stake11111111111111111111111111111111111111 consumed 12172 of 994868 compute units",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: Authorize",
+      "Program Stake11111111111111111111111111111111111111 consumed 12186 of 982696 compute units",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success"
+    ]
+  }
+}

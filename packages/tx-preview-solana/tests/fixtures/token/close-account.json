@@ -1,0 +1,83 @@
+{
+  "signature": "2Z7dXJKkPYNoEYggdKbBND7vMdVXFVAUKrNK3zWgG8NyUBqo6JYmQ5yT8pJ1eE1rfeqa1hTbqYSxGhXwKQdYEnF",
+  "slot": "470611129",
+  "blockTime": "1794935132",
+  "version": "legacy",
+  "note": "Token CloseAccount",
+  "wire": "AQFXAD86n7BB82ckZO3aWTc8vNqksT+lkVWHGSKEncHsrh3L3KW0Sih3DU3/aEY6PoV7gMdXOLcGcoyvD4GZ4QwBAAEDjb4R3okE0+rZnSgHYUMUjNS6aPBrc0tb/7J0GLUzSko9W3luQgEWdwoD8DHajmf+5YBpFNbn8AGmiesNiMvBNQbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpMUKSqGJ9sCcZWVYxFVIvOov2kwc6UXa04GpaRJrokVsBAgMBAAABCQ==",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "AYJasr9GtAowjeSDCvHKs9dkdMLfTAM5qQKcNgSs1YTB",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "58Wmf42Jvp3LUj9ZRUiULu3HxsBz3Y85qsjnHfvZVNUc",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "program": "spl-token",
+      "parsed": {
+        "type": "closeAccount",
+        "info": {
+          "account": "58Wmf42Jvp3LUj9ZRUiULu3HxsBz3Y85qsjnHfvZVNUc",
+          "destination": "AYJasr9GtAowjeSDCvHKs9dkdMLfTAM5qQKcNgSs1YTB",
+          "owner": "AYJasr9GtAowjeSDCvHKs9dkdMLfTAM5qQKcNgSs1YTB"
+        }
+      }
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5000",
+    "computeUnitsConsumed": "120",
+    "preBalances": [
+      "3972207708",
+      "1488440",
+      "240130698"
+    ],
+    "postBalances": [
+      "3973691148",
+      "0",
+      "240130698"
+    ],
+    "preTokenBalances": [
+      {
+        "accountIndex": 1,
+        "mint": "2anhKq7srLuvKDi63EyAPYyK71vSGeyTrVxTJRN4fc8N",
+        "uiTokenAmount": {
+          "uiAmount": null,
+          "decimals": 6,
+          "amount": "0",
+          "uiAmountString": "0"
+        },
+        "owner": "AYJasr9GtAowjeSDCvHKs9dkdMLfTAM5qQKcNgSs1YTB",
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+      }
+    ],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 120 of 200000 compute units",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success"
+    ]
+  }
+}

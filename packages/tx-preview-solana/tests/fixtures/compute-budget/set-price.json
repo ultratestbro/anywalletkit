@@ -1,0 +1,237 @@
+{
+  "signature": "ADHgHZCTRUpapyNW4SNVX1Yx5gJySmEdYyCeULKLuhu9pkvG9Ft2W1U5LH7xeDjTW4SLJcJDG3gqnCF8D4ucQ47",
+  "slot": "470616156",
+  "blockTime": "1794936218",
+  "version": 0,
+  "note": "Compute Budget SetComputeUnitPrice",
+  "wire": "AQfxpu0WlimVASy7wk+ayBQ5sS0mzkzW9PQxkuUSUm9rNC1b/KBOKeUiHINUGY1TIKDsXOnJGW5xS2K9puuHbwiAAQAIDJAHbrC7xgVjFwgC8H77KR0+yQ5CwdB4BTOUWTGfMu45n9Gpj8eYSCV6ZAXo6nI2CeK/f67npXgkNWPxaT8IxFx5igKkUSTaMUEbNiPyfQYTyEBMb32/Rm0a2Ve4uKOqh6kO+wkJFPnNRZUOAh6nVelfKAKqJ7vaTtYAxk8FJC+1AwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAAAGcf5M0OjZ8T5ExNsr2i8MdmNEHogjqkDFFcI988KlJ6ThAA6NyJg2dHkcqu/hljc+z9an1KU+m1uO+6KHOL5/+qFAB5gITn8IEF/Dckr2CVapatrpBfiXITxpFjcT9cuQnDSdoje693Vev/XItb0US3hAPAtFiCgUFfrgC10nR9dlp1DZHzcTxdM239KYiafkA/h03VqC3XHgq5mks3yNU3XVbv82o0zFAUwxp0abTntJPhJ4xA6ztLnFnI2OfRJWEPguO4Cnkfq0PHL2+DFavGfL/diQhJrtK7Jq3GVgoBScOyU/n0FnNKX99++AzaOc4/zUQG2oBn25RMrg9Oh9AgQACQMBAAAAAAAAAAUMAAYHAQwICQ0KCwIDCrrXUB6u4tMhAgABlB43/PEmIpaH5lsW73IgDe85WCcSutJj6wCc67IgNmIAAgtK",
+  "lookupTables": {
+    "AyC4m8fYEgR9mYcf6zzajevPjF8QhptY9Nae5LX6xgiu": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      "GAMEzqJehF8yAnKiTARUuhZMvLvkZVAsCVri5vSfemLr",
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      "HctDXX6qb77pcm8CAaWQLd2dTFPAF9wqJ6NNgmdAerFX"
+    ]
+  },
+  "accountKeys": [
+    {
+      "pubkey": "AhEHLhA4f2EMUvDJ7AiDnNp56uWMDUfFf645BMVVkLet",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "BksFXJyLEAYWffqRgiYw7wfvb22qqA3tczUPye6GCtEw",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "9BSPXmLfvHVJz7peeC5X6WpevFLuaWDqaQSovEaedT3U",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "CNw9h5mfJrjWn6W22ryp61Xs8UZ9KFCdBPs7C9XVJf8Y",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "C6crX5kByqEPy55Y2edsP7T1PGhHUmKU4cUL7GbWdpsY",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "HsMY2GedwpGjZuUPr6o7jFGvRjCLZ2qn1MSG9LxkSrhY",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "AjVrjRvmz3bquxntsBkM7GLZrCPutrtfLYXT4Lxn7MAE",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "FVpZMyGdQvvFAu56J41P32J9NSff4jC46bTyqgkee6U4",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "6co3zn4uPzYdnoAUY6eGnGNXXMhsDG1n6DfRf9YAHrSM",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "6ny545QXZbGDWXo6F7UEVC7MncAzNNxB62tbVoYWG5gs",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "GAMEzqJehF8yAnKiTARUuhZMvLvkZVAsCVri5vSfemLr",
+      "signer": false,
+      "writable": false,
+      "source": "lookupTable"
+    },
+    {
+      "pubkey": "HctDXX6qb77pcm8CAaWQLd2dTFPAF9wqJ6NNgmdAerFX",
+      "signer": false,
+      "writable": false,
+      "source": "lookupTable"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "ComputeBudget111111111111111111111111111111"
+    },
+    {
+      "programId": "SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5001",
+    "computeUnitsConsumed": "18119",
+    "preBalances": [
+      "866370448",
+      "4621440",
+      "1760880",
+      "2143680",
+      "1",
+      "1141440",
+      "3883680",
+      "1190160",
+      "16112400",
+      "2039280",
+      "14769120",
+      "1920960",
+      "7231441",
+      "3578440"
+    ],
+    "postBalances": [
+      "866365447",
+      "4621440",
+      "1760880",
+      "2143680",
+      "1",
+      "1141440",
+      "3883680",
+      "1190160",
+      "16112400",
+      "2039280",
+      "14769120",
+      "1920960",
+      "7231441",
+      "3578440"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": [
+        "GAMEzqJehF8yAnKiTARUuhZMvLvkZVAsCVri5vSfemLr",
+        "HctDXX6qb77pcm8CAaWQLd2dTFPAF9wqJ6NNgmdAerFX"
+      ]
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE invoke [1]",
+      "Program log: Instruction: StartMiningAsteroid",
+      "Program log: Current state: Idle(Idle { sector: [-25, 15] })",
+      "Program SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE consumed 17969 of 202850 compute units",
+      "Program SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE success"
+    ]
+  }
+}

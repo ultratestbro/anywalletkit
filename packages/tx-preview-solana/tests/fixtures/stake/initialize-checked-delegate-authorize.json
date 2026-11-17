@@ -1,0 +1,125 @@
+{
+  "signature": "4RpuBvGxvA12YcoA1Fo3FBrZagbrsvLgFztUwD425XXsdHCq4oVj2crYsqEA87yAQp4icNhmY9EKL3AdC922AwHw",
+  "slot": "470576830",
+  "blockTime": "1794927752",
+  "version": 0,
+  "note": "InitializeChecked + DelegateStake + Authorize (v0)",
+  "wire": "Aat1ukBtboES3u3R7fz7K3pAQ9dAgQSASx2Rk/jEbzkmetkWPPhnbYLou1r8YbR8BlJbxkSMA7qPWn9mH4nX6waAAQAICqz6c6DuFoXmD+IsPGJiLZ4es+fRQ/r0rY8Q18vd41xU4sigrXRRlmYOOKcX0qKiTb8lFoWX4IEt5OvadbCcRnMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAABqHYF5E3VCqYNDe9/ip6slV/U1yKeHIraKSdwAAAAAAGodgXpQIFC2gHkebObbiOHltxUPYfxnkKTrTRAAAAAAan1RcYx3TJKFZjmGkdXraLXrijm0ttXHNVWyEAAAAABqfVFxksXFEhjMlMPUrxf1ja7gibof1E49vZigAAAAAGp9UXGTWE0P7tm7NDHRMga+VEKBtXuFZsxTdf9AAAAK+m3F4UPB4lxmPjBm4KbFgXsebeRvJDQ6zVN6TcWhfDMjIYhimcDfeEcbfjjJZ1Xj0HsxFLd7jQVxmj5vTpdooFAwAJA+gDAAAAAAAAAgIAAXwDAAAArPpzoO4WheYP4iw8YmItnh6z59FD+vStjxDXy93jXFQgAAAAAAAAAEZDMDhBNzhDMUQ1OTE4MzM1MkZDQTBCQ0YxMURDNkMzMSAMQgQAAADIAAAAAAAAAAah2BeRN1QqmDQ3vf4qerJVf1NcinhyK2ikncAAAAAABAQBBwAABAkAAAAEBgEJBggFAAQCAAAABAMBBgAoAQAAAAxDzBJ3kP6q3dHRy6GI4jcXQRwKwPBScZO0VdXCh+nXAAAAAAA=",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "CeEdEeKPmRLTZARiuPqeDRSpA8zNijdoDBGm3xvB7Cs5",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "GGGaPzrGhiN8S1XQDsJJScwdgN2rzy6bM6SefYLwdUTc",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "Stake11111111111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "StakeConfig11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SysvarC1ock11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SysvarRent111111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SysvarStakeHistory1111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "CpfvLiiPALdzZTP3fUrALg2TXwEDSAknRh1sn5JCt9Sr",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5606",
+    "computeUnitsConsumed": "33861",
+    "preBalances": [
+      "18327960113",
+      "0",
+      "1",
+      "1",
+      "1141440",
+      "960480",
+      "1169280",
+      "1009200",
+      "114979200",
+      "189460182030"
+    ],
+    "postBalances": [
+      "39994394",
+      "18287960113",
+      "1",
+      "1",
+      "1141440",
+      "960480",
+      "1169280",
+      "1009200",
+      "114979200",
+      "189460182030"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: InitializeChecked",
+      "Program Stake11111111111111111111111111111111111111 consumed 5336 of 605700 compute units",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: DelegateStake",
+      "Program Stake11111111111111111111111111111111111111 consumed 16053 of 600364 compute units",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: Authorize",
+      "Program Stake11111111111111111111111111111111111111 consumed 12172 of 584311 compute units",
+      "Program Stake11111111111111111111111111111111111111 success"
+    ]
+  }
+}

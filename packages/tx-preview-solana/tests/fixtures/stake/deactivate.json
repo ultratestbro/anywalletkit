@@ -1,0 +1,45 @@
+{
+  "signature": "2dj73PdsuDV9n4TmWaHz8brwfXfFzwR2vqsgEgwxDa93kKLNbZHcne4ycYzJybV8ZhjkQh3L7dGwYoMj2Jqmax3u",
+  "slot": "470609247",
+  "blockTime": "1794934726",
+  "version": "legacy",
+  "note": "Deactivate",
+  "wire": "AVGwJASk3lp0guhLC2bAQJElrT8HGAW/6SgerpfT8AP2DMLubiP2wgBDaSt3NO0z8FUKYHpqM5QBXIcbXOL0FgwBAAMFkOjvADYMPbgauc8f8tE+j01WrtP9Q3ujVu+kYJileSUd6TyenYMtskCSGJxvQGEV9nowE8vMr3bQMaYXJTtWAgMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAABqHYF5E3VCqYNDe9/ip6slV/U1yKeHIraKSdwAAAAAAGp9UXGMd0yShWY5hpHV62i164o5tLbVxzVVshAAAAAH3UT3Dxwj22ALLJ09ta0htLiS/2j5N1sKTn6fc4X8ATAwIABQKAGgYAAgAJA1DDAAAAAAAAAwMBBAAEBQAAAA==",
+  "lookupTables": {},
+  "meta": {
+    "err": null,
+    "fee": "25000",
+    "computeUnitsConsumed": "11489",
+    "preBalances": [
+      "684861229",
+      "5012986864",
+      "1",
+      "1141440",
+      "1169280"
+    ],
+    "postBalances": [
+      "684836229",
+      "5012986864",
+      "1",
+      "1141440",
+      "1169280"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: Deactivate",
+      "Program Stake11111111111111111111111111111111111111 consumed 11189 of 399700 compute units",
+      "Program Stake11111111111111111111111111111111111111 success"
+    ]
+  }
+}

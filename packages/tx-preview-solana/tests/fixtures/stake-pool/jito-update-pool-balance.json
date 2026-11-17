@@ -1,0 +1,143 @@
+{
+  "signature": "2JDwwiZwWQMr2rPGAMLXAV4jZfKSm5JRR8BT5jeYtZexj3ZtyrqNJweUf2Ynyhm4t5k5gndouSMq6JZzGiaJswPr",
+  "slot": "470614275",
+  "blockTime": "1794935809",
+  "version": "legacy",
+  "note": "Jito UpdateStakePoolBalance (crank)",
+  "wire": "AUDeoeDLPN4KAouKAafLfW53tA1Ig3uTb8jTXZbavh1YD2U+8R1RqlLmy4mK2dAhDBaoybNFqwhFxxn0MogtsQUBAAUKqco4w7VJ7XCMmDe0+rPgJANZJBnLID2XK8NHTs3BanAEij4Iw7SVvhf0VCfYm+xbgMfiaVwYZNdnQ9s5vtNG1iPgdQm63e39tRapC5GXu1BHQyVdDjfF/13OiiQe7cQxdo8oo6Oy+1LzWlin5YtZXETHeO0BLPcapvnCNnAMZCf80UHpgyyvEK2RdJXKDycbWyk81HAn6nNwB+1A6zmgvQMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAABoFO1Mr2ihdGcv2shgMaY+hOoV76HUS3IpP229sAFlAG3fbh12Whk9nL4UbO63msHLSF7V9bN5E6jPWFfv8AqVTlniTAUaihSnsel5fw4Szfp0kCFmUxlaalEqbxZmArnqdo/t9kTIqum44hiK3Qa8VQ+/cWyCK5zmPHeD2VLh/mYhDcBjq4xTBAwW/MLwZmbzidnw7IXtO/COf/9vxshwMFAAkDAQAAAAAAAAAFAAUCwFwVAAYHAQgCCQMEBwEH",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "CRnkKQTxctQ7LHVN3yssdgJyEksBJeBrDdwZAxBtsJoZ",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "3R3nGZpQs2aZo5FDQvd2MUQ6R7KhAPainds6uT6uE2mn",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "8yoigZfzZ1nNaadumY9uPVD118225UYHTDpmjpr2nrSa",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "6iQKfEyhr3bZMotVkW6beNZz5CPAkiwvgV2CTje9pVSS",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "BgKUXdS29YcHCFrPm5M8oLHiTzZaMDjsebggjoaQ6KFL",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5002",
+    "computeUnitsConsumed": "24878",
+    "preBalances": [
+      "14014037813",
+      "2719416388",
+      "5081753568",
+      "2039282",
+      "3826303234",
+      "1",
+      "153141440",
+      "240130698",
+      "13446884230",
+      "2086614693"
+    ],
+    "postBalances": [
+      "14014032811",
+      "2719416388",
+      "5081753568",
+      "2039282",
+      "3826303234",
+      "1",
+      "153141440",
+      "240130698",
+      "13446884230",
+      "2086614693"
+    ],
+    "preTokenBalances": [
+      {
+        "accountIndex": 3,
+        "mint": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "uiTokenAmount": {
+          "uiAmount": 278.52539203,
+          "decimals": 9,
+          "amount": "278525392030",
+          "uiAmountString": "278.52539203"
+        },
+        "owner": "GSyXx6WRm2o6Qu4RWxTH17swLZKpTKQdQTS2uGcus1NF",
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+      }
+    ],
+    "postTokenBalances": [
+      {
+        "accountIndex": 3,
+        "mint": "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn",
+        "uiTokenAmount": {
+          "uiAmount": 278.52539203,
+          "decimals": 9,
+          "amount": "278525392030",
+          "uiAmountString": "278.52539203"
+        },
+        "owner": "GSyXx6WRm2o6Qu4RWxTH17swLZKpTKQdQTS2uGcus1NF",
+        "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+      }
+    ],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy invoke [1]",
+      "Program log: Instruction: UpdateStakePoolBalance",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy consumed 24578 of 1399700 compute units",
+      "Program SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy success"
+    ]
+  }
+}

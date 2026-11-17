@@ -1,0 +1,57 @@
+{
+  "signature": "4tu99t3weyC9P6aCVdKSGyjZbimkyP9kZee1FQeAvn3gs5voyDXfrZhRidF2PLY2xb3Q1rTTM5hu6k58TJYkkRjT",
+  "slot": "470611126",
+  "blockTime": "1794935131",
+  "version": "legacy",
+  "note": "SPL Memo v2",
+  "wire": "AcLOg/zZI6H6kNN14hH6zLURPSHLNthivnNHwC8NmQ75guc/cHSqba4MteNCP34IfhJMPTDVF3oL74wDt1oBmAYBAAECNRI8U/Up8z/qfWF+1w9mauB+G0JB6u70Aa5pz1icA0AFSlNamSkhBk0k6HFg2jh8fDW13bySu4HkH6hAQQVEjQAorzcnJGqlGKP9s0YcpOU27vGEm0AHPOoDAlJV3PRxAQEBAEA3QjFCQjMyMTREMkJGNjhEMzQ5MzIyMzRFOTI1MDNFRkMxNjJDNzQ4M0E4QkRDRTRDOTZCQjZCMTg2MUU1Rjcy",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "4aAjfrZji3sLLqY9woQTsFVDETAWvLGiD4eyVeKiMzqm",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+      "program": "spl-memo",
+      "parsed": "7B1BB3214D2BF68D34932234E92503EFC162C7483A8BDCE4C96BB6B1861E5F72"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5000",
+    "computeUnitsConsumed": "37611",
+    "preBalances": [
+      "541531715",
+      "523015236"
+    ],
+    "postBalances": [
+      "541526715",
+      "523015236"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr invoke [1]",
+      "Program log: Signed by 4aAjfrZji3sLLqY9woQTsFVDETAWvLGiD4eyVeKiMzqm",
+      "Program log: Memo (len 64): \"7B1BB3214D2BF68D34932234E92503EFC162C7483A8BDCE4C96BB6B1861E5F72\"",
+      "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr consumed 37611 of 200000 compute units",
+      "Program MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr success"
+    ]
+  }
+}

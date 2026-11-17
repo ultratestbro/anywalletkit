@@ -15,6 +15,10 @@ sidebar:
 - `tx-preview-evm` decodes the calls and approvals, simulates the balance changes, and
   returns named checks (`approval-unlimited`, `simulation-reverted`, `recipient-foreign`…)
   that your app words its own way. See [Transaction preview](/guides/tx-preview/).
+- `tx-preview-solana` (beta) decodes every instruction of a Solana transaction (Token-2022
+  extensions, Stake, Jupiter and Kamino included), resolves lookup tables and simulates the
+  signer's SOL and token balance changes. It reports facts (`unlimited-approve`,
+  `sets-authority`, `durable-nonce`…); a verdict layer comes next.
 - `kit` [policies](/concepts/policies/) call your `confirm` step before **every** signature
   and broadcast, and refuse by fee cap, allowlist or blocklist. Wire the preview into
   `confirm` and nothing reaches the key unseen.

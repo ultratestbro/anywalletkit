@@ -1,0 +1,118 @@
+{
+  "signature": "4g9Yp1f3g7jfoy9YgdrCYioM3FJxtmT4RU9z9SJAVwW5TVfRTcQDLatht9BZyHD2bQsMq4bA2N7ZJyf4g8SbpXeM",
+  "slot": "413431829",
+  "blockTime": "1776275522",
+  "version": "legacy",
+  "note": "Token-2022 InitializeTokenMetadata (token-metadata interface)",
+  "wire": "AbfPak7UeEcpXw/om/XdbP6qnF2BD/Yd0tH/41/tB3KDKUXer9MSBHnwnpNv6EiLNbsGwMyxfqaxF7Vh35AfxQYBAAQGOo3hBtDXNonz55JFiN8M3kJKQGJWDIyQ/EyFIQAcbwYF2usXC9eTT253vQrB34zObyMGO60MozJCOAWS9xPrIQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAAAG3fbh7nWP3hhCXbzkbM3athr8TYO5DSf+vfko2KGL/AeNqqeCA9d7yCO5aGPaTYZRxkP8EOtsvluXh+BW2kvdncRBcOD1VQ6amNL3gb/9od+bq+Hl7m1IG/8crP1VMJoDAgIAAQwCAAAAcKwQAAAAAAAEBAEFAQBd0uEeoli4TY0TAAAATmV1cmFsaW5rIFByZVN0b2NrcwkAAABORVVSQUxJTkstAAAAaHR0cHM6Ly9wcmVzdG9ja3MuY29tL21ldGFkYXRhL25ldXJhbGluay5qc29uAwAFAlkYAAA=",
+  "lookupTables": {},
+  "accountKeys": [
+    {
+      "pubkey": "4wa8FTHDBLNf1DCAWhNbqJ5ZRGkV8TQX1TaF2VMpNttM",
+      "signer": true,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S",
+      "signer": false,
+      "writable": true,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "11111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "ComputeBudget111111111111111111111111111111",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    },
+    {
+      "pubkey": "WV9PJN7XTmTLVwbutCLFxp8TyePee6Xq5mRq6Fti5Wc",
+      "signer": false,
+      "writable": false,
+      "source": "transaction"
+    }
+  ],
+  "rpcInstructions": [
+    {
+      "programId": "11111111111111111111111111111111",
+      "program": "system",
+      "parsed": {
+        "type": "transfer",
+        "info": {
+          "destination": "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S",
+          "lamports": 1092720,
+          "source": "4wa8FTHDBLNf1DCAWhNbqJ5ZRGkV8TQX1TaF2VMpNttM"
+        }
+      }
+    },
+    {
+      "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "program": "spl-token",
+      "parsed": {
+        "type": "initializeTokenMetadata",
+        "info": {
+          "metadata": "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S",
+          "mint": "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S",
+          "mintAuthority": "4wa8FTHDBLNf1DCAWhNbqJ5ZRGkV8TQX1TaF2VMpNttM",
+          "name": "Neuralink PreStocks",
+          "symbol": "NEURALINK",
+          "updateAuthority": "WV9PJN7XTmTLVwbutCLFxp8TyePee6Xq5mRq6Fti5Wc",
+          "uri": "https://prestocks.com/metadata/neuralink.json"
+        }
+      }
+    },
+    {
+      "programId": "ComputeBudget111111111111111111111111111111"
+    }
+  ],
+  "meta": {
+    "err": null,
+    "fee": "5000",
+    "computeUnitsConsumed": "6233",
+    "preBalances": [
+      "503094461",
+      "6138720",
+      "1",
+      "1",
+      "58559541",
+      "1134064814"
+    ],
+    "postBalances": [
+      "501996741",
+      "7231440",
+      "1",
+      "1",
+      "58559541",
+      "1134064814"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [1]",
+      "Program log: TokenMetadataInstruction: Initialize",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 5933 of 6083 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success"
+    ]
+  }
+}

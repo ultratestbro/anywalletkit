@@ -1,0 +1,61 @@
+{
+  "signature": "2Pq1b5PEFwUTK8HZf157NuiPH2GfWrpuBnrs3M2zoVLoBy5hVfAMaX58TVekWmgqRcXHanQZ5S4LUi7zMDU2JUjS",
+  "slot": "470610742",
+  "blockTime": "1794935049",
+  "version": "legacy",
+  "note": "native staking: CreateAccount + Initialize + DelegateStake (legacy)",
+  "wire": "AUWz6jsOeMzSztu/ubdeB7Z0lQjv+ZrEaFykyQjvGZ9AZwHX9f+XYWBjHkVRJ/2u31mdmrI0M0FWbjDF45vc/AEBAAgK1Hwq+xEX4Nku6Lm3fq/SnWIMfu5jCMNP3RlIOdJdN769h6F5jFt34/JMgoOMkDbNG/eCeNCkVcUj2lNKeBG1YwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAfOBpD4L7YUdf670WBe8gw0apFncG2CnORplDXEwngK4DBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAAah2BeRN1QqmDQ3vf4qerJVf1NcinhyK2ikncAAAAAABqHYF6UCBQtoB5Hmzm24jh5bcVD2H8Z5Ck600QAAAAAGp9UXGMd0yShWY5hpHV62i164o5tLbVxzVVshAAAAAAan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABqfVFxk1hND+7ZuzQx0TIGvlRCgbV7hWbMU3X/QAAACU6vivVwi5S9ZwByHRC1mY5Vw0dYVRkIXc5/oN/Dbj+QUEAAUCxV4AAAQACQPAxi0AAAAAAAICAAFwAwAAANR8KvsRF+DZLui5t36v0p1iDH7uYwjDT90ZSDnSXTe+FAAAAAAAAABleG9kdXM6MTc5NDkzNTAxODEwMsCTSUgBAAAAyAAAAAAAAAAGodgXkTdUKpg0N73+KnqyVX9TXIp4citopJ3AAAAAAAUCAQh0AAAAANR8KvsRF+DZLui5t36v0p1iDH7uYwjDT90ZSDnSXTe+1Hwq+xEX4Nku6Lm3fq/SnWIMfu5jCMNP3RlIOdJdN74AAAAAAAAAAAAAAAAAAAAA1Hwq+xEX4Nku6Lm3fq/SnWIMfu5jCMNP3RlIOdJdN74FBgEDBwkGAAQCAAAA",
+  "lookupTables": {},
+  "meta": {
+    "err": null,
+    "fee": "77783",
+    "computeUnitsConsumed": "24261",
+    "preBalances": [
+      "5507826583",
+      "0",
+      "1",
+      "10000000000",
+      "1",
+      "1141440",
+      "960480",
+      "1169280",
+      "1009200",
+      "114979200"
+    ],
+    "postBalances": [
+      "0",
+      "5507748800",
+      "1",
+      "10000000000",
+      "1",
+      "1141440",
+      "960480",
+      "1169280",
+      "1009200",
+      "114979200"
+    ],
+    "preTokenBalances": [],
+    "postTokenBalances": [],
+    "loadedAddresses": {
+      "writable": [],
+      "readonly": []
+    },
+    "innerInstructions": [],
+    "logMessages": [
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+      "Program ComputeBudget111111111111111111111111111111 success",
+      "Program 11111111111111111111111111111111 invoke [1]",
+      "Program 11111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: Initialize",
+      "Program Stake11111111111111111111111111111111111111 consumed 7758 of 23811 compute units",
+      "Program Stake11111111111111111111111111111111111111 success",
+      "Program Stake11111111111111111111111111111111111111 invoke [1]",
+      "Program log: Instruction: DelegateStake",
+      "Program Stake11111111111111111111111111111111111111 consumed 16053 of 16053 compute units",
+      "Program Stake11111111111111111111111111111111111111 success"
+    ]
+  }
+}
