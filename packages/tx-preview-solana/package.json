@@ -1,0 +1,41 @@
+{
+  "name": "@anywalletkit/tx-preview-solana",
+  "version": "0.0.0",
+  "description": "What a Solana transaction will do before it is signed: every instruction decoded (System, SPL Token, Token-2022 with all extensions, Associated Token, Compute Budget, Stake, Address Lookup Table, Memo, SPL Stake Pool, Jupiter, Kamino) through a pluggable decoder registry, lookup tables resolved, and the signer's SOL and token balance changes from simulateTransaction.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/tx-preview-solana" },
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@solana-program/address-lookup-table": "^0.16.0",
+    "@solana-program/compute-budget": "^0.20.0",
+    "@solana-program/stake": "^0.11.0",
+    "@solana-program/system": "^0.16.0",
+    "@solana-program/token": "^0.18.0",
+    "@solana-program/token-2022": "^0.20.0",
+    "@solana/kit": "^8.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.1.0"
+  },
+  "keywords": ["solana", "transaction", "preview", "simulation", "decoder", "token-2022", "security", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
+}
