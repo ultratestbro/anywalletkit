@@ -48,5 +48,32 @@
     "quotedToAmount": "9973",
     "gasUsed": 404600,
     "note": "keypers released the key at 22:01:55; the swap landed in the next block (position 2) as a public transaction, like the first run"
+  },
+  {
+    "at": "2026-11-17T22:07:23.347Z",
+    "label": "swap 0.01 xDAI \u2192 USDC.e (Uniswap v3 SwapRouter02, on-chain quote)",
+    "from": "0x8abe813577e47415a3cd0bbc68c7abca2c4c55ba",
+    "eon": 10,
+    "submissionHash": "0x00d477ca191b22c25c763d1508700035fa40bd18816f8caf1113ab48ecb95efe",
+    "transactionHash": "0xf4a893351bc609955d183d94aa29e8a83dba2670469528e859b40567cdc4433b",
+    "nonce": 11,
+    "gasLimit": "187556",
+    "encryptedGasFee": "187556005251568",
+    "submittedAtBlock": 49333015,
+    "visibleBeforeInclusion": false,
+    "status": "included",
+    "blockNumber": 49333307,
+    "position": 8,
+    "blocksAfterSubmission": 292,
+    "success": true,
+    "seconds": 1514,
+    "sequencer": "0xc5C4b277277A1A8401E0F039dfC49151bA64DC2E",
+    "explorerStatus": "Unshielded inclusion",
+    "explorerDecryptedAt": "2026-11-17T22:32:05Z",
+    "includedAt": "2026-11-17T22:32:10Z",
+    "usdceReceived": "9998",
+    "quotedOnChain": "9998",
+    "gasUsed": 131654,
+    "note": "on-chain only (SwapRouter02 exactInputSingle, quote by static call); key released 22:32:05, landed next block at position 8 as a public transaction"
   }
 ]
