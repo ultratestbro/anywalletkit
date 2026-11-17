@@ -1,0 +1,25 @@
+[
+  {
+    "at": "2026-11-17T20:53:00Z",
+    "from": "0x8abe813577e47415a3cd0bbc68c7abca2c4c55ba",
+    "eon": 10,
+    "submissionHash": "0x2e368b5e0a780b97a18016c3524453ca6bcf8a38c8c3e4f10894817c04ecca0d",
+    "submissionBlock": 49332135,
+    "transactionHash": "0x383aa0f12bffcb01e18eff765d72f935068e61356b64f9da8bcbf79a42fb2fe7",
+    "nonce": 7,
+    "gasLimit": "25200",
+    "encryptedGasFee": "25200000604800",
+    "visibleBeforeInclusion": false,
+    "status": "included",
+    "blockNumber": 49332601,
+    "position": 8,
+    "blocksAfterSubmission": 466,
+    "success": true,
+    "sequencer": "0xc5C4b277277A1A8401E0F039dfC49151bA64DC2E",
+    "includedAt": "2026-11-17T21:32:25Z",
+    "waitSeconds": 2365,
+    "explorerStatus": "Unshielded inclusion",
+    "explorerDecryptedAt": "2026-11-17T21:32:20Z",
+    "note": "keypers released the key (decryption worked), but the decrypting validator's block 49332600 did not carry it; it landed one block later at position 8 as a public transaction"
+  }
+]
