@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-fynd?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-fynd)
 
-[Fynd](https://docs.fynd.xyz) — Propeller Heads' DEX aggregator — as a same-chain swap2 provider for Any Wallet Kit. Exact-input swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain, routed over the pools Tycho indexes.
+[Fynd](https://docs.fynd.xyz) — Propeller Heads' DEX aggregator — as a same-chain swap2 provider for Any Wallet Kit. Exact-input swaps on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain, Robinhood Chain, Arc and Elysium, routed over the pools Tycho indexes.
 
 ## Install
 
@@ -43,8 +43,14 @@ The router reverts below the minimum. With `rpcUrls` set, the exact transaction 
 | Polygon (137) | `0x4dB0B661dc706f7e09e54273028B22f61f8F94C2` |
 | Unichain (130) | `0x556dff14e4A42259ebCE4fa087323c1047e9a55A` |
 | Robinhood Chain (4663) | `0x6F460540B03651d2Ad0ec28f777e4A0480A756a5` |
+| Arc (5042) | `0x52A1BC20F2B78461D7a03c32f6c7388D4587980f` |
+| Elysium (99901) | `0x643577F3b0cB8CE1b1b73C6E872b907aCACD2662` |
 
-On 2026-11-16 Propeller Heads paused every earlier router and redeployed TychoRouterV3 on every chain (registry commit `8aab890`). Versions up to 0.2.12 pin the paused routers and refuse every quote; upgrade. The paused routers stay in `FYND_PREVIOUS_ROUTERS`, which only `describeFyndActivity` reads, so past swaps keep their label in history; they are never a call target or a spender.
+On 2026-11-16 Propeller Heads paused every earlier router and redeployed TychoRouterV3 on every chain (registry commit `8aab890`). Versions up to 0.2.12 pin the paused routers and refuse every quote; upgrade. The paused routers stay in `FYND_PREVIOUS_ROUTERS`, which only `describeFyndActivity` reads, so past swaps keep their label in history; they are never a call target or a spender. Arc and Elysium were added after the redeploy, on its routers; no earlier router there was ever pinned, so they have no previous routers.
+
+**Arc's native coin.** Arc pays gas in USDC with 18-decimal native accounting; the token catalog lists USDC only through its 6-decimal ERC-20 interface (`0x3600…`). Fynd prices a native leg on Arc in the 18-decimal units, so a swap with the native coin (zero address or the router's `0xEeee…` sentinel) on either side is refused there; swap the ERC-20 USDC instead. `fyndNativeSwaps(chainId)` says where native legs are allowed: wherever the catalog lists the chain's native coin (HYPE on Elysium, ETH, BNB, POL elsewhere).
+
+**Not served yet: Plasma.** The registry lists a router on Plasma (9745), but the hosted API answers `unknown_chain` for it (2026-11-17), so it is not in `FYND_CHAINS`.
 
 **Why `uniswap_v4_hooks` is excluded by default.** On 2026-10-24 every Ethereum route the hosted API built through Uniswap v4 hook pools was quoted about 0.6–1% above the market and reverted when simulated (4 of 4 native-input pairs, and USDT → USDC). The same pairs without those pools executed (8 of 8 across Ethereum, Base and Arbitrum). A route through an excluded family is refused even if the server returns one. The hosted API has neither its own simulation nor its price guard enabled, so these checks are the wallet's.
 

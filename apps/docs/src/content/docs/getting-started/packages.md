@@ -58,7 +58,7 @@ inside the router.
 | `@anywalletkit/protocol-swap2-uniswap` | Uniswap v3 straight from the contracts |
 | `@anywalletkit/protocol-swap2-balancer` | Balancer v2, priced and enforced on-chain by the Vault |
 | `@anywalletkit/protocol-swap2-curve` | Curve Router NG — same-chain swaps from the contracts over a pinned pool allowlist; no API, no key |
-| `@anywalletkit/protocol-swap2-fynd` | Fynd (Propeller Heads) same-chain swaps on 7 EVM chains, settled through TychoRouterV3 — Fynd outputs are under the Fynd License |
+| `@anywalletkit/protocol-swap2-fynd` | Fynd (Propeller Heads) same-chain swaps on 9 EVM chains, settled through TychoRouterV3 — Fynd outputs are under the Fynd License |
 | `@anywalletkit/protocol-swap2-relay` | Relay — EVM → EVM through the RelayDepository on 29 chains; the order is hashed and checked on the device, the deposit built locally; no key |
 | `@anywalletkit/protocol-swap2-0x` | 0x Swap API v2 same-chain swaps on 7 EVM chains through Permit2; the Settler comes from 0x's on-chain registry and every signed payload is checked on the device |
 | `@anywalletkit/protocol-swap2-across` | Across — EVM → EVM bridging of the same asset between 17 chains through a plain SpokePool deposit built and verified on the device; priced from Across API V5 against Across's relayer fee; API key on your server (`acrossRemoteProvider` in the app) |

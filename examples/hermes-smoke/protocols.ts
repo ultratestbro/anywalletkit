@@ -455,6 +455,10 @@ export async function smokeProtocols(check: Check): Promise<void> {
   let fyndOldRefused = false
   try { checkFyndTransaction({ to: FYND_PREVIOUS_ROUTERS[8453]![0]!, value: 0n, data: fyndData }, fyndExpected) } catch { fyndOldRefused = true }
   check('fynd: pins the redeployed Base router and refuses the paused one', FYND_CHAINS[8453]!.router === '0xd374c00614f95492D816b5957E3797ce3f0c445C' && fyndOldRefused)
+  // Arc and Elysium (2026-11-17): their own routers; Arc's native USDC (18-decimal units, not a catalog asset) is refused.
+  let fyndArcNativeRefused = false
+  try { checkFyndTransaction({ to: FYND_CHAINS[5042]!.router, value: 0n, data: fyndData }, { ...fyndExpected, chainId: 5042, tokenOut: '0x0000000000000000000000000000000000000000' }) } catch (e) { fyndArcNativeRefused = /native coin on Arc/.test(e instanceof Error ? e.message : '') }
+  check('fynd: Arc and Elysium routers pinned; Arc native coin refused', FYND_CHAINS[5042]!.router === '0x52A1BC20F2B78461D7a03c32f6c7388D4587980f' && FYND_CHAINS[99901]!.router === '0x643577F3b0cB8CE1b1b73C6E872b907aCACD2662' && fynd.supportsChain!('eip155:99901') && !fynd.supportsChain!('eip155:9745') && fyndArcNativeRefused)
   {
     // 0x Settler: the word-level execute decoder and the pre-signing check run under Hermes (bigint words, checksums).
     const dead = '0x000000000000000000000000000000000000dEaD'
