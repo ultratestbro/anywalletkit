@@ -11,23 +11,26 @@ import {createSwap2Handler} from '@anywalletkit/protocol-swap2-core/server';
 import {stargateProvider} from '../dist/provider.js';
 import {stargatePins,checkedStargateQuote} from '../dist/pins.js';
 import {stargateRegistry} from '../dist/deployments.js';
-import {stargateTaxiProof} from '../dist/tracking.js';
+import {stargateTaxiProof,stargateComposedTaxiProof} from '../dist/tracking.js';
+import {checkedStargateComposeQuote,stargateComposeMessage} from '../dist/compose-route.js';
 import {jsonServer,closeServer,journal} from './fork-support.mjs';
 import {stringify} from './evidence.mjs';
-const RPC={'eip155:8453':process.env.RPC_8453??'https://mainnet.base.org','eip155:42161':process.env.RPC_42161??'https://arb1.arbitrum.io/rpc'};
+const RPC={'eip155:8453':process.env.RPC_8453??'https://mainnet.base.org','eip155:42161':process.env.RPC_42161??'https://arb1.arbitrum.io/rpc','eip155:1':process.env.RPC_1??'https://ethereum-rpc.publicnode.com'};
 // Hard caps: amount per case and the native value (messaging fee + ETH amount) a reviewed source may carry.
 const CASES={
   'base-arb-eth':{from:'eip155:8453',to:'eip155:42161',assetId:13,amount:800000000000000n,min:792000000000000n,maxValue:1800000000000000n},
   'arb-base-eth':{from:'eip155:42161',to:'eip155:8453',assetId:13,amount:800000000000000n,min:792000000000000n,maxValue:1800000000000000n},
   'base-arb-usdc':{from:'eip155:8453',to:'eip155:42161',assetId:1,amount:2000000n,min:1980000n,maxValue:1000000000000000n},
   'arb-base-usdc':{from:'eip155:42161',to:'eip155:8453',assetId:1,amount:2000000n,min:1980000n,maxValue:1000000000000000n},
+  // Compose: the floor is the reviewed preview's toTokenAmountMin (final DAI on Ethereum).
+  'arb-eth-compose-dai':{from:'eip155:42161',to:'eip155:1',assetId:1,amount:2000000n,maxValue:2500000000000000n,route:'compose',toToken:'0x6B175474E89094C44Da98b954EedeAC495271d0F'},
 };
 const tokenAbi=parseAbi(['function balanceOf(address) view returns(uint256)','function allowance(address,address) view returns(uint256)']);
 const check=(ok,code)=>{if(!ok)throw new Error(`mainnet: ${code}`);},same=(a,b)=>a.toLowerCase()===b.toLowerCase();
 const log=(...a)=>console.log(new Date().toISOString().slice(11,19),...a);
 const DIR=process.env.STARGATE_MAINNET_DIR??join(homedir(),'.awk-stargate-mainnet'),DATABASE=join(DIR,'operations.sqlite');
 const REPORT=new URL('../tests/fixtures/mainnet-funded.json',import.meta.url);
-const config=()=>({enabled:true,rpcUrls:RPC,quoteTtlMs:120000});
+const config=()=>({enabled:true,rpcUrls:RPC,quoteTtlMs:120000,compose:{enabled:true}});
 const client=(chain)=>createPublicClient({transport:http(RPC[chain],{retryCount:3,timeout:20000})});
 const balance=(chain,token,owner)=>token===zeroAddress?client(chain).getBalance({address:owner}):client(chain).readContract({address:token,abi:tokenAbi,functionName:'balanceOf',args:[owner]});
 const sides=(c)=>[stargateRegistry.deployments.find(d=>d.chain===c.from&&d.assetId===c.assetId),stargateRegistry.deployments.find(d=>d.chain===c.to&&d.assetId===c.assetId)];
@@ -86,34 +89,36 @@ async function main() {
       return;
     }
     const c=CASES[name];check(c,`unknown case; one of ${Object.keys(CASES).join(', ')}`);
-    const [source,destination]=sides(c),operationId=`mainnet-${name}-${Date.now()}`;
+    const [source,destination]=sides(c),operationId=`mainnet-${name}-${Date.now()}`,route=c.route??'taxi',toToken=c.toToken??destination.token;
     const m=await manager(c.from),account=await m.getAccount(0);
     const store=journal(DATABASE);let reviewed;
     try{
-      const beforeSrcNative=await balance(c.from,zeroAddress,actor),beforeSrcToken=await balance(c.from,source.token,actor),beforeDest=await balance(c.to,destination.token,actor);
+      const beforeSrcNative=await balance(c.from,zeroAddress,actor),beforeSrcToken=await balance(c.from,source.token,actor),beforeDest=await balance(c.to,toToken,actor);
       check(beforeSrcToken>=c.amount&&beforeSrcNative>=c.maxValue,'insufficient source balance');
       const router=new RouterSwap2Protocol(account,{fromChain:c.from,providers:[provider],operationStore:store,reviewExecution:async(plan)=>{
-        check(plan.provider==='stargate'&&plan.routeId==='taxi'&&plan.sourceAmount===c.amount&&same(plan.recipient,actor)&&plan.minDestAmount>0n,'wrong reviewed terms');
+        check(plan.provider==='stargate'&&plan.routeId===route&&plan.sourceAmount===c.amount&&same(plan.recipient,actor)&&plan.minDestAmount>0n,'wrong reviewed terms');
         check(plan.source.kind==='call'&&same(plan.source.to,source.address)&&plan.source.value<=c.maxValue,'source value above cap');
         check(plan.approvals.every(a=>same(a.spender,source.address)&&same(a.token,source.token)&&a.amount===c.amount),'nonexact approval');
         reviewed=plan;log(`reviewed: value ${plan.source.value}, min out ${plan.minDestAmount}, approvals ${plan.approvals.length}`);
       }});
-      const options={fromToken:source.token,toToken:destination.token,toChain:c.to,recipient:actor,fromTokenAmount:c.amount,minAmountOut:c.min,slippage:0.005,operationId};
-      log(`send ${name} ${operationId}`);
-      await router.using('stargate','taxi').swap2(options);
+      const pick=router.using('stargate',route),base={fromToken:source.token,toToken,toChain:c.to,recipient:actor,fromTokenAmount:c.amount,slippage:0.005};
+      const min=c.min??BigInt((await pick.quoteSwap2(base)).toTokenAmountMin);
+      log(`send ${name} ${operationId} (route ${route}, floor ${min})`);
+      await pick.swap2({...base,minAmountOut:min,operationId});
       const row=await store.load(operationId),sourceStep=row.steps.find(s=>s.kind==='source');check(sourceStep?.hash,'missing journal source hash');
       const receipt=await client(c.from).waitForTransactionReceipt({hash:sourceStep.hash});check(receipt.status==='success','source reverted');
-      const q=quotes.at(-1),{intent}=checkedStargateQuote(q,stargateRegistry),proof=stargateTaxiProof(intent,receipt);
+      const q=quotes.at(-1),composed=route==='compose'?checkedStargateComposeQuote(q,stargateRegistry).compose:undefined;
+      const proof=composed?stargateComposedTaxiProof(composed.bridge,receipt,composed.bridge.sender,stargateComposeMessage(composed)):stargateTaxiProof(checkedStargateQuote(q,stargateRegistry).intent,receipt);
       const receipts=await Promise.all(row.steps.filter(s=>s.hash&&s.chain===c.from).map(s=>client(c.from).getTransactionReceipt({hash:s.hash}))),gas=receipts.reduce((n,r)=>n+r.gasUsed*r.effectiveGasPrice+(r.l1Fee??0n),0n);
       const spentNative=beforeSrcNative-await balance(c.from,zeroAddress,actor);
       const residual=source.token===zeroAddress?0n:await client(c.from).readContract({address:source.token,abi:tokenAbi,functionName:'allowance',args:[actor,source.address]});check(residual===0n,'residual allowance');
       log(`source ${sourceStep.hash} guid ${proof.guid} amount ${proof.amount}; tracking`);
-      const entry={operationId,case:name,actor,source:c.from,destination:c.to,symbol:source.symbol,amount:String(c.amount),sourceHash:sourceStep.hash,guid:proof.guid,amountReceivedLD:String(proof.amount),quotedMin:String(reviewed.minDestAmount),nativeFeeCap:q.txRequest.nativeFee,sourceValue:String(reviewed.source.value),sourceNativeSpent:String(spentNative),sourceGasReceipts:String(gas),steps:row.steps.map(s=>({kind:s.kind,state:s.state,hash:s.hash})),sentAt:new Date().toISOString()};
+      const entry={operationId,case:name,route,toToken,actor,source:c.from,destination:c.to,symbol:source.symbol,amount:String(c.amount),sourceHash:sourceStep.hash,guid:proof.guid,amountReceivedLD:String(proof.amount),quotedMin:String(reviewed.minDestAmount),nativeFeeCap:q.txRequest.nativeFee,sourceValue:String(reviewed.source.value),sourceNativeSpent:String(spentNative),sourceGasReceipts:String(gas),steps:row.steps.map(s=>({kind:s.kind,state:s.state,hash:s.hash})),sentAt:new Date().toISOString()};
       await appendReport(entry);
       const r=await track(router,operationId,Number(process.env.STARGATE_TRACK_MS??2400000));
-      const delta=await balance(c.to,destination.token,actor)-beforeDest;
+      const delta=await balance(c.to,toToken,actor)-beforeDest;
       await appendReport({...entry,status:r.status,destinationBalanceDelta:String(delta),completedAt:new Date().toISOString()});
-      log(`${name}: ${r.status.state}; destination delta ${delta} (proof amount ${proof.amount})`);
+      log(`${name}: ${r.status.state}; destination delta ${delta} (${composed?`swap minimum ${composed.minReturn}`:`proof amount ${proof.amount}`})`);
       check(r.status.state==='completed','not completed within the tracking window; resume later with --resume '+operationId);
     }finally{store.close();m.dispose();}
   }finally{await close();}

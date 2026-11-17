@@ -54,6 +54,8 @@ and never printed. Results go to `tests/fixtures/mainnet-funded.json`.
 | Date | Transfer | Result |
 |---|---|---|
 | 2026-11-17 | Arbitrum → Base, 2 USDC (exact approval) | Received 1.998793 USDC, equal to the source `OFTSent` amount and the destination balance delta; 0.000688 ETH messaging paid against a 0.00085 ETH cap (headroom refunded); zero residual allowance; `completed` after both chains finalized (~18 min); fresh read-only process resumed to `completed` with one source step |
+| 2026-11-17 | Base → Arbitrum, 2 USDC | Payout 1.998785 USDC proven from the finalized `OFTReceived`; 0.000695 ETH spent against a 0.000866 ETH cap; `completed` |
+| 2026-11-17 | **Compose** Arbitrum 2 USDC → Ethereum DAI | Bridge 1.998759 USDC into the LI.FI receiver; the LayerZero executor ran `lzCompose` and the swap paid 1.998378 DAI (minimum 1.988386); client reported `completed` from the finalized executor events; 0.001884 ETH spent against a 0.002344 ETH cap (Ethereum compose gas included) |
 
 ## Run the foundation checks
 
@@ -480,12 +482,12 @@ be labelled without fabricating successful asset movements.
 - SDK-332: executable compose route (opt-in) built on the Ethereum LI.FI composer evidence
   adapter: SDK-encoded intent, client preflight, router candidate, journalled execution,
   `completed` / `partial` tracking and a gas-bounded `lzCompose` retry, verified on mainnet
-  forks. A funded public compose transfer is still owed. Other DEX variants and composers
-  remain out of scope.
+  forks and one funded mainnet transfer (Arbitrum USDC → Ethereum DAI). Other DEX variants
+  and composers remain out of scope.
 - SDK-333: history, documentation, exports, module registry entry, changeset and conformance
-  are in place. One funded public Taxi transfer (Arbitrum → Base USDC) passed with a
-  fresh-process resume; native ETH, the reverse direction and mobile/device validation of
-  the persistent journal are still owed before publishing.
+  are in place. Funded Taxi transfers passed in both directions (Arbitrum ⇄ Base USDC) with a
+  fresh-process resume; native ETH and mobile/device validation of the persistent journal are
+  still owed before publishing.
 
 The shared `pnpm test:hermes` smoke includes Stargate bigint/dust and uint72 ticket
 handling, recorded cached-token recovery receipts, native-drop tuple decoding and
