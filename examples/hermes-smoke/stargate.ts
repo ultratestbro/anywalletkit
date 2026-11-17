@@ -7,6 +7,10 @@ import {createPublicClient, custom, decodeEventLog, encodeAbiParameters, parseEv
 import {proveLifiStargateCompose, lifiStargateComposeOutcome, stargateComposeQueueState, type StargateComposeExpectation} from '@anywalletkit/protocol-swap2-stargate/compose'
 import {COMPOSE_DEX_PINS, validateLifiUnoswap2Compose} from '@anywalletkit/protocol-swap2-stargate/compose-dex'
 import {LIFI_ETHEREUM_COMPOSER} from '@anywalletkit/protocol-swap2-stargate/compose'
+import {parseStargateComposeIntent, stargateComposeIntentId, stargateComposeMessage, stargateComposeProof, type StargateComposeIntent} from '@anywalletkit/protocol-swap2-stargate/compose-route'
+import {decodeAbiParameters, decodeFunctionData} from 'viem'
+import {LIFI_COMPOSE_PAYLOAD} from '@anywalletkit/protocol-swap2-stargate/compose'
+import {COMPOSE_UNOSWAP_ABI} from '@anywalletkit/protocol-swap2-stargate/compose-dex'
 import composeRecorded from '../../packages/protocol-swap2-stargate/tests/fixtures/compose.json'
 import recorded from '../../packages/protocol-swap2-stargate/tests/fixtures/recovery.json'
 
@@ -68,6 +72,14 @@ export async function smokeStargate(check: (what: string, ok: boolean, detail?: 
       }}, {retryCount: 0})})
       const validated = await validateLifiUnoswap2Compose(proof, client, at)
       check('stargate: compose DEX bigint flags, minimum and canonical pools', validated.minimum === expected.minimum && validated.pools.length === 2 && !validated.executionSupported)
+      // Executable route: rebuild the recorded swap from an SDK intent (uint256 pool words, random id source).
+      const [txId, [swap], to] = decodeAbiParameters(LIFI_COMPOSE_PAYLOAD, expected.composeMsg)
+      const [, fromAmount, minReturn, dex0, dex1] = decodeFunctionData({abi: COMPOSE_UNOSWAP_ABI, data: swap!.callData}).args
+      const src = stargateRegistry.deployments.find((d) => d.chain === 'eip155:42161' && d.assetId === 1)!, dst = stargateRegistry.deployments.find((d) => d.chain === 'eip155:1' && d.assetId === 1)!
+      const route: StargateComposeIntent = {bridge: {source: src, destination: dst, mode: 'taxi', sender: to, recipient: LIFI_ETHEREUM_COMPOSER.receiver, amount: 98_133_750n, minimum: fromAmount, nativeDrop: 0n}, recipient: to, finalToken: swap!.receivingAssetId, dex: [dex0, dex1], minReturn, gas: 500_000n, transactionId: txId}
+      const reparsed = parseStargateComposeIntent(stargateComposeIntentId(route), stargateRegistry)
+      check('stargate: compose intent round-trip and recorded payload', reparsed.dex[0] === dex0 && reparsed.minReturn === minReturn && stargateComposeMessage(reparsed).length === expected.composeMsg.length && crypto.getRandomValues(new Uint8Array(32)).length === 32)
+      check('stargate: SDK compose proof feeds the outcome adapter', lifiStargateComposeOutcome(stargateComposeProof(reparsed, proof.bridge), parsed(c.execution.receipt)).state === 'completed')
     }
   }
 

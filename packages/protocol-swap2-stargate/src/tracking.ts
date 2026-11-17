@@ -9,12 +9,16 @@ import type {StargateRegistry} from "./registry.js";
 import {assertStargate, nonzeroAddress, sameAddress, stargateRpc, type StargateRpcConfig} from "./rpc.js";
 import {busDriveData, busPassengerPrefix, stargateBusNativeDrop, stargateBusPayout, stargateBusProof, stargateBusTicket, type StargateBusProof, type StargateBusTicket} from "./bus.js";
 import {STARGATE_TAXI_EXECUTORS, stargateTaxiNativeDrop} from "./native-drop.js";
+import {COMPOSE_ABI, LIFI_ETHEREUM_COMPOSER, lifiStargateComposeOutcome, stargateComposeQueueState, type LifiStargateComposeProof} from "./compose.js";
+import {checkStargateComposer, isStargateComposeIntent, parseStargateComposeIntent, stargateComposeMessage, stargateComposeProof, stargateComposeRetryGas, type StargateComposeIntent} from "./compose-route.js";
 
 export interface StargateTrackingConfig extends StargateRpcConfig {
   registry?: StargateRegistry;
   scanUrl?: string;
   /** Default: RPC finalized block. Explicit depths are an app finality policy, not universal finality. */
   confirmations?: Readonly<Record<string, number>>;
+  /** Seconds after the compose delivery before a manual lzCompose retry is offered. Default 600. */
+  composeRetryAfterS?: number;
   /** Explicit reviewed executor pins for Taxi native-drop evidence. Default: verified Base executor only. */
   taxiExecutors?: Readonly<Record<string, readonly Hex[]>>;
   /** Bounded default log discovery. Older queues can use the indexer callbacks below. */
@@ -100,6 +104,9 @@ export function createStargateTracker(config: StargateTrackingConfig) {
   const scan = (config.scanUrl ?? "https://scan.layerzero-api.com").replace(/\/+$/, "");
   assertStargate(/^https?:\/\//.test(scan), "invalid Scan URL");
   const fetchImpl = config.fetchImpl ?? fetch;
+  // The LayerZero executor normally runs lzCompose right after delivery; racing it only wastes the user's gas.
+  const composeRetryAfter = config.composeRetryAfterS ?? 600;
+  assertStargate(Number.isSafeInteger(composeRetryAfter) && composeRetryAfter >= 0 && composeRetryAfter <= 7 * 86_400, "invalid compose retry delay");
   const pageSize = config.busLogPageSize ?? 2000, pages = config.busLogPages ?? 8;
   const findDrive = config.findBusDrive, queuedPassengers = config.queuedBusPassengers;
   assertStargate(Number.isSafeInteger(pageSize) && pageSize >= 1 && pageSize <= 10_000 && Number.isSafeInteger(pages) && pages >= 1 && pages <= 32, "invalid Bus log discovery bounds");
@@ -142,12 +149,14 @@ export function createStargateTracker(config: StargateTrackingConfig) {
     }
     return null;
   }
-  async function evidence(ref: IntentRef): Promise<{proof: TransferProof | null; ticket?: StargateBusTicket} | null> {
-    const i = parseStargateIntent(ref.intentId, registry);
+  async function evidence(ref: IntentRef): Promise<{proof: TransferProof | null; ticket?: StargateBusTicket; compose?: StargateComposeIntent} | null> {
+    const compose = isStargateComposeIntent(ref.intentId) ? parseStargateComposeIntent(ref.intentId, registry) : undefined;
+    const i = compose ? compose.bridge : parseStargateIntent(ref.intentId, registry);
     if (!hash(ref.sourceTxHash)) return null;
     const r = await receipt(rpc.client(i.source.chain), i.source.chain, i.source.chainId, ref.sourceTxHash);
     if (r?.status === "reverted" && r.from && r.to && sameAddress(r.from, i.sender) && sameAddress(r.to, i.source.address)) throw new SourceReverted();
     if (!r) return null;
+    if (compose) return {proof: stargateComposedTaxiProof(i, r, i.sender, stargateComposeMessage(compose)), compose};
     if (i.mode === "taxi") return {proof: stargateTaxiProof(i, r)};
     const ticket = stargateBusTicket(i, r);
     return {ticket, proof: await busProof(ticket, ref)};
@@ -175,14 +184,38 @@ export function createStargateTracker(config: StargateTrackingConfig) {
       const data = (json as {data?: unknown})?.data;
       if (!Array.isArray(data)) return provided;
       for (const item of data.slice(0, 32)) {
-        const m = item as {guid?: string; destination?: {tx?: {txHash?: string}; nativeDrop?: {tx?: {txHash?: string}}}};
+        const m = item as {guid?: string; destination?: {tx?: {txHash?: string}; nativeDrop?: {tx?: {txHash?: string}}; lzCompose?: {txs?: unknown}}};
         if (typeof m.guid === "string" && sameAddress(m.guid, p.guid)) {
           if (hash(m.destination?.tx?.txHash)) provided.push(m.destination.tx.txHash);
           if (hash(m.destination?.nativeDrop?.tx?.txHash)) provided.push(m.destination.nativeDrop.tx.txHash);
+          const composed = m.destination?.lzCompose?.txs;
+          if (Array.isArray(composed)) for (const tx of composed.slice(0, 8)) if (hash((tx as {txHash?: unknown})?.txHash)) provided.push((tx as {txHash: Hex}).txHash);
         }
       }
     } catch { /* Scan is discovery only; caller-supplied hashes still need receipt verification. */ }
     return [...new Set(provided)];
+  }
+  /**
+   * Compose state from finalized receipts and the Endpoint queue. Scan names candidate
+   * transactions only; the queue commitment decides whether a retry is possible at all.
+   */
+  type ComposeState = {outcome: "completed" | "intermediate-refunded"; txHash: Hex; lifi: LifiStargateComposeProof} | {queue: ReturnType<typeof stargateComposeQueueState>; retryable: boolean; delivered: Hex | undefined; lifi: LifiStargateComposeProof};
+  async function composeState(ref: IntentRef, c: StargateComposeIntent, p: StargateTaxiProof): Promise<ComposeState> {
+    const d = p.intent.destination, client = rpc.client(d.chain), lifi = stargateComposeProof(c, p);
+    let deliveredAt: bigint | undefined, delivered: Hex | undefined;
+    for (const txHash of await destinationHashes(ref, p)) {
+      try {
+        const r = await receipt(client, d.chain, d.chainId, txHash);
+        if (!r) continue;
+        if (stargateTaxiPayout(p, r)) { delivered = txHash; deliveredAt = (await client.getBlock({blockNumber: r.blockNumber})).timestamp; }
+        const outcome = lifiStargateComposeOutcome(lifi, r);
+        if (outcome.state !== "unverified") return {outcome: outcome.state, txHash, lifi};
+      } catch { /* A bad or unindexed discovery candidate proves nothing. */ }
+    }
+    assertStargate(await client.getChainId() === d.chainId, "compose RPC chain mismatch");
+    const queue = stargateComposeQueueState(lifi.messageHash, await client.readContract({address: d.endpoint, abi: COMPOSE_ABI, functionName: "composeQueue", args: [d.address, LIFI_ETHEREUM_COMPOSER.receiver, p.guid, 0]}));
+    const stale = deliveredAt !== undefined && deliveredAt + BigInt(composeRetryAfter) <= BigInt(Math.floor(Date.now() / 1000));
+    return {queue, retryable: queue === "pending" && stale, delivered, lifi};
   }
   async function trackIntent(ref: IntentRef): Promise<IntentStatus> {
     let deposited = false;
@@ -192,6 +225,14 @@ export function createStargateTracker(config: StargateTrackingConfig) {
       deposited = true;
       const p = e.proof;
       if (!p) return {state: "pending", depositReceived: true};
+      if (e.compose && !("seat" in p)) {
+        const s = await composeState(ref, e.compose, p);
+        // A receiver fallback pays the bridged asset instead of the requested output.
+        if ("outcome" in s) return {state: s.outcome === "completed" ? "completed" : "partial", depositReceived: true, destTxHash: s.txHash};
+        if (s.retryable) return {state: "action-required", depositReceived: true, ...(s.delivered ? {destTxHash: s.delivered} : {})};
+        if (!s.delivered && (await cached(p) || await retryableMessage(p))) return {state: "action-required", depositReceived: true};
+        return {state: "pending", depositReceived: true};
+      }
       const d = p.intent.destination, c = rpc.client(d.chain);
       let paidHash: Hex | undefined, nativeDropProved = false;
       for (const txHash of await destinationHashes(ref, p)) {
@@ -269,6 +310,18 @@ export function createStargateTracker(config: StargateTrackingConfig) {
       if (!p) return e.ticket ? await driveRecovery(e.ticket) : [];
       const i = p.intent;
       const c = rpc.client(i.destination.chain);
+      if (e.compose && !("seat" in p)) {
+        const s = await composeState(ref, e.compose, p);
+        if (!("outcome" in s) && s.retryable) {
+          // Fresh pins and recoverGas: a retry with too little gas would make the receiver pay out the bridged token.
+          const block = await c.getBlock({blockTag: "latest"});
+          const {recoverGas} = await checkStargateComposer(c, i.destination, block.number);
+          return [{id: `${p.guid}:compose:0`, kind: "compose", description: "Run the pending LI.FI compose on Ethereum again with the reviewed swap minimum. If the swap still fails, the composer pays the bridged token to the recipient. Ethereum transaction gas is paid separately.", validUntilMs: Date.now() + 60_000,
+            tx: {chain: i.destination.chain, chainId: i.destination.chainId, to: i.destination.endpoint, value: "0", gasLimit: String(stargateComposeRetryGas(e.compose, recoverGas)), data: encodeFunctionData({abi: COMPOSE_ABI, functionName: "lzCompose", args: [i.destination.address, LIFI_ETHEREUM_COMPOSER.receiver, p.guid, 0, s.lifi.message, "0x"]})},
+          }];
+        }
+        if ("outcome" in s || s.delivered || s.queue !== "absent") return [];
+      }
       if (await c.readContract({address: i.destination.address, abi: STARGATE_ABI, functionName: "status"}) !== 1) return [];
       if (await cached(p)) return [{id: `${p.guid}:retry-token:${seatOf(p)}`, kind: "retry-token", description: "Retry the cached Stargate token payout to the original recipient. Destination transaction gas is paid separately.", validUntilMs: Date.now() + 60_000,
         tx: {chain: i.destination.chain, chainId: i.destination.chainId, to: i.destination.address, value: "0", data: retryTokenData(p)},

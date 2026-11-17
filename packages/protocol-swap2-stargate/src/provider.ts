@@ -9,8 +9,11 @@ import {createStargateQuoter, type StargateMode, type StargateQuoteRequest} from
 import {assertStargate, safeReadError} from "./rpc.js";
 import {createStargateTracker, type StargateTrackingConfig} from "./tracking.js";
 import {describeStargateActivity} from "./activity.js";
+import {checkedStargateComposeQuote, createStargateComposer, isStargateComposeIntent, STARGATE_COMPOSE_CHAIN, type StargateComposeConfig} from "./compose-route.js";
 
 export interface StargateProviderConfig extends StargatePinsConfig, StargateTrackingConfig {
+  /** Executable compose (`routeId: "compose"`): opt in here and in the client pins. Default off. */
+  compose?: StargateComposeConfig;
   /** Explicit opt-in until funded end-to-end validation is complete. Default false. */
   enabled?: boolean;
   /** Taxi only for new transfers. A retired Bus selector is refused, without fallback. */
@@ -20,7 +23,10 @@ export interface StargateProviderConfig extends StargatePinsConfig, StargateTrac
 }
 const PREVIEW_ACTOR = "0x1111111111111111111111111111111111111111";
 
-/** Direct Taxi transport; historical Bus tracking. API/compose execution is not admitted. */
+/**
+ * Direct Taxi transport; historical Bus tracking. With `compose.enabled`, Taxi into the
+ * pinned Ethereum LI.FI composer plus one checked Uniswap V3 swap (`routeId: "compose"`).
+ */
 export function stargateProvider(config: StargateProviderConfig): CrossChainProvider {
   const registry = config.registry ?? stargateRegistry;
   const quoter = createStargateQuoter(config);
@@ -29,14 +35,35 @@ export function stargateProvider(config: StargateProviderConfig): CrossChainProv
   const enabled = config.enabled ?? false, mode = config.defaultMode ?? "taxi";
   const configuredChains = new Set(Object.keys(config.rpcUrls));
   const drop = Object.freeze({...config.nativeDrop});
+  const composer = config.compose?.enabled ? createStargateComposer(config) : undefined;
   assertStargate(mode === "taxi", STARGATE_BUS_RETIRED);
-  const supports = (src: string, token: string, dst: string, out: string) => {
+  const taxiRoute = (src: string, token: string, dst: string, out: string) => {
     const source = stargateToken(src, token), destination = stargateToken(dst, out);
     return !!source && !!destination && quoter.supportsRoute(src, source, dst, destination);
   };
+  const composeRoute = (src: string, token: string, dst: string, out: string) => {
+    const source = stargateToken(src, token), destination = stargateToken(dst, out);
+    return !!composer && !!source && !!destination && composer.supportsRoute(src, source, dst, destination);
+  };
+  const supports = (src: string, token: string, dst: string, out: string) => taxiRoute(src, token, dst, out) || composeRoute(src, token, dst, out);
+  async function getComposeQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote> {
+    const sourceToken = stargateToken(params.sourceChain, params.sourceToken), finalToken = stargateToken(params.destChain, params.destToken);
+    assertStargate(composer && sourceToken && finalToken && params.destChain === STARGATE_COMPOSE_CHAIN && /^[0-9]{1,78}$/.test(params.amountIn), "invalid compose route or amount");
+    assertStargate(params.minAmountOut === undefined || /^[0-9]{1,78}$/.test(params.minAmountOut), "invalid minimum");
+    assertStargate(drop.taxi === undefined, "native drop is not available with compose");
+    const source = registry.find(params.sourceChain, sourceToken);
+    assertStargate(source && (params.sourceDecimals === undefined || params.sourceDecimals === source.localDecimals), "source decimals mismatch");
+    const dry = params.dry !== false;
+    const out = await composer.quote({sourceChain: params.sourceChain, sourceToken, finalToken, sender: params.refundAddress || (dry ? PREVIEW_ACTOR : ""), recipient: params.destAddress || (dry ? PREVIEW_ACTOR : ""), amount: BigInt(params.amountIn),
+      ...(params.minAmountOut !== undefined ? {minimum: BigInt(params.minAmountOut)} : {}), ...(params.slippageBps !== undefined ? {slippageBps: params.slippageBps} : {})}, signal);
+    checkedStargateComposeQuote(out, registry);
+    return out;
+  }
   async function getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
     try {
       assertStargate(!params.flex, "flexible deposits are unsupported");
+      const compose = params.routeId === "compose" || (params.routeId === undefined && !taxiRoute(params.sourceChain, params.sourceToken, params.destChain, params.destToken) && composeRoute(params.sourceChain, params.sourceToken, params.destChain, params.destToken));
+      if (compose) return await getComposeQuote(params, signal);
       const selected = params.routeId ?? mode;
       assertStargate(selected === "taxi" || selected === "bus", "unknown route selector");
       const sourceToken = stargateToken(params.sourceChain, params.sourceToken), destinationToken = stargateToken(params.destChain, params.destToken);
@@ -67,6 +94,11 @@ export function stargateProvider(config: StargateProviderConfig): CrossChainProv
     } catch (error) { params.onRefusal?.(safeReadError(error).message); return null; }
   }
   async function buildDeposit(q: Quote): Promise<UnsignedTx> {
+    if (isStargateComposeIntent(q.intentId)) {
+      assertStargate(composer, "compose is not enabled");
+      const {compose, tx} = checkedStargateComposeQuote(q, registry), source = compose.bridge.source;
+      return {chain: source.chain, to: tx.to, data: tx.data, value: tx.value!, chainId: source.chainId, ...(tx.approvalAddress ? {approvalAddress: tx.approvalAddress} : {})};
+    }
     const {intent, tx} = checkedStargateQuote(q, registry);
     return {chain: intent.source.chain, to: tx.to!, data: tx.data!, value: tx.value!, chainId: intent.source.chainId, ...(tx.approvalAddress ? {approvalAddress: tx.approvalAddress} : {})};
   }
@@ -74,13 +106,17 @@ export function stargateProvider(config: StargateProviderConfig): CrossChainProv
     name: "stargate", enabled: () => enabled,
     supportsRoute: (from, to) => supports(from.chain, from.token, to.chain, to.token),
     supportsChain: (chain) => stargateChainActive(chain) && registry.deployments.some((d) => d.chain === chain) && configuredChains.has(chain),
+    // Compose shares the Taxi chain pairs: its bridge leg is a Taxi transfer into Ethereum.
     supportsChainPair: (from, to) => stargateChainActive(from) && stargateChainActive(to) && registry.paths.some((p) => p.source === from && p.destination === to) && configuredChains.has(from) && configuredChains.has(to),
     callTargets: pins.callTargets, spenders: pins.spenders,
     describeActivity: (tx, ctx) => describeStargateActivity(tx, ctx, registry),
     getQuote,
     async getQuotes(params, signal) {
       assertStargate(params.dry !== false, "candidate enumeration is preview-only");
-      const modes: StargateMode[] = params.routeId ? [params.routeId as StargateMode] : ["taxi"];
+      const modes: string[] = params.routeId ? [params.routeId] : [
+        ...(taxiRoute(params.sourceChain, params.sourceToken, params.destChain, params.destToken) ? ["taxi"] : []),
+        ...(composeRoute(params.sourceChain, params.sourceToken, params.destChain, params.destToken) ? ["compose"] : []),
+      ];
       const results = await Promise.all(modes.map((routeId) => getQuote({...params, routeId, dry: true}, signal)));
       return results.filter((q): q is Quote => q !== null);
     },

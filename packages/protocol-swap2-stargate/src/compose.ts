@@ -48,15 +48,11 @@ export interface LifiStargateComposeProof {
   readonly finalToken: Address;
   readonly minimum: bigint;
   readonly swap: {readonly callTo: Address; readonly fromAmount: bigint};
-  /** Nested DEX calldata has not been approved. No executable route or retry is implied. */
-  readonly executionSupported: false;
+  /** True only for routes this SDK encoded and checked before signing (`compose-route`); historical proofs are evidence only. */
+  readonly executionSupported: boolean;
 }
 
-/** Type-3 index-zero compose gas. No arbitrary native value or extra executor options. */
-export function stargateComposeOptions(gas: bigint): Hex {
-  assertStargate(typeof gas === "bigint" && gas > 0n && gas < (1n << 128n), "compose gas must be a positive uint128");
-  return encodePacked(["uint16", "uint8", "uint16", "uint8", "uint16", "uint128"], [3, 1, 19, 3, 0, gas]);
-}
+export {stargateComposeOptions} from "./quote.js";
 
 /** Zero is absent; ONE is consumed (unlike cleared inboundPayloadHash for lzReceive). */
 export function stargateComposeQueueState(messageHash: Hex, queue: Hex): "absent" | "consumed" | "pending" | "mismatch" {
@@ -89,7 +85,7 @@ export function proveLifiStargateCompose(expected: StargateComposeExpectation, s
     .filter((l) => sameAddress(l.args.guid, bridge.guid));
   assertStargate(sent.length === 1 && sameAddress(sent[0]!.args.from, i.destination.address) && sameAddress(sent[0]!.args.to, pins.receiver) && sent[0]!.args.index === 0 && sameAddress(sent[0]!.args.message, message), "compose queue message mismatch");
   const intent = Object.freeze({...i, source: Object.freeze({...i.source}), destination: Object.freeze({...i.destination})});
-  return Object.freeze({bridge: Object.freeze({...bridge, intent}), transactionId, message, messageHash: keccak256(message), recipient, finalToken: expected.finalToken, minimum: expected.minimum, swap: Object.freeze({callTo: swap.callTo, fromAmount: swap.fromAmount}), executionSupported: false});
+  return Object.freeze({bridge: Object.freeze({...bridge, intent}), transactionId, message, messageHash: keccak256(message), recipient, finalToken: expected.finalToken, minimum: expected.minimum, swap: Object.freeze({callTo: swap.callTo, fromAmount: swap.fromAmount}), executionSupported: false as boolean});
 }
 
 export type StargateComposeOutcome =

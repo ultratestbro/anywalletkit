@@ -103,6 +103,11 @@
       "types": "./dist/compose-dex.d.ts",
       "import": "./dist/compose-dex.js",
       "require": "./dist/compose-dex.cjs"
+    },
+    "./compose-route": {
+      "types": "./dist/compose-route.d.ts",
+      "import": "./dist/compose-route.js",
+      "require": "./dist/compose-route.cjs"
     }
   },
   "files": [

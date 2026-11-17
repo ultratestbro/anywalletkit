@@ -23,6 +23,11 @@ export interface StargateQuoteRequest {
   mode: StargateMode;
   /** Taxi specifies a uint128 amount. The legacy Bus option is refused for new quotes. */
   nativeDrop?: {amount: bigint} | {bus: true};
+  /**
+   * Taxi compose: the bridge output must arrive exactly (no slippage on the bridge
+   * leg), and `message` builds the composeMsg for that exact destination amount.
+   */
+  compose?: {gas: bigint; message: (received: bigint, signal?: AbortSignal) => Promise<Hex>};
 }
 export interface StargateSendParam {
   readonly dstEid: number;
@@ -75,6 +80,12 @@ export interface StargateQuoteConfig extends StargateRpcConfig {
 const UINT64_MAX = (1n << 64n) - 1n;
 const UINT256_MAX = (1n << 256n) - 1n;
 
+/** Type-3 index-zero compose gas. No arbitrary native value or extra executor options. */
+export function stargateComposeOptions(gas: bigint): Hex {
+  assertStargate(typeof gas === "bigint" && gas > 0n && gas < (1n << 128n), "compose gas must be a positive uint128");
+  return encodePacked(["uint16", "uint8", "uint16", "uint8", "uint16", "uint128"], [3, 1, 19, 3, 0, gas]);
+}
+
 /** Type 3 / executor worker 1 / native-drop option 2, with a 48-byte payload. */
 export function taxiNativeDrop(amount: bigint, recipient: Address): Hex {
   assertStargate(typeof amount === "bigint" && amount > 0n && amount < (1n << 128n), "native drop must be a positive uint128");
@@ -122,6 +133,8 @@ export function createStargateQuoter(config: StargateQuoteConfig) {
       const at = {address: source.address, abi: STARGATE_ABI, blockNumber: sourceBlock.number, account: sender};
       const creditSD = await src.readContract({...at, functionName: "paths", args: [destination.eid]});
       let extraOptions: Hex = "0x", nativeDrop = 0n;
+      const compose = request.compose;
+      assertStargate(!compose || (!request.nativeDrop && slippage === 0 && minimum === 0n), "compose takes an exact bridge output without native drop");
       if (request.nativeDrop) {
         assertStargate("amount" in request.nativeDrop && !("bus" in request.nativeDrop), "Taxi requires an explicit native drop amount");
         nativeDrop = request.nativeDrop.amount;
@@ -141,7 +154,10 @@ export function createStargateQuoter(config: StargateQuoteConfig) {
       const slipFloor = (received * BigInt(10_000 - slippage) + 9999n) / 10_000n;
       const minAmountLD = sourceMinimum(minimum > slipFloor ? minimum : slipFloor, source.localDecimals, destination.localDecimals, source.sharedDecimals);
       assertStargate(minAmountLD <= receipt.amountReceivedLD, "output is below the caller's minimum");
-      const sendParam = Object.freeze({...probe, minAmountLD});
+      const sendParam = Object.freeze(compose
+        ? {...probe, minAmountLD, extraOptions: stargateComposeOptions(compose.gas), composeMsg: await compose.message(received, signal)}
+        : {...probe, minAmountLD});
+      assertNotAborted(signal);
       const fee = await src.readContract({...at, functionName: "quoteSend", args: [sendParam, false]});
       assertStargate(fee.lzTokenFee === 0n, "LZ token fees are unsupported");
       const cap = fee.nativeFee + (fee.nativeFee * BigInt(headroom) + 9999n) / 10_000n;

@@ -16,7 +16,30 @@ export const COMPOSE_DEX_PINS = Object.freeze({
   /** Observed four-byte suffix; its ownership/meaning is not an authorization signal. */
   calldataSuffix: "2a94d114",
 });
-const ADDRESS = (1n << 160n) - 1n, V3 = 1n << 253n, NO_WRAP = 1n << 251n, ZERO_FOR_ONE = 1n << 247n;
+export const UNOSWAP_FLAGS = Object.freeze({V3: 1n << 253n, NO_WRAP: 1n << 251n, ZERO_FOR_ONE: 1n << 247n});
+const ADDRESS = (1n << 160n) - 1n, {V3, NO_WRAP, ZERO_FOR_ONE} = UNOSWAP_FLAGS;
+
+/** Exactly two canonical Uniswap V3 pools from `input` to `output`, as read at `blockNumber`. */
+export async function unoswap2V3Path(client: PublicClient, blockNumber: bigint, input: Hex, words: readonly [bigint, bigint], output: Hex) {
+  let current = input;
+  const pools: Hex[] = [], fees: number[] = [], tokens: Hex[] = [input];
+  for (const encoded of words) {
+    assertStargate((encoded >> 253n) === 1n && (encoded & ~(ADDRESS | V3 | NO_WRAP | ZERO_FOR_ONE)) === 0n, "unsupported compose DEX flags");
+    const address = getAddress(toHex(encoded & ADDRESS, {size: 20}));
+    const at = {address, abi: COMPOSE_POOL_ABI, blockNumber};
+    const [token0, token1, fee] = await Promise.all([
+      client.readContract({...at, functionName: "token0"}), client.readContract({...at, functionName: "token1"}), client.readContract({...at, functionName: "fee"}),
+    ]);
+    const canonical = await client.readContract({address: COMPOSE_DEX_PINS.factory, abi: COMPOSE_POOL_ABI, functionName: "getPool", args: [token0, token1, fee], blockNumber});
+    assertStargate(sameAddress(canonical, address) && address !== zeroAddress && !sameAddress(token0, token1), "unreviewed compose DEX pool");
+    const forward = (encoded & ZERO_FOR_ONE) !== 0n;
+    assertStargate(sameAddress(current, forward ? token0 : token1), "compose DEX path input mismatch");
+    current = forward ? token1 : token0;
+    pools.push(address); fees.push(fee); tokens.push(current);
+  }
+  assertStargate(sameAddress(current, output), "compose DEX path output mismatch");
+  return Object.freeze({pools: Object.freeze(pools), fees: Object.freeze(fees), tokens: Object.freeze(tokens)});
+}
 
 /**
  * Checks a narrow DEX operation independently of LI.FI discovery: one unoswap2
@@ -52,23 +75,7 @@ export async function validateLifiUnoswap2Compose(p: LifiStargateComposeProof, c
   const canonicalCall = encodeFunctionData({abi: COMPOSE_UNOSWAP_ABI, functionName: "unoswap2", args: call.args}).toLowerCase();
   assertStargate([canonicalCall, canonicalCall + pins.calldataSuffix].includes(swap.callData.toLowerCase()), "noncanonical compose DEX calldata");
   assertStargate(token > 0n && token <= ADDRESS && sameAddress(toHex(token, {size: 20}), swap.sendingAssetId) && amount === swap.fromAmount && minimum > 0n && minimum >= p.minimum, "compose DEX input or minimum mismatch");
-  let current = swap.sendingAssetId;
-  const pools: Hex[] = [];
-  for (const encoded of [dex, dex2]) {
-    assertStargate((encoded >> 253n) === 1n && (encoded & ~(ADDRESS | V3 | NO_WRAP | ZERO_FOR_ONE)) === 0n, "unsupported compose DEX flags");
-    const address = getAddress(toHex(encoded & ADDRESS, {size: 20}));
-    const at = {address, abi: COMPOSE_POOL_ABI, blockNumber};
-    const [token0, token1, fee] = await Promise.all([
-      client.readContract({...at, functionName: "token0"}), client.readContract({...at, functionName: "token1"}), client.readContract({...at, functionName: "fee"}),
-    ]);
-    const canonical = await client.readContract({address: pins.factory, abi: COMPOSE_POOL_ABI, functionName: "getPool", args: [token0, token1, fee], blockNumber});
-    assertStargate(sameAddress(canonical, address) && address !== zeroAddress && !sameAddress(token0, token1), "unreviewed compose DEX pool");
-    const forward = (encoded & ZERO_FOR_ONE) !== 0n;
-    assertStargate(sameAddress(current, forward ? token0 : token1), "compose DEX path input mismatch");
-    current = forward ? token1 : token0;
-    pools.push(address);
-  }
-  assertStargate(sameAddress(current, p.finalToken), "compose DEX path output mismatch");
+  const {pools} = await unoswap2V3Path(client, blockNumber, swap.sendingAssetId, [dex, dex2], p.finalToken);
   assertStargate((await client.getBlock({blockNumber})).hash === block.hash, "compose DEX block changed");
-  return Object.freeze({adapter: "lifi-ethereum-unoswap2-v3" as const, amount, minimum, finalToken: p.finalToken, recipient: p.recipient, pools: Object.freeze(pools), blockNumber, blockHash: block.hash, executionSupported: false as const});
+  return Object.freeze({adapter: "lifi-ethereum-unoswap2-v3" as const, amount, minimum, finalToken: p.finalToken, recipient: p.recipient, pools, blockNumber, blockHash: block.hash, executionSupported: false as const});
 }

@@ -1,44 +1,32 @@
-import {decodeFunctionData, encodeFunctionData, pad, zeroAddress, type Hex} from "viem";
-import {ccAssetByToken} from "@anywalletkit/swap2-assets";
+import {decodeFunctionData, encodeFunctionData, pad, type Hex} from "viem";
 import type {Quote, QuoteParams, RemotePins, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
-import {STARGATE_BUS_RETIRED, stargateChainActive} from "./availability.js";
+import {STARGATE_BUS_RETIRED} from "./availability.js";
 import {STARGATE_ABI} from "./abi.js";
-import {destinationAmount, sourceMinimum, splitSourceAmount} from "./amounts.js";
+import {sourceMinimum} from "./amounts.js";
+import {checkedStargateComposeQuote, createStargateComposer, isStargateComposeIntent, STARGATE_COMPOSE_CHAIN, type StargateComposeConfig} from "./compose-route.js";
 import {stargateRegistry} from "./deployments.js";
 import {parseStargateIntent, stargateToken} from "./intent.js";
 import {createStargateQuoter, taxiNativeDrop, type StargateQuoteConfig, type StargateSendParam} from "./quote.js";
-import type {StargateDeployment, StargateRegistry} from "./registry.js";
+import type {StargateRegistry} from "./registry.js";
+import {checkedStargateAccounting, checkedStargateSource, stargateFees} from "./source-tx.js";
 import {assertStargate, sameAddress} from "./rpc.js";
 import {createStargateTracker, type StargateTrackingConfig} from "./tracking.js";
 
 export interface StargatePinsConfig extends StargateQuoteConfig, StargateTrackingConfig {
   nativeDrop?: {taxi?: bigint; bus?: boolean};
+  /** Client opt-in for executable compose quotes; without it the pins refuse them. */
+  compose?: StargateComposeConfig;
 }
 
-export function stargateFees(source: StargateDeployment, protocolFee: bigint, cap: bigint): NonNullable<Quote["fees"]> {
-  const nativeToken = ccAssetByToken(source.chain, zeroAddress)?.assetId ?? zeroAddress;
-  return [
-    ...(protocolFee ? [{type: "protocol" as const, amount: String(protocolFee), token: source.kind === "native" ? nativeToken : source.token, included: true, description: "Stargate protocol fee, already deducted from output"}] : []),
-    {type: "network", amount: String(cap), token: nativeToken, included: false, description: "Messaging fee cap; unused headroom is refunded. Source transaction gas is additional."},
-  ];
-}
+export {stargateFees};
 
 export function checkedStargateQuote(q: Quote, registry: StargateRegistry) {
   const intent = parseStargateIntent(q.intentId, registry);
   const {source, destination, mode, sender, recipient, amount, minimum, nativeDrop} = intent;
   assertStargate(mode !== "bus", STARGATE_BUS_RETIRED);
-  assertStargate(stargateChainActive(source.chain) && stargateChainActive(destination.chain), "chain support has ended for new transfers");
-  const tx = q.txRequest;
-  assertStargate(q.provider === "stargate" && q.routeId === mode && tx && tx.to && tx.data, "missing Stargate transaction");
-  assertStargate(q.depositAddress === "" && q.depositMemo === null && tx.serializedTx === undefined && tx.gasLimit === undefined, "unexpected transaction fields");
-  assertStargate(sameAddress(tx.to, source.address) && tx.chainId === source.chainId && q.sourceAmount === String(amount) && q.minDestAmount === String(minimum), "quote identity mismatch");
-  assertStargate(Number.isFinite(q.validUntilMs) && q.validUntilMs > Date.now(), "quote expired");
-  assertStargate(typeof tx.nativeFee === "string" && /^(0|[1-9][0-9]{0,77})$/.test(tx.nativeFee), "invalid messaging fee cap");
-  const cap = BigInt(tx.nativeFee);
-  const value = cap + (source.kind === "native" ? amount : 0n);
-  assertStargate(value < (1n << 256n) && tx.value === String(value), "native value mismatch");
-  assertStargate(source.kind !== "native" && source.approvalRequired ? !!tx.approvalAddress && sameAddress(tx.approvalAddress, source.address) : tx.approvalAddress === undefined, "approval spender mismatch");
+  const {tx, cap} = checkedStargateSource(q, source, destination, amount, mode);
+  assertStargate(q.minDestAmount === String(minimum), "quote identity mismatch");
   const sendParam: StargateSendParam = {
     dstEid: destination.eid, to: pad(recipient, {size: 32}), amountLD: amount,
     minAmountLD: sourceMinimum(minimum, source.localDecimals, destination.localDecimals, source.sharedDecimals),
@@ -51,15 +39,8 @@ export function checkedStargateQuote(q: Quote, registry: StargateRegistry) {
   const parsed = decodeFunctionData({abi: STARGATE_ABI, data: tx.data as Hex});
   assertStargate(parsed.functionName === "sendToken", "unsupported source function");
   assertStargate(/^[0-9]+$/.test(q.destAmount) && BigInt(q.destAmount) >= minimum, "invalid quoted output");
-  const pd = q.providerData;
-  assertStargate(pd && ["sentAmount", "dust", "protocolFee", "protocolReward", "messagingFee"].every((key) => /^(0|[1-9][0-9]{0,77})$/.test(pd[key] ?? "")), "missing amount accounting");
-  const split = splitSourceAmount(amount, source.localDecimals, source.sharedDecimals);
-  assertStargate(pd.sentAmount === String(split.sentLD) && pd.dust === String(split.dustLD), "dust accounting mismatch");
-  assertStargate(destinationAmount(split.sentLD - BigInt(pd.protocolFee!) + BigInt(pd.protocolReward!), source.localDecimals, destination.localDecimals, source.sharedDecimals) === BigInt(q.destAmount), "fee accounting mismatch");
-  assertStargate(BigInt(pd.messagingFee!) <= cap, "messaging fee exceeds cap");
-  assertStargate(pd.nativeDrop === String(nativeDrop), "native drop display mismatch");
-  const fees = stargateFees(source, BigInt(pd.protocolFee!), cap);
-  assertStargate(q.fees?.length === fees.length && fees.every((fee, index) => Object.entries(fee).every(([key, value]) => q.fees![index]![key as keyof typeof fee] === value)), "fee display mismatch");
+  checkedStargateAccounting(q, source, destination, amount, cap, BigInt(q.destAmount));
+  assertStargate(q.providerData!.nativeDrop === String(nativeDrop), "native drop display mismatch");
   return {intent, sendParam, cap, tx};
 }
 
@@ -68,8 +49,19 @@ export function stargatePins(config: StargatePinsConfig): RemotePins {
   const quoter = createStargateQuoter(config);
   const recovery = createStargateTracker(config);
   const drop = {...config.nativeDrop};
+  const composer = config.compose?.enabled ? createStargateComposer(config) : undefined;
+  function verifyComposeQuote(params: QuoteParams, q: Quote) {
+    assertStargate(composer && !params.flex && validQuote(q, params, "stargate"), "compose is not enabled on this client");
+    const checked = checkedStargateComposeQuote(q, registry), {bridge: i} = checked.compose;
+    assertStargate(i.source.chain === params.sourceChain && params.destChain === STARGATE_COMPOSE_CHAIN && sameAddress(stargateToken(params.sourceChain, params.sourceToken) ?? "", i.source.token) && sameAddress(stargateToken(params.destChain, params.destToken) ?? "", checked.compose.finalToken), "quote changed requested asset or chain");
+    const placeholder = params.dry !== false ? "0x1111111111111111111111111111111111111111" : "";
+    assertStargate(sameAddress(params.destAddress || placeholder, checked.compose.recipient) && sameAddress(params.refundAddress || placeholder, i.sender), "quote changed recipient or refund address");
+    assertStargate(params.sourceDecimals === undefined || params.sourceDecimals === i.source.localDecimals, "source decimals mismatch");
+    return checked;
+  }
   function verifyQuote(params: QuoteParams, q: Quote): string | null {
     try {
+      if (isStargateComposeIntent(q.intentId)) { verifyComposeQuote(params, q); return null; }
       assertStargate(!params.flex && validQuote(q, params, "stargate"), "invalid normalized quote");
       const {intent: i} = checkedStargateQuote(q, registry);
       assertStargate(i.source.chain === params.sourceChain && i.destination.chain === params.destChain && sameAddress(stargateToken(params.sourceChain, params.sourceToken) ?? "", i.source.token) && sameAddress(stargateToken(params.destChain, params.destToken) ?? "", i.destination.token), "quote changed requested asset or chain");
@@ -90,6 +82,15 @@ export function stargatePins(config: StargatePinsConfig): RemotePins {
     async verifyBuild(q: Quote, tx: UnsignedTx, params?: QuoteParams) {
       try {
         if (params) assertStargate(verifyQuote(params, q) === null, "quote mismatch");
+        if (isStargateComposeIntent(q.intentId)) {
+          assertStargate(composer, "compose is not enabled on this client");
+          const {compose, tx: expected, cap} = checkedStargateComposeQuote(q, registry), source = compose.bridge.source;
+          const canonical: UnsignedTx = {chain: source.chain, to: expected.to, data: expected.data, value: expected.value!, chainId: source.chainId, ...(expected.approvalAddress ? {approvalAddress: expected.approvalAddress} : {})};
+          assertStargate(Object.keys(tx).every((key) => key in canonical) && Object.entries(canonical).every(([key, value]) => tx[key as keyof UnsignedTx] === value), "build mismatch");
+          await composer.verifyBuild(compose, cap);
+          assertStargate(q.validUntilMs > Date.now(), "quote changed during preflight");
+          return null;
+        }
         const {intent, tx: expected, cap} = checkedStargateQuote(q, registry);
         const canonical: UnsignedTx = {chain: intent.source.chain, to: expected.to!, data: expected.data!, value: expected.value!, chainId: intent.source.chainId, ...(expected.approvalAddress ? {approvalAddress: expected.approvalAddress} : {})};
         assertStargate(Object.keys(tx).every((key) => key in canonical) && Object.entries(canonical).every(([key, value]) => tx[key as keyof UnsignedTx] === value), "build mismatch");

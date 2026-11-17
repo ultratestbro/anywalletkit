@@ -1,20 +1,31 @@
-# Stargate integration (in development)
+# @anywalletkit/protocol-swap2-stargate
 
-Work for [SDK-321](https://megabunny.xyz/b/SDK/t/321), starting with
-[SDK-322](https://megabunny.xyz/b/SDK/t/322) and
-[SDK-323](https://megabunny.xyz/b/SDK/t/323). This private package contains interfaces,
-amount accounting, a reviewed deployment registry, direct Taxi quotes, execution/client
-pins, historical Taxi/Bus passenger tracking and destination recovery. `stargateProvider` and
-`StargateSwap2Protocol` are disabled by default (`enabled: true` is an explicit opt-in).
-The package remains private and absent from the module registry pending controlled
-Taxi validation and release preparation. Taxi can ship separately from the unfinished
-API/compose routes; a LayerZero API key is not a Taxi release prerequisite.
-No funded public-network send has been performed.
+Direct Stargate V2 **Taxi** transfers between 15 EVM chains: quotes read straight from the
+pinned pools, the source `sendToken` call is rebuilt and checked on the client, and delivery
+counts only when the destination pool's payout is proven from finalized receipts. Cached
+tokens and undelivered LayerZero messages get separately reviewed, separately paid recovery.
+Historical Bus transfers stay trackable. No LayerZero API key is needed.
 
-The full scope includes new Taxi transfers, historical Bus recovery, verified deployments, tracking,
-recovery and gas drop. The separate `protocol-swap2-layerzero` package covers
-Value Transfer API routes. Composer support requires an explicit adapter for a
-verified deployment; a new universal Solidity composer is a separate project.
+`stargateProvider` and `StargateSwap2Protocol` are off by default: pass `enabled: true`.
+The executable compose route (Taxi into the pinned Ethereum LI.FI composer plus one checked
+Uniswap V3 swap) is a second, separate opt-in: `compose: {enabled: true}` on the backend
+provider **and** the client pins. Value Transfer API routes live in the separate, still
+private `protocol-swap2-layerzero` package. Work tracked in
+[SDK-321](https://megabunny.xyz/b/SDK/t/321).
+
+```ts
+import {stargateProvider} from '@anywalletkit/protocol-swap2-stargate/provider'
+
+const stargate = stargateProvider({
+  enabled: true,
+  // Source AND destination RPCs: quotes, client checks and payout proofs read both chains.
+  rpcUrls: {'eip155:42161': ARBITRUM_RPC, 'eip155:8453': BASE_RPC},
+})
+```
+
+Pass the reviewed `toTokenAmountMin` as `minAmountOut`, persist an `operationStore`, and on
+`Swap2MaybeSentError` resume the returned id instead of sending again (see
+`examples/swap/src/stargate.ts` and `examples/server/src/stargate.ts`).
 
 ## Current service availability
 
@@ -29,6 +40,20 @@ that boundary. Historical deployment identities remain available for tracking.
 This is a conservative interpretation of the effective date in the
 [updated support announcement](https://layerzero.network/blog/support-update-july-24-2026).
 A configured peer is not a promise of continued service.
+
+## Funded mainnet verification
+
+`scripts/verify-mainnet.mjs` runs the production shape on public mainnet: quotes and builds
+cross a sealed HTTP backend, the client applies its own pins and RPCs, the router journals
+every step in SQLite, and tracking waits for finalized receipts. Without flags it only quotes.
+`--send <case>` broadcasts one capped transfer (amount and attached native value are hard
+limits checked in the review callback); `--resume <operationId>` reopens the journal in a
+fresh process with a read-only account. The signer phrase is read from `STARGATE_ENV_FILE`
+and never printed. Results go to `tests/fixtures/mainnet-funded.json`.
+
+| Date | Transfer | Result |
+|---|---|---|
+| 2026-11-17 | Arbitrum → Base, 2 USDC (exact approval) | Received 1.998793 USDC, equal to the source `OFTSent` amount and the destination balance delta; 0.000688 ETH messaging paid against a 0.00085 ETH cap (headroom refunded); zero residual allowance; `completed` after both chains finalized (~18 min); fresh read-only process resumed to `completed` with one source step |
 
 ## Run the foundation checks
 
@@ -215,6 +240,56 @@ bytes do not enter the direct executable provider.
 References: [StargateBase](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/StargateBase.sol),
 [native pool](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/StargatePoolNative.sol).
 
+## Executable compose route
+
+With `compose: {enabled: true}` on both the provider and the client pins, a source USDC or
+USDT deployment with an Ethereum counterpart can deliver **another ERC20 on Ethereum**
+(`routeId: "compose"`, also offered by `getQuotes` next to Taxi). The bridge leg is Taxi into
+the pinned LI.FI `ReceiverStargateV2`; its compose message carries one swap that this SDK
+encodes itself: 1inch V6 `unoswap2` through two canonical Uniswap V3 pools (via WETH, USDC or
+USDT), priced by QuoterV2 at one block. No LI.FI or 1inch API is called.
+
+- **Exact bridge leg.** The bridge minimum equals the quoted output, so the swap input is
+  known exactly; if Stargate's fee rises before the send, the source call reverts instead of
+  delivering less than the encoded swap needs.
+- **Self-contained intent.** `stargate:2:compose:…` carries every parameter (amounts, both
+  pool words, swap minimum, compose gas, LI.FI transaction id). Clients rebuild the whole
+  `sendToken` calldata and refuse any byte of difference, a changed recipient or minimum.
+- **Client preflight.** Before signing, the pins re-quote the bridge (fee within the reviewed
+  cap, output unchanged), check the receiver, executor, router and factory bytecode and the
+  receiver's executor/endpoint/TokenMessaging wiring, confirm both pools through
+  `factory.getPool`, require compose gas ≥ `recoverGas` + 250k, and re-price the exact path:
+  a destination price already below the reviewed minimum refuses the build.
+- **Gas.** Compose gas is the receiver's `recoverGas` (100k today) plus 400k for the swap
+  (`compose.swapGas`); a two-hop V3 swap measures ~166k. It is paid inside the messaging fee,
+  so Ethereum-bound compose quotes cost more than plain Taxi.
+
+Tracking states:
+
+| State | Evidence |
+|---|---|
+| `completed` | Finalized `ComposeDelivered` plus the executor's swap and an actual final-token payment ≥ the reviewed minimum |
+| `partial` | The receiver's `LiFiTransferRecovered`: the swap did not run and the bridged USDC/USDT was paid to the recipient on Ethereum |
+| `action-required` | Bridge delivered, the Endpoint `composeQueue` still holds the exact message hash, and `composeRetryAfterS` (default 600 s) has passed since delivery. The client's own setting decides: a backend offering the retry earlier is refused at `verifyRecovery` |
+| `pending` | Otherwise, including a consumed queue whose outcome receipt is not yet indexed or finalized |
+
+The `compose` recovery offer calls `EndpointV2.lzCompose` with the original message, zero
+value and an explicit `gasLimit` (compose gas or `recoverGas` + 250k, whichever is larger,
+plus 250k overhead): wallet gas estimation would otherwise settle on the receiver's cheaper
+fallback path. A consumed queue is never offered again. `lzCompose` is permissionless, and
+LI.FI documents that anyone can call it first with too little gas and force the fallback
+([ReceiverStargateV2 v1.1.0](https://etherscan.io/address/0xB539B40793171211DCA8834da044fC14bCe64BDC#code));
+the user then holds the bridged token and the route reports `partial`. The receiver does not
+check `composeFrom`, so a user-sent compose is accepted like LI.FI's own.
+
+`scripts/verify-fork-compose.mjs` (Anvil forks of Arbitrum and Ethereum, `RPC_42161`/`RPC_1`)
+sends Arbitrum USDC → Ethereum DAI through the HTTP backend and client pins, relays the packet
+locally, then covers two cases: the executor never runs `lzCompose` (a client on the default
+window reports `pending` and refuses to sign the backend's early offer; with the window at 0
+the retry executes and delivers DAI ≥ the minimum),
+and an underfunded third-party `lzCompose` (receiver fallback → `partial`, USDC paid, no
+further offers). Report: `tests/fixtures/fork-compose.json`.
+
 ## Compose evidence adapter
 
 The `./compose` entry point provides a **read-only** adapter for the Ethereum LI.FI
@@ -264,12 +339,11 @@ runtime hash is pinned separately, and its address matches the
 This is not a claim of a reproducible factory source build. The success fixture passes
 the DEX validator; the opaque aggregator call in the fallback fixture is refused.
 
-Every proof and DEX validation result has `executionSupported: false`. Outcome checks
-establish observed payment; DEX validation establishes this narrow call's constraints,
-not price availability or execution authorization. Source compose quotes, arbitrary
-DEX calldata, automatic retry and wallet execution remain disabled pending executable
-route admission and durable step integration. Read-only proof support must not be
-used as a spender or contract allowlist. API access is not needed to refresh these
+Historical proofs and DEX validation results have `executionSupported: false`: they
+establish observed payment and one call's constraints, not execution authorization. Only
+proofs built by `stargateComposeProof` for an SDK-encoded intent report `true`. Arbitrary
+DEX calldata stays refused, and read-only proof support must not be used as a spender or
+contract allowlist. API access is not needed to refresh these
 historical fixtures. The receiver may return the intermediate asset on insufficient
 compose gas or swap failure; successful queue consumption does not guarantee a swap.
 
@@ -285,9 +359,8 @@ must install the normal Hermes polyfills before importing wallet/protocol packag
 backend status cannot substitute for verified payout, and each recovery offer is
 checked against the client's current on-chain commitment before signing.
 
-`module.draft.json` is a release preparation artifact, deliberately excluded from the
-public registry. The separate LayerZero discovery transport is not an executable
-protocol module and has no module registration yet. Both packages remain private.
+`module.json` registers this package in the module registry. The separate LayerZero
+discovery transport is not an executable protocol module and stays private.
 
 ## Execution and tracking contract
 
@@ -404,16 +477,15 @@ be labelled without fabricating successful asset movements.
 - SDK-330/SDK-331: API discovery and resumable steps, key held server-side. Include only
   routes for which every wallet operation has a validator. EVM multicall, signatures
   and fresh Solana transactions need separate adapters. Unknown VM steps fail closed.
-- SDK-332: Ethereum LI.FI composer evidence adapter and real success/fallback fixtures
-  implemented, with a narrow 1inch `unoswap2`/Uniswap V3 calldata validator.
-  Other DEX variants, executable route admission and reviewed
-  compose retry remain open; the evidence adapter cannot authorize a transaction.
-- SDK-333: history, documentation, package exports, module registry, changesets,
-  conformance, regressions, Hermes and controlled end-to-end validation.
-  Receipt-backed local history and its recorded conformance cases are implemented;
-  local mainnet-fork execution, remote recovery and process-restart checks are implemented.
-  A separate Taxi release still needs a bounded funded transfer and mobile/device
-  validation. API/composer adapters remain separate unfinished capabilities.
+- SDK-332: executable compose route (opt-in) built on the Ethereum LI.FI composer evidence
+  adapter: SDK-encoded intent, client preflight, router candidate, journalled execution,
+  `completed` / `partial` tracking and a gas-bounded `lzCompose` retry, verified on mainnet
+  forks. A funded public compose transfer is still owed. Other DEX variants and composers
+  remain out of scope.
+- SDK-333: history, documentation, exports, module registry entry, changeset and conformance
+  are in place. One funded public Taxi transfer (Arbitrum → Base USDC) passed with a
+  fresh-process resume; native ETH, the reverse direction and mobile/device validation of
+  the persistent journal are still owed before publishing.
 
 The shared `pnpm test:hermes` smoke includes Stargate bigint/dust and uint72 ticket
 handling, recorded cached-token recovery receipts, native-drop tuple decoding and
@@ -421,10 +493,9 @@ LayerZero public discovery, compose success/fallback and canonical DEX pool vali
 It passed 370 checks in the React Native 0.81.5 Hermes VM.
 This offline VM check does not replace a mobile end-to-end transfer.
 
-Stage 1 remains open for API contract fixtures/access and the complete API/compose
-capability matrix. Taxi executor coverage beyond Base requires separately reviewed pins.
-No mainnet sends or
-package publication are part of the collection commands above.
+Stage 1 remains open for authenticated API contract fixtures. Taxi native-drop executor
+coverage beyond Base requires separately reviewed pins. The collection commands above
+never send transactions; only `verify-mainnet.mjs --send` does.
 
 Protocol documentation: [Stargate integration](https://docs.layerzero.network/v2/developers/evm/stargate/overview),
 [Value Transfer API](https://docs.layerzero.network/v2/developers/value-transfer-api/overview).
