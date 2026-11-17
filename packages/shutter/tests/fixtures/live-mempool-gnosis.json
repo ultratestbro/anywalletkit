@@ -21,5 +21,32 @@
     "explorerStatus": "Unshielded inclusion",
     "explorerDecryptedAt": "2026-11-17T21:32:20Z",
     "note": "keypers released the key (decryption worked), but the decrypting validator's block 49332600 did not carry it; it landed one block later at position 8 as a public transaction"
+  },
+  {
+    "at": "2026-11-17T22:00:54.894Z",
+    "label": "swap 0.01 xDAI \u2192 USDC (LI.FI / 1inch)",
+    "from": "0x8abe813577e47415a3cd0bbc68c7abca2c4c55ba",
+    "eon": 10,
+    "submissionHash": "0xa3e1786076e539ee742786a61d44fb946777f6a1037027c0cfcb6e425087ca91",
+    "transactionHash": "0xce987ed1a926f5e0fae09fe1d8645b060c7b7cb3ce2f3b8c870faa610b7fbe83",
+    "nonce": 9,
+    "gasLimit": "619336",
+    "encryptedGasFee": "619336017341408",
+    "submittedAtBlock": 49332939,
+    "visibleBeforeInclusion": false,
+    "status": "included",
+    "blockNumber": 49332952,
+    "position": 2,
+    "blocksAfterSubmission": 13,
+    "success": true,
+    "seconds": 94,
+    "sequencer": "0xc5C4b277277A1A8401E0F039dfC49151bA64DC2E",
+    "explorerStatus": "Unshielded inclusion",
+    "explorerDecryptedAt": "2026-11-17T22:01:55Z",
+    "includedAt": "2026-11-17T22:02:00Z",
+    "usdcReceived": "9973",
+    "quotedToAmount": "9973",
+    "gasUsed": 404600,
+    "note": "keypers released the key at 22:01:55; the swap landed in the next block (position 2) as a public transaction, like the first run"
   }
 ]
