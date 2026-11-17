@@ -34,8 +34,8 @@ export interface ShutterMempoolNetwork {
 }
 
 /**
- * Shutterized Gnosis Chain (contracts read on chain 2026-11-18: eon 10, the last submission 2026-11-08 decrypted and
- * included 74 blocks later). Shutter decommissions it on 2026-11-25; it is refused from 2026-11-24 00:00 UTC.
+ * Shutterized Gnosis Chain (contracts read on chain 2026-11-18: eon 10; 37 of ~296k validators registered, so a
+ * decrypting block comes about every 11 hours). Shutter decommissions it on 2026-11-25; refused from 2026-11-24 00:00 UTC.
  */
 export const SHUTTER_GNOSIS_MEMPOOL: ShutterMempoolNetwork = {
   name: 'gnosis',

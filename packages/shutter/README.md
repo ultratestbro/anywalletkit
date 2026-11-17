@@ -74,7 +74,7 @@ What happens:
 
 Refused before anything is signed: the wrong chain, a gas limit over the 1M gas set aside per block for encrypted transactions, a balance that cannot pay both transactions, an eon without a published key, a network past its shutdown date.
 
-Until it is in a block, the account must send nothing else: any transaction with nonce n + 1 replaces it. That is also how to cancel, or to give up and send it publicly. Only blocks of Shutter validators decrypt, so inclusion takes minutes, not seconds (74 blocks for the last one before our tests). The eon key comes from your RPC: use one you trust.
+Until it is in a block, the account must send nothing else: any transaction with nonce n + 1 replaces it. That is also how to cancel, or to give up and send it publicly. Only blocks proposed by validators registered with Shutter decrypt, so the wait depends on how many are registered. On 2026-11-18 it was 37 of about 296,000 Gnosis validators, and Shutter's explorer estimated about 11 hours to inclusion. The default 10-minute wait then ends with `pending`: the ciphertext stays queued, keep following it with `getEncryptedSendStatus`. The eon key comes from your RPC: use one you trust.
 
 **Shutdown.** Shutter decommissions the Gnosis encrypted mempool on 2026-11-25, and `SHUTTER_GNOSIS_MEMPOOL` refuses from 2026-11-24. The next deployment target is Ethereum (EIP-8491). The network is a parameter (`ShutterMempoolNetwork`: Sequencer, keyper set manager, key broadcast contract, chain), so a new deployment needs a new preset, not new code, as long as it keeps this protocol.
 
