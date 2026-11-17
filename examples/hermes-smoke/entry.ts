@@ -42,7 +42,7 @@ import { WalletManagerNear, describeTransaction as describeNear, encodeTransacti
 import { smokeProtocols } from './protocols.js'
 import { smokeUtf8 } from './utf8.js'
 import { smokeTxPreviewSolana } from './tx-preview-solana.js'
-import { smokeShutterApi } from './shutter-api.js'
+import { smokeShutterApi } from './shutter.js'
 import fastPbkdf2 from '@anywalletkit/runtime-hermes/fast-pbkdf2'
 import { sealBackup, openBackup, encodeBackup, decodeBackup, isBackupError } from '@anywalletkit/seed-vault'
 import { avatarUrl, ensCcipRequest, ensCcipViaProxy, ensResolver, warningsFor, coinTypeFor, decodeBtcScript } from '@anywalletkit/names-ens'
@@ -400,7 +400,7 @@ async function main() {
     checks++
   })
   smokeShutterApi((what, ok, detail) => {
-    if (!ok) throw new Error(`shutter-api check failed: ${what}${detail ? ` :: ${detail}` : ''}`)
+    if (!ok) throw new Error(`shutter check failed: ${what}${detail ? ` :: ${detail}` : ''}`)
     checks++
   }, out)
   out(`HERMES_SMOKE_OK ${checks}`)

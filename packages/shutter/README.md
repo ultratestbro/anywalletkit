@@ -1,8 +1,11 @@
-# @anywalletkit/shutter-api
+# @anywalletkit/shutter
 
-[![npm](https://img.shields.io/npm/v/@anywalletkit/shutter-api?label=npm)](https://www.npmjs.com/package/@anywalletkit/shutter-api)
+[![npm](https://img.shields.io/npm/v/@anywalletkit/shutter?label=npm)](https://www.npmjs.com/package/@anywalletkit/shutter)
 
-Seal a message until a time, open it after, with [Shutter](https://shutter.network)'s threshold encryption. Nobody can read it before then: not you, not the app, not the API. A set of keypers releases the decryption key at the time you registered, and not before. This is commit-reveal for wallets and apps: sealed predictions, bids, votes, notes to the future.
+[Shutter](https://shutter.network)'s threshold encryption for wallets and apps, on the device, in two ways:
+
+- **Sealed messages (Shutter API).** Seal a message until a time, open it after. Nobody can read it before then: not you, not the app, not the API. A set of keypers releases the decryption key at the time you registered, and not before. This is commit-reveal for wallets and apps: sealed predictions, bids, votes, notes to the future.
+- **Encrypted transactions (encrypted mempool).** The wallet signs a transaction and encrypts it before it leaves the phone. Only the ciphertext goes on chain; the keypers release its key for the block it is scheduled in, and a Shutter validator decrypts it into that block. The order is fixed before anyone can read the transaction, so nobody can front-run or sandwich it. No RPC operator sees it in the clear.
 
 - **Encryption and decryption run on the device**, in pure TypeScript (BLS12-381 IBE over `@noble/curves`). There is no WASM and no `Buffer`, so it runs in React Native (Hermes), browsers and Node. The output is byte-compatible with Shutter's own Go and TypeScript implementations: the tests run Shutter's published vectors.
 - **Nothing is taken on trust that can be checked.** Each identity the API returns is re-derived from the prefix and the registering account. Each decryption key is checked against the eon key by pairing before it is used. Decryption verifies that the ciphertext was not changed (the Fujisaki–Okamoto check). The ciphertext never leaves the device: this package does not offer the API's `/decrypt_commitment`.
@@ -13,7 +16,7 @@ Beta (0.x). Apache-2.0.
 ## Install
 
 ```sh
-npm install @anywalletkit/shutter-api
+npm install @anywalletkit/shutter
 ```
 
 React Native needs a `crypto.getRandomValues` polyfill (`react-native-get-random-values`) for the encryption randomness.
@@ -21,7 +24,7 @@ React Native needs a `crypto.getRandomValues` polyfill (`react-native-get-random
 ## Seal and open
 
 ```ts
-import { ShutterApi, seal, openText, ShutterNotYetRevealedError } from '@anywalletkit/shutter-api'
+import { ShutterApi, seal, openText, ShutterNotYetRevealedError } from '@anywalletkit/shutter'
 
 const api = new ShutterApi()  // Gnosis mainnet; SHUTTER_CHIADO for the testnet
 const sealed = await seal({ api, message: 'ETH closes the year above $5k', revealAt: Math.floor(Date.parse('2027-01-01') / 1000) })
@@ -48,10 +51,37 @@ await readRegistration((to, data) => rpc.call({ to, data }), api, sealed.identit
 
 The account sends `register(eon, identityPrefix, revealAt)` to the registry, so it needs a little xDAI for gas. The message is encrypted only after the wallet hands the transaction over. If the user refuses to sign, nothing is sealed that could never open.
 
+## Send an encrypted transaction
+
+```ts
+import { sendEncryptedTransaction, waitForEncryptedTransaction } from '@anywalletkit/shutter'
+
+const sent = await sendEncryptedTransaction({
+  rpc,        // EIP-1193 `request` on Gnosis: a viem client, a wallet RPC
+  account,    // { address, signTransaction }: signs offline (wallet-evm's account fits)
+  tx: { to, data, value },
+})
+const status = await waitForEncryptedTransaction(rpc, sent)  // 'included' | 'submission-failed' | 'replaced' | 'pending'
+```
+
+What happens:
+
+1. The eon (keyper set) and its public key are read from the keypers' contracts on chain.
+2. The account signs the transaction with nonce n + 1 (offline), and the package checks it signed exactly that.
+3. The signed transaction is encrypted for `identityPrefix ‖ account` with a random prefix.
+4. The account signs the submission with nonce n: `submitEncryptedTransaction(eon, prefix, ciphertext, gasLimit)` to the Sequencer, paying `gasLimit × maxFeePerGas` for the encrypted gas. Only this one is broadcast.
+5. When a Shutter validator proposes, the keypers release the key for the queued identities. The validator decrypts the transaction and puts it in its block, under the transaction's own hash.
+
+Refused before anything is signed: the wrong chain, a gas limit over the 1M gas set aside per block for encrypted transactions, a balance that cannot pay both transactions, an eon without a published key, a network past its shutdown date.
+
+Until it is in a block, the account must send nothing else: any transaction with nonce n + 1 replaces it. That is also how to cancel, or to give up and send it publicly. Only blocks of Shutter validators decrypt, so inclusion takes minutes, not seconds (74 blocks for the last one before our tests). The eon key comes from your RPC: use one you trust.
+
+**Shutdown.** Shutter decommissions the Gnosis encrypted mempool on 2026-11-25, and `SHUTTER_GNOSIS_MEMPOOL` refuses from 2026-11-24. The next deployment target is Ethereum (EIP-8491). The network is a parameter (`ShutterMempoolNetwork`: Sequencer, keyper set manager, key broadcast contract, chain), so a new deployment needs a new preset, not new code, as long as it keeps this protocol.
+
 ## Lower level
 
 ```ts
-import { encrypt, decrypt, verifyDecryptionKey, deriveIdentity, registerCalldata } from '@anywalletkit/shutter-api'
+import { encrypt, decrypt, verifyDecryptionKey, deriveIdentity, registerCalldata } from '@anywalletkit/shutter'
 
 const ciphertext = encrypt({ message, identity, eonKey })          // 0x03 ‖ c1 ‖ c2 ‖ c3
 verifyDecryptionKey(key, identity, eonKey)                           // e(key, G2) = e(H(identity), eonKey)
@@ -84,3 +114,5 @@ The scheme is a threshold: the keypers (currently 3 of 5 on the production API) 
 ## Live checks
 
 `node scripts/verify-live.mjs gnosis|chiado [--self]` runs the full cycle and appends the result to `tests/fixtures/live-<network>.json`: seal, refuse an early open, confirm the registration on chain, open after the reveal time.
+
+`node scripts/send-encrypted-live.mjs` sends a small encrypted xDAI transfer to yourself on Gnosis and follows it into a block (`tests/fixtures/live-mempool-gnosis.json`).

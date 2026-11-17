@@ -36,7 +36,7 @@ into the app; never install from GitHub.
 | Hermes polyfills | `runtime-hermes` |
 | Swaps and bridges | `protocol-swap2-router` + providers: `protocol-swap2-{lifi,near-intents,thorchain,chainflip,cctp,usdt0,stargate,uniswap,balancer,curve,wrap,jupiter,omniston,fynd,relay,symbiosis,0x,across}`; engine/types in `protocol-swap2-core`; token catalog `swap2-assets` |
 | Earn | `protocol-staking-{lido-evm,ssv-evm,tonstakers-ton,spl-stake-pool-solana,native-solana,native-monad,native-near,liquid-near}`, `protocol-lending-{aave-evm,morpho-evm,mellow-evm,kamino-solana,curve-evm}` |
-| Safety and data | `tx-preview-evm`, `tx-preview-solana`, `shutter-api`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
+| Safety and data | `tx-preview-evm`, `tx-preview-solana`, `shutter`, `protocol-approvals-evm`, `history-evm`, `names-ens`, `networks`, `tokens` |
 | dApp connection | `walletconnect-ton` (WalletConnect for TON dApps); `extension-kit` (browser extension) |
 | Testing your own module | `conformance` (Vitest suites) |
 

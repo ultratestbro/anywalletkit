@@ -1,0 +1,37 @@
+{
+  "name": "@anywalletkit/shutter",
+  "version": "0.0.0",
+  "description": "Shutter threshold encryption for wallets and apps: send transactions encrypted on the device through Shutter's encrypted mempool (ordered before anyone can read them: no front-running), and seal a message until a time (commit-reveal) with the Shutter API. Encryption and decryption run on the device in pure TypeScript (BLS12-381 IBE, byte-compatible with Shutter's own SDK), decryption keys are verified by pairing before use, identities register through the API or straight from the user's own account on Gnosis. Works in React Native (Hermes), browsers and Node.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/ultratestbro/anywalletkit.git", "directory": "packages/shutter" },
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "viem": "^2.57.2",
+    "vitest": "^5.1.0"
+  },
+  "keywords": ["shutter", "mev", "encrypted-mempool", "threshold-encryption", "commit-reveal", "timelock", "ibe", "bls12-381", "gnosis", "anywalletkit"],
+  "publishConfig": { "access": "public", "provenance": true }
+}

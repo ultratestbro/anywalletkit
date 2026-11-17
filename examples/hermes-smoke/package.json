@@ -46,7 +46,7 @@
     "@anywalletkit/protocol-swap2-usdt0": "workspace:*",
     "@anywalletkit/runtime-hermes": "workspace:*",
     "@anywalletkit/seed-vault": "workspace:*",
-    "@anywalletkit/shutter-api": "workspace:*",
+    "@anywalletkit/shutter": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*",
     "@anywalletkit/tokens": "workspace:*",
     "@anywalletkit/tx-preview-solana": "workspace:*",

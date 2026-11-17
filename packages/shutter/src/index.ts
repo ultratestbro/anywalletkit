@@ -5,3 +5,9 @@ export { deriveIdentity, registerCalldata, registrationsCalldata, decodeRegistra
 export { SHUTTER_GNOSIS, SHUTTER_CHIADO, SHUTTER_NETWORKS, type ShutterNetwork } from './networks.js'
 export { ShutterError, ShutterApiError, ShutterCryptoError, ShutterNotYetRevealedError } from './errors.js'
 export { utf8Encode, utf8Decode, type BytesLike } from './bytes.js'
+export {
+  sendEncryptedTransaction, waitForEncryptedTransaction, getEncryptedSendStatus, encryptTransaction, submitEncryptedCalldata, mempoolIdentity, readEonKey,
+  SHUTTER_GNOSIS_MEMPOOL,
+  type ShutterMempoolNetwork, type ShutterRpc, type ShutterMempoolAccount, type ShutterSignRequest, type EncryptedTransactionRequest, type SendEncryptedInput,
+  type EncryptedSend, type EncryptedSendStatus,
+} from './mempool.js'
