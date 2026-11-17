@@ -1,0 +1,63 @@
+{
+  "name": "@anywalletkit/protocol-swap2-layerzero",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Read-only LayerZero Value Transfer API discovery and server transport. Execution adapters in development.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "fixtures:public": "node scripts/capture-public.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.0.3"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ultratestbro/anywalletkit.git",
+    "directory": "packages/protocol-swap2-layerzero"
+  },
+  "bugs": {
+    "url": "https://github.com/ultratestbro/anywalletkit/issues"
+  },
+  "keywords": [
+    "anywalletkit",
+    "wallet",
+    "layerzero",
+    "stargate"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

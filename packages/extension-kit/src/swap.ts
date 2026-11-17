@@ -28,7 +28,7 @@ export interface RouteView {
   feeUsd: number
   /** On-chain pool venues take the fee inside the output; "$0.00" would mislead. */
   feeNote?: string
-  etaSeconds: number
+  etaSeconds: number | null
   validUntilMs: number
   tags: ('best' | 'fastest')[]
   /** Why this route is not a plain pick: a flagged route is never BEST (see {@link rank}). Absent when there is nothing to say. */
@@ -159,8 +159,9 @@ function gapBps(dest: bigint, min: bigint): number {
  * The BEST route is listed first; the rest keep the output order. With no route eligible there is no BEST.
  */
 export function rank(quotes: Quote[], options: RankOptions = {}): RouteView[] {
-  const sorted = [...quotes].sort((a, b) => (BigInt(b.destAmount) > BigInt(a.destAmount) ? 1 : BigInt(b.destAmount) < BigInt(a.destAmount) ? -1 : a.feeUsd - b.feeUsd || a.etaSeconds - b.etaSeconds))
-  const fastest = sorted.length ? sorted.reduce((f, q) => (q.etaSeconds < f.etaSeconds ? q : f)) : null
+  const sorted = [...quotes].sort((a, b) => (BigInt(b.destAmount) > BigInt(a.destAmount) ? 1 : BigInt(b.destAmount) < BigInt(a.destAmount) ? -1 : a.feeUsd - b.feeUsd || (a.etaSeconds ?? Infinity) - (b.etaSeconds ?? Infinity)))
+  // An unknown ETA (null) is never the fastest.
+  const fastest = sorted.reduce<Quote | null>((f, q) => q.etaSeconds === null ? f : !f || q.etaSeconds < f.etaSeconds! ? q : f, null)
   const depositProviders = new Set(options.depositAddressProviders ?? [])
   const paysAssignedAddress = (q: Quote): boolean => {
     if (depositProviders.has(q.provider)) return true
@@ -244,7 +245,7 @@ export interface SwapApproval {
   recipient: { address: string; isOwn: boolean }
   refundAddress: string
   feeUsd: number
-  etaSeconds: number
+  etaSeconds: number | null
   validUntilMs: number
   approvals: { token: string; spender: string; amount: string }[]
   source:

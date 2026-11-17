@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "kind": "local-mainnet-fork-compose",
+  "capturedAt": "2026-11-17T10:08:10.433Z",
+  "publicTransactionsSent": 0,
+  "limitations": [
+    "Local simulated funding, DVN verification and executor lzCompose; not a funded public transfer",
+    "The griefing case drives the receiver fallback with a deliberately underfunded lzCompose"
+  ],
+  "forks": [
+    {
+      "chainId": 42161,
+      "number": "525003256",
+      "hash": "0xe01c329ff991f7815947f28841ce0b3c422a3dee7f443b674143b62a0b9a038c",
+      "timestamp": "1794909799"
+    },
+    {
+      "chainId": 1,
+      "number": "26434043",
+      "hash": "0xb2c0440bc98898e891ebf2c1aae8b3476409e5281f513d0ad689ab80a716e587",
+      "timestamp": "1794909791"
+    }
+  ],
+  "cases": [
+    {
+      "scenario": "retry-completes",
+      "amount": "20000000",
+      "source": "eip155:42161",
+      "destination": "eip155:1",
+      "finalToken": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "sourceHash": "0xab73bcd660f0bf5fbb41d06c46ce9a7218766015c9d9dda4899e004a494a02bb",
+      "guid": "0xd58f3e60f166143d19b308f5ac4bbae62d59d1e33e8d53b84d602ad07974cf6c",
+      "bridgedAmount": "19987599",
+      "minReturn": "19784938501818624328",
+      "composeGas": "500000",
+      "dex": [
+        "18318670367622288729119628487999955377719852855463979203320946671283437119430",
+        "14474011154664524427946373126501898198217969197856866857699860976186689262598"
+      ],
+      "deliveryHash": "0xeee8c983a0bfb4d2be83132a9a57729f2518d132f77f08cd2af24f051852de89",
+      "composeHash": "0xa0dae929bd38766f3e9a4aa256d5611a790bdf3f29e743ab0c1e73598bcea949",
+      "composeGasUsed": "331104",
+      "recoveryOffer": {
+        "kind": "compose",
+        "gasLimit": "750000"
+      },
+      "state": "completed",
+      "daiDelta": "19984786365473357907",
+      "usdcDelta": "0",
+      "journal": [
+        {
+          "index": 0,
+          "kind": "approval",
+          "chain": "eip155:42161",
+          "state": "submitted",
+          "hash": "0x376801dd47e6f47008a32de286ce8c91a288a15e784967c1bd1d5a104318e992"
+        },
+        {
+          "index": 1,
+          "kind": "source",
+          "chain": "eip155:42161",
+          "state": "submitted",
+          "hash": "0xab73bcd660f0bf5fbb41d06c46ce9a7218766015c9d9dda4899e004a494a02bb"
+        }
+      ]
+    },
+    {
+      "scenario": "griefed-fallback",
+      "amount": "20000000",
+      "source": "eip155:42161",
+      "destination": "eip155:1",
+      "finalToken": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "sourceHash": "0x7521718f4a3dfec35fbc497eab636f1eb8c11fb1dbf06ef73268c955d2dc26f2",
+      "guid": "0x0dbb457b6ff5408be61f9f192d144c085795d2b192837ce42e70d9ae6e8a8665",
+      "bridgedAmount": "19987599",
+      "minReturn": "19784938126839636527",
+      "composeGas": "500000",
+      "dex": [
+        "18318670367622288729119628487999955377719852855463979203320946671283437119430",
+        "14474011154664524427946373126501898198217969197856866857699860976186689262598"
+      ],
+      "deliveryHash": "0x3188cc572c253cebb59ca8e4c56fb24a6906c202d9a6efb46b667ca9b4e141c6",
+      "composeHash": "0x2d7be0167aa50566e8c25a71f433e4c7b94235929bc22bb6c498a6edb9abad2f",
+      "composeGasUsed": "102241",
+      "recoveryOffer": null,
+      "state": "partial",
+      "daiDelta": "0",
+      "usdcDelta": "19987599",
+      "journal": [
+        {
+          "index": 0,
+          "kind": "approval",
+          "chain": "eip155:42161",
+          "state": "submitted",
+          "hash": "0x4e021412daa0673435383581f78f09edeaa6c8d425a682afb64db113ae1dec50"
+        },
+        {
+          "index": 1,
+          "kind": "source",
+          "chain": "eip155:42161",
+          "state": "submitted",
+          "hash": "0x7521718f4a3dfec35fbc497eab636f1eb8c11fb1dbf06ef73268c955d2dc26f2"
+        }
+      ]
+    }
+  ]
+}

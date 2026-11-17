@@ -14,6 +14,8 @@ export interface Asset {
 
 /** What the engine asks a provider to quote. Amounts are base-unit strings; exact input only. */
 export interface QuoteParams {
+  /** Stable provider-scoped route selector (e.g. taxi/bus), never a quote/intent id. */
+  routeId?: string;
   /** Local-only (never serialized): called with the reason when the provider
    *  refuses to quote — a shared-instance "last refusal" field raced under
    *  concurrent quotes, so the reason rides per-call. `info` classifies the
@@ -88,6 +90,8 @@ export interface TxRequest {
 export interface Quote {
   /** Provider name. */
   provider: string;
+  /** Stable route selector, preserved when refreshing price/expiry. */
+  routeId?: string;
   /** Provider's id for this swap; tracked with `trackIntent`. */
   intentId: string;
   depositAddress: string; // where the user sends source funds ("" on dry quotes)
@@ -107,8 +111,8 @@ export interface Quote {
   feeUsd: number; // normalized fee for scoring
   /** Honest itemized fees when the provider exposes base-unit amounts. */
   fees?: {type: "network" | "protocol" | "affiliate" | "other"; amount: string; token: string; included: boolean; description?: string}[];
-  /** Estimated time to delivery. */
-  etaSeconds: number; // estimated settlement time
+  /** Estimated time to delivery, or null when no defensible estimate is available. */
+  etaSeconds: number | null;
   /** Provider's reliability hint, 0 to 1. */
   reliability: number; // 0..1 provider/route reliability hint
   /** Quote expiry, unix milliseconds. */
@@ -129,6 +133,19 @@ export interface IntentRef {
    * take it as the delivery; a bare `destTxHash` proves only that a claim was sent.
    */
   destTxConfirmed?: boolean;
+  /** A separately reviewed recovery transaction; never replaces the original source hash. */
+  recoveryTxHash?: string;
+  recoveryChain?: string;
+  recoveryActionId?: string;
+}
+
+/** A fresh, explicitly priced recovery call. Calldata must be checked on the signing client. */
+export interface RecoveryQuote {
+  id: string;
+  kind: "claim" | "retry-token" | "retry-message" | "drive-bus" | "compose";
+  description: string;
+  validUntilMs: number;
+  tx: UnsignedTx;
 }
 
 /** The router's chosen quote, tagged with how it scored. */
@@ -137,7 +154,7 @@ export interface RoutedQuote extends Quote {
     score: number;
     weights: ScoreWeights;
     /** Every validated route: `score` is its value against the best (0..1). */
-    candidates: {provider: string; sourceAmount: string; etaSeconds: number; score: number; minDestAmount?: string; netValueUsd?: number | null}[];
+    candidates: {provider: string; routeId?: string; sourceAmount: string; etaSeconds: number | null; score: number; minDestAmount?: string; netValueUsd?: number | null}[];
   };
 }
 
@@ -234,13 +251,19 @@ export interface UnsignedTx {
 export interface RemotePins {
   callTargets(chain: string): readonly string[];
   spenders(chain: string): readonly string[];
+  /** Paid recovery targets and independent client revalidation, when supported. */
+  recoveryTargets?(chain: string): readonly string[];
+  verifyRecovery?(ref: IntentRef, quote: RecoveryQuote, actor: string): Promise<string | null>;
+  /** Independent client tracking, when completion must be proven locally from chain evidence. */
+  trackIntent?(ref: IntentRef): Promise<IntentStatus>;
   /**
    * A client-side check of a remote quote's transaction against the user's own request — the
    * provider's local validator run again on this side (Fynd: `checkFyndTransaction`): the reason it
    * fails, or null.
    */
   verifyQuote?(params: QuoteParams, quote: Quote): string | null;
-  /** A client-side check of a remote build (typed order, cell body) against its quote: the reason it fails, or null. */
+  /** Read-only client check of a remote build against its quote: reason or null.
+   * May run repeatedly, including after preflight immediately before signing. */
   verifyBuild?(quote: Quote, tx: UnsignedTx, params?: QuoteParams): string | null | Promise<string | null>;
   /**
    * The classification of a text `verifyQuote` or `verifyBuild` returned (`reason`, see Swap2RefusalReason), so a
@@ -268,6 +291,10 @@ export interface CrossChainProvider {
   supportsRoute(from: Asset, to: Asset): boolean;
   /** A quote, or `null` with the reason passed to `params.onRefusal`. */
   getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null>;
+  /** Optional display-only candidates, at most 32, each with a unique routeId.
+   * When present, getQuote must also return a routeId, including its default quote.
+   * Execution uses getQuote with the selected routeId and must not substitute it. */
+  getQuotes?(params: QuoteParams, signal?: AbortSignal): Promise<Quote[]>;
   /** The source-leg transaction for a quote. */
   buildDeposit(quote: Quote): Promise<UnsignedTx>;
   /**
@@ -293,6 +320,13 @@ export interface CrossChainProvider {
    * destination-chain account (`claimSwap2`); `tx.chain` names that chain.
    */
   buildClaim?(ref: IntentRef): Promise<UnsignedTx | null>;
+  /** Fresh recovery offers, on the source or destination; no signing or side effects. */
+  getRecoveryQuotes?(ref: IntentRef): Promise<RecoveryQuote[]>;
+  /** Local/client pins, never addresses supplied by a backend response. */
+  recoveryTargets?(chain: string): readonly string[];
+  /** Required client validator: bind calldata/value/recipient to on-chain intent evidence,
+   * and recheck current recoverability. Called again after review, before signature. */
+  verifyRecovery?(ref: IntentRef, quote: RecoveryQuote, actor: string): Promise<string | null>;
   /**
    * The contracts a claim from {@link buildClaim} may call on `chain` (CAIP-2) — CCTP's
    * MessageTransmitter. `claimSwap2` refuses a claim to anything else, and a provider with a claim

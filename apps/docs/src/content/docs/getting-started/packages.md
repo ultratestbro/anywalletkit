@@ -54,6 +54,7 @@ inside the router.
 | `@anywalletkit/protocol-swap2-omniston` | STON.fi Omniston — TON swaps, TON ↔ EVM and EVM ↔ EVM stablecoin orders |
 | `@anywalletkit/protocol-swap2-cctp` | Circle CCTP V2 — native USDC between EVM chains |
 | `@anywalletkit/protocol-swap2-usdt0` | USDT0 — Tether's LayerZero OFT: USDT between 16 EVM chains in one transaction; USDT into TON (Tron opt-in) through the Legacy Mesh |
+| `@anywalletkit/protocol-swap2-stargate` | Stargate V2 Taxi — USDC, USDT and ETH between 15 EVM chains straight from the pools, client-verified delivery and recovery; opt-in Ethereum compose swap |
 | `@anywalletkit/protocol-swap2-uniswap` | Uniswap v3 straight from the contracts |
 | `@anywalletkit/protocol-swap2-balancer` | Balancer v2, priced and enforced on-chain by the Vault |
 | `@anywalletkit/protocol-swap2-curve` | Curve Router NG — same-chain swaps from the contracts over a pinned pool allowlist; no API, no key |

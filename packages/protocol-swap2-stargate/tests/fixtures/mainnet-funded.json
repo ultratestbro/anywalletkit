@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "kind": "public-mainnet-funded",
+  "limitations": [
+    "Small capped transfers from one test wallet; not a load or latency study"
+  ],
+  "cases": [
+    {
+      "operationId": "mainnet-arb-base-usdc-1794906559553",
+      "case": "arb-base-usdc",
+      "actor": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "source": "eip155:42161",
+      "destination": "eip155:8453",
+      "symbol": "USDC",
+      "amount": "2000000",
+      "sourceHash": "0x6463c1b1f01c774d581b2c616ddfc9450c0da01cd1f60f734d662ad9a4cf5f10",
+      "guid": "0xfd2717a14b4cc25c84af5a87dd4819d24bbe807f9bb634f3f7d440632c24f79e",
+      "amountReceivedLD": "1998793",
+      "quotedMin": "1988800",
+      "nativeFeeCap": "849764928049802",
+      "sourceValue": "849764928049802",
+      "sourceNativeSpent": "688344739681841",
+      "sourceGasReceipts": "8532797242000",
+      "steps": [
+        {
+          "kind": "approval",
+          "state": "submitted",
+          "hash": "0x6f010387bc0448ed7554a7e26213c43bcfa4bd0c179c9cb6f02af82d9834f57d"
+        },
+        {
+          "kind": "source",
+          "state": "submitted",
+          "hash": "0x6463c1b1f01c774d581b2c616ddfc9450c0da01cd1f60f734d662ad9a4cf5f10"
+        }
+      ],
+      "sentAt": "2026-11-17T09:09:31Z",
+      "status": {
+        "state": "completed",
+        "depositReceived": true,
+        "destTxHash": "0x4bdf60409ec176974fbbacc05394253d18b6a4558b89b854d17fa648011eaae7"
+      },
+      "destinationBalanceDelta": "1998793",
+      "completedAt": "2026-11-17T09:27:18Z",
+      "resume": {
+        "readOnlyProcess": true,
+        "status": {
+          "state": "completed",
+          "depositReceived": true,
+          "destTxHash": "0x4bdf60409ec176974fbbacc05394253d18b6a4558b89b854d17fa648011eaae7"
+        },
+        "sourceSteps": 1,
+        "checkedAt": "2026-11-17T09:27:47.694Z"
+      }
+    },
+    {
+      "operationId": "mainnet-arb-eth-compose-dai-1794910951820",
+      "case": "arb-eth-compose-dai",
+      "route": "compose",
+      "toToken": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "actor": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "source": "eip155:42161",
+      "destination": "eip155:1",
+      "symbol": "USDC",
+      "amount": "2000000",
+      "sourceHash": "0x3abc10c04a165403e55019ec7ad047b95cc39b961229a9791417e511b9def476",
+      "guid": "0xd58f3e60f166143d19b308f5ac4bbae62d59d1e33e8d53b84d602ad07974cf6c",
+      "amountReceivedLD": "1998759",
+      "quotedMin": "1988386450185092960",
+      "nativeFeeCap": "2344012075421808",
+      "sourceValue": "2344012075421808",
+      "sourceNativeSpent": "1884323513165446",
+      "sourceGasReceipts": "9113852828000",
+      "steps": [
+        {
+          "kind": "approval",
+          "state": "submitted",
+          "hash": "0x7bbb51929653dd413f5595c97b34e1284bd96ea314ba39c9583694f79dea32be"
+        },
+        {
+          "kind": "source",
+          "state": "submitted",
+          "hash": "0x3abc10c04a165403e55019ec7ad047b95cc39b961229a9791417e511b9def476"
+        }
+      ],
+      "sentAt": "2026-11-17T10:22:52.053Z",
+      "status": {
+        "state": "completed",
+        "depositReceived": true,
+        "destTxHash": "0x7e120d16d81a6d735ff5c9a9b0b7ef670f1e8267565e712af8026e93e685c487"
+      },
+      "destinationBalanceDelta": "1998378341894565788",
+      "completedAt": "2026-11-17T10:37:37.412Z",
+      "composeTxHash": "0x7e120d16d81a6d735ff5c9a9b0b7ef670f1e8267565e712af8026e93e685c487",
+      "note": "Final DAI delta from the compose receipt (Transfer of 1998378341894565788 DAI to the recipient, executed by the LayerZero executor; no manual lzCompose). The run recorded -584119804428 because the script read the USDC balance after the swap against a DAI baseline; fixed in verify-mainnet.mjs."
+    },
+    {
+      "operationId": "mainnet-base-arb-usdc-1794910699603",
+      "case": "base-arb-usdc",
+      "actor": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "source": "eip155:8453",
+      "destination": "eip155:42161",
+      "symbol": "USDC",
+      "amount": "2000000",
+      "sourceHash": "0x376688fd37343d3a921d0ce2d6d1ea38a96d30cc078924c0d8c84c0dc1a67551",
+      "guid": "0x3f7c8c760ece940fb32f052c1e0882bfbfe382231dc34250175fa481715df875",
+      "amountReceivedLD": "1998785",
+      "quotedMin": "1988792",
+      "nativeFeeCap": "865697821536302",
+      "sourceValue": "865697821536302",
+      "sourceNativeSpent": "695185302813835",
+      "sourceGasReceipts": "3327352023540x140fba75722812960000000x1c6bc1011",
+      "steps": [
+        {
+          "kind": "approval",
+          "state": "submitted",
+          "hash": "0xc2b06a8f86899e2a220b2aa957c08cb8df9b93a00a947948456f6f2fd3407b27"
+        },
+        {
+          "kind": "source",
+          "state": "submitted",
+          "hash": "0x376688fd37343d3a921d0ce2d6d1ea38a96d30cc078924c0d8c84c0dc1a67551"
+        }
+      ],
+      "sentAt": "2026-11-17T10:18:30.742Z",
+      "status": {
+        "state": "completed",
+        "depositReceived": true,
+        "destTxHash": "0x2cbeef821ac9701a677b5aff80c450eed8d28bc746f3035a93cb8e74084a7062"
+      },
+      "destinationBalanceDelta": null,
+      "completedAt": "2026-11-17T10:37:48.111Z",
+      "note": "Destination balance delta not isolated: the compose case spent 2 USDC from this Arbitrum wallet while this transfer was being tracked (raw delta -1215 = 1998785 - 2000000). Payout proven by the client from the finalized destination OFTReceived (1998785) in 0x2cbeef821ac9701a677b5aff80c450eed8d28bc746f3035a93cb8e74084a7062."
+    }
+  ],
+  "updatedAt": "2026-11-17T10:37:48.112Z"
+}

@@ -22,7 +22,8 @@
     "@anywalletkit/protocol-swap2-uniswap": "workspace:*",
     "@anywalletkit/protocol-swap2-usdt0": "workspace:*",
     "@anywalletkit/protocol-swap2-wrap": "workspace:*",
-    "@anywalletkit/wallet-evm": "workspace:*"
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/protocol-swap2-stargate": "workspace:*"
   },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",

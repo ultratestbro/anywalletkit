@@ -1,0 +1,30 @@
+{
+  "name": "@anywalletkit/protocol-swap2-stargate",
+  "type": "swap2",
+  "chains": [
+    "eip155:1",
+    "eip155:10",
+    "eip155:14",
+    "eip155:56",
+    "eip155:130",
+    "eip155:137",
+    "eip155:146",
+    "eip155:1329",
+    "eip155:5000",
+    "eip155:8453",
+    "eip155:9745",
+    "eip155:42161",
+    "eip155:43114",
+    "eip155:98866",
+    "eip155:534352"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
+  "path": "packages/protocol-swap2-stargate",
+  "description": "Direct Stargate V2 Taxi between 15 EVM chains: pinned pools, client-rebuilt sendToken, finalized payout proofs and reviewed paid recovery; opt-in Ethereum compose swap. Scroll new transfers end 2026-12-08 UTC.",
+  "addedAt": "2026-11-16"
+}

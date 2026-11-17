@@ -12,7 +12,7 @@ import type {
   RoutedQuote,
   ScoreWeights,
 } from "@anywalletkit/protocol-swap2-core/types";
-import {quoteRejection, remotePinRefusal} from "@anywalletkit/protocol-swap2-core/validate";
+import {quoteRejection, remotePinRefusal, validQuote, validRouteId} from "@anywalletkit/protocol-swap2-core/validate";
 import {refusal, refusalInfo, refusalOf, type Swap2Refusal, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {bigintToNumber} from "@anywalletkit/core";
@@ -54,8 +54,8 @@ export interface RouteSet {
   quotes: RankedQuote[];
   /** Most delivered value (net of fees when priced) within the tie band. */
   best: RankedQuote;
-  /** Lowest ETA. */
-  fastest: RankedQuote;
+  /** Lowest known ETA, or null when every route has an unknown ETA. */
+  fastest: RankedQuote | null;
   /** Providers still quoting (only non-empty in progressive `onUpdate` snapshots). */
   pending: string[];
   /** Why the venues that sat out did (same as `lastRejections`). */
@@ -149,6 +149,7 @@ export class CrossChainRouter {
       enabled: provider.enabled.bind(provider),
       supportsRoute: provider.supportsRoute.bind(provider),
       getQuote: provider.getQuote.bind(provider),
+      ...(provider.getQuotes ? {getQuotes: provider.getQuotes.bind(provider)} : {}),
       buildDeposit: provider.buildDeposit.bind(provider),
       trackIntent: provider.trackIntent.bind(provider),
       ...(provider.preflightDeposit ? {preflightDeposit: provider.preflightDeposit.bind(provider)} : {}),
@@ -157,6 +158,9 @@ export class CrossChainRouter {
       // Two-phase routes (CCTP): the destination claim. Missing here, the engine
       // and the server both reported "provider 'cctp' has no claim step" (2026-10-13).
       ...(provider.buildClaim ? {buildClaim: provider.buildClaim.bind(provider)} : {}),
+      ...(provider.getRecoveryQuotes ? {getRecoveryQuotes: provider.getRecoveryQuotes.bind(provider)} : {}),
+      ...(provider.recoveryTargets ? {recoveryTargets: provider.recoveryTargets.bind(provider)} : {}),
+      ...(provider.verifyRecovery ? {verifyRecovery: provider.verifyRecovery.bind(provider)} : {}),
       ...(provider.claimTargets ? {claimTargets: provider.claimTargets.bind(provider)} : {}),
       // A remote stub's marker and the app's pins (scan 2026-10-27 modules, F8/F9/F16): dropped here, the engine took a
       // remote provider for a local one and checked its calldata against the backend's own addresses.
@@ -244,7 +248,7 @@ export class CrossChainRouter {
   ): Promise<RoutedQuote | null> {
     const set = await this.getQuotes(params, options);
     if (!set) return null;
-    const pick = options?.prefer === "fastest" ? set.fastest : set.best;
+    const pick = options?.prefer === "fastest" ? set.fastest ?? set.best : set.best;
     const {netValueUsd: _n, relativeValue: _r, tags: _t, ...quote} = pick;
     return {
       ...quote,
@@ -253,6 +257,7 @@ export class CrossChainRouter {
         weights: this.weights,
         candidates: set.quotes.map((q) => ({
           provider: q.provider,
+          ...(q.routeId !== undefined ? {routeId: q.routeId} : {}),
           sourceAmount: q.sourceAmount,
           etaSeconds: q.etaSeconds,
           score: q.relativeValue,
@@ -323,7 +328,9 @@ export class CrossChainRouter {
     const pending = new Set(eligible.map((p) => p.name));
     const publish = () => {
       if (!options?.onUpdate || accepted.length === 0) return;
-      const set = this.rank(accepted, snapshot, [...pending], rejections, classified);
+      const active = accepted.filter((q) => validQuote(q, snapshot, q.provider));
+      if (active.length === 0) return;
+      const set = this.rank(active, snapshot, [...pending], rejections, classified);
       try { options.onUpdate(set); } catch { /* an observer must not break the auction */ }
     };
     await Promise.all(eligible.map(async (p, i) => {
@@ -336,31 +343,44 @@ export class CrossChainRouter {
         }
         try { snapshot.onRefusal?.(reason, valid); } catch { /* diagnostics only */ }
       }});
-      let q: Quote | null = null;
-      let rejected: ReturnType<typeof quoteRejection> = null;
+      const ownAccepted: Quote[] = [];
       try {
-        q = await withTimeout(p.getQuote(own, controller.signal), timeoutMs);
-        if (!q) {
+        // Candidates are previews only. A live request creates at most one execution quote.
+        const multiple = !!p.getQuotes && snapshot.dry !== false && snapshot.routeId === undefined;
+        const result = await withTimeout(multiple ? p.getQuotes!(Object.freeze({...own, dry: true}), controller.signal) : p.getQuote(own, controller.signal).then((q) => q ? [q] : []), timeoutMs);
+        if (!Array.isArray(result) || result.length > 32) throw new Error("invalid candidate response (maximum 32)");
+        if (result.length === 0) {
           // A provider RETURNING null (vs throwing) was the one silent path
           // left — record it so the surfaced no-route error names the venue.
           reject(p.name, refusals[i] ?? `${p.name}: returned no quote`, refusals[i] !== undefined ? refusalInfos[i] : {reason: "no_route"});
-        } else if ((rejected = quoteRejection(q, snapshot, p.name))) {
-          const reason = `${p.name}: rejected by validation (minDest=${q.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q.validUntilMs}, now=${Date.now()})`;
-          reject(p.name, reason, rejected);
-          console.warn(`swap2-router: ${reason}`);
-          q = null;
-        } else {
+        }
+        const ids = new Map<string, number>();
+        for (const q of result) if (validRouteId(q?.routeId)) ids.set(q.routeId, (ids.get(q.routeId) ?? 0) + 1);
+        for (const candidate of result) {
+          const q = candidate;
+          if ((p.getQuotes && !validRouteId(q?.routeId)) || (multiple && ids.get(q.routeId!) !== 1)) {
+            reject(p.name, `${p.name}: candidate has missing or duplicate routeId`, {reason: "upstream_unavailable"});
+            continue;
+          }
+          const rejected = quoteRejection(q, snapshot, p.name);
+          if (rejected) {
+            const reason = `${p.name}: rejected by validation (minDest=${q?.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q?.validUntilMs}, now=${Date.now()})`;
+            reject(p.name, reason, rejected);
+            console.warn(`swap2-router: ${reason}`);
+            continue;
+          }
           // A remote stub's route that calls or approves an address the app did not pin: execution would refuse it.
           const unpinned = remotePinRefusal(p, q, snapshot.sourceChain);
           if (unpinned) {
             reject(p.name, unpinned, {reason: "policy_refused"});
             console.warn(`swap2-router: ${unpinned}`);
-            q = null;
-          } else if (options?.requireImmediateExecution && !(q.depositAddress.length > 0 || q.txRequest !== undefined)) {
-            // Legacy deposit-address screens cannot execute order-based quotes that
-            // require a separate build/sign/register lifecycle.
-            q = null;
+            continue;
           }
+          // Legacy deposit-address screens cannot execute order-based quotes that
+          // require a separate build/sign/register lifecycle.
+          if (options?.requireImmediateExecution && !(q.depositAddress.length > 0 || q.txRequest !== undefined)) continue;
+          // Isolate provider-owned nested data and observers of progressive snapshots.
+          ownAccepted.push({...copyQuote(q), provider: p.name});
         }
       } catch (err) {
         // A failed venue sitting out silently is indistinguishable from "no
@@ -369,18 +389,19 @@ export class CrossChainRouter {
         const reason = `${p.name}: ${err instanceof Error ? err.message.slice(0, 160) : String(err).slice(0, 160)}`;
         reject(p.name, reason, refusalOf(err));
         console.warn(`swap2-router: quote failed — ${reason}`);
-        q = null;
+        ownAccepted.length = 0;
       } finally {
         controller.abort();
       }
       pending.delete(p.name);
       // Provider identity is an execution security boundary. Never trust the
       // provider field returned by an untrusted adapter; bind it to its slot.
-      if (q) accepted.push({...q, provider: p.name});
+      accepted.push(...ownAccepted);
       publish();
     }));
-    if (accepted.length === 0) return null;
-    return this.rank(accepted, snapshot, [], rejections, classified);
+    const active = accepted.filter((q) => validQuote(q, snapshot, q.provider));
+    if (active.length === 0) return null;
+    return this.rank(active, snapshot, [], rejections, classified);
   }
 
   /** Status from the named provider; `failed` when it is not installed. */
@@ -411,7 +432,7 @@ export class CrossChainRouter {
   private rank(quotes: Quote[], params: QuoteParams, pending: string[], rejections: string[], refusals: Swap2Refusal[]): RouteSet {
     const usd = this.valueUsd ? quotes.map((q) => {
       try {
-        const v = this.valueUsd!(q, params);
+        const v = this.valueUsd!(copyQuote(q), params);
         return typeof v === "number" && Number.isFinite(v) ? v : null;
       } catch { return null; }
     }) : quotes.map(() => null);
@@ -427,31 +448,36 @@ export class CrossChainRouter {
       relative = outs.map((o) => fraction(o, max));
     }
     const ranked: RankedQuote[] = quotes.map((q, i) => ({
-      ...q,
+      ...copyQuote(q),
       netValueUsd: priced ? usd[i]! : null,
       relativeValue: relative[i]!,
       tags: [],
     }));
 
     const tier = ranked.filter((q) => q.relativeValue >= 1 - this.tieBand - 1e-12);
-    const etas = tier.map((q) => q.etaSeconds);
+    const etas = tier.flatMap((q) => q.etaSeconds === null ? [] : [q.etaSeconds]);
     const minEta = Math.min(...etas);
     const maxEta = Math.max(...etas);
     const w = this.weights;
     const tieScore = (q: RankedQuote) =>
       w.price * q.relativeValue +
-      w.speed * (maxEta === minEta ? 1 : (maxEta - q.etaSeconds) / (maxEta - minEta)) +
+      w.speed * (q.etaSeconds === null ? 0 : maxEta === minEta ? 1 : (maxEta - q.etaSeconds) / (maxEta - minEta)) +
       w.reliability * q.reliability;
     const best = tier.reduce((a, b) => (tieScore(b) > tieScore(a) ? b : a));
-    const fastest = ranked.reduce((a, b) =>
-      b.etaSeconds < a.etaSeconds || (b.etaSeconds === a.etaSeconds && b.relativeValue > a.relativeValue) ? b : a);
+    const fastest = ranked.reduce<RankedQuote | null>((a, b) => b.etaSeconds === null ? a :
+      a === null || b.etaSeconds < a.etaSeconds! || (b.etaSeconds === a.etaSeconds && b.relativeValue > a.relativeValue) ? b : a, null);
     best.tags.push("best");
-    fastest.tags.push("fastest");
+    fastest?.tags.push("fastest");
 
     // The list reads top-down by value; the pick leads its price tier.
-    ranked.sort((a, b) => (a === best ? -1 : b === best ? 1 : b.relativeValue - a.relativeValue || a.etaSeconds - b.etaSeconds));
+    ranked.sort((a, b) => (a === best ? -1 : b === best ? 1 : b.relativeValue - a.relativeValue || (a.etaSeconds ?? Infinity) - (b.etaSeconds ?? Infinity)));
     return {quotes: ranked, best, fastest, pending, rejections: [...rejections], refusals: [...refusals]};
   }
+}
+
+/** Detach nested quote data before exposing it to observers. */
+function copyQuote(q: Quote): Quote {
+  return {...q, ...(q.txRequest ? {txRequest: {...q.txRequest}} : {}), ...(q.providerData ? {providerData: {...q.providerData}} : {}), ...(q.fees ? {fees: q.fees.map((f) => ({...f}))} : {})};
 }
 
 /** Ratio of two non-negative bigints as a 0..1 number. */

@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "kind": "local-mainnet-fork-integration",
+  "capturedAt": "2026-11-16T18:11:08.665Z",
+  "publicTransactionsSent": 0,
+  "limitations": [
+    "Local simulated funding and DVN verification; not a funded public cross-chain transfer",
+    "One-confirmation LOCAL policy; no real network finality/latency or mobile device assertion"
+  ],
+  "forks": [
+    {
+      "chainId": 8453,
+      "number": "58311334",
+      "hash": "0xd9b5010314cacdef559bbfc052afa6a335a9ffab01a47956901de242b2f149ce",
+      "timestamp": "1794852642"
+    },
+    {
+      "chainId": 42161,
+      "number": "524821095",
+      "hash": "0x8677708b819bac335430485563d1b8f52fd7ce7ba7c38e771675914774fd4e10",
+      "timestamp": "1794852642"
+    }
+  ],
+  "cases": [
+    {
+      "assetId": 13,
+      "amount": "1000000000000123",
+      "source": "eip155:8453",
+      "destination": "eip155:42161",
+      "sourceHash": "0x3afd062e94d97090ad926a7975ea7b4c19407236a154fe4c76e139c5c072fb2c",
+      "guid": "0x8a448f752340ff219586eb723df717f2d5f13b58d0b9a3b2aa8a01235a39d4b6",
+      "amountReceived": "999000000000000",
+      "messagingPaid": "692563768839841",
+      "sourceGasPaid": "353845961159616",
+      "reviews": [
+        {
+          "provider": "stargate",
+          "routeId": "taxi",
+          "fromChain": "eip155:8453",
+          "destChain": "eip155:42161",
+          "destToken": "0x0000000000000000000000000000000000000000",
+          "recipient": "0xC15565d3b7a7C268A9A4eE34CdEBFf757aBf27B1",
+          "refundAddress": "0x86111B8c563e70203824961066C16016066d3695",
+          "sourceAmount": "1000000000000123",
+          "destAmount": "999000000000000",
+          "minDestAmount": "995000000000000",
+          "feeUsd": 0,
+          "etaSeconds": null,
+          "validUntilMs": 1794852765222,
+          "approvals": [],
+          "source": {
+            "kind": "call",
+            "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+            "data": "0xcbef2aa900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000003135a95c8524a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000086111b8c563e70203824961066c16016066d3695000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000C15565d3b7a7C268A9A4eE34CdEBFf757aBf27B100000000000000000000000000000000000000000000000000038d7ea4c6807b000000000000000000000000000000000000000000000000000388f27d8d300000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "value": "1865704711049925",
+            "chainId": 8453
+          }
+        }
+      ],
+      "sourceSteps": [
+        {
+          "index": 0,
+          "kind": "source",
+          "chain": "eip155:8453",
+          "state": "submitted",
+          "hash": "0x3afd062e94d97090ad926a7975ea7b4c19407236a154fe4c76e139c5c072fb2c"
+        }
+      ],
+      "ambiguousReplySimulated": false,
+      "cachedRecipientFailureSimulated": false,
+      "recoveryKind": "retry-message",
+      "sourceSendCount": 1,
+      "relay": {
+        "dvnSimulated": true,
+        "receiveLibrary": "0x7B9E184e07a6EE1aC23eAe0fe8D6Be2f663f05e6",
+        "verificationHash": "0xe3797bb6c2c50cc17ea3e1d5005936873a8ee1a06bce32d0e48c6d405ab9dfa8",
+        "skippedLocalNonces": []
+      },
+      "recoveryHash": "0x480d5b4ef086438fea902918c2a711974f87331d62420e4be14911fa1bcd90d1",
+      "resume": {
+        "status": {
+          "state": "completed",
+          "depositReceived": true,
+          "destTxHash": "0x480d5b4ef086438fea902918c2a711974f87331d62420e4be14911fa1bcd90d1"
+        },
+        "phase": "submitted",
+        "steps": [
+          {
+            "index": 0,
+            "kind": "source",
+            "chain": "eip155:8453",
+            "state": "submitted",
+            "hash": "0x3afd062e94d97090ad926a7975ea7b4c19407236a154fe4c76e139c5c072fb2c"
+          }
+        ],
+        "readOnly": true
+      },
+      "destinationBalanceDelta": "999000000000000",
+      "replayRefused": true
+    },
+    {
+      "assetId": 1,
+      "amount": "10000000",
+      "source": "eip155:8453",
+      "destination": "eip155:42161",
+      "sourceHash": "0x8dd506f88d0f37d85e035ff19c7cd721d1bd1f1cc0e8968f478f9eb5e973fa52",
+      "guid": "0x2276bb74883c5167ed6fe200ca9b960bfd114a29db3c7839c41bed9d8d55ff46",
+      "amountReceived": "9993929",
+      "messagingPaid": "692563768839841",
+      "sourceGasPaid": "432170683272849",
+      "reviews": [
+        {
+          "provider": "stargate",
+          "routeId": "taxi",
+          "fromChain": "eip155:8453",
+          "destChain": "eip155:42161",
+          "destToken": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+          "recipient": "0xC15565d3b7a7C268A9A4eE34CdEBFf757aBf27B1",
+          "refundAddress": "0x86111B8c563e70203824961066C16016066d3695",
+          "sourceAmount": "10000000",
+          "destAmount": "9993929",
+          "minDestAmount": "9943960",
+          "feeUsd": 0,
+          "etaSeconds": null,
+          "validUntilMs": 1794852783530,
+          "approvals": [
+            {
+              "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              "spender": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+              "amount": "10000000",
+              "chainId": 8453
+            }
+          ],
+          "source": {
+            "kind": "call",
+            "to": "0x27a16dc786820B16E5c9028b75B99F6f604b5d26",
+            "data": "0xcbef2aa900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000003135a95c8524a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000086111b8c563e70203824961066c16016066d3695000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000C15565d3b7a7C268A9A4eE34CdEBFf757aBf27B10000000000000000000000000000000000000000000000000000000000989680000000000000000000000000000000000000000000000000000000000097bb9800000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "value": "865704711049802",
+            "chainId": 8453
+          }
+        }
+      ],
+      "sourceSteps": [
+        {
+          "index": 0,
+          "kind": "approval",
+          "chain": "eip155:8453",
+          "state": "submitted",
+          "hash": "0xe9112c3e0f1e5fff1d61699c69791348a92e4009e2e4d0ddadedfb27094e2291"
+        },
+        {
+          "index": 1,
+          "kind": "source",
+          "chain": "eip155:8453",
+          "state": "unknown",
+          "hash": "0x8dd506f88d0f37d85e035ff19c7cd721d1bd1f1cc0e8968f478f9eb5e973fa52"
+        }
+      ],
+      "ambiguousReplySimulated": true,
+      "cachedRecipientFailureSimulated": false,
+      "recoveryKind": "retry-message",
+      "sourceSendCount": 2,
+      "relay": {
+        "dvnSimulated": true,
+        "receiveLibrary": "0x7B9E184e07a6EE1aC23eAe0fe8D6Be2f663f05e6",
+        "verificationHash": "0x1744b969f699cae539b8e2b2d0f0806d519af6ce99a7bf0c1a6d47bf29701287",
+        "skippedLocalNonces": []
+      },
+      "recoveryHash": "0xc4901e1d830539e3ed962fa8350bf42683ddc7644f95dcaca095d5e10a628b60",
+      "resume": {
+        "status": {
+          "state": "completed",
+          "depositReceived": true,
+          "destTxHash": "0xc4901e1d830539e3ed962fa8350bf42683ddc7644f95dcaca095d5e10a628b60"
+        },
+        "phase": "unknown",
+        "steps": [
+          {
+            "index": 0,
+            "kind": "approval",
+            "chain": "eip155:8453",
+            "state": "submitted",
+            "hash": "0xe9112c3e0f1e5fff1d61699c69791348a92e4009e2e4d0ddadedfb27094e2291"
+          },
+          {
+            "index": 1,
+            "kind": "source",
+            "chain": "eip155:8453",
+            "state": "unknown",
+            "hash": "0x8dd506f88d0f37d85e035ff19c7cd721d1bd1f1cc0e8968f478f9eb5e973fa52"
+          }
+        ],
+        "readOnly": true
+      },
+      "destinationBalanceDelta": "9993929",
+      "replayRefused": true
+    },
+    {
+      "assetId": 13,
+      "amount": "1000000000000123",
+      "source": "eip155:8453",
+      "destination": "eip155:42161",
+      "sourceHash": "0x099690be51c7478b785bc861b023c5f87d8b44e03dea6368ab0fa610b1044942",
+      "guid": "0xcc7455f3d0d19238a4019be5028db4a0dd963f8f4b906ea38914f26e112fe43f",
+      "amountReceived": "999000000000000",
+      "messagingPaid": "692563768839841",
+      "sourceGasPaid": "353200208890512",
+      "reviews": [
+        {
+          "provider": "stargate",
+          "routeId": "taxi",
+          "fromChain": "eip155:8453",
+          "destChain": "eip155:42161",
+          "destToken": "0x0000000000000000000000000000000000000000",
+          "recipient": "0xC15565d3b7a7C268A9A4eE34CdEBFf757aBf27B1",
+          "refundAddress": "0x86111B8c563e70203824961066C16016066d3695",
+          "sourceAmount": "1000000000000123",
+          "destAmount": "999000000000000",
+          "minDestAmount": "995000000000000",
+          "feeUsd": 0,
+          "etaSeconds": null,
+          "validUntilMs": 1794852787804,
+          "approvals": [],
+          "source": {
+            "kind": "call",
+            "to": "0xdc181Bd607330aeeBEF6ea62e03e5e1Fb4B6F7C7",
+            "data": "0xcbef2aa900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000003135a95c8524a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000086111b8c563e70203824961066c16016066d3695000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000C15565d3b7a7C268A9A4eE34CdEBFf757aBf27B100000000000000000000000000000000000000000000000000038d7ea4c6807b000000000000000000000000000000000000000000000000000388f27d8d300000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "value": "1865704711049925",
+            "chainId": 8453
+          }
+        }
+      ],
+      "sourceSteps": [
+        {
+          "index": 0,
+          "kind": "source",
+          "chain": "eip155:8453",
+          "state": "submitted",
+          "hash": "0x099690be51c7478b785bc861b023c5f87d8b44e03dea6368ab0fa610b1044942"
+        }
+      ],
+      "ambiguousReplySimulated": false,
+      "cachedRecipientFailureSimulated": true,
+      "cachedDeliveryHash": "0xc2978a2263127b1e4e1ceda3cb2299622ef2cdee1d762822051ea6ed369f346c",
+      "recoveryKind": "retry-token",
+      "sourceSendCount": 1,
+      "relay": {
+        "dvnSimulated": true,
+        "receiveLibrary": "0x7B9E184e07a6EE1aC23eAe0fe8D6Be2f663f05e6",
+        "verificationHash": "0xefbac890d103da4c61be9e084bb4d8f823d5f5e2d3376db2c6e38143d2de23d0",
+        "skippedLocalNonces": []
+      },
+      "recoveryHash": "0xc623d7c167e9140b397dd558955c563e6f6f3f31583dacf62ba3e03c7781df64",
+      "resume": {
+        "status": {
+          "state": "completed",
+          "depositReceived": true,
+          "destTxHash": "0xc623d7c167e9140b397dd558955c563e6f6f3f31583dacf62ba3e03c7781df64"
+        },
+        "phase": "submitted",
+        "steps": [
+          {
+            "index": 0,
+            "kind": "source",
+            "chain": "eip155:8453",
+            "state": "submitted",
+            "hash": "0x099690be51c7478b785bc861b023c5f87d8b44e03dea6368ab0fa610b1044942"
+          }
+        ],
+        "readOnly": true
+      },
+      "destinationBalanceDelta": "999000000000000",
+      "replayRefused": true
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit
 import {BaseSwap2Protocol} from "./base.js";
 import type {CrossChainProvider, Quote, QuoteParams} from "../types.js";
 import {refusalInfo, refusalOf, type Swap2Refusal, type Swap2RefusalInfo, type Swap2RefusalReason} from "../errors.js";
-import {quoteRejection, remotePinRefusal} from "../validate.js";
+import {quoteRejection, remotePinRefusal, validRouteId} from "../validate.js";
 
 /** A single-provider swap2: quoting/tracking route through one solver. The
  *  per-provider packages subclass this — the contribution unit shape. */
@@ -53,7 +53,7 @@ export abstract class SingleProviderSwap2 extends BaseSwap2Protocol {
         if (!outcome.text) outcome.refusals = [{reason: "no_route", message: `${name}: returned no quote`, provider: name}];
         return null;
       }
-      const rejected = quoteRejection(quote, snapshot, name);
+      const rejected = quoteRejection(quote, snapshot, name) ?? (this.provider.getQuotes && !validRouteId(quote.routeId) ? {reason: "upstream_unavailable" as const} : null);
       if (rejected) {
         note(`${name}: rejected by validation (minDest=${quote.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"})`, rejected);
         return null;

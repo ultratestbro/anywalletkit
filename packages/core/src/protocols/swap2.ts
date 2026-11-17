@@ -56,6 +56,10 @@ export interface Swap2CommonOptions {
   recipient?: string
   /** Where a failed cross-chain swap sends the input back. Defaults to the source address. */
   refundAddress?: string
+  /** Stable route selector within the chosen provider; preserves the chosen mode on requote. */
+  routeId?: string
+  /** Application-chosen idempotency key; requires the engine's durable operation store. */
+  operationId?: string
   /** Decimal, 0.01 = 1 %. */
   slippage?: number
   /** Minimum acceptable destination amount, base units (overrides slippage when set). */
@@ -97,6 +101,8 @@ export interface Swap2Transaction {
 
 /** A price for a swap, before anything is signed. Amounts in base units. */
 export interface Swap2Quote {
+  /** Stable provider-scoped route selector, when the provider offers multiple paths. */
+  routeId?: string
   /** What leaves the wallet. */
   fromTokenAmount: bigint
   /** Expected delivery. */

@@ -26,11 +26,14 @@ import type {CrossChainProvider, Quote, QuoteParams} from "@anywalletkit/protoco
 import type {Swap2Refusal} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext, Swap2Options, Swap2Quote} from "@anywalletkit/core";
 import {CrossChainRouter, type RouteSet, type RouterOptions} from "../router.js";
+import {validRouteId} from "@anywalletkit/protocol-swap2-core/validate";
 
 /** One route in a picker: the public quote plus its place in the auction. */
 export interface Swap2Route {
   /** Provider name. */
   provider: string;
+  /** Pass with provider to using(provider, routeId) to preserve this path. */
+  routeId?: string;
   /** The provider's quote. */
   quote: Swap2Quote;
   /** Net USD value when the router prices routes (`valueUsd`), else null. */
@@ -46,6 +49,8 @@ export interface Swap2Route {
  * the engine options.
  */
 export interface RouterSwap2Config extends Swap2EngineConfig {
+  /** Stable route within the selected provider; normally set by using(provider, routeId). */
+  routeId?: string;
   /** The providers to aggregate over. Only what the caller installs is bundled. */
   providers?: CrossChainProvider[];
   /**
@@ -79,6 +84,8 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
   private readonly router: CrossChainRouter;
   private readonly account: Swap2Account | undefined;
   private readonly routerConfig: RouterSwap2Config;
+  /** The router that resolved each request: a pinned provider quotes through its own `only()` router. */
+  private readonly resolvedBy = new WeakMap<QuoteParams, CrossChainRouter>();
 
   constructor(account: Swap2Account | undefined, config: RouterSwap2Config) {
     super(account, config);
@@ -94,13 +101,24 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
       ...(config.tieBand !== undefined ? {tieBand: config.tieBand} : {}),
     });
     this.account = account;
+    if (config.routeId !== undefined && !validRouteId(config.routeId)) throw new Error("swap2: invalid routeId");
     // A snapshot, like the engine's own: `using()` builds the picked route's protocol from it, so a later change to the
     // caller's object cannot hand that route another `nativeFeeCeiling` or `reviewExecution`, nor change `prefer` after construction.
     this.routerConfig = Object.freeze({...config});
   }
 
-  protected resolveQuote(params: QuoteParams): Promise<Quote | null> {
-    return this.router.getBestQuote(params, this.routerConfig.prefer ? {prefer: this.routerConfig.prefer} : undefined);
+  protected async resolveQuote(params: QuoteParams, provider?: string): Promise<Quote | null> {
+    const router = provider ? this.router.only(provider) : this.router;
+    this.resolvedBy.set(params, router);
+    return router.getBestQuote(params, this.routerConfig.prefer ? {prefer: this.routerConfig.prefer} : undefined);
+  }
+
+  protected override toParams(options: Swap2Options, dry: boolean): QuoteParams {
+    const params = super.toParams(options, dry);
+    const routeId = this.routerConfig.routeId;
+    if (routeId === undefined) return params;
+    if (params.routeId !== undefined && params.routeId !== routeId) throw new Error("swap2: request conflicts with the selected routeId");
+    return {...params, routeId};
   }
 
   /**
@@ -108,14 +126,14 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
    * `onUpdate` gets the ranked list each time another provider answers, so a
    * UI shows the first price as soon as the fastest venue replies. Routes the
    * caller's floor or fee caps refuse are left out. Execute the one the user
-   * picks with `using(route.provider).swap2(...)`.
+   * picks with `using(route.provider, route.routeId).swap2(...)`.
    */
   async quoteSwap2Routes(options: Swap2Options, opts?: {onUpdate?: (routes: Swap2Route[], pending: string[]) => void}): Promise<Swap2Route[]> {
     const snapshot = await this.prepareOptions(this.snapshotOf(options));
     const view = (set: RouteSet): Swap2Route[] =>
       set.quotes.flatMap((q) => {
         const quote = this.routeQuote(q, snapshot);
-        return quote ? [{provider: q.provider, quote, netValueUsd: q.netValueUsd, relativeValue: q.relativeValue, tags: [...q.tags]}] : [];
+        return quote ? [{provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), quote, netValueUsd: q.netValueUsd, relativeValue: q.relativeValue, tags: [...q.tags]}] : [];
       });
     const set = await this.router.getQuotes(this.toParams(snapshot, true), opts?.onUpdate
       ? {onUpdate: (partial) => opts.onUpdate!(view(partial), partial.pending)}
@@ -124,17 +142,19 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
   }
 
   /** This protocol pinned to one provider — the route a user picked from `quoteSwap2Routes`. */
-  using(provider: string): RouterSwap2Protocol {
-    const {providers: _p, router: _r, ...rest} = this.routerConfig;
-    return new RouterSwap2Protocol(this.account, {...rest, router: this.router.only(provider)});
+  using(provider: string, routeId?: string): RouterSwap2Protocol {
+    const {providers: _p, router: _r, routeId: _id, ...rest} = this.routerConfig;
+    return new RouterSwap2Protocol(this.account, {...rest, router: this.router.only(provider), ...(routeId !== undefined ? {routeId} : {})});
   }
 
   protected override noRouteDetail(params?: QuoteParams): string {
-    return ((params && this.router.rejectionsFor(params)) ?? this.router.lastRejections).join("; ").slice(0, 400);
+    const router = (params && this.resolvedBy.get(params)) ?? this.router;
+    return ((params && router.rejectionsFor(params)) ?? router.lastRejections).join("; ").slice(0, 400);
   }
 
   protected override noRouteRefusals(params?: QuoteParams): readonly Swap2Refusal[] {
-    return (params && this.router.refusalsFor(params)) ?? this.router.lastRefusals;
+    const router = (params && this.resolvedBy.get(params)) ?? this.router;
+    return (params && router.refusalsFor(params)) ?? router.lastRefusals;
   }
 
   protected providerFor(name: string): CrossChainProvider | undefined {

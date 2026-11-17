@@ -20,10 +20,11 @@ const STALE = [
 ]
 // Counts a page states as facts, checked against their source (2026-10-25 review:
 // README said 22 modules and 43 packages while the registry had 23 and the repo 44).
+const packageDirs = readdirSync(join(root, 'packages'), {withFileTypes: true}).filter((e) => e.isDirectory()).map((e) => e.name)
 const modules = JSON.parse(readFileSync(join(root, 'registry/modules.json'), 'utf8'))
 const COUNTS = [
   [/\b(\d+) modules today\b/, (modules.modules ?? modules).length, 'registry/modules.json lists'],
-  [/\bacross (\d+) packages\b/, readdirSync(join(root, 'packages')).length, 'packages/ holds'],
+  [/\bacross (\d+) packages\b/, packageDirs.length, 'packages/ holds'],
 ]
 const files = []
 const walk = (dir) => {
@@ -34,7 +35,7 @@ const walk = (dir) => {
   }
 }
 files.push(join(root, 'README.md'), join(root, 'AGENTS.md'))
-for (const d of readdirSync(join(root, 'packages'))) files.push(join(root, 'packages', d, 'README.md'))
+for (const d of packageDirs) files.push(join(root, 'packages', d, 'README.md'))
 walk(join(root, 'prompts'))
 walk(join(root, 'apps/docs/src/content/docs'))
 let failed = 0

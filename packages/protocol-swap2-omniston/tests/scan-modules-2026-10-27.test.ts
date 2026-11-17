@@ -188,7 +188,8 @@ describe("remote TON cell bodies need the app's own check (scan 2026-10-27 modul
     const ok = tonRun(nativeCase, live(nativeCase), {provider: stub(nativeCase, live(nativeCase), verify)});
     await ok.swap();
     expect(ok.sent).toHaveLength(1);
-    expect(targets).toEqual([nativeCase.messages[0]!.targetAddress]);
+    // Client validation runs at build and again after backend preflight.
+    expect(targets).toEqual([nativeCase.messages[0]!.targetAddress, nativeCase.messages[0]!.targetAddress]);
     // The validator says no: refused before anything is signed.
     const no = tonRun(nativeCase, live(nativeCase), {provider: stub(nativeCase, live(nativeCase), omnistonVerifyBuild({validateTonSwapTarget: () => false, validateTonSwapLeg: () => true}))});
     await expect(no.swap()).rejects.toThrow(/is not a recognized DEX contract/);

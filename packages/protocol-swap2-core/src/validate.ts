@@ -15,6 +15,11 @@ export function slippageFloor(dest: bigint, slippageBps: number): bigint {
   return keep <= 0 ? 0n : (dest * BigInt(keep)) / 10_000n;
 }
 
+/** Bounded opaque ASCII selector; providers define its stable meaning. */
+export function validRouteId(value: unknown): value is string {
+  return typeof value === "string" && /^[\x21-\x7e]{1,256}$/.test(value);
+}
+
 /** Shared quote validator used by both the aggregate and single-provider paths. */
 export function validQuote(q: Quote, params: QuoteParams, provider: string): boolean {
   return quoteRejection(q, params, provider) === null;
@@ -35,6 +40,8 @@ const BAD_REQUEST = Object.freeze({});
  */
 export function quoteRejection(q: Quote, params: QuoteParams, provider: string): {readonly reason?: Swap2RefusalReason} | null {
   try {
+    if (q.routeId !== undefined && !validRouteId(q.routeId)) return MALFORMED;
+    if (params.routeId !== undefined && (!validRouteId(params.routeId) || q.routeId !== params.routeId)) return OTHER_QUOTE;
     if (q.provider !== provider || q.sourceAmount !== params.amountIn) return OTHER_QUOTE;
     if (typeof q.intentId !== "string" || !q.intentId || typeof q.depositAddress !== "string" || (q.depositMemo !== null && typeof q.depositMemo !== "string")) return MALFORMED;
     if (![q.sourceAmount, q.destAmount, q.minDestAmount].every((value) => /^[0-9]+$/.test(value))) return MALFORMED;
@@ -52,7 +59,7 @@ export function quoteRejection(q: Quote, params: QuoteParams, provider: string):
       // floats. A ceil here refused nearly every slippage-bounded quote by one base unit.
       if (min < slippageFloor(dest, params.slippageBps)) return BELOW;
     }
-    if (!Number.isFinite(q.etaSeconds) || q.etaSeconds < 0) return MALFORMED;
+    if (q.etaSeconds !== null && (!Number.isFinite(q.etaSeconds) || q.etaSeconds < 0)) return MALFORMED;
     if (!Number.isFinite(q.reliability) || q.reliability < 0 || q.reliability > 1) return MALFORMED;
     if (!Number.isFinite(q.feeUsd) || q.feeUsd < 0) return MALFORMED;
     if (q.fees && (!Array.isArray(q.fees) || !q.fees.every((fee) =>

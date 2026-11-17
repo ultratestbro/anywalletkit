@@ -19,7 +19,8 @@
     "@anywalletkit/protocol-swap2-near-intents": "workspace:*",
     "@anywalletkit/protocol-swap2-router": "workspace:*",
     "@anywalletkit/protocol-swap2-thorchain": "workspace:*",
-    "@anywalletkit/wallet-evm": "workspace:*"
+    "@anywalletkit/wallet-evm": "workspace:*",
+    "@anywalletkit/protocol-swap2-stargate": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
