@@ -2058,6 +2058,31 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
 
+  packages/wallet-zcash-shielded:
+    dependencies:
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@scure/base':
+        specifier: ^2.4.0
+        version: 2.4.0
+      react-native-zcash:
+        specifier: '>=0.13.5'
+        version: 0.13.6(react-native@0.88.0(@babel/core@7.29.7)(react@19.3.1))
+    devDependencies:
+      '@anywalletkit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anywalletkit/wallet-zcash':
+        specifier: workspace:*
+        version: link:../wallet-zcash
+      '@types/node':
+        specifier: ^22
+        version: 22.20.5
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
+
   packages/walletconnect-ton:
     dependencies:
       '@ton/core':
@@ -4327,6 +4352,12 @@ packages:
   bcp-47@2.1.1:
     resolution: {integrity: sha512-KLw+H/gd2p4zly1X7Yh/qziuyae5/w/QFnvTng9eZL5fvszL7Whl3MBoWF8yxL7ksUjBfOD+OxkytiqbBpG+Fw==}
 
+  biggystring@4.3.0:
+    resolution: {integrity: sha512-hkU2YpjWLkVO2Py7tcZC0CbiW+2wqb9fkSr8JDYQaKPjFG7RWcGaQU1MnXB+GFilkQgHsH+i7/q48hInZCca+g==}
+
+  bn.js@4.12.5:
+    resolution: {integrity: sha512-3aRg6/JxfffFD+OlOjOFR3Vo79l39ooBTFucxx+MT3dhCtzn3EmiUPQo+6/OZuI2jbXi3YKgmiTFBgChQMwIRQ==}
+
   boolbase@1.0.0:
     resolution: {integrity: sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==}
 
@@ -5871,6 +5902,11 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
+  react-native-zcash@0.13.6:
+    resolution: {integrity: sha512-tgnplR1Mn6c7+kiaBBQiAkp0crvhSjzPZZ1hR4qD/2qU4w5HBFyHhF7okQ3FlLNnQgZGQOy22+0fKUOrrT9Mog==}
+    peerDependencies:
+      react-native: '>=0.47.0 <1.0.0'
+
   react-native@0.88.0:
     resolution: {integrity: sha512-v/wee0nYWcammMYBnSat/e3WY/5iaf9YQOMcBrfKT/wPApPPlHp94hgZovBtwhMuthR01yc/8cGn0FpFTE/C4A==}
     engines: {node: ^22.13.0 || ^24.3.0 || >= 26.0.0}
@@ -5970,6 +6006,9 @@ packages:
 
   retext-smartypants@6.2.0:
     resolution: {integrity: sha512-kk0jOU7+zGv//kfjXEBjdIryL1Acl4i9XNkHxtM7Tm5lFiCog576fjNC9hjoR7LTKQ0DsPWy09JummSsH1uqfQ==}
+
+  rfc4648@1.5.4:
+    resolution: {integrity: sha512-rRg/6Lb+IGfJqO05HZkN50UtY7K/JhxJag1kP23+zyMfrvoB0B7RWv06MbOzoc79RgCdNTiUaNsTT1AJZ7Z+cg==}
 
   rolldown@1.2.14:
     resolution: {integrity: sha512-eTBTTqMR6uHKLgcUqpJP8ntzDI6V4LYA8negAMBEI7gkgVvOdrx6VsvS2Ym+83KhOPdLCHWJu0w7UQFJZhHKNw==}
@@ -9125,6 +9164,12 @@ snapshots:
       is-alphanumerical: 2.0.1
       is-decimal: 2.0.1
 
+  biggystring@4.3.0:
+    dependencies:
+      bn.js: 4.12.5
+
+  bn.js@4.12.5: {}
+
   boolbase@1.0.0: {}
 
   brace-expansion@5.0.12:
@@ -10973,6 +11018,12 @@ snapshots:
 
   react-is@18.3.1: {}
 
+  react-native-zcash@0.13.6(react-native@0.88.0(@babel/core@7.29.7)(react@19.3.1)):
+    dependencies:
+      biggystring: 4.3.0
+      react-native: 0.88.0(@babel/core@7.29.7)(react@19.3.1)
+      rfc4648: 1.5.4
+
   react-native@0.88.0(@babel/core@7.29.7)(react@19.3.1):
     dependencies:
       '@react-native/asset-utils': 0.88.0
@@ -11130,6 +11181,8 @@ snapshots:
       '@types/nlcst': 2.0.3
       nlcst-to-string: 4.0.0
       unist-util-visit: 5.1.0
+
+  rfc4648@1.5.4: {}
 
   rolldown@1.2.14:
     dependencies:

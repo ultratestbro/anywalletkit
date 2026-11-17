@@ -1,0 +1,62 @@
+{
+  "name": "@anywalletkit/wallet-zcash-shielded",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PROTOTYPE (SDK-229, not published): shielded Zcash (Ironwood) for React Native wallets on Any Wallet Kit \u2014 a thin TypeScript layer over react-native-zcash (ZODL Zcash SDKs, librustzcash). Unified address, sync from a birthday height, balance per pool. Sending, shielding and the Orchard \u2192 Ironwood migration are typed but not implemented yet.",
+  "license": "MIT OR Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ultratestbro/anywalletkit.git",
+    "directory": "packages/wallet-zcash-shielded"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0"
+  },
+  "peerDependencies": {
+    "react-native-zcash": ">=0.13.5"
+  },
+  "devDependencies": {
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/wallet-zcash": "workspace:*",
+    "@types/node": "^22",
+    "vitest": "^5.1.0"
+  },
+  "keywords": [
+    "zcash",
+    "shielded",
+    "ironwood",
+    "unified-address",
+    "react-native",
+    "anywalletkit"
+  ]
+}
