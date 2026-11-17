@@ -32,6 +32,20 @@ Before anything is approved or signed, the encoded transaction is decoded and ch
 
 The router reverts below the minimum. With `rpcUrls` set, the exact transaction is also simulated: at quote time for native input (no allowance needed), and right before broadcast for every swap.
 
+**Routers.** `FYND_CHAINS` pins the active TychoRouterV3 from Propeller Heads' [deployment registry](https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json):
+
+| Chain | Router |
+|---|---|
+| Ethereum (1) | `0xe41c726421007e133a59365432fE886a73B45126` |
+| Base (8453) | `0xd374c00614f95492D816b5957E3797ce3f0c445C` |
+| Arbitrum (42161) | `0x1B82e8C16Ce8E17535C9B6b8AD107f61b0b192B5` |
+| BNB Smart Chain (56) | `0xEe7eCe626064BDA1c6aFDb8A281afe44Eabd3242` |
+| Polygon (137) | `0x4dB0B661dc706f7e09e54273028B22f61f8F94C2` |
+| Unichain (130) | `0x556dff14e4A42259ebCE4fa087323c1047e9a55A` |
+| Robinhood Chain (4663) | `0x6F460540B03651d2Ad0ec28f777e4A0480A756a5` |
+
+On 2026-11-16 Propeller Heads paused every earlier router and redeployed TychoRouterV3 on every chain (registry commit `8aab890`). Versions up to 0.2.12 pin the paused routers and refuse every quote; upgrade. The paused routers stay in `FYND_PREVIOUS_ROUTERS`, which only `describeFyndActivity` reads, so past swaps keep their label in history; they are never a call target or a spender.
+
 **Why `uniswap_v4_hooks` is excluded by default.** On 2026-10-24 every Ethereum route the hosted API built through Uniswap v4 hook pools was quoted about 0.6–1% above the market and reverted when simulated (4 of 4 native-input pairs, and USDT → USDC). The same pairs without those pools executed (8 of 8 across Ethereum, Base and Arbitrum). A route through an excluded family is refused even if the server returns one. The hosted API has neither its own simulation nor its price guard enabled, so these checks are the wallet's.
 
 ## Configure

@@ -1,6 +1,7 @@
 import {describe, expect, it} from "vitest";
 import {encodeFunctionData, getAddress} from "viem";
 import {FYND_CHAINS, FyndTransactionError, ROUTER_NATIVE, TYCHO_ROUTER_ABI, TYCHO_ROUTER_SELECTORS, checkFyndTransaction} from "../src/router.js";
+import {FYND_PREVIOUS_ROUTERS} from "../src/activity.js";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -53,6 +54,39 @@ describe("checkFyndTransaction", () => {
 
   it("knows all nine swap entry points for history", () => {
     expect(TYCHO_ROUTER_SELECTORS.size).toBe(9);
-    expect(getAddress(ROUTER)).toBe("0xAbA5B53b03eAfaD1C5fc8BD5Fc765fC85Bb3de67");
+    expect(getAddress(ROUTER)).toBe("0xd374c00614f95492D816b5957E3797ce3f0c445C");
   });
 });
+
+// Propeller Heads paused every TychoRouterV3 on 2026-11-16 and redeployed it on every chain the same day
+// (tycho registry commit 8aab890). Fynd's API builds to the new routers only; the paused ones must not pass.
+describe("the 2026-11-16 router redeploy", () => {
+  it("pins the redeployed router of the registry on every chain", () => {
+    const registry: Record<number, string> = {
+      1: "0xe41c726421007e133a59365432fE886a73B45126",
+      8453: "0xd374c00614f95492D816b5957E3797ce3f0c445C",
+      42161: "0x1B82e8C16Ce8E17535C9B6b8AD107f61b0b192B5",
+      56: "0xEe7eCe626064BDA1c6aFDb8A281afe44Eabd3242",
+      137: "0x4dB0B661dc706f7e09e54273028B22f61f8F94C2",
+      130: "0x556dff14e4A42259ebCE4fa087323c1047e9a55A",
+      4663: "0x6F460540B03651d2Ad0ec28f777e4A0480A756a5",
+    };
+    expect(Object.fromEntries(Object.entries(FYND_CHAINS).map(([id, c]) => [id, getAddress(c.router)]))).toEqual(registry);
+    for (const c of Object.values(FYND_CHAINS)) expect(c.router).toBe(getAddress(c.router));
+  });
+
+  it("refuses a swap built to the router it replaced, on every chain", () => {
+    expect(Object.keys(FYND_PREVIOUS_ROUTERS).sort()).toEqual(Object.keys(FYND_CHAINS).sort());
+    for (const [id, previous] of Object.entries(FYND_PREVIOUS_ROUTERS)) {
+      expect(previous.length).toBeGreaterThan(0);
+      for (const old of previous) {
+        expect(sameAs(old, FYND_CHAINS[Number(id)]!.router)).toBe(false);
+        const run = () => checkFyndTransaction({to: old, value: 0n, data: single()}, {...expected, chainId: Number(id)});
+        expect(run).toThrow(FyndTransactionError);
+        expect(run).toThrow(/not the Tycho router/);
+      }
+    }
+  });
+});
+
+const sameAs = (a: string, b: string) => getAddress(a) === getAddress(b);
