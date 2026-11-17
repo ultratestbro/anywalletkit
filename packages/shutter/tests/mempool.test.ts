@@ -19,6 +19,21 @@ const abiBytes = (hex: string) => {
   return `0x${word(32n)}${word(BigInt(b.length / 2))}${b.padEnd(Math.ceil(b.length / 64) * 64, '0')}`
 }
 
+/**
+ * Intrinsic gas after Pectra: 21000 + calldata at 16 gas per non-zero byte and 4 per zero byte, but at least the
+ * EIP-7623 floor of 21000 + 10 per token (a zero byte is 1 token, a non-zero byte 4). Gnosis applies the floor.
+ */
+function calldataGas(data: string): { standard: bigint; floor: bigint } {
+  let zero = 0n
+  let nonzero = 0n
+  for (let i = 2; i < data.length; i += 2) if (data.slice(i, i + 2) === '00') zero++; else nonzero++
+  return { standard: 21_000n + 4n * zero + 16n * nonzero, floor: 21_000n + 10n * (zero + 4n * nonzero) }
+}
+const max = (a: bigint, b: bigint) => (a > b ? a : b)
+const intrinsicGas = (data: string) => max(calldataGas(data).standard, calldataGas(data).floor)
+/** What a node answers for the submission: the standard cost plus ~30k of execution (the event), or the floor. */
+const submissionEstimate = (data: string) => max(calldataGas(data).standard + 30_000n, calldataGas(data).floor)
+
 /** The account as a wallet would hand it over: signs offline, nothing else. */
 function account(over: { tamper?: boolean } = {}): ShutterMempoolAccount & { signed: ShutterSignRequest[] } {
   const signed: ShutterSignRequest[] = []
@@ -33,7 +48,7 @@ function account(over: { tamper?: boolean } = {}): ShutterMempoolAccount & { sig
 }
 
 /** A Gnosis RPC stand-in with the Shutter contracts (one-key keyper set, eon 10). */
-function fakeRpc(over: { chainId?: number; eonKey?: string; balance?: bigint; nonce?: number; latestNonce?: number; receipts?: Record<string, unknown> } = {}) {
+function fakeRpc(over: { innerGas?: bigint; chainId?: number; eonKey?: string; balance?: bigint; nonce?: number; latestNonce?: number; receipts?: Record<string, unknown> } = {}) {
   const sent: string[] = []
   const calls: string[] = []
   const rpc = {
@@ -45,7 +60,10 @@ function fakeRpc(over: { chainId?: number; eonKey?: string; balance?: bigint; no
         case 'eth_chainId': return `0x${(over.chainId ?? 100).toString(16)}`
         case 'eth_getBlockByNumber': return { number: '0x2f0c000', baseFeePerGas: `0x${GWEI.toString(16)}` }
         case 'eth_maxPriorityFeePerGas': return '0x1'
-        case 'eth_estimateGas': return (params[0] as { to: string }).to.toLowerCase() === SHUTTER_GNOSIS_MEMPOOL.sequencer.toLowerCase() ? '0x10000' : '0x5208'
+        case 'eth_estimateGas': {
+          const { to, data } = params[0] as { to: string; data: string }
+          return to.toLowerCase() === SHUTTER_GNOSIS_MEMPOOL.sequencer.toLowerCase() ? `0x${submissionEstimate(data).toString(16)}` : `0x${(over.innerGas ?? 21_000n).toString(16)}`
+        }
         case 'eth_getTransactionCount': return `0x${((params[1] === 'latest' ? over.latestNonce : undefined) ?? over.nonce ?? 7).toString(16)}`
         case 'eth_getBalance': return `0x${(over.balance ?? 10n ** 18n).toString(16)}`
         case 'eth_call': {
@@ -108,6 +126,14 @@ describe('sendEncryptedTransaction', () => {
     const tx = parseTransaction(inner)
     expect({ nonce: tx.nonce, to: tx.to, value: tx.value, gas: tx.gas, chainId: tx.chainId }).toEqual({ nonce: 8, to: TO, value: 5n, gas: 25_200n, chainId: 100 })
     expect(sent).toMatchObject({ nonce: 8, eon: 10, network: 'gnosis', from: signer.address.toLowerCase() })
+  })
+
+  it('gives a swap-sized submission enough gas for its random ciphertext (intrinsic gas regression)', async () => {
+    const rpc = fakeRpc({ innerGas: 516_137n })
+    const swapData = `0x${'5a'.repeat(2020)}` as Hex
+    await sendEncryptedTransaction({ rpc, account: account(), tx: { to: TO, value: 10n ** 16n, data: swapData } })
+    const submission = parseTransaction(rpc.sent[0] as Hex)
+    expect(submission.gas! >= intrinsicGas(submission.data!)).toBe(true)
   })
 
   it('refuses before signing anything: wrong chain, gas over the per-block cap, a balance short of both transactions, no eon key, shut down', async () => {

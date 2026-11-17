@@ -250,8 +250,11 @@ export async function sendEncryptedTransaction(input: SendEncryptedInput): Promi
 
   const inner: ShutterSignRequest = { type: 2, chainId: network.chainId, nonce: submitNonce + 1, to, value, data, gasLimit, maxFeePerGas, maxPriorityFeePerGas }
   const encryptedGasFee = gasLimit * maxFeePerGas
-  // The ciphertext length depends only on the signed transaction's length; estimate the submission with a stand-in.
-  const placeholder = submitEncryptedCalldata({ eon, identityPrefix: `0x${'11'.repeat(32)}`, ciphertext: new Uint8Array(1 + 96 + 32 + Math.ceil((data.length / 2 + 160) / 32) * 32), gasLimit })
+  // Estimate the submission before anything is signed, with a stand-in at least as long as the real ciphertext (the
+  // signed transaction is the calldata plus at most ~160 bytes) and with no zero bytes: the ciphertext is random, and a
+  // non-zero calldata byte costs 4× a zero one (40 against 10 under the EIP-7623 floor). A zero-filled stand-in put a
+  // 2 KB swap's submission under its intrinsic gas on Gnosis (2026-11-18).
+  const placeholder = submitEncryptedCalldata({ eon, identityPrefix: `0x${'11'.repeat(32)}`, ciphertext: new Uint8Array(1 + 96 + 32 + Math.ceil((data.length / 2 + 160) / 32) * 32).fill(0xff), gasLimit })
   const submitEst = quantity(await rpc.request({ method: 'eth_estimateGas', params: [{ from, to: network.sequencer, data: placeholder, value: `0x${encryptedGasFee.toString(16)}` }] }), 'gas estimate')
   const submitGas = (submitEst * 13n + 9n) / 10n
 
