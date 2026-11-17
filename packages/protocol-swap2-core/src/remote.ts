@@ -220,7 +220,8 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
         const info = refusalInfo({reason, retryAfterMs, httpStatus});
         throw info ? withReason(error, info) : error;
       }
-      if (out) checkQuote(snapshot, out);
+      // The caller's own params object: a pins hook may key state on it (0x keeps the Settler set it checked against).
+      if (out) checkQuote(params, out);
       if (out && typeof out === "object" && typeof out.intentId === "string") remember(out, snapshot);
       return out;
     },

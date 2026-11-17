@@ -186,13 +186,15 @@ describe("2. zeroExRemoteProvider re-reads the registry on the device before bro
     return {app, q: q!, tx};
   };
 
-  it("the device read comes first (fresh), then the backend's preflight", async () => {
+  it("the device read comes first (fresh), then the backend's preflight, then the client check again", async () => {
     const log: string[] = [];
     const real = createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: RPC});
     const resolver: SettlerResolver = {resolve: async (id, o) => { log.push(`resolve:${o?.fresh === true ? "fresh" : "cached"}`); return real.resolve(id, o); }, known: (id) => real.known(id)};
     const {app, q, tx} = await remoteQuote(log, resolver);
     await app.preflightDeposit!(q, tx);
-    expect(log).toEqual(["resolve:fresh", "preflight"]);
+    // The remote provider re-runs the client build check after the backend's preflight (swap2-core), so a Settler
+    // change during that call is still caught on the device: a second fresh registry read.
+    expect(log).toEqual(["resolve:fresh", "preflight", "resolve:fresh"]);
   });
 
   it("refuses before asking the backend: a Settler the registry no longer names, a transaction that is not the quote, a quote for no served chain", async () => {
