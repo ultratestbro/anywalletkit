@@ -37,7 +37,7 @@
     "hermes-engine-cli": "^0.12.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "8.72.1",
+    "typescript-eslint": "8.72.2",
     "vitest": "^5.1.0"
   },
   "pnpm": {

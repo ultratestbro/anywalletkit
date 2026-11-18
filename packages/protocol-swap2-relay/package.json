@@ -34,7 +34,7 @@
     "@anywalletkit/protocol-swap2-core": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*",
     "@noble/curves": "^2.4.0",
-    "viem": "^2.57.2"
+    "viem": "^2.57.18"
   },
   "peerDependencies": { "@anywalletkit/core": "workspace:*" },
   "devDependencies": {
