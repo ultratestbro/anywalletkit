@@ -46,7 +46,9 @@ shielded receiver, and its transparent receiver must equal the account's t-addre
   of its own and shares the Orchard receiver (librustzcash `zcash_keys` 0.17), so the address
   receives into Ironwood after NU6.3.
 - Sync from a birthday and per-pool balance on mainnet after NU7, on an iPhone 16 Pro and an Android
-  emulator (mainnet receive: see the report).
+  emulator.
+- A real mainnet receive into Ironwood: 0.00575 ZEC sent to the prototype's unified address, mined at
+  block 3,586,149 (txid `c8459b64116abc8f9cb83e03bca259e7505020414b499821d64168b371188cf7`), shown by the module as spendable Ironwood balance on the iPhone.
 - One seed for both worlds: the address's transparent receiver is `m/44'/133'/0'/0/j`, j being the
   diversifier index the SDK picked (0, 1 or 4 on our test seeds) — checked on the device
   against AWK's transparent package.

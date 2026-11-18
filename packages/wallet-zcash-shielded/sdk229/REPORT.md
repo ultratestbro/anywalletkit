@@ -12,7 +12,7 @@
 | Пакет `@anywalletkit/wallet-zcash-shielded` | ✅ `getAddress`, `getBalance`, `onSyncProgress`; 84 теста |
 | Unified-адрес с Ironwood + transparent | ✅ `p2pkh · sapling · orchard(0x03)`; Ironwood делит Orchard-получатель |
 | Синк от birthday, баланс по пулам на mainnet после NU7 | ✅ Android-эмулятор и iPhone 16 Pro |
-| Приём ZEC на UA (mainnet, txid) | ⏳ ждёт перевода от владельца |
+| Приём ZEC на UA (mainnet, txid) | ✅ 0.00575 ZEC в **Ironwood**, блок 3 586 149, txid `c8459b64116a…` (полный — раздел 2) |
 | Замеры | ✅ размер iOS/Android; синк, CPU, память на эмуляторе и на iPhone 16 Pro |
 | **Лицензия** | ⚠️ NU7-путь = ZODL SDK, **AGPL-3.0-only, App Store запрещён без коммерческой лицензии** |
 
@@ -51,7 +51,14 @@ branch id `77190ad9` (NU7). `na.zec.rocks` — то же; `eu.zec.rocks` не о
   **Следствие для M2:** у одного кошелька два «основных» t-адреса (AWK #0 и UA #j). Нужно
   решить: показывать в transparent-части Vaulty адрес #j, либо проверить, что SDK видит средства
   на #0 (gap limit transparent-сканирования в librustzcash) — проверить переводом.
-- **Приём на UA:** _ждёт перевода (txid — сюда)._
+- **Приём на UA (mainnet, 2026-11-18):** владелец отправил ZEC на UA тестового кошелька из своего кошелька.
+  txid `c8459b64116abc8f9cb83e03bca259e7505020414b499821d64168b371188cf7`, блок **3 586 149** (12:41:09 UTC), транзакция v6 (NU7-формат), 9 166 байт, комиссия
+  отправителя 0.0001 ZEC. На iPhone 16 Pro прототип после синка до 3 586 185 показал
+  **Ironwood 575 000 zat = 0.00575 ZEC, spendable**; transparent/Sapling/Orchard = 0. В базе SDK:
+  один выход, пул Ironwood (код 4), одна запись в `ironwood_received_notes`. Независимо: lightwalletd
+  `zec.rocks` `GetTransaction` по txid отдаёт ту же высоту 3 586 149. То есть UA принимает в Ironwood
+  через Orchard-формат получателя (0x03), а модуль видит и показывает этот пул. Отправить обратно
+  прототип пока не может (`send` — M2); средства остаются на тестовой фразе.
 
 ## 3. Замеры
 
