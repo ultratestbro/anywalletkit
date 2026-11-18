@@ -1,6 +1,7 @@
 # react-native-zcash — upstream drafts (SDK-229)
 
-Drafts only. **Nothing here has been filed.** Each item needs the owner's "yes" before it becomes an
+**Filed 2026-11-18** (owner's yes): U6 → [#81](https://github.com/EdgeApp/react-native-zcash/issues/81), U11 → [#82](https://github.com/EdgeApp/react-native-zcash/issues/82), U12 → [#83](https://github.com/EdgeApp/react-native-zcash/issues/83),
+U7 → [zodl-swift-wallet-sdk#120](https://github.com/zodl-inc/zodl-swift-wallet-sdk/issues/120) + [zodl-android-wallet-sdk#64](https://github.com/zodl-inc/zodl-android-wallet-sdk/issues/64). The rest are drafts: each needs the owner's "yes" before it becomes an
 issue or a PR on [EdgeApp/react-native-zcash](https://github.com/EdgeApp/react-native-zcash)
 (or on the ZODL SDKs where noted). Our open issue there: #80 (no answer as of 2026-11-17).
 
@@ -15,13 +16,13 @@ built with its own `npm run update-sources` on macOS (Apple Silicon), Rust 1.97.
 | U3 | react-native-zcash | Android needs core library desugaring and minSdk 27 in the app | issue (folded into U1) |
 | U4 | react-native-zcash | `update-sources` needs NDK 27.0.12077973 exactly; the error says "NDK is not installed" | PR (docs + check) |
 | U5 | react-native-zcash | `initialize` crashes (`try!`) instead of rejecting when a storage path fails | PR |
-| U6 | react-native-zcash | Seed handling: the BIP-39 phrase crosses the bridge as a JS string on every init / spend | issue (design) |
-| U7 | ZODL SDKs | Binary size: libzcashlc / libzcashwalletsdk carry Tor (arti), voting, Keystone even with Tor off | issue to ZODL |
+| U6 | react-native-zcash | Seed handling: the BIP-39 phrase crosses the bridge as a JS string on every init / spend | issue #81 ✅ |
+| U7 | ZODL SDKs | Binary size: libzcashlc / libzcashwalletsdk carry Tor (arti), voting, Keystone even with Tor off | swift #120, android #64 ✅ |
 | U8 | react-native-zcash / ZODL | Licence: NU7 path is AGPL-3.0-only, with no App Store permission | question |
 | U9 | react-native-zcash | `AndroidManifest.xml` still sets `package=` (AGP warns it is ignored) | PR (one line) |
 | U10 | react-native-zcash | Android module lacks `addListener` / `removeListeners` (RN warns on `new NativeEventEmitter`) | PR |
-| U11 | react-native-zcash | NU7 branch ships stale checkpoints; `updateCheckpoints.ts` still assumes 75 s blocks | PR |
-| U12 | react-native-zcash | iOS: the first `SYNCING` status is emitted before JS subscribes and is lost | PR |
+| U11 | react-native-zcash | NU7 branch ships stale checkpoints; `updateCheckpoints.ts` still assumes 75 s blocks | issue #82 ✅ |
+| U12 | react-native-zcash | iOS: the first `SYNCING` status is emitted before JS subscribes and is lost | issue #83 ✅ |
 
 ---
 

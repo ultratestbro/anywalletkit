@@ -1,7 +1,8 @@
 # SDK-229 — прототип shielded ZEC (Ironwood) на react-native-zcash: отчёт
 
 Дата прогонов: 2026-11-17 (Android-эмулятор, размеры), 2026-11-18 (iPhone). Ветка AWK: `feat/zcash-shielded-proto` (worktree `~/anywalletkit-zec-shielded`),
-ветка Vaulty: `feat/zcash-shielded-proto` (worktree `~/vaulty-zec`). Ничего не запушено и не опубликовано.
+ветка Vaulty: `feat/zcash-shielded-proto` (worktree `~/vaulty-zec`). Обе ветки запушены 2026-11-18; npm не публиковался.
+Upstream-issue отправлены 2026-11-18: Edge #81, #82, #83; ZODL swift #120, android #64 (UPSTREAM.md).
 
 ## Коротко
 
@@ -147,7 +148,7 @@ iPhone 16 Pro — high-end; mid-range iPhone нет.
 
 ## 6. Upstream
 
-Черновики — `UPSTREAM.md` (U1–U12), ничего не отправлено. Главное: Expo config plugin, проверка
+Черновики — `UPSTREAM.md` (U1–U12); U6, U7, U11, U12 отправлены как issue, остальное — черновики. Главное: Expo config plugin, проверка
 NDK в `update-sources`, `try!` → reject в `initialize`, init по UFVK без фразы, размер Rust-библиотеки
 (Tor/voting/Keystone как Cargo-фичи), лицензия, устаревшие чекпоинты и 75-секундные блоки в
 `updateCheckpoints.ts`, `removeListeners` в Android-модуле, первый `SYNCING` на iOS теряется.
