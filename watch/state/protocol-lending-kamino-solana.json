@@ -64,7 +64,7 @@
      "eNLm5e5KVDX2vEcCkt75PpZ2GMfXcZES3QrFshgpVzp"
     ]
    },
-   "seenAt": "2026-11-17T15:58:42.659Z",
+   "seenAt": "2026-11-18T15:38:05.948Z",
    "changedAt": "2026-11-13T14:33:26.855Z"
   },
   "vaults": {
@@ -274,7 +274,7 @@
      "qoCFKVrNfFCJKxEaLBbXrWNpeMT2xyfUEjFqMyddheA"
     ]
    },
-   "seenAt": "2026-11-17T15:58:42.694Z",
+   "seenAt": "2026-11-18T15:38:06.362Z",
    "changedAt": "2026-11-13T14:33:26.967Z"
   },
   "farms-program": {
@@ -288,7 +288,7 @@
     "slot": 444035168,
     "authority": "CivjSDKgTpmkRNL4zYcmv9D9QqPJg6yTxBVxMGcXvMuY"
    },
-   "seenAt": "2026-11-17T15:58:42.969Z",
+   "seenAt": "2026-11-18T15:38:05.618Z",
    "changedAt": "2026-10-14T15:11:05.541Z"
   },
   "klend-program": {
@@ -302,7 +302,7 @@
     "slot": 461744249,
     "authority": "GzFgdRJXmawPhGeBsyRCDLx4jAKPsvbUqoqitzppkzkW"
    },
-   "seenAt": "2026-11-17T15:58:43.126Z",
+   "seenAt": "2026-11-18T15:38:05.670Z",
    "changedAt": "2026-11-04T09:35:50.957Z"
   },
   "docs-api": {
@@ -318,7 +318,7 @@
    "seenAt": "2026-11-16T15:40:53.642Z",
    "changedAt": "2026-11-15T13:55:15.325Z",
    "error": "HTTP 403",
-   "errorAt": "2026-11-17T15:58:42.896Z"
+   "errorAt": "2026-11-18T15:38:06.043Z"
   },
   "kvault-program": {
    "type": "solana-program",
@@ -331,7 +331,7 @@
     "slot": 461660004,
     "authority": "GzFgdRJXmawPhGeBsyRCDLx4jAKPsvbUqoqitzppkzkW"
    },
-   "seenAt": "2026-11-17T15:58:43.006Z",
+   "seenAt": "2026-11-18T15:38:05.647Z",
    "changedAt": "2026-11-04T09:35:50.921Z"
   },
   "klend": {
@@ -347,7 +347,7 @@
     "url": "https://github.com/Kamino-Finance/klend/releases/tag/release/v1.28.0",
     "prerelease": true
    },
-   "seenAt": "2026-11-17T15:58:43.010Z",
+   "seenAt": "2026-11-18T15:38:05.543Z",
    "changedAt": "2026-11-07T12:58:01.345Z"
   },
   "klend-sdk": {
@@ -362,7 +362,7 @@
     "url": "https://github.com/Kamino-Finance/klend-sdk/commit/6a26d6f1b5afb29953ffd139ee8c0c4ca5f26ce6",
     "note": "default branch: Update klend-sdk"
    },
-   "seenAt": "2026-11-17T15:58:43.529Z",
+   "seenAt": "2026-11-18T15:38:07.049Z",
    "changedAt": "2026-10-20T10:24:16.203Z"
   }
  }

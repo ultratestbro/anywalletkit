@@ -14,7 +14,7 @@
     "url": "https://github.com/solana-program/stake/releases/tag/js%40v0.11.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-17T15:58:51.000Z",
+   "seenAt": "2026-11-18T15:38:17.074Z",
    "changedAt": "2026-10-25T20:21:40.591Z"
   },
   "stake-program": {
@@ -28,7 +28,7 @@
     "slot": 443232000,
     "authority": null
    },
-   "seenAt": "2026-11-17T15:58:50.931Z",
+   "seenAt": "2026-11-18T15:38:17.029Z",
    "changedAt": "2026-10-25T20:21:40.819Z"
   },
   "docs-stake-accounts": {
@@ -43,7 +43,7 @@
     "sha": "38bb13b720",
     "url": "https://github.com/solana-foundation/solana-com/blob/main/apps/docs/content/docs/en/references/staking/stake-accounts.mdx"
    },
-   "seenAt": "2026-11-17T15:58:50.846Z",
+   "seenAt": "2026-11-18T15:38:17.045Z",
    "changedAt": "2026-11-04T17:01:37.744Z"
   }
  }

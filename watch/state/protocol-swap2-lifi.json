@@ -50,7 +50,7 @@
      "unit"
     ]
    },
-   "seenAt": "2026-11-17T15:59:06.606Z",
+   "seenAt": "2026-11-18T15:38:30.637Z",
    "changedAt": "2026-11-16T15:41:14.722Z"
   },
   "exchanges": {
@@ -105,7 +105,7 @@
      "titan"
     ]
    },
-   "seenAt": "2026-11-17T15:59:06.609Z",
+   "seenAt": "2026-11-18T15:38:30.641Z",
    "changedAt": "2026-11-12T15:10:53.706Z"
   },
   "chains": {
@@ -184,7 +184,7 @@
      "99901"
     ]
    },
-   "seenAt": "2026-11-17T15:59:06.402Z",
+   "seenAt": "2026-11-18T15:38:30.601Z",
    "changedAt": "2026-11-09T16:13:39.882Z"
   },
   "docs-changelog": {
@@ -197,7 +197,7 @@
     "hash": "f1d6e1fad6ede5ef",
     "chars": 27790
    },
-   "seenAt": "2026-11-17T15:59:06.774Z",
+   "seenAt": "2026-11-18T15:38:30.940Z",
    "changedAt": "2026-11-13T14:33:40.275Z"
   },
   "sdk": {
@@ -213,7 +213,7 @@
     "url": "https://github.com/lifinance/sdk/releases/tag/%40lifi/sdk%404.13.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-17T15:59:06.062Z",
+   "seenAt": "2026-11-18T15:38:29.774Z",
    "changedAt": "2026-11-16T15:41:14.120Z"
   },
   "contracts": {
@@ -227,7 +227,7 @@
     "url": "https://github.com/lifinance/contracts/releases/tag/pre-signing-2.0-baseline",
     "note": "tags only"
    },
-   "seenAt": "2026-11-17T15:59:06.038Z",
+   "seenAt": "2026-11-18T15:38:29.885Z",
    "changedAt": "2026-10-14T15:12:20.663Z"
   },
   "diamond-selectors-polygon": {
@@ -364,7 +364,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.697Z",
+   "seenAt": "2026-11-18T15:38:29.402Z",
    "changedAt": "2026-11-04T17:01:43.018Z"
   },
   "diamond-selectors-base": {
@@ -501,7 +501,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.698Z",
+   "seenAt": "2026-11-18T15:38:29.411Z",
    "changedAt": "2026-11-04T17:01:43.023Z"
   },
   "diamond-selectors-ethereum": {
@@ -638,7 +638,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.759Z",
+   "seenAt": "2026-11-18T15:38:29.543Z",
    "changedAt": "2026-11-04T17:01:43.036Z"
   },
   "diamond-selectors-optimism": {
@@ -775,7 +775,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.737Z",
+   "seenAt": "2026-11-18T15:38:29.454Z",
    "changedAt": "2026-11-04T17:01:43.042Z"
   },
   "diamond-selectors-bnb-chain": {
@@ -912,7 +912,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.700Z",
+   "seenAt": "2026-11-18T15:38:29.409Z",
    "changedAt": "2026-11-04T17:01:43.047Z"
   },
   "diamond-selectors-arbitrum": {
@@ -1049,7 +1049,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.747Z",
+   "seenAt": "2026-11-18T15:38:29.467Z",
    "changedAt": "2026-11-04T17:01:43.050Z"
   },
   "diamond-selectors-gnosis": {
@@ -1186,7 +1186,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.855Z",
+   "seenAt": "2026-11-18T15:38:29.536Z",
    "changedAt": "2026-11-04T17:01:43.083Z"
   },
   "diamond-selectors-unichain": {
@@ -1323,7 +1323,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.873Z",
+   "seenAt": "2026-11-18T15:38:29.534Z",
    "changedAt": "2026-11-04T17:01:43.091Z"
   },
   "diamond-selectors-monad": {
@@ -1460,7 +1460,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.872Z",
+   "seenAt": "2026-11-18T15:38:29.548Z",
    "changedAt": "2026-11-04T17:01:43.121Z"
   },
   "diamond-selectors-avalanche": {
@@ -1597,7 +1597,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.028Z",
+   "seenAt": "2026-11-18T15:38:30.648Z",
    "changedAt": "2026-11-04T17:01:43.148Z"
   },
   "diamond-selectors-robinhood-chain": {
@@ -1734,7 +1734,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.971Z",
+   "seenAt": "2026-11-18T15:38:29.592Z",
    "changedAt": "2026-11-04T17:01:43.153Z"
   },
   "diamond-selectors-hyperevm": {
@@ -1871,7 +1871,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:05.877Z",
+   "seenAt": "2026-11-18T15:38:29.674Z",
    "changedAt": "2026-11-04T17:01:43.213Z"
   },
   "diamond-selectors-scroll": {
@@ -2008,7 +2008,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.115Z",
+   "seenAt": "2026-11-18T15:38:29.772Z",
    "changedAt": "2026-11-04T17:01:43.274Z"
   },
   "diamond-selectors-plasma": {
@@ -2145,7 +2145,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.173Z",
+   "seenAt": "2026-11-18T15:38:29.879Z",
    "changedAt": "2026-11-04T17:01:43.299Z"
   },
   "diamond-selectors-berachain": {
@@ -2282,7 +2282,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.191Z",
+   "seenAt": "2026-11-18T15:38:29.892Z",
    "changedAt": "2026-11-04T17:01:43.315Z"
   },
   "diamond-selectors-zksync-era": {
@@ -2419,7 +2419,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.075Z",
+   "seenAt": "2026-11-18T15:38:29.830Z",
    "changedAt": "2026-11-04T17:01:43.317Z"
   },
   "diamond-selectors-celo": {
@@ -2556,7 +2556,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.080Z",
+   "seenAt": "2026-11-18T15:38:29.897Z",
    "changedAt": "2026-11-04T17:01:43.329Z"
   },
   "diamond-selectors-world-chain": {
@@ -2693,7 +2693,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.142Z",
+   "seenAt": "2026-11-18T15:38:30.014Z",
    "changedAt": "2026-11-04T17:01:43.330Z"
   },
   "diamond-selectors-linea": {
@@ -2830,7 +2830,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.192Z",
+   "seenAt": "2026-11-18T15:38:30.003Z",
    "changedAt": "2026-11-04T17:01:43.395Z"
   },
   "diamond-selectors-sei": {
@@ -2967,7 +2967,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.273Z",
+   "seenAt": "2026-11-18T15:38:30.041Z",
    "changedAt": "2026-11-04T17:01:43.402Z"
   },
   "diamond-selectors-sonic": {
@@ -3104,7 +3104,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.270Z",
+   "seenAt": "2026-11-18T15:38:30.034Z",
    "changedAt": "2026-11-04T17:01:43.432Z"
   },
   "diamond-selectors-megaeth": {
@@ -3241,7 +3241,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.111Z",
+   "seenAt": "2026-11-18T15:38:29.927Z",
    "changedAt": "2026-11-04T17:01:43.451Z"
   },
   "diamond-selectors-plume": {
@@ -3378,7 +3378,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.207Z",
+   "seenAt": "2026-11-18T15:38:30.112Z",
    "changedAt": "2026-11-04T17:01:43.478Z"
   },
   "diamond-selectors-ink": {
@@ -3515,7 +3515,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.341Z",
+   "seenAt": "2026-11-18T15:38:30.094Z",
    "changedAt": "2026-11-04T17:01:43.482Z"
   },
   "diamond-selectors-arc": {
@@ -3652,7 +3652,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.250Z",
+   "seenAt": "2026-11-18T15:38:30.140Z",
    "changedAt": "2026-11-04T17:01:43.489Z"
   },
   "diamond-selectors-katana": {
@@ -3789,7 +3789,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.348Z",
+   "seenAt": "2026-11-18T15:38:30.223Z",
    "changedAt": "2026-11-04T17:01:43.610Z"
   },
   "diamond-selectors-flare": {
@@ -3926,7 +3926,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.533Z",
+   "seenAt": "2026-11-18T15:38:30.339Z",
    "changedAt": "2026-11-04T17:01:43.612Z"
   },
   "diamond-selectors-x-layer": {
@@ -4063,7 +4063,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.383Z",
+   "seenAt": "2026-11-18T15:38:30.224Z",
    "changedAt": "2026-11-04T17:01:43.625Z"
   },
   "diamond-selectors-mantle": {
@@ -4200,7 +4200,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.510Z",
+   "seenAt": "2026-11-18T15:38:30.291Z",
    "changedAt": "2026-11-04T17:01:43.713Z"
   },
   "diamond-selectors-morph": {
@@ -4337,7 +4337,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.415Z",
+   "seenAt": "2026-11-18T15:38:30.455Z",
    "changedAt": "2026-11-04T17:01:45.041Z"
   },
   "diamond-selectors-elysium": {
@@ -4474,7 +4474,7 @@
      "0xfc5f1003": "startBridgeTokensViaGasZip"
     }
    },
-   "seenAt": "2026-11-17T15:59:06.630Z",
+   "seenAt": "2026-11-18T15:38:30.609Z",
    "changedAt": "2026-11-11T14:18:10.474Z"
   }
  }
