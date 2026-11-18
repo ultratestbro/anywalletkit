@@ -105,7 +105,13 @@ export class ZcashShieldedWallet {
         for (const l of this.balanceListeners) l(next)
       },
       onStatusChanged: (s) => this.setProgress({ status: STATUS[s.name] ?? this.progress.status }),
-      onUpdate: (u) => this.setProgress({ percent: clampPercent(u.scanProgress), networkHeight: u.networkBlockHeight > 0 ? u.networkBlockHeight : this.progress.networkHeight }),
+      onUpdate: (u) => {
+        const percent = clampPercent(u.scanProgress)
+        // iOS emits the first SYNCING status before JS has subscribed, so a running scan can arrive
+        // with the status still "disconnected"; progress below 100 % from a live server means syncing.
+        const inferSyncing = this.progress.status === 'disconnected' && u.networkBlockHeight > 0 && percent < 100
+        this.setProgress({ ...(inferSyncing ? { status: 'syncing' as const } : {}), percent, networkHeight: u.networkBlockHeight > 0 ? u.networkBlockHeight : this.progress.networkHeight })
+      },
       onTransactionsChanged: () => undefined,
       onError: (e) => this.reportError(e.level, e.message),
     })

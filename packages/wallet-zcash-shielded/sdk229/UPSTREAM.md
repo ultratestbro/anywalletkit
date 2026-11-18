@@ -21,6 +21,7 @@ built with its own `npm run update-sources` on macOS (Apple Silicon), Rust 1.97.
 | U9 | react-native-zcash | `AndroidManifest.xml` still sets `package=` (AGP warns it is ignored) | PR (one line) |
 | U10 | react-native-zcash | Android module lacks `addListener` / `removeListeners` (RN warns on `new NativeEventEmitter`) | PR |
 | U11 | react-native-zcash | NU7 branch ships stale checkpoints; `updateCheckpoints.ts` still assumes 75 s blocks | PR |
+| U12 | react-native-zcash | iOS: the first `SYNCING` status is emitted before JS subscribes and is lost | PR |
 
 ---
 
@@ -180,3 +181,17 @@ of it), second run ≈ 21 min (Android Rust for four ABIs + Gradle publish 8 m 4
 > `scripts/updateCheckpoints.ts` still has `blockTimeSeconds: 75` and the comment "75 second blocks";
 > since NU7 (block 3,543,405) blocks are 25 s, so the "days to next checkpoint" estimate is 3× too
 > long. Make the block time height-aware or just say blocks.
+
+## U12 — PR: iOS loses the first status event
+
+**Title:** iOS: replay the current sync status when JS subscribes
+
+> On iOS the synchronizer's first `StatusEvent` (`SYNCING`) never reaches JS: in three runs on an
+> iPhone 16 Pro (iOS 27.0.1, 2026-11-18) the status stayed at its initial value for the whole scan and
+> only `SYNCED` arrived; the same app on Android receives `SYNCING` a few seconds after
+> `makeSynchronizer`. Likely cause (not traced): `updateSyncStatus` emits only on change, and the
+> first change happens before `synchronizer.subscribe()` has added the JS listeners.
+>
+> Fix: keep the last status per alias and emit it again when listeners are added (or expose
+> `getStatus(alias)`). Apps can work around it by treating `UpdateEvent.scanProgress < 100` as syncing,
+> which is what we do in our wrapper.

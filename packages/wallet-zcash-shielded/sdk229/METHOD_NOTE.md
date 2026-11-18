@@ -1,6 +1,6 @@
 # Shielded ZEC (Ironwood) for React Native wallets — method note
 
-*Any Wallet Kit (AWK) · supporting document for the ZCG application · prototype measured 2026-11-17*
+*Any Wallet Kit (AWK) · supporting document for the ZCG application · prototype measured 2026-11-17/18*
 
 ## What we build
 
@@ -45,12 +45,12 @@ shielded receiver, and its transparent receiver must equal the account's t-addre
 - Unified address with transparent, Sapling and Orchard-format receivers; Ironwood has no typecode
   of its own and shares the Orchard receiver (librustzcash `zcash_keys` 0.17), so the address
   receives into Ironwood after NU6.3.
-- Sync from a birthday and per-pool balance on mainnet after NU7 (Android emulator; iPhone and a
-  mainnet receive: see the table).
+- Sync from a birthday and per-pool balance on mainnet after NU7, on an iPhone 16 Pro and an Android
+  emulator (mainnet receive: see the report).
 - One seed for both worlds: the address's transparent receiver is `m/44'/133'/0'/0/j`, j being the
-  diversifier index the SDK picked (1 or 4 on our test seeds, not always 0) — checked on the device
+  diversifier index the SDK picked (0, 1 or 4 on our test seeds) — checked on the device
   against AWK's transparent package.
-- 82 unit tests (ZIP-316 vectors, balance mapping, address checks, sync state).
+- 84 unit tests (ZIP-316 vectors, balance mapping, address checks, sync state).
 
 ## Measurements
 
@@ -58,14 +58,16 @@ shielded receiver, and its transparent receiver must equal the account's t-addre
 |---|---|---|
 | Device | iPhone 16 Pro, iOS 27.0.1 (high-end; no mid-range iPhone available) | Emulator, Android 16 (API 36), 2 cores, 2 GB RAM, arm64 on Apple Silicon (no physical low-end device) |
 | App size, without → with module | IPA (zip, stripped) 24.1 → 47.4 MB (+23.3); executable 9.7 → 65.7 MB | APK arm64-v8a 61.8 → 117.9 MB (+56.1); native lib 53.6 MB (19.6 MB gzip) |
-| First sync, birthday 3,520,000 (2026-10-16, 62.7k blocks) | TBD | 1,135 s (18.9 min) |
-| First sync, new wallet (checkpoint 3,580,000, ≈2.6k blocks) | TBD | 298 s |
-| Memory during sync (RSS, median / max) | TBD | 249 / 275 MB |
-| CPU during sync (mean / p95, % of one core) | TBD | 104 % / 141 % of 200 % |
+| First sync, birthday 3,520,000 (2026-10-16; 66.0k blocks iOS, 62.7k Android) | 308 s (5.1 min) | 1,135 s (18.9 min) |
+| First sync, new wallet (checkpoint 3,580,000; ≈6.0k blocks iOS, ≈2.6k Android) | 32 s | 298 s |
+| Memory during sync, median / max | footprint 165 / 178 MB, resident 259 / 306 MB | RSS 249 / 275 MB |
+| CPU during sync (mean / p95, % of one core) | 124 % / 227 % of 600 % | 104 % / 141 % of 200 % |
 
 Server: zec.rocks:443 (ECC lightwalletd v0.6.1, Zebra 7.1.0, NU7). Wrapper: react-native-zcash
 `jon/zcash-nu7-sdks` @ ca9c738 (ZODL Swift SDK @ 03a7799, Android SDK 5.2.2 @ 42ebb78, rebuilt on the
-final NU7 crates). Every number comes from a real run on the stated device on 2026-11-17.
+final NU7 crates). Every number comes from one real run on the stated device (emulator 2026-11-17,
+iPhone 2026-11-18, Release builds). iPhone CPU/memory: Instruments Activity Monitor; the phone reached
+the "Serious" thermal state during the 2026-10-16 run, so its figures may include throttling.
 
 ## Limits and risks
 

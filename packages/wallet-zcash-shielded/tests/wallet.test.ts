@@ -91,6 +91,16 @@ describe('ZcashShieldedWallet', () => {
     expect(seen).toEqual(['disconnected:0:0', 'syncing:0:0', 'syncing:42.5:3581000', 'syncing:100:3581000', 'synced:100:3581000'])
   })
 
+  it('treats progress from a live server as syncing when the SYNCING status never arrived (iOS)', async () => {
+    const f = fakeNative()
+    const w = await open(f.native)
+    f.emit().onUpdate({ alias: 'proto-1', scanProgress: 0.7, networkBlockHeight: 3_585_961 })
+    expect(w.getSyncProgress()).toEqual({ status: 'syncing', percent: 0.7, networkHeight: 3_585_961 })
+    f.emit().onStatusChanged({ alias: 'proto-1', name: 'SYNCED' })
+    f.emit().onUpdate({ alias: 'proto-1', scanProgress: 100, networkBlockHeight: 3_585_962 })
+    expect(w.getSyncProgress().status).toBe('synced')
+  })
+
   it('returns the unified address with its decoded receivers', async () => {
     const w = await open(fakeNative().native)
     const a = await w.getAddress()

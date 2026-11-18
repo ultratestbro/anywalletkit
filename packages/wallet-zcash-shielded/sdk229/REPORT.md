@@ -1,6 +1,6 @@
 # SDK-229 — прототип shielded ZEC (Ironwood) на react-native-zcash: отчёт
 
-Дата прогонов: 2026-11-17. Ветка AWK: `feat/zcash-shielded-proto` (worktree `~/anywalletkit-zec-shielded`),
+Дата прогонов: 2026-11-17 (Android-эмулятор, размеры), 2026-11-18 (iPhone). Ветка AWK: `feat/zcash-shielded-proto` (worktree `~/anywalletkit-zec-shielded`),
 ветка Vaulty: `feat/zcash-shielded-proto` (worktree `~/vaulty-zec`). Ничего не запушено и не опубликовано.
 
 ## Коротко
@@ -9,11 +9,11 @@
 |---|---|
 | NU7-ветка react-native-zcash собирается без форка (iOS + Android) | ✅ штатный `update-sources`; нужен NDK ровно 27.0.12077973 |
 | Vaulty (Expo 58, RN 0.88, New Architecture) Release с модулем | ✅ iOS и Android; три правки нативных проектов (см. «Интеграция») |
-| Пакет `@anywalletkit/wallet-zcash-shielded` | ✅ `getAddress`, `getBalance`, `onSyncProgress`; 83 теста |
+| Пакет `@anywalletkit/wallet-zcash-shielded` | ✅ `getAddress`, `getBalance`, `onSyncProgress`; 84 теста |
 | Unified-адрес с Ironwood + transparent | ✅ `p2pkh · sapling · orchard(0x03)`; Ironwood делит Orchard-получатель |
-| Синк от birthday, баланс по пулам на mainnet после NU7 | ✅ Android-эмулятор; iPhone — см. ниже |
+| Синк от birthday, баланс по пулам на mainnet после NU7 | ✅ Android-эмулятор и iPhone 16 Pro |
 | Приём ZEC на UA (mainnet, txid) | ⏳ ждёт перевода от владельца |
-| Замеры | ✅ размер iOS/Android, синк/CPU/память на эмуляторе; iPhone — см. ниже |
+| Замеры | ✅ размер iOS/Android; синк, CPU, память на эмуляторе и на iPhone 16 Pro |
 | **Лицензия** | ⚠️ NU7-путь = ZODL SDK, **AGPL-3.0-only, App Store запрещён без коммерческой лицензии** |
 
 ## 1. Сборка обёртки на NU7
@@ -45,7 +45,7 @@ branch id `77190ad9` (NU7). `na.zec.rocks` — то же; `eu.zec.rocks` не о
 - **Баланс по пулам** transparent / Sapling / Orchard / Ironwood (spendable, total, pending) — bigint.
 - **Ключи из того же seed:** transparent-получатель UA = `m/44'/133'/0'/0/j`, где j — индекс
   диверсификатора, который выбрал SDK (первый годный для Sapling). Это **не всегда 0**: на трёх
-  тестовых фразах j = 1, 4, 1. Ключ тот же, путь тот же, отличается только индекс адреса.
+  тестовых фразах эмулятора j = 1, 4, 1; на фразе iPhone j = 0. Ключ тот же, путь тот же, отличается только индекс адреса.
   Проверено в приложении: адрес SDK найден среди `@anywalletkit/wallet-zcash` getAccount(0…63);
   на векторах ZIP-316 (account 0, j = 0) совпадение побайтно — тест в пакете.
   **Следствие для M2:** у одного кошелька два «основных» t-адреса (AWK #0 и UA #j). Нужно
@@ -55,7 +55,7 @@ branch id `77190ad9` (NU7). `na.zec.rocks` — то же; `eu.zec.rocks` не о
 
 ## 3. Замеры
 
-Все цифры — реальные прогоны 2026-11-17, n = 1 на точку.
+Все цифры — реальные прогоны (эмулятор 2026-11-17, iPhone 2026-11-18), n = 1 на точку.
 
 ### Размер (Release, arm64)
 
@@ -77,8 +77,8 @@ branch id `77190ad9` (NU7). `na.zec.rocks` — то же; `eu.zec.rocks` не о
 |---|---|---|---|---|---|---|
 | Android-эмулятор* | 2026-10-16 | 3 520 000 → 3 582 650 | 62 650 | **1 135 с (18.9 мин)** | 104 % / 141 % (из 200) | RSS 249 / 275 MB |
 | Android-эмулятор* | fresh | 3 580 000 → 3 582 580 | ≈ 2 580 | **298 с** | 73 % / 103 % | RSS 242 / 249 MB |
-| iPhone 16 Pro, iOS 27.0.1 | 2026-10-16 | _TBD_ | | | | |
-| iPhone 16 Pro, iOS 27.0.1 | fresh | _TBD_ | | | | |
+| iPhone 16 Pro, iOS 27.0.1** | 2026-10-16 | 3 520 000 → 3 585 957 | 65 957 | **308 с (5.1 мин)** | 124 % / 227 % (из 600) | footprint 165 / 178 MB; resident 259 / 306 MB |
+| iPhone 16 Pro, iOS 27.0.1** | fresh | 3 580 000 → 3 585 962 | ≈ 5 960 | **32 с** | 157 % / 190 % (из 600) | footprint 174 / 175 MB; resident 292 / 293 MB |
 
 \* Эмулятор Android 16 (API 36, Google Play arm64), 2 ядра, 2 GB RAM, на Mac с Apple Silicon.
 **Не физическое low-end устройство** — его нет. CPU — доля одного ядра по тикам `/proc/<pid>/stat`,
@@ -86,7 +86,23 @@ branch id `77190ad9` (NU7). `na.zec.rocks` — то же; `eu.zec.rocks` не о
 не вошли. Первая попытка сэмплить через `dumpsys meminfo` выбросила: он вызывает GC в приложении
 (паузы до 8 с) и искажает замер.
 
+\*\* iPhone 16 Pro (iPhone17,1, 6 ядер: 2 P + 4 E), iOS 27.0.1 (24A446), Release-сборка, по кабелю
+(заряжался). Время — от «open» до статуса `synced` по журналу самого экрана (AsyncStorage `zec-bench`,
+снят с устройства через `devicectl`). CPU и память — Instruments, шаблон Activity Monitor, все процессы,
+сэмпл ≈ 1 с: CPU = прирост CPU time процесса / время (% одного ядра), p95 — по окнам 5 с; footprint —
+physical footprint (по нему iOS выгружает приложение), resident — real memory. До прогона (экран
+открыт, синка нет): CPU 8 %, footprint 144 MB.
+**Нагрев:** по Instruments телефон перешёл в Fair через 3.5 мин записи и в **Serious** через 7.7 мин —
+прогон «2026-10-16» шёл первые 1.5 мин в Fair, остальное в Serious, «fresh» — целиком в Serious.
+Возможен термотроттлинг, т. е. цифры iPhone скорее консервативные.
+Первая попытка на iPhone не вошла в таблицу: прогоны «2026-10-16» и «fresh» запустили с разницей 13 с
+(второй останавливает первый), затем «fresh» переоткрыли. Повтор — с новыми alias, без вмешательства.
+
 iPhone 16 Pro — high-end; mid-range iPhone нет.
+
+**Находка (iOS):** первый `StatusEvent` `SYNCING` на iOS не доходит до JS (на Android доходит) — пока
+синк идёт, статус оставался `disconnected`. Исправлено в нашем слое: прогресс < 100 % от живого
+сервера при статусе `disconnected` считается `syncing` (тест в пакете). Черновик для Edge — UPSTREAM U12.
 
 ## 4. Интеграция в Expo-приложение (правки, которые пришлось сделать)
 
@@ -124,10 +140,10 @@ iPhone 16 Pro — high-end; mid-range iPhone нет.
 
 ## 6. Upstream
 
-Черновики — `UPSTREAM.md` (U1–U10), ничего не отправлено. Главное: Expo config plugin, проверка
+Черновики — `UPSTREAM.md` (U1–U12), ничего не отправлено. Главное: Expo config plugin, проверка
 NDK в `update-sources`, `try!` → reject в `initialize`, init по UFVK без фразы, размер Rust-библиотеки
 (Tor/voting/Keystone как Cargo-фичи), лицензия, устаревшие чекпоинты и 75-секундные блоки в
-`updateCheckpoints.ts`, `removeListeners` в Android-модуле.
+`updateCheckpoints.ts`, `removeListeners` в Android-модуле, первый `SYNCING` на iOS теряется.
 
 ## 7. Открытые вопросы
 
