@@ -1,5 +1,12 @@
 # @anywalletkit/protocol-swap2-lifi
 
+## 0.8.6
+
+### Patch Changes
+
+- Updated dependencies [ef9b9d7]
+  - @anywalletkit/protocol-swap2-core@0.16.0
+
 ## 0.8.5
 
 ### Patch Changes

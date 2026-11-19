@@ -10,9 +10,16 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
-## 2026-11-19: a failed dry run after an approval is re-quoted, Permit2 allowances stay
+## 2026-11-20: CCTP Standard route, a failed dry run after an approval is re-quoted, Permit2 allowances stay
 
-Nothing to change in code. Bump `protocol-swap2-core` to 0.16.0 for fewer approval transactions when a swap fails.
+Nothing to change in code. Bump `protocol-swap2-core` to 0.16.0 for fewer approval transactions when a swap fails,
+and `protocol-swap2-cctp` for the free Standard route.
+
+- **protocol-swap2-cctp (minor):** quotes carry `routeId: "fast"` or `"standard"`, and `getQuotes` lists Standard (no
+  Circle fee, waits for the source's finality: 15–19 min from Ethereum and its L2s, ~30 min from Ink and Morph, hours
+  from Linea) next to Fast when it pays out more. Without a `routeId` nothing changes (Fast when offered). A CCTP stub
+  behind your server lists both only with `remoteProvider({name: "cctp", baseUrl, multiQuotes: true, ...cctpPins})`.
+  Standard's `etaSeconds` now follows the source domain (was ~17–20 min everywhere).
 
 - **protocol-swap2-core 0.16.0:** when the dry run of the swap fails right after an approval the execution mined (a
   node behind the approval's block, a price that moved while it mined), the engine quotes once more on that
