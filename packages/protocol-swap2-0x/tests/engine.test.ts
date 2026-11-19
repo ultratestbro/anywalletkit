@@ -145,21 +145,23 @@ describe("ZeroExSwap2Protocol — local mode", () => {
     expect(log.sent).toEqual([]);
   });
 
-  it("a signed call that does not simulate is not sent, and the allowance is taken back", async () => {
+  it("a signed call that does not simulate is quoted once more, then not sent; the Permit2 allowance stays (signature transfer only)", async () => {
     world();
     const log = fresh();
-    const acc = account(log, {quoteSendTransaction: async (t: Sent) => { if (log.signed.length && t.to === SETTLER) throw new Error("execution reverted"); return {fee: 1n}; }});
+    const acc = account(log, {quoteSendTransaction: async (t: Sent) => { if (log.signed.length && t.to === SETTLER && t.gasLimit === undefined) throw new Error("execution reverted"); return {fee: 1n}; }});
     await expect(local(acc).swap2(options)).rejects.toThrow(/signed swap does not simulate from this account/);
-    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+    // the first pass and the re-quote pass each signed a permit; no approve(Permit2, 0)
+    expect(log.signed).toHaveLength(2);
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
   });
 
-  it("a Settler that left the registry between quote and execution: no swap sent, the permit never leaves the device, the allowance taken back", async () => {
+  it("a Settler that left the registry between quote and execution: no swap sent, nothing signed, the Permit2 allowance stays", async () => {
     // read 1 = the live quote; read 2 = preflight, where the registry no longer names the quoted Settler (paused, rolled back)
     world({onRegistryRead: (n) => (n === 1 ? {current: SETTLER, prev: PREV_SETTLER} : {current: PREV_SETTLER, prev: OLDER_SETTLER})});
     const log = fresh();
     await expect(local(account(log)).swap2(options)).rejects.toThrow(/the quoted 0x Settler is no longer in the on-chain registry/);
     // the engine approves, runs the provider's preflight, and asks for the permit only after it passed: nothing is signed
-    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
     expect(log.signed).toHaveLength(0);
     // only the gas pre-check (the unsigned call at its quoted limit) touched the Settler call: the signed one was not even dry-run
     expect(log.estimated.filter((e) => e.to === SETTLER).every((e) => e.gasLimit !== undefined)).toBe(true);

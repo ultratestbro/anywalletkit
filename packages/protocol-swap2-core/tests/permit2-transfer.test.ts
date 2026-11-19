@@ -256,13 +256,14 @@ describe("Permit2 signature-transfer execution", () => {
     expect(log.sent[0]!.to).toBe(SETTLER);
   });
 
-  it("a signed call that does not simulate is not sent, and the allowance is revoked", async () => {
+  it("a signed call that does not simulate is not sent, and the Permit2 allowance stays (signature transfer only)", async () => {
     const log = fresh();
     const acc = account(log, {quoteSendTransaction: async (t: {data?: string}) => { if (t.data?.endsWith("cd".repeat(65))) throw new Error("execution reverted"); return {fee: 1n}; }});
     const err = await protocol(provider(tx()), acc).swap2(options).catch((e: unknown) => e);
     expect((err as Error).message).toMatch(/signed swap does not simulate from this account \(execution reverted\) — nothing was sent/);
     expect(refusalOf(err)?.reason).toBe("simulation_failed");
-    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+    // The approval, then nothing: no approve(Permit2, 0).
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
   });
 
   it("an account without signTypedData cannot run it: nothing goes out, not even the approval", async () => {
@@ -277,19 +278,19 @@ describe("Permit2 signature-transfer execution", () => {
     expect(log.sent).toEqual([]);
   });
 
-  it("a signature declined after the approval: the swap is not sent and the allowance is revoked", async () => {
+  it("a signature declined after the approval: the swap is not sent and the Permit2 allowance stays", async () => {
     const log = fresh();
     await expect(protocol(provider(tx()), account(log, {signTypedData: async () => { throw new Error("User rejected the request"); }})).swap2(options)).rejects.toThrow(/User rejected the request/);
-    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
   });
 
-  it("a signature the account returns malformed is refused: nothing is sent, or the approval is revoked", async () => {
+  it("a signature the account returns malformed is refused: nothing is sent but the approval", async () => {
     const standing = fresh();
     await expect(protocol(provider(tx()), account(standing, {getAllowance: async () => AMOUNT, signTypedData: async () => "0x1234"})).swap2(options)).rejects.toThrow(/no usable signature/);
     expect(standing.sent).toEqual([]);
     const approved = fresh();
     await expect(protocol(provider(tx()), account(approved, {signTypedData: async () => "0x1234"})).swap2(options)).rejects.toThrow(/no usable signature/);
-    expect(approved.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+    expect(approved.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
   });
 
   it("a deadline that passes between the quote and the signature is quote_expired, with nothing sent", async () => {
@@ -309,20 +310,169 @@ describe("Permit2 signature-transfer execution", () => {
     expect(log.signed).toEqual([]);
   });
 
-  it("a deadline that passes after the approval (during the provider's preflight) is quote_expired, and the allowance is revoked", async () => {
+  it("a deadline that passes after the approval (during the provider's preflight) is quote_expired, and the Permit2 allowance stays", async () => {
     const log = fresh();
     const deadline = now() + 120;
     const realNow = Date.now;
     const p = provider(tx({permit2Transfer: typed((t) => { t.message.deadline = String(deadline); })}), {preflightDeposit: async () => { Date.now = () => (deadline + 1) * 1000; }});
     try {
       const err = await protocol(p, account(log)).swap2(options).catch((e: unknown) => e);
-      expect((err as Error).message).toBe("swap2: the Permit2 signature deadline passed before signing — the swap was not sent and the allowance was revoked");
+      expect((err as Error).message).toBe("swap2: the Permit2 signature deadline passed before signing — the swap was not sent and the Permit2 allowance was left in place (it moves nothing without a new signature)");
       expect(refusalOf(err)?.reason).toBe("quote_expired");
     } finally {
       Date.now = realNow;
     }
     expect(log.signed).toEqual([]);
-    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
+  });
+
+  // 2026-11-19, cp0x Swap web, 0x on Ethereum (DAI → ETH): the dry run right after the mined approval reverted, the
+  // engine revoked Permit2 — two approval transactions paid, no swap.
+  describe("a dry run that fails after the approval this execution mined", () => {
+    const revertOnce = (log: Log, failures = 1) => {
+      let left = failures;
+      return account(log, {quoteSendTransaction: async (t: {data?: string; gasLimit?: bigint}) => {
+        log.estimated.push(t);
+        if (t.data?.endsWith("cd".repeat(65)) && left > 0) { left--; throw new Error("execution reverted"); }
+        return {fee: 1n};
+      }});
+    };
+
+    it("is quoted once more on the same allowance and goes out: one approval, no approve(0)", async () => {
+      const log = fresh();
+      const phases: string[] = [];
+      let quotes = 0;
+      const base = provider(tx());
+      const p = provider(tx(), {getQuote: async (params) => { quotes++; return base.getQuote(params); }});
+      class P extends SingleProviderSwap2 {
+        protected readonly provider = p;
+        protected chainSupported(): boolean { return true; }
+      }
+      const result = await new P(revertOnce(log) as never, {fromChain: "eip155:8453", onExecutionPhase: (phase) => { phases.push(phase); }}).swap2(options);
+      expect(quotes).toBe(2);
+      expect(log.sent.map((s) => s.data?.slice(0, 10))).toEqual(["0x095ea7b3", "0x1fff991f"]);
+      expect(log.sent[0]!.data).toBe(APPROVE(AMOUNT));
+      expect(phases).toEqual(["approving", "signing", "requoting", "signing", "broadcast"]);
+      // The first permit went into the failed dry run only; the re-quote's permit is the one sent.
+      expect(log.signed).toHaveLength(2);
+      expect(result.hash).toBe("0x2");
+    });
+
+    it("re-quotes once only: when the second pass fails too, nothing more is sent (the Permit2 allowance stays)", async () => {
+      const log = fresh();
+      let quotes = 0;
+      const base = provider(tx());
+      const p = provider(tx(), {getQuote: async (params) => { quotes++; return base.getQuote(params); }});
+      const err = await protocol(p, revertOnce(log, 5)).swap2(options).catch((e: unknown) => e);
+      expect(refusalOf(err)?.reason).toBe("simulation_failed");
+      expect(quotes).toBe(2);
+      expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
+    });
+
+    it("the re-quote is reviewed again when it pays out less, flagged requoted", async () => {
+      const log = fresh();
+      const plans: Swap2ExecutionPlan[] = [];
+      let quotes = 0;
+      const base = provider(tx());
+      const p = provider(tx(), {getQuote: async (params) => { quotes++; const q = await base.getQuote(params); return quotes === 1 ? q : {...q!, destAmount: "399000000000000"}; }});
+      await protocol(p, revertOnce(log), (plan) => { plans.push(plan); }).swap2(options);
+      expect(plans.map((x) => x.requoted)).toEqual([undefined, true]);
+      expect(plans[1]!.destAmount).toBe(399_000_000_000_000n);
+      expect(plans[1]!.minDestAmount).toBe(396_000_000_000_000n);
+    });
+
+    it("the re-quote is held to the caller's floor: below it, refused, and nothing more is sent", async () => {
+      const log = fresh();
+      let quotes = 0;
+      const base = provider(tx());
+      const p = provider(tx(), {getQuote: async (params) => { quotes++; const q = await base.getQuote(params); return quotes === 1 ? q : {...q!, destAmount: "390000000000000", minDestAmount: "386000000000000"}; }});
+      await expect(protocol(p, revertOnce(log)).swap2(options)).rejects.toThrow();
+      expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
+    });
+
+    it("with the Permit2 allowance already in place (nothing approved), a failed dry run is not re-quoted", async () => {
+      const log = fresh();
+      let quotes = 0;
+      const base = provider(tx());
+      const p = provider(tx(), {getQuote: async (params) => { quotes++; return base.getQuote(params); }});
+      const acc = {...revertOnce(log), getAllowance: async () => AMOUNT};
+      await expect(protocol(p, acc).swap2(options)).rejects.toThrow(/does not simulate/);
+      expect(quotes).toBe(1);
+      expect(log.sent).toEqual([]);
+    });
+  });
+
+  describe("a spender other than Permit2 (a router allowance, ownGasEstimate)", () => {
+    const ROUTER_APPROVE = (amount: bigint) => `0x095ea7b3${SETTLER.slice(2).toLowerCase().padStart(64, "0")}${amount.toString(16).padStart(64, "0")}`;
+    const plain = (): TxRequest => ({to: SETTLER, data: DATA, value: "0", chainId: 8453, gasLimit: "400000", approvalAddress: SETTLER});
+    const reverting = (log: Log, failures: number) => {
+      let left = failures;
+      return account(log, {quoteSendTransaction: async (t: {to?: string; data?: string; gasLimit?: bigint}) => {
+        log.estimated.push(t);
+        if (t.to === SETTLER && t.gasLimit === undefined && left > 0) { left--; throw new Error("execution reverted"); }
+        return {fee: 1n};
+      }});
+    };
+
+    it("a dry run that fails after its approval is re-quoted and goes out, with no revoke", async () => {
+      const log = fresh();
+      await protocol(provider(plain(), {ownGasEstimate: true}), reverting(log, 1)).swap2(options);
+      expect(log.sent.map((s) => s.data)).toEqual([ROUTER_APPROVE(AMOUNT), DATA]);
+    });
+
+    it("when the re-quote fails too, the allowance is revoked exactly once", async () => {
+      const log = fresh();
+      const err = await protocol(provider(plain(), {ownGasEstimate: true}), reverting(log, 5)).swap2(options).catch((e: unknown) => e);
+      expect(refusalOf(err)?.reason).toBe("simulation_failed");
+      expect(log.sent.map((s) => s.data)).toEqual([ROUTER_APPROVE(AMOUNT), ROUTER_APPROVE(0n)]);
+    });
+
+    it("a declined review of the re-quote revokes it once", async () => {
+      const log = fresh();
+      let quotes = 0;
+      const base = provider(plain(), {ownGasEstimate: true});
+      const p = {...base, getQuote: async (params: QuoteParams) => { quotes++; const q = await base.getQuote(params); return quotes === 1 ? q : {...q!, destAmount: "399000000000000"}; }};
+      let reviews = 0;
+      await expect(protocol(p, reverting(log, 1), () => { if (++reviews === 2) throw new Error("declined"); }).swap2(options)).rejects.toThrow(/declined/);
+      expect(log.sent.map((s) => s.data)).toEqual([ROUTER_APPROVE(AMOUNT), ROUTER_APPROVE(0n)]);
+    });
+  });
+
+  describe("simulation_failed names the revert", () => {
+    // viem's eth_estimateGas revert: EstimateGasExecutionError → ExecutionRevertedError → RpcRequestError {data}.
+    const viemRevert = (data: string) => {
+      const rpc = Object.assign(new Error("RPC Request failed."), {name: "RpcRequestError", code: 3, data});
+      const node = Object.assign(new Error("Execution reverted for an unknown reason.", {cause: rpc}), {name: "ExecutionRevertedError", code: 3});
+      return Object.assign(new Error(`Execution reverted for an unknown reason.\n\nRequest Arguments:\n  from: ${ME}\n  data: ${DATA}`, {cause: node}), {name: "EstimateGasExecutionError"});
+    };
+    const failWith = async (error: () => Error) => {
+      const log = fresh();
+      const acc = account(log, {getAllowance: async () => AMOUNT, quoteSendTransaction: async (t: {data?: string}) => { if (t.data?.endsWith("cd".repeat(65))) throw error(); return {fee: 1n}; }});
+      return protocol(provider(tx()), acc).swap2(options).catch((e: unknown) => e) as Promise<Error>;
+    };
+    const word = (s: string) => `0x08c379a0${(32n).toString(16).padStart(64, "0")}${s.length.toString(16).padStart(64, "0")}${Buffer.from(s).toString("hex").padEnd(64, "0")}`;
+
+    it("a known custom error: its selector and name, no arguments", async () => {
+      const err = await failWith(() => viemRevert(`0x97a6f3b9${USDC.slice(2).toLowerCase().padStart(64, "0")}${(10n ** 18n).toString(16).padStart(64, "0")}${(9n * 10n ** 17n).toString(16).padStart(64, "0")}`));
+      expect(err.message).toBe("swap2: the signed swap does not simulate from this account (reverted: 0x97a6f3b9 TooMuchSlippage) — nothing was sent");
+      expect(refusalOf(err)?.reason).toBe("simulation_failed");
+      expect(err.message).not.toMatch(new RegExp(USDC.slice(2), "i"));
+    });
+
+    it("an unknown custom error: the selector alone; viem's ContractFunctionRevertedError `raw` is read too", async () => {
+      expect((await failWith(() => viemRevert("0xdeadbeef"))).message).toMatch(/\(reverted: 0xdeadbeef\)/);
+      const contract = () => Object.assign(new Error("The contract function reverted."), {name: "ContractFunctionRevertedError", raw: "0x756688fe", data: {errorName: "InvalidNonce"}});
+      expect((await failWith(contract)).message).toMatch(/\(reverted: 0x756688fe InvalidNonce\)/);
+    });
+
+    it("Error(string): the reason when it is plain words, the selector alone when it carries digits", async () => {
+      expect((await failWith(() => viemRevert(word("TRANSFER_FROM_FAILED")))).message).toMatch(/\(reverted: 0x08c379a0 Error\("TRANSFER_FROM_FAILED"\)\)/);
+      expect((await failWith(() => viemRevert(word("min out 12345")))).message).toMatch(/\(reverted: 0x08c379a0 Error\) —/);
+    });
+
+    it("without revert data: the node's message, as before", async () => {
+      expect((await failWith(() => new Error("execution reverted"))).message).toMatch(/\(execution reverted\) — nothing was sent/);
+    });
   });
 
   const refused: [string, TxRequest, RegExp, Swap2RefusalReason][] = [

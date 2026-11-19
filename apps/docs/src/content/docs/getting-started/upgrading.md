@@ -10,6 +10,23 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## 2026-11-19: a failed dry run after an approval is re-quoted, Permit2 allowances stay
+
+Nothing to change in code. Bump `protocol-swap2-core` to 0.16.0 for fewer approval transactions when a swap fails.
+
+- **protocol-swap2-core 0.16.0:** when the dry run of the swap fails right after an approval the execution mined (a
+  node behind the approval's block, a price that moved while it mined), the engine quotes once more on that
+  allowance before giving up, like it does when the quote expires during the approval. Expect the `requoting` phase
+  and, when the plan changed, a second `reviewExecution` call with `requoted: true` in this case too. One re-quote
+  per execution; the allowance is revoked only when that pass fails as well.
+- **Permit2 signature transfers (0x) no longer revoke:** after a failed 0x swap the Permit2 allowance stays. Permit2
+  moves nothing on it without a fresh signature per transfer. Every other spender is still revoked. An app that
+  counted an `approve(…, 0)` after a failed 0x swap sees none now.
+- **`simulation_failed` names the revert:** the message reads `(reverted: 0x97a6f3b9 TooMuchSlippage)` when the
+  account's error carries revert data (selector, and the name for known errors: 0x Settler, Permit2, ERC-20, Uniswap
+  routers), and the node's text as before otherwise. No addresses or amounts.
+- Apps pinned to `protocol-swap2-core` 0.15.0: 0.15.1 already signs the 0x permit after the approval, once.
+
 ## 2026-11-17: Stargate, Fynd's redeployed router, routes per provider
 
 Bump `protocol-swap2-fynd` now: 0.2.12 and older refuse every Fynd quote. Code that reads an ETA must accept `null`.

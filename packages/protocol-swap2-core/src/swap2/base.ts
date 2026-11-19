@@ -9,7 +9,7 @@
  * through the bound account. Subclasses only supply "which provider(s)".
  */
 import {Swap2Protocol} from "@anywalletkit/core";
-import {encodeFunctionData, getAddress} from "viem";
+import {decodeAbiParameters, encodeFunctionData, getAddress} from "viem";
 import {decodeCall} from "@anywalletkit/tx-preview-evm";
 import type {
   Swap2Options,
@@ -57,6 +57,7 @@ import {
   Swap2ValidationError,
   combinedRefusal,
   refusal,
+  refusalOf,
   type Swap2Refusal,
   type Swap2RefusalReason,
 } from "../errors.js";
@@ -127,6 +128,43 @@ function dryRunFailure(error: unknown): "revert" | "transport" | "other" {
   const status = (s: unknown) => typeof s === "number" && (s === 429 || (s >= 500 && s <= 599));
   if (chain.some((e) => status(e.status) || e.code === -32005 || LOST_ANSWER.test(text(e)) || UNANSWERED.test(text(e)))) return "transport";
   return "other";
+}
+
+/**
+ * Errors a swap's dry run reverts with, by selector: the 0x Settler, Permit2, OpenZeppelin ERC-20 and the Uniswap
+ * routers. Names only — their arguments (addresses, amounts) never reach a message.
+ */
+const REVERT_NAMES: Record<string, string> = {
+  "0x97a6f3b9": "TooMuchSlippage", "0xe758b8d5": "ConfusedDeputy", "0xc321526c": "InvalidSignatureLen", "0x3c74eed6": "ActionInvalid", "0xfb772a88": "ZeroSellAmount",
+  "0xcd21db4f": "SignatureExpired", "0x756688fe": "InvalidNonce", "0x815e1d64": "InvalidSigner", "0x8baa579f": "InvalidSignature", "0x4be6321b": "InvalidSignatureLength",
+  "0x3728b83d": "InvalidAmount", "0xb0669cbc": "InvalidContractSignature", "0xd81b2f2e": "AllowanceExpired", "0xf96fb071": "InsufficientAllowance",
+  "0xfb8f41b2": "ERC20InsufficientAllowance", "0xe450d38c": "ERC20InsufficientBalance",
+  "0x39d35496": "V3TooLittleReceived", "0x849eaf98": "V2TooLittleReceived", "0x5bf6f916": "TransactionDeadlinePassed",
+  "0x08c379a0": "Error", "0x4e487b71": "Panic",
+};
+
+/**
+ * The revert behind a failed dry run, as `0x<selector> <Name>`: the 4-byte selector of the revert data (viem keeps it
+ * in the cause chain's `data` — `RpcRequestError`, `RawContractError` — or as `raw` on `ContractFunctionRevertedError`,
+ * never in the message), the error's name when it is a known one, and an `Error(string)` reason when it is plain words
+ * (one with digits or hex could carry an amount or an address, and is left out). Undefined without revert data.
+ */
+function revertOf(error: unknown): string | undefined {
+  let data: string | undefined;
+  for (let e = error as {cause?: unknown; data?: unknown; raw?: unknown} | undefined, i = 0; e && typeof e === "object" && i < 8 && !data; e = e.cause as typeof e, i++) {
+    const nested = e.data && typeof e.data === "object" ? (e.data as {data?: unknown}).data : undefined;
+    data = [e.raw, e.data, nested].find((d): d is string => typeof d === "string" && /^0x[0-9a-fA-F]{8}(?:[0-9a-fA-F]{2})*$/.test(d));
+  }
+  if (!data) return undefined;
+  const selector = data.slice(0, 10).toLowerCase();
+  if (selector === "0x08c379a0") {
+    try {
+      const [reason] = decodeAbiParameters([{type: "string"}], `0x${data.slice(10)}`);
+      if (/^[A-Za-z _:'.-]{1,64}$/.test(reason)) return `${selector} Error("${reason}")`;
+    } catch { /* the selector and name alone */ }
+  }
+  const name = REVERT_NAMES[selector];
+  return name ? `${selector} ${name}` : selector;
 }
 
 /** Our config adds the account's source chain (CAIP-2) the base type omits. */
@@ -635,8 +673,9 @@ interface Swap2Signer {
 
 /**
  * An exact allowance the first execution pass mined before its quote
- * expired, handed to the re-quote pass (SDK-128). The pass that adopts it
- * owns its cleanup; until then the first pass revokes on any failure.
+ * expired — or before a dry run of the swap failed — handed to the re-quote
+ * pass (SDK-128). The pass that adopts it owns its cleanup; until then the
+ * first pass revokes on any failure.
  */
 interface CarriedAllowance {
   journal?: Swap2OperationJournal;
@@ -646,6 +685,8 @@ interface CarriedAllowance {
   spender: string;
   amount: bigint;
   revoke: () => Promise<void>;
+  /** The first pass spent it through Permit2 as a signature transfer only: it is not revoked on failure (see executeSwap2). */
+  signatureTransferOnly: boolean;
   adopted: boolean;
   /** What the first pass's `reviewExecution` approved; the re-quote is reviewed again if it differs. */
   reviewed?: Swap2ExecutionPlan;
@@ -1574,23 +1615,32 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     const sameHex = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
     let approvalAmounts: bigint[] = [];
     let revokeApproval: (() => Promise<void>) | undefined;
+    // An allowance to canonical Permit2 that this execution spends only as a signature transfer (PermitTransferFrom,
+    // 0x Settler) is not revoked after a failure: Permit2 moves nothing on it without a fresh signature per transfer,
+    // and the revoke would cost a transaction and a wallet prompt, and the next such swap an approval again. Every
+    // other spender is revoked as before, and so is a Permit2 allowance a pass would spend through Permit2's own
+    // allowances (AllowanceTransfer: no `permit2Transfer` on the quote). Permit2 allowances the user signed earlier
+    // to other spenders are theirs: this engine never signs one.
+    const signatureTransferOnly = !!permit2 && (!carried || carried.signatureTransferOnly);
+    const keep = async (): Promise<void> => {};
+    const revokedNote = (kept: boolean, allowance = "the allowance") => kept ? "the Permit2 allowance was left in place (it moves nothing without a new signature)" : `${allowance} was revoked`;
     if (carried && !needsApproval) {
       // The fresh quote no longer spends through an allowance: the one the
       // first pass mined would outlive this swap with nobody to revoke it.
       carried.adopted = true;
-      await carried.revoke().catch(() => {});
-      throw new Swap2QuoteError("swap2: the fresh quote no longer spends through an allowance — aborted, the allowance was revoked", {reason: "policy_refused"});
+      if (!carried.signatureTransferOnly) await carried.revoke().catch(() => {});
+      throw new Swap2QuoteError(`swap2: the fresh quote no longer spends through an allowance — aborted, ${revokedNote(carried.signatureTransferOnly)}`, {reason: "policy_refused"});
     }
     if (needsApproval && carried) {
       // Re-quote pass: the allowance must fit the fresh quote exactly;
       // otherwise it is revoked and the swap aborts (the caller may retry).
       if (!sameHex(carried.token, source.contract!) || !sameHex(carried.spender, unsigned.approvalAddress!) || carried.amount !== approvalAmount) {
         carried.adopted = true;
-        await carried.revoke().catch(() => {});
-        throw new Swap2QuoteError(`swap2: the fresh quote moved the spender to ${unsigned.approvalAddress} — aborted, the allowance for ${carried.spender} was revoked`, {reason: "vault_mismatch"});
+        if (!carried.signatureTransferOnly) await carried.revoke().catch(() => {});
+        throw new Swap2QuoteError(`swap2: the fresh quote moved the spender to ${unsigned.approvalAddress} — aborted, ${revokedNote(carried.signatureTransferOnly, `the allowance for ${carried.spender}`)}`, {reason: "vault_mismatch"});
       }
       carried.adopted = true;
-      revokeApproval = carried.revoke;
+      revokeApproval = signatureTransferOnly ? keep : carried.revoke;
     } else if (needsApproval) {
       // Mainnet USDT refuses non-zero → non-zero; every other token
       // overwrites. The live allowance decides what is actually needed: the
@@ -1608,8 +1658,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       }
       // Permit2 is a standing spender many apps share: an allowance already covering the input is the user's own and
       // is left as it is (lowering it to the exact amount would cost a transaction and break those apps). A smaller
-      // one, or one that cannot be read, is set to exactly the input like any other approval — and, like any approval
-      // this engine sends, taken back to 0 when the swap does not go out (the earlier, smaller value is not restored).
+      // one, or one that cannot be read, is set to exactly the input like any other approval. When the swap does not go
+      // out it stays (signature transfer only, see above); otherwise it is taken back to 0 (the earlier, smaller value
+      // is not restored).
       approvalAmounts = current === approvalAmount || (permit2 && current !== undefined && current >= approvalAmount)
         ? [] : [...(usdtMainnet && current !== 0n ? [0n] : []), approvalAmount];
     }
@@ -1664,7 +1715,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           reviewed = deepFreeze(structuredCloneSafe(previous ? {...plan, requoted: true as const} : plan));
           await review(reviewed);
           if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
-            throw new Swap2QuoteError(`swap2: quote expired during review — ${previous ? "the allowance was revoked" : "nothing was signed"}`, {reason: "quote_expired"});
+            throw new Swap2QuoteError(`swap2: quote expired during review — ${previous ? revokedNote(signatureTransferOnly) : "nothing was signed"}`, {reason: "quote_expired"});
           }
         } catch (error) {
           // Second review: the allowance is ours and already adopted by this pass.
@@ -1689,13 +1740,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // that will not sign costs nothing. When approvals are needed it is signed only after them, once the quote is
     // known to be still live (re-quoted otherwise) and the provider's preflight passed: the approvals can outlive the
     // quote, and a permit signed before them would be thrown away with it and asked for again (2026-11-17, 0x on
-    // Ethereum: permit → approve → permit). The trade-off: a permit declined after the approvals costs a revoke. An
-    // account with no signTypedData at all is refused here, before any approval.
+    // Ethereum: permit → approve → permit). A permit declined after the approvals leaves the Permit2 allowance in place,
+    // which moves nothing without a signature (see `signatureTransferOnly`). An account with no signTypedData at all is
+    // refused here, before any approval.
     let signedData: string | undefined;
     const signPermit2 = async (): Promise<void> => {
       this.emitPhase("signing");
       try {
-        signedData = await this.signPermit2Transfer(signer, unsigned, permit2!, !!revokeApproval);
+        signedData = await this.signPermit2Transfer(signer, unsigned, permit2!, revokeApproval ? revokedNote(signatureTransferOnly) : undefined);
       } catch (error) {
         // The allowance this swap created, or the one a re-quote pass adopted: nobody else revokes it.
         await revokeApproval?.().catch(() => {});
@@ -1708,6 +1760,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
     if (permit2 && !approvalAmounts.length) await signPermit2();
 
+    // The real revoke of the approvals this pass sends, whatever `revokeApproval` does on failure: a re-quote pass
+    // gets it and decides again.
+    let revokeAllowance: (() => Promise<void>) | undefined;
     if (approvalAmounts.length) {
       const approve = async (amount: bigint, kind: "approval" | "revoke" = "approval") => {
         const send = async () => {
@@ -1729,7 +1784,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // Install cleanup BEFORE broadcasting approval. An RPC can lose the
       // response after the transaction was accepted; treating that exception
       // as "nothing happened" would leave a live allowance with no callback.
-      revokeApproval = async () => { await approve(0n, "revoke"); };
+      revokeAllowance = async () => { await approve(0n, "revoke"); };
+      revokeApproval = signatureTransferOnly ? keep : revokeAllowance;
       try {
         for (const [i, amount] of approvalAmounts.entries()) {
           this.emitPhase("approving", {index: i + 1, total: approvalAmounts.length});
@@ -1741,25 +1797,29 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       }
     }
 
+    // The approvals this pass mined are exact and ours. When the swap cannot go out as quoted — the quote expired
+    // while they were mined, or the dry run of the call failed after them — quote once more and spend them, instead of
+    // revoking them (one more tx) and making the caller pay for the approvals again. The second pass is bound to the
+    // same provider, route, spender and amount, held to the caller's floor like the first, reviewed again when its
+    // plan differs, and never re-quotes itself: one re-quote per execution.
+    const mayRequote = !carried && approvalAmounts.length > 0 && !!revokeAllowance;
+    const requote = async (): Promise<Swap2Result> => {
+      this.emitPhase("requoting");
+      const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), ...(journal ? {journal} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeAllowance!, signatureTransferOnly, adopted: false, ...(reviewed ? {reviewed} : {})};
+      try {
+        return await this.executeSwap2(signer, snapshot, config, handoff);
+      } catch (error) {
+        if (!handoff.adopted) await revokeApproval?.().catch(() => {});
+        throw error;
+      }
+    };
+
     // The quote/build step can be separated from the actual send by an ERC-20
     // approval. Recheck rotating/halt-sensitive provider state only now.
     if (q.validUntilMs > 0 && q.validUntilMs <= Date.now()) {
       // The mined approvals outlived the quote (mainnet USDT: 50–108 s of
-      // approvals against a 55 s LI.FI / 45 s Omniston TTL, SDK-128). The
-      // allowance is exact and ours: quote once more and spend it, instead of
-      // revoking it (a third tx) and making the caller pay for the approvals
-      // again. The second pass is bound to the same spender and amount, held
-      // to the caller's floor like the first, and never re-quotes itself.
-      if (!carried && approvalAmounts.length && revokeApproval) {
-        this.emitPhase("requoting");
-        const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), ...(journal ? {journal} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: approvalAmount, revoke: revokeApproval, adopted: false, ...(reviewed ? {reviewed} : {})};
-        try {
-          return await this.executeSwap2(signer, snapshot, config, handoff);
-        } catch (error) {
-          if (!handoff.adopted) await revokeApproval().catch(() => {});
-          throw error;
-        }
-      }
+      // approvals against a 55 s LI.FI / 45 s Omniston TTL, SDK-128).
+      if (mayRequote) return await requote();
       await revokeApproval?.().catch(() => {});
       throw new Swap2QuoteError("swap2: quote expired before source broadcast", {reason: "quote_expired"});
     }
@@ -1835,13 +1895,20 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // MUST use the account's transfer({token,recipient,amount}); passing token metadata
     // to sendTransaction would be ignored and send native SOL/TON/TRX instead.
     let sent: {hash: string};
-    if (!permitAfterApprovals) this.emitPhase("signing"); // the permit's "signing" covers the send
+    if (!permit2) this.emitPhase("signing"); // a permit's "signing" (before or after the approvals) covers the send
     // Dry-run the exact call (a Permit2 call with its signature, now that the allowance is in place). Nothing is
-    // broadcast yet, so a failure here is a clean one: the allowance this swap created is revoked.
+    // broadcast yet, so a failure here is a clean one. After approvals this pass mined, a call that reverts (or a
+    // permit whose deadline passed) is quoted once more on that allowance (2026-11-19, 0x on Ethereum: the dry run
+    // right after the approval reverted, the engine revoked, the user paid two approvals for no swap): a node behind
+    // the approval's block, a price moved past the minimum while the approval mined. Otherwise — an RPC that did not
+    // answer, the re-quote pass itself, an allowance that was already there — the allowance this swap created is
+    // revoked (or left, for a signature transfer).
     if (ownGas) {
       try {
         await this.dryRunCall(signer, unsigned, signedData ?? unsigned.data, permit2);
       } catch (error) {
+        const reason = refusalOf(error)?.reason;
+        if (mayRequote && (reason === "simulation_failed" || reason === "quote_expired")) return await requote();
         await revokeApproval?.().catch(() => {});
         throw error;
       }
@@ -1935,11 +2002,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
   /**
    * Permit2 signature transfer: the account signs the rebuilt `PermitTransferFrom` as EIP-712 typed data and the
    * signature is appended to the calldata. Runs before the approvals when none are needed, after them otherwise
-   * (`approved`: an allowance this swap holds is revoked on failure); nothing leaves the device here.
+   * (`allowance`: what happens to the allowance this swap holds on failure); nothing leaves the device here.
    */
-  private async signPermit2Transfer(signer: Swap2Signer, unsigned: UnsignedTx, permit2: Permit2Transfer, approved = false): Promise<string> {
+  private async signPermit2Transfer(signer: Swap2Signer, unsigned: UnsignedTx, permit2: Permit2Transfer, allowance?: string): Promise<string> {
     if (!signer.signTypedData) throw new Swap2ExecutionError("swap2: a Permit2 swap needs an account with signTypedData");
-    if (permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError(`swap2: the Permit2 signature deadline passed before signing — ${approved ? "the swap was not sent and the allowance was revoked" : "nothing was sent"}`, {reason: "quote_expired"});
+    if (permit2.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Swap2QuoteError(`swap2: the Permit2 signature deadline passed before signing — ${allowance ? `the swap was not sent and ${allowance}` : "nothing was sent"}`, {reason: "quote_expired"});
     const signature = await signer.signTypedData({domain: permit2.domain, types: permit2.types, primaryType: permit2.primaryType, message: permit2.message});
     return appendPermit2Signature(unsigned.data!, signature);
   }
@@ -1969,7 +2036,10 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           }
           throw new Swap2ExecutionError(`swap2: the ${what} could not be dry-run: the account's RPC did not answer (${why(error)}) — nothing was sent`, {cause: error, reason: "upstream_unavailable"});
         }
-        throw new Swap2ExecutionError(`swap2: the ${what} does not simulate from this account (${why(error)}) — nothing was sent`, {cause: error, reason: "simulation_failed"});
+        // The revert's selector and name, when the account's error carries the revert data (an app reads it from the
+        // text); the node's own message otherwise.
+        const revert = revertOf(error);
+        throw new Swap2ExecutionError(`swap2: the ${what} does not simulate from this account (${revert ? `reverted: ${revert}` : why(error)}) — nothing was sent`, {cause: error, reason: "simulation_failed"});
       }
     }
   }
