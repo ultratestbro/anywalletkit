@@ -33,7 +33,7 @@
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
-    "viem": "^2.57.2"
+    "viem": "^2.57.18"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"

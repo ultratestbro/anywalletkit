@@ -63,11 +63,11 @@
   "dependencies": {
     "@anywalletkit/protocol-swap2-core": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*",
-    "@ston-fi/omniston-sdk": "0.8.12",
+    "@ston-fi/omniston-sdk": "0.8.13",
     "@ton/core": "^0.63.1",
     "@ton/crypto": "^3.3.0",
     "buffer": "^6.0.3",
-    "viem": "^2.45.0"
+    "viem": "^2.57.18"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"

@@ -14,7 +14,7 @@
     "@anywalletkit/wallet-evm": "workspace:*",
     "@anywalletkit/tx-preview-evm": "workspace:*",
     "@anywalletkit/protocol-swap2-core": "workspace:*",
-    "viem": "^2.57.16"
+    "viem": "^2.57.18"
   },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",

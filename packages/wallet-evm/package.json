@@ -44,7 +44,7 @@
   "dependencies": {
     "@anywalletkit/core": "workspace:*",
     "@noble/curves": "^2.4.0",
-    "viem": "^2.57.2"
+    "viem": "^2.57.18"
   },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",
