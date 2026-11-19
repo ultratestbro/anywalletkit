@@ -11,7 +11,7 @@
     "hash": "d3dd765df97ab9c9",
     "chars": 3327
    },
-   "seenAt": "2026-11-18T15:38:32.258Z",
+   "seenAt": "2026-11-19T15:44:38.833Z",
    "changedAt": "2026-11-18T15:38:32.258Z"
   },
   "omniston-sdk": {
@@ -26,7 +26,7 @@
     "url": "https://github.com/ston-fi/omniston-sdk/commit/ae756abd35e2aafe4f6aa4a80e669d7ce84dcea5",
     "note": "default branch: release(sdk-react): v.0.8.13"
    },
-   "seenAt": "2026-11-18T15:38:32.878Z",
+   "seenAt": "2026-11-19T15:44:39.381Z",
    "changedAt": "2026-11-09T16:13:41.795Z"
   },
   "ton-escrow-minter-rev2-code": {
@@ -39,7 +39,7 @@
     "codeHash": "5b4ee4f1ae234a06",
     "state": "active"
    },
-   "seenAt": "2026-11-18T15:38:32.072Z",
+   "seenAt": "2026-11-19T15:44:38.923Z",
    "changedAt": "2026-11-13T14:33:41.085Z"
   },
   "ton-escrow-minter-rev2-data": {
@@ -52,7 +52,7 @@
    "meta": {
     "hash": "853978cb4754dcb9"
    },
-   "seenAt": "2026-11-18T15:38:32.486Z",
+   "seenAt": "2026-11-19T15:44:38.753Z",
    "changedAt": "2026-11-13T14:33:41.088Z"
   }
  }
