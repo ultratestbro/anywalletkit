@@ -59,10 +59,28 @@ EVM routes.
 
 ## What the provider does
 
-- **Mode** `auto` (default) takes Fast when the pair offers it and Circle's
-  Fast allowance covers the amount, else Standard; `fast` / `standard` force
-  one. Fees come from `GET /v2/burn/USDC/fees/{src}/{dst}` (bps), the
-  allowance from `GET /v2/fastBurn/USDC/allowance`.
+- **Two routes**, `routeId: "fast"` and `"standard"`. Fast costs Circle's fee
+  and lands in seconds to minutes; Standard is free and waits for the source's
+  hard finality. `getQuotes` returns both where the pair has both, so a route
+  list (the router's `getQuotes`, an app's picker) shows the free, slower one
+  next to the fast one; with the router's default tie band the fee (about
+  1 bps) leaves both at the same price, so Fast stays the pick and Standard is
+  the user's choice. A picked route is quoted or refused, never swapped (a
+  `"fast"` request with the Fast allowance used up is refused, not sent as
+  Standard). Through a server: `remoteProvider({name: "cctp", baseUrl,
+  multiQuotes: true, ...cctpPins})`; `cctpVerifyQuote` refuses a quote whose
+  `routeId` is not its burn's threshold.
+- **How long Standard takes** (Circle's published averages, the ETA uses the
+  upper end plus the claim): Ethereum, Arbitrum, Base, OP Mainnet, Unichain,
+  World Chain, Plume and X Layer 15–19 min; Ink and Morph ~30 min; Linea
+  6–32 h; Avalanche, Polygon PoS, Sonic, Monad, Sei, HyperEVM, Plasma and Arc a
+  few seconds (these offer no Fast Transfer as a source, so Standard is their
+  only route and costs nothing).
+- **Mode** `auto` (default) offers both routes and, without a `routeId`, takes
+  Fast when the pair offers it and Circle's Fast allowance covers the amount,
+  else Standard; `fast` / `standard` keep one route only. Fees come from
+  `GET /v2/burn/USDC/fees/{src}/{dst}` (bps), the allowance from
+  `GET /v2/fastBurn/USDC/allowance`.
 - **Output is guaranteed**: `maxFee` in the calldata = published fee + a 10 %
   buffer (`feeBufferPct`), and Circle can deduct at most `maxFee`; the quote's
   `minDestAmount` is `amount − maxFee`. The unused buffer is never charged.

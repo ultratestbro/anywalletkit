@@ -42,7 +42,7 @@ app, and each provider also works on its own without the router.
 | `chainflip` | Native cross-chain (vault swaps) | Native BTC, ETH, SOL, TRX and USDC / USDT; from Ethereum, Arbitrum and Tron to those plus Solana and Bitcoin; no key, 0 bps |
 | `symbiosis` | Cross-chain (pool bridge + DEX legs) | Ethereum, BNB Chain, Avalanche, Polygon, Arbitrum, Optimism, Base, TON (sources) and Tron (opt-in source); all nine as destinations; no key, 0 bps |
 | `omniston` | STON.fi | TON swaps, TON ↔ EVM and EVM ↔ EVM stablecoin orders |
-| `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage |
+| `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage. Two routes: `fast` (Circle's fee, about 1 bps; seconds to minutes) and `standard` (free; waits for the source's finality: 15–19 min from Ethereum and its L2s, hours from Linea) |
 | `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 16 EVM chains in one transaction; the direct USDT path into HyperEVM; USDT from Ethereum / Arbitrum / Celo into TON through the Legacy Mesh (destinations only); Tron opt-in (`meshDestinations`): its LayerZero fee is above the engine's native-fee ceiling today |
 | `stargate` | Stargate V2 Taxi (LayerZero) | USDC, USDT and ETH between 15 EVM chains from the pools, no API key; delivery and paid recovery checked against the chain. Opt-in `compose` route swaps into another ERC-20 on Ethereum. Off until `enabled: true` ([below](#stargate)) |
 | `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |

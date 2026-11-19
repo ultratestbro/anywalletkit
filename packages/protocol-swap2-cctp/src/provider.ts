@@ -5,7 +5,7 @@ import {describeCctpActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
 import {timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
-import {CCTP_API, CCTP_BY_DOMAIN, CCTP_DOMAINS, FINALITY_FAST, FINALITY_STANDARD, cctp as cctpCfg, type CctpDomain} from "./config.js";
+import {CCTP_API, CCTP_BY_DOMAIN, CCTP_DOMAINS, FINALITY_FAST, FINALITY_STANDARD, STANDARD_ATTESTATION_SECONDS, cctp as cctpCfg, type CctpDomain} from "./config.js";
 import {bigintToNumber} from "@anywalletkit/core";
 
 /**
@@ -17,9 +17,14 @@ import {bigintToNumber} from "@anywalletkit/core";
  * exposes it through `buildClaim` / `claimSwap2` (status "action-required").
  *
  *  - Fast Transfer (finality 1000, confirmed, ~seconds–minutes) costs a fee in
- *    bps that Circle publishes per pair; Standard (2000, finalized, ~15 min)
- *    is free. `mode: "auto"` takes Fast when the pair offers it and the Fast
- *    allowance covers the amount, else Standard.
+ *    bps that Circle publishes per pair; Standard (2000, finalized) is free and
+ *    waits for the source's hard finality: 15–19 min from Ethereum and its L2s,
+ *    ~30 min from Ink and Morph, hours from Linea, seconds from chains with fast
+ *    finality (which offer no Fast Transfer as a source). Two routes,
+ *    `routeId: "fast"` and `"standard"`: `getQuotes` returns both where the pair
+ *    has both, so a route list shows the free, slower one next to the fast one.
+ *    Without a `routeId`, `mode: "auto"` takes Fast when the pair offers it and
+ *    the Fast allowance covers the amount, else Standard.
  *  - `maxFee` sent on-chain is the published fee (plus a small buffer) and is
  *    the only thing that can be deducted: the guaranteed output is
  *    amount − maxFee. `preflightDeposit` re-reads Circle's published fee right
@@ -49,12 +54,23 @@ const GAS_DEPOSIT = "200000";
 const GAS_CLAIM = "260000";
 
 export type CctpMode = "auto" | "fast" | "standard";
+/** A CCTP route: Fast Transfer (fee, seconds to minutes) or Standard (free, waits for the source's finality). */
+export type CctpRoute = "fast" | "standard";
+
+/** Seconds from the burn to the mint: Circle's attestation plus the user's claim on the destination. */
+function etaSeconds(src: CctpDomain, threshold: number): number {
+  if (threshold === FINALITY_FAST) return src.domain === 0 ? 180 : 45;
+  return (STANDARD_ATTESTATION_SECONDS[src.domain] ?? 1140) + 40;
+}
 
 export interface CctpProviderConfig {
   enabled?: boolean;
   /** Circle attestation API base (default https://iris-api.circle.com). */
   apiUrl?: string;
-  /** Fast when offered and within the allowance (default), or force one path. */
+  /**
+   * Which routes the provider offers: both (`"auto"`, default — without a `routeId` it quotes Fast when offered and
+   * within the allowance, else Standard), or only one of them.
+   */
   mode?: CctpMode;
   /** Extra headroom on the published Fast fee, in percent of the fee (default 10). The excess is never charged. */
   feeBufferPct?: number;
@@ -205,6 +221,94 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
     }
   }
 
+  async function quoteRoute(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
+    if (params.flex) return null; // the amount is baked into the calldata
+    // A picked route is quoted or refused, never swapped for the other one: a re-quote after an approval keeps it, and
+    // a user who picked Fast does not get a 20-minute transfer (nor one who picked free a fee).
+    const picked = params.routeId;
+    if (picked !== undefined && picked !== "fast" && picked !== "standard") { params.onRefusal?.(`unknown route '${picked}' (fast | standard)`, {reason: "policy_refused"}); return null; }
+    if (picked !== undefined && mode !== "auto" && picked !== mode) { params.onRefusal?.(`the ${picked} route is turned off (mode: ${mode})`, {reason: "policy_refused"}); return null; }
+    const want: CctpMode = picked ?? mode;
+    const src = CCTP_DOMAINS[params.sourceChain];
+    const dst = CCTP_DOMAINS[params.destChain];
+    if (!src || !dst || src === dst) return null;
+    if (params.sourceToken.toUpperCase() !== "USDC") return null;
+    if (!(same(params.destToken, dst.usdc) || params.destToken.toUpperCase() === "USDC")) return null;
+    const usdc = usdcOf(src);
+    if (!usdc) { params.onRefusal?.("catalog USDC on the source chain is not Circle's native USDC", {reason: "unsupported_pair"}); return null; }
+    if (!/^\d+$/.test(params.amountIn)) return null;
+    const amount = BigInt(params.amountIn);
+    if (amount <= 0n) return null;
+    // The placeholder prices a dry quote; a live one without a recipient would mint to it (round 3, H8).
+    const recipient = params.destAddress || (params.dry !== false ? EVM_PLACEHOLDER : "");
+    if (!recipient) { params.onRefusal?.("a live quote needs a recipient", {reason: "policy_refused"}); return null; }
+    if (!isAddress(recipient)) { params.onRefusal?.("destination must be an EVM address"); return null; }
+
+    try {
+      const fees = await feeRows(src, dst, signal);
+      if (!fees || !Array.isArray(fees) || fees.length === 0) {
+        // No fee list (404) or an empty one: Circle does not serve the pair; a list of another shape is a broken answer.
+        params.onRefusal?.("Circle publishes no fee for this pair", {reason: !fees || Array.isArray(fees) ? "unsupported_pair" : "upstream_unavailable"});
+        return null;
+      }
+      const fast = fees.find((f) => f.finalityThreshold === FINALITY_FAST);
+      const standard = fees.find((f) => f.finalityThreshold === FINALITY_STANDARD);
+      let threshold: number;
+      let bps: number;
+      if (want === "standard") {
+        if (!standard) { params.onRefusal?.("Standard Transfer is not offered for this pair", {reason: "unsupported_pair"}); return null; }
+        threshold = FINALITY_STANDARD; bps = standard.minimumFee;
+      } else {
+        let fastOk = !!fast;
+        if (fastOk) {
+          const allowance = await getJson<{allowance?: number}>("/v2/fastBurn/USDC/allowance", signal).catch(() => null);
+          // The allowance is in whole USDC; refuse Fast when it cannot cover the burn.
+          if (typeof allowance?.allowance === "number" && allowance.allowance * 1e6 < bigintToNumber(amount)) fastOk = false;
+        }
+        if (fastOk) { threshold = FINALITY_FAST; bps = fast!.minimumFee; }
+        else if (want === "fast") {
+          params.onRefusal?.(fast ? "Fast Transfer allowance is exhausted" : "Fast Transfer is not offered for this pair", {reason: fast ? "insufficient_liquidity" : "unsupported_pair"});
+          return null;
+        }
+        else if (standard) { threshold = FINALITY_STANDARD; bps = standard.minimumFee; }
+        else { params.onRefusal?.("neither Fast nor Standard is offered", {reason: "unsupported_pair"}); return null; }
+      }
+      if (!Number.isFinite(bps) || bps < 0) return null;
+      const maxFee = feeFor(amount, bps, bufferPct);
+      if (maxFee >= amount) { params.onRefusal?.(`amount is below the ${threshold === FINALITY_FAST ? "Fast" : "Standard"} Transfer fee`, {reason: "amount_too_small"}); return null; }
+      const out = amount - maxFee;
+      if (params.minAmountOut !== undefined && out < BigInt(params.minAmountOut)) return null;
+
+      const data = encodeFunctionData({
+        abi: TOKEN_MESSENGER_ABI,
+        functionName: "depositForBurn",
+        args: [amount, dst.domain, pad(getAddress(recipient), {size: 32}), getAddress(usdc), zeroHash, maxFee, threshold],
+      });
+      return {
+        provider: "cctp",
+        routeId: threshold === FINALITY_FAST ? "fast" : "standard",
+        intentId: `cctp:${src.domain}:${dst.domain}:${threshold}`,
+        depositAddress: "",
+        depositMemo: null,
+        txRequest: {to: src.tokenMessenger, data, value: "0", chainId: src.chainId, gasLimit: GAS_DEPOSIT, approvalAddress: src.tokenMessenger},
+        sourceAmount: amount.toString(),
+        destAmount: out.toString(),
+        minDestAmount: out.toString(),
+        feeUsd: bigintToNumber(maxFee) / 1e6,
+        fees: maxFee > 0n ? [{type: "protocol", amount: maxFee.toString(), token: usdc, included: true, description: `Circle ${threshold === FINALITY_FAST ? "Fast" : "Standard"} Transfer fee (${bps} bps + ${bufferPct}% buffer, unused part is not charged)`}] : [],
+        etaSeconds: etaSeconds(src, threshold),
+        reliability: 0.99,
+        validUntilMs: Date.now() + quoteTtlMs,
+        providerData: {
+          sourceDomain: String(src.domain), destinationDomain: String(dst.domain), finalityThreshold: String(threshold),
+          maxFee: maxFee.toString(), mintRecipient: getAddress(recipient), claimChain: dst.caip2, claimRequired: "1",
+        },
+      };
+    } catch {
+      return null;
+    }
+  }
+
   return {
     name: "cctp",
     claimTargets: cctpClaimTargets,
@@ -221,86 +325,20 @@ export function cctpProvider(config: CctpProviderConfig = {}): CrossChainProvide
       return same(to.token, dst.usdc) || to.token.toUpperCase() === "USDC";
     },
 
-    async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      if (params.flex) return null; // the amount is baked into the calldata
-      const src = CCTP_DOMAINS[params.sourceChain];
-      const dst = CCTP_DOMAINS[params.destChain];
-      if (!src || !dst || src === dst) return null;
-      if (params.sourceToken.toUpperCase() !== "USDC") return null;
-      if (!(same(params.destToken, dst.usdc) || params.destToken.toUpperCase() === "USDC")) return null;
-      const usdc = usdcOf(src);
-      if (!usdc) { params.onRefusal?.("catalog USDC on the source chain is not Circle's native USDC", {reason: "unsupported_pair"}); return null; }
-      if (!/^\d+$/.test(params.amountIn)) return null;
-      const amount = BigInt(params.amountIn);
-      if (amount <= 0n) return null;
-      // The placeholder prices a dry quote; a live one without a recipient would mint to it (round 3, H8).
-      const recipient = params.destAddress || (params.dry !== false ? EVM_PLACEHOLDER : "");
-      if (!recipient) { params.onRefusal?.("a live quote needs a recipient", {reason: "policy_refused"}); return null; }
-      if (!isAddress(recipient)) { params.onRefusal?.("destination must be an EVM address"); return null; }
+    getQuote: (params: QuoteParams, signal?: AbortSignal) => quoteRoute(params, signal),
 
-      try {
-        const fees = await feeRows(src, dst, signal);
-        if (!fees || !Array.isArray(fees) || fees.length === 0) {
-          // No fee list (404) or an empty one: Circle does not serve the pair; a list of another shape is a broken answer.
-          params.onRefusal?.("Circle publishes no fee for this pair", {reason: !fees || Array.isArray(fees) ? "unsupported_pair" : "upstream_unavailable"});
-          return null;
-        }
-        const fast = fees.find((f) => f.finalityThreshold === FINALITY_FAST);
-        const standard = fees.find((f) => f.finalityThreshold === FINALITY_STANDARD);
-        let threshold: number;
-        let bps: number;
-        if (mode === "standard") {
-          if (!standard) { params.onRefusal?.("Standard Transfer is not offered for this pair", {reason: "unsupported_pair"}); return null; }
-          threshold = FINALITY_STANDARD; bps = standard.minimumFee;
-        } else {
-          let fastOk = !!fast;
-          if (fastOk) {
-            const allowance = await getJson<{allowance?: number}>("/v2/fastBurn/USDC/allowance", signal).catch(() => null);
-            // The allowance is in whole USDC; refuse Fast when it cannot cover the burn.
-            if (typeof allowance?.allowance === "number" && allowance.allowance * 1e6 < bigintToNumber(amount)) fastOk = false;
-          }
-          if (fastOk) { threshold = FINALITY_FAST; bps = fast!.minimumFee; }
-          else if (mode === "fast") {
-            params.onRefusal?.(fast ? "Fast Transfer allowance is exhausted" : "Fast Transfer is not offered for this pair", {reason: fast ? "insufficient_liquidity" : "unsupported_pair"});
-            return null;
-          }
-          else if (standard) { threshold = FINALITY_STANDARD; bps = standard.minimumFee; }
-          else { params.onRefusal?.("neither Fast nor Standard is offered", {reason: "unsupported_pair"}); return null; }
-        }
-        if (!Number.isFinite(bps) || bps < 0) return null;
-        const maxFee = feeFor(amount, bps, bufferPct);
-        if (maxFee >= amount) { params.onRefusal?.("amount is below the Fast Transfer fee", {reason: "amount_too_small"}); return null; }
-        const out = amount - maxFee;
-        if (params.minAmountOut !== undefined && out < BigInt(params.minAmountOut)) return null;
-
-        const data = encodeFunctionData({
-          abi: TOKEN_MESSENGER_ABI,
-          functionName: "depositForBurn",
-          args: [amount, dst.domain, pad(getAddress(recipient), {size: 32}), getAddress(usdc), zeroHash, maxFee, threshold],
-        });
-        const eta = threshold === FINALITY_FAST ? (src.domain === 0 ? 180 : 45) : (src.domain === 0 ? 1200 : 1000);
-        return {
-          provider: "cctp",
-          intentId: `cctp:${src.domain}:${dst.domain}:${threshold}`,
-          depositAddress: "",
-          depositMemo: null,
-          txRequest: {to: src.tokenMessenger, data, value: "0", chainId: src.chainId, gasLimit: GAS_DEPOSIT, approvalAddress: src.tokenMessenger},
-          sourceAmount: amount.toString(),
-          destAmount: out.toString(),
-          minDestAmount: out.toString(),
-          feeUsd: bigintToNumber(maxFee) / 1e6,
-          fees: maxFee > 0n ? [{type: "protocol", amount: maxFee.toString(), token: usdc, included: true, description: `Circle Fast Transfer fee (${bps} bps + ${bufferPct}% buffer, unused part is not charged)`}] : [],
-          etaSeconds: eta,
-          reliability: 0.99,
-          validUntilMs: Date.now() + quoteTtlMs,
-          providerData: {
-            sourceDomain: String(src.domain), destinationDomain: String(dst.domain), finalityThreshold: String(threshold),
-            maxFee: maxFee.toString(), mintRecipient: getAddress(recipient), claimChain: dst.caip2, claimRequired: "1",
-          },
-        };
-      } catch {
-        return null;
-      }
+    /**
+     * Both routes for a route list (preview only): Fast and Standard where the pair offers both and `mode` allows
+     * them, so the user can take the free, slower one. Standard is listed next to Fast only when it pays out more (a
+     * source where Circle charges no Fast fee — Avalanche, 2026-11-20 — would show the same amount twice). Execution
+     * re-quotes the picked `routeId`.
+     */
+    async getQuotes(params: QuoteParams, signal?: AbortSignal): Promise<Quote[]> {
+      if (params.dry === false) return [];
+      const routes: string[] = params.routeId !== undefined ? [params.routeId] : mode === "auto" ? ["fast", "standard"] : [mode];
+      const quotes = (await Promise.all(routes.map((routeId) => quoteRoute({...params, routeId, dry: true}, signal)))).filter((q): q is Quote => q !== null);
+      const fast = quotes.find((q) => q.routeId === "fast");
+      return fast && params.routeId === undefined ? quotes.filter((q) => q === fast || BigInt(q.destAmount) > BigInt(fast.destAmount)) : quotes;
     },
 
     async buildDeposit(quote: Quote): Promise<UnsignedTx> {
@@ -475,6 +513,9 @@ export function cctpVerifyQuote(params: QuoteParams, quote: Quote): string | nul
   if (!same(burnToken, src.usdc)) return why(`the burn spends ${burnToken}, not the source domain's USDC`, "policy_refused");
   if (caller !== zeroHash) return why("the burn names a destination caller", "policy_refused");
   if (threshold !== FINALITY_FAST && threshold !== FINALITY_STANDARD) return why(`finality threshold ${threshold} is neither Fast nor Standard`, "policy_refused");
+  // The route the user sees is the burn's: a "fast" label on a Standard burn would be a 20-minute (or 32-hour) wait.
+  const route = threshold === FINALITY_FAST ? "fast" : "standard";
+  if ((quote.routeId !== undefined && quote.routeId !== route) || (params.routeId !== undefined && params.routeId !== route)) return why(`the burn is a ${route} transfer, not the '${params.routeId ?? quote.routeId}' route`, "policy_refused");
   if (maxFee >= amount || amount - maxFee < floor) return why(`the burn's maxFee ${maxFee} leaves less than the ${floor} minimum`, "price_check_failed");
   // The server appends its intent token (`<id>~<tag>`); the id before it is what the server's provider tracks and claims.
   if ((/^([\s\S]+)~[0-9a-f]{32}$/.exec(quote.intentId)?.[1] ?? quote.intentId) !== `cctp:${src.domain}:${dst.domain}:${threshold}`) return why("the intent id does not name this burn", "policy_refused");

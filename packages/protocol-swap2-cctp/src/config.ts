@@ -64,6 +64,34 @@ export const CCTP_API = "https://iris-api.circle.com";
 export const FINALITY_FAST = 1000;
 export const FINALITY_STANDARD = 2000;
 
+/**
+ * How long Circle takes to attest a Standard Transfer from each source domain, in seconds: the upper end of the
+ * average Circle publishes (developers.circle.com/cctp/required-block-confirmations, read 2026-11-20). It is the
+ * source's hard finality: an L2 waits for its batch to finalize on Ethereum (15–19 min), Linea for its proof
+ * (6–32 h); a chain with fast finality attests in seconds — and offers no Fast Transfer as a source.
+ */
+export const STANDARD_ATTESTATION_SECONDS: Readonly<Record<number, number>> = Object.freeze({
+  0: 1140, // Ethereum ~15–19 min
+  1: 8, // Avalanche
+  2: 1140, // OP Mainnet
+  3: 1140, // Arbitrum
+  6: 1140, // Base
+  7: 8, // Polygon PoS
+  10: 1140, // Unichain
+  11: 115_200, // Linea ~6–32 h
+  13: 8, // Sonic
+  14: 1140, // World Chain
+  15: 5, // Monad
+  16: 5, // Sei
+  19: 5, // HyperEVM
+  21: 1800, // Ink ~30 min
+  22: 1140, // Plume
+  26: 1, // Arc ~0.5 s
+  30: 1800, // Morph ~20–30 min
+  33: 1, // Plasma
+  37: 1140, // X Layer
+});
+
 export const cctp = {
   supportsChain(chain: string): boolean {
     return isEvm(chain) && !!CCTP_DOMAINS[`eip155:${evmRef(chain)}`];
