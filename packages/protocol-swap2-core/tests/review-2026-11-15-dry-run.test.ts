@@ -127,13 +127,14 @@ describe("the dry run tells a revert from the account's RPC failing", () => {
     expect(log.sent).toHaveLength(1);
   });
 
-  it("a Permit2 dry run whose RPC stays down is upstream_unavailable, not simulation_failed, and the allowance is taken back", async () => {
+  it("a Permit2 dry run whose RPC stays down is upstream_unavailable, not simulation_failed, and is not re-quoted", async () => {
     const log = fresh();
     const err = await protocol(provider(permitTx()), account(log, () => { throw fetchFailed(); })).swap2(tokenSale).catch((e: unknown) => e);
     expect((err as Error).message).toBe("swap2: the signed swap could not be dry-run: the account's RPC did not answer (fetch failed) — nothing was sent");
     expect(refusalOf(err)?.reason).toBe("upstream_unavailable");
     expect(log.estimated.filter((e) => e.to === ROUTER && e.gasLimit === undefined)).toHaveLength(2);
-    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+    // A signature transfer: the Permit2 allowance stays (it moves nothing without a new signature).
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
   });
 
   it("a 429 from the RPC and a timeout are transport failures too", async () => {
@@ -146,13 +147,14 @@ describe("the dry run tells a revert from the account's RPC failing", () => {
     }
   });
 
-  it("a revert is not retried, and the allowance is taken back", async () => {
+  it("a revert is not retried within a pass: after the approval it is quoted once more, and the Permit2 allowance stays", async () => {
     const log = fresh();
     const err = await protocol(provider(permitTx()), account(log, () => { throw reverted(); })).swap2(tokenSale).catch((e: unknown) => e);
     expect((err as Error).message).toBe("swap2: the signed swap does not simulate from this account (Execution reverted for an unknown reason.) — nothing was sent");
     expect(refusalOf(err)?.reason).toBe("simulation_failed");
-    expect(log.estimated.filter((e) => e.to === ROUTER && e.gasLimit === undefined)).toHaveLength(1);
-    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT), APPROVE(0n)]);
+    // One dry run in the first pass, one in the re-quote pass.
+    expect(log.estimated.filter((e) => e.to === ROUTER && e.gasLimit === undefined)).toHaveLength(2);
+    expect(log.sent.map((s) => s.data)).toEqual([APPROVE(AMOUNT)]);
   });
 
   it("a transport failure followed by a revert is a revert", async () => {
