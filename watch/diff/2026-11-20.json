@@ -1,0 +1,153 @@
+{
+ "date": "2026-11-20",
+ "modules": 30,
+ "sources": 766,
+ "changes": [
+  {
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
+   "id": "sdks",
+   "label": "Morpho SDKs releases",
+   "type": "github-releases",
+   "what": "@morpho-org/evm-simulation-v9.0.0-next.1 → @morpho-org/morpho-ts-v4.5.0 (2026-11-20)",
+   "link": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-ts-v4.5.0",
+   "before": {
+    "tag": "@morpho-org/evm-simulation-v9.0.0-next.1",
+    "name": "@morpho-org/evm-simulation-v9.0.0-next.1",
+    "at": "2026-11-19",
+    "url": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/evm-simulation-v9.0.0-next.1",
+    "prerelease": true
+   },
+   "after": {
+    "tag": "@morpho-org/morpho-ts-v4.5.0",
+    "name": "@morpho-org/morpho-ts-v4.5.0",
+    "at": "2026-11-20",
+    "url": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-ts-v4.5.0",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
+   "id": "docs-addresses",
+   "label": "Morpho docs · deployed addresses",
+   "type": "http-text",
+   "what": "page text changed (77176 → 81423 chars)",
+   "link": "https://docs.morpho.org/get-started/resources/addresses/",
+   "before": {
+    "hash": "672e9e1fb88899fb",
+    "chars": 77176
+   },
+   "after": {
+    "hash": "a1c61309b9b7532e",
+    "chars": 81423
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-across",
+   "id": "api-v5-quote-and-execute",
+   "label": "Across API V5 · quote and execute (the API this module reads its price from)",
+   "type": "github-file",
+   "what": "file changed 87924a1ef7 → f303ca993a",
+   "link": "https://github.com/across-protocol/skills/blob/master/skills/quote-and-execute/SKILL.md",
+   "before": {
+    "sha": "87924a1ef7",
+    "url": "https://github.com/across-protocol/skills/blob/master/skills/quote-and-execute/SKILL.md"
+   },
+   "after": {
+    "sha": "f303ca993a",
+    "url": "https://github.com/across-protocol/skills/blob/master/skills/quote-and-execute/SKILL.md"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-fynd",
+   "id": "fynd-releases",
+   "label": "Fynd releases",
+   "type": "github-releases",
+   "what": "0.125.2 → 0.127.0 (2026-11-20)",
+   "link": "https://github.com/propeller-heads/fynd/releases/tag/0.127.0",
+   "before": {
+    "tag": "0.125.2",
+    "name": "0.125.2",
+    "at": "2026-11-16",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.125.2",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "0.127.0",
+    "name": "0.127.0",
+    "at": "2026-11-20",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.127.0",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-omniston",
+   "id": "docs-omniston",
+   "label": "STON.fi docs · Omniston",
+   "type": "http-text",
+   "what": "page text changed (3327 → 3327 chars)",
+   "link": "https://docs.ston.fi/docs/developer-section/omniston",
+   "before": {
+    "hash": "d3dd765df97ab9c9",
+    "chars": 3327
+   },
+   "after": {
+    "hash": "b33e49697c27494e",
+    "chars": 3327
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-uniswap",
+   "id": "sdks",
+   "label": "Uniswap SDKs (sdk-core address map) releases",
+   "type": "github-releases",
+   "what": "@uniswap/uniswapx-sdk@3.2.0 → @uniswap/liquidity-launcher-sdk@2.2.0 (2026-11-19)",
+   "link": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/liquidity-launcher-sdk%402.2.0",
+   "before": {
+    "tag": "@uniswap/uniswapx-sdk@3.2.0",
+    "name": "@uniswap/uniswapx-sdk@3.2.0",
+    "at": "2026-11-16",
+    "url": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/uniswapx-sdk%403.2.0",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "@uniswap/liquidity-launcher-sdk@2.2.0",
+    "name": "@uniswap/liquidity-launcher-sdk@2.2.0",
+    "at": "2026-11-19",
+    "url": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/liquidity-launcher-sdk%402.2.0",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/wallet-zcash",
+   "id": "zebra-releases",
+   "label": "Zebra node releases (network upgrade activation heights)",
+   "type": "github-releases",
+   "what": "v7.2.0-beta.1 → v7.2.0-beta.2 (2026-11-19) pre-release",
+   "link": "https://github.com/ZcashFoundation/zebra/releases/tag/v7.2.0-beta.2",
+   "before": {
+    "tag": "v7.2.0-beta.1",
+    "name": "Zebra 7.2.0-beta.1",
+    "at": "2026-11-19",
+    "url": "https://github.com/ZcashFoundation/zebra/releases/tag/v7.2.0-beta.1",
+    "prerelease": true
+   },
+   "after": {
+    "tag": "v7.2.0-beta.2",
+    "name": "Zebra 7.2.0-beta.2",
+    "at": "2026-11-19",
+    "url": "https://github.com/ZcashFoundation/zebra/releases/tag/v7.2.0-beta.2",
+    "prerelease": true
+   }
+  }
+ ],
+ "errors": [
+  {
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
+   "id": "docs-api",
+   "label": "Kamino docs · developers API",
+   "error": "HTTP 403",
+   "stale": true
+  }
+ ],
+ "repointed": []
+}

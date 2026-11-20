@@ -14,7 +14,7 @@
     "call": "owner()",
     "result": "0xb524735356985d2f267fa010d681f061dff03715"
    },
-   "seenAt": "2026-11-19T15:44:28.783Z",
+   "seenAt": "2026-11-20T15:26:41.526Z",
    "changedAt": "2026-11-16T15:41:03.349Z"
   },
   "hub-pool": {
@@ -28,7 +28,7 @@
     "codeHash": "f6d231059267e7eb",
     "bytes": 19572
    },
-   "seenAt": "2026-11-19T15:44:28.797Z",
+   "seenAt": "2026-11-20T15:26:41.528Z",
    "changedAt": "2026-11-16T15:41:03.362Z"
   },
   "hub-registry-ethereum": {
@@ -50,7 +50,7 @@
      "0x5c7bcd6e7de5423a257d81b442095a1a6ced35c5"
     ]
    },
-   "seenAt": "2026-11-19T15:44:28.862Z",
+   "seenAt": "2026-11-20T15:26:41.537Z",
    "changedAt": "2026-11-16T15:41:03.414Z"
   },
   "paused-ethereum": {
@@ -66,7 +66,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:28.927Z",
+   "seenAt": "2026-11-20T15:26:41.547Z",
    "changedAt": "2026-11-16T15:41:03.466Z"
   },
   "spokepool-interface": {
@@ -80,7 +80,7 @@
     "sha": "e480eb5037",
     "url": "https://github.com/across-protocol/contracts/blob/master/contracts/interfaces/V3SpokePoolInterface.sol"
    },
-   "seenAt": "2026-11-19T15:44:28.910Z",
+   "seenAt": "2026-11-20T15:26:41.692Z",
    "changedAt": "2026-11-16T15:41:03.468Z"
   },
   "spokepool-ethereum": {
@@ -97,7 +97,7 @@
     "beacon": null,
     "implCodeHash": "596ef7a0b6584549"
    },
-   "seenAt": "2026-11-19T15:44:28.929Z",
+   "seenAt": "2026-11-20T15:26:41.551Z",
    "changedAt": "2026-11-16T15:41:03.469Z"
   },
   "paused-optimism": {
@@ -113,7 +113,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:28.939Z",
+   "seenAt": "2026-11-20T15:26:41.572Z",
    "changedAt": "2026-11-16T15:41:03.502Z"
   },
   "hub-registry-optimism": {
@@ -135,7 +135,7 @@
      "0x6f26bf09b1c792e3228e5467807a900a503c0281"
     ]
    },
-   "seenAt": "2026-11-19T15:44:28.997Z",
+   "seenAt": "2026-11-20T15:26:41.560Z",
    "changedAt": "2026-11-16T15:41:03.522Z"
   },
   "spokepool-source": {
@@ -149,7 +149,7 @@
     "sha": "90f8e04d21",
     "url": "https://github.com/across-protocol/contracts/blob/master/contracts/spoke-pools/SpokePool.sol"
    },
-   "seenAt": "2026-11-19T15:44:28.958Z",
+   "seenAt": "2026-11-20T15:26:41.690Z",
    "changedAt": "2026-11-16T15:41:03.541Z"
   },
   "deployed-addresses": {
@@ -163,7 +163,7 @@
     "sha": "680a24a758",
     "url": "https://github.com/across-protocol/contracts/blob/master/broadcast/deployed-addresses.json"
    },
-   "seenAt": "2026-11-19T15:44:29.024Z",
+   "seenAt": "2026-11-20T15:26:41.674Z",
    "changedAt": "2026-11-18T15:38:20.652Z"
   },
   "hub-registry-unichain": {
@@ -185,7 +185,7 @@
      "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.001Z",
+   "seenAt": "2026-11-20T15:26:41.585Z",
    "changedAt": "2026-11-16T15:41:03.574Z"
   },
   "spokepool-optimism": {
@@ -202,7 +202,7 @@
     "beacon": null,
     "implCodeHash": "fe3cc4d0d00ef779"
    },
-   "seenAt": "2026-11-19T15:44:28.934Z",
+   "seenAt": "2026-11-20T15:26:41.569Z",
    "changedAt": "2026-11-16T15:41:03.590Z"
   },
   "spokepool-polygon": {
@@ -219,7 +219,7 @@
     "beacon": null,
     "implCodeHash": "1334fe223f04e68f"
    },
-   "seenAt": "2026-11-19T15:44:29.022Z",
+   "seenAt": "2026-11-20T15:26:41.645Z",
    "changedAt": "2026-11-16T15:41:03.620Z"
   },
   "hub-registry-polygon": {
@@ -241,7 +241,7 @@
      "0x9295ee1d8c5b022be115a2ad3c30c72e34e7f096"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.063Z",
+   "seenAt": "2026-11-20T15:26:41.641Z",
    "changedAt": "2026-11-16T15:41:03.626Z"
   },
   "paused-polygon": {
@@ -257,7 +257,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.012Z",
+   "seenAt": "2026-11-20T15:26:41.650Z",
    "changedAt": "2026-11-16T15:41:03.627Z"
   },
   "paused-unichain": {
@@ -273,7 +273,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.101Z",
+   "seenAt": "2026-11-20T15:26:41.622Z",
    "changedAt": "2026-11-16T15:41:03.670Z"
   },
   "api-v5-quote-and-execute": {
@@ -282,13 +282,13 @@
     "repo": "across-protocol/skills",
     "path": "skills/quote-and-execute/SKILL.md"
    },
-   "value": "87924a1ef7e2c2c5b5f385f971fd2c83d0e51894",
+   "value": "f303ca993a408dc76ba12e5fd9f422ccc7ab075c",
    "meta": {
-    "sha": "87924a1ef7",
+    "sha": "f303ca993a",
     "url": "https://github.com/across-protocol/skills/blob/master/skills/quote-and-execute/SKILL.md"
    },
-   "seenAt": "2026-11-19T15:44:29.002Z",
-   "changedAt": "2026-11-16T15:41:03.675Z"
+   "seenAt": "2026-11-20T15:26:41.741Z",
+   "changedAt": "2026-11-20T15:26:41.741Z"
   },
   "hub-registry-monad": {
    "type": "evm-call",
@@ -309,7 +309,7 @@
      "0xd2ecb3afe598b746f8123cae365a598da831a449"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.082Z",
+   "seenAt": "2026-11-20T15:26:41.661Z",
    "changedAt": "2026-11-16T15:41:03.677Z"
   },
   "paused-monad": {
@@ -325,7 +325,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.153Z",
+   "seenAt": "2026-11-20T15:26:41.712Z",
    "changedAt": "2026-11-16T15:41:03.719Z"
   },
   "hub-registry-zksync": {
@@ -347,7 +347,7 @@
      "0xe0b015e54d54fc84a6cb9b666099c46ade9335ff"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.087Z",
+   "seenAt": "2026-11-20T15:26:41.699Z",
    "changedAt": "2026-11-16T15:41:03.727Z"
   },
   "spokepool-unichain": {
@@ -364,7 +364,7 @@
     "beacon": null,
     "implCodeHash": "d0a15f491555c7d2"
    },
-   "seenAt": "2026-11-19T15:44:29.328Z",
+   "seenAt": "2026-11-20T15:26:41.631Z",
    "changedAt": "2026-11-16T15:41:03.761Z"
   },
   "hub-registry-worldchain": {
@@ -386,7 +386,7 @@
      "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.157Z",
+   "seenAt": "2026-11-20T15:26:41.721Z",
    "changedAt": "2026-11-16T15:41:03.778Z"
   },
   "spokepool-monad": {
@@ -403,7 +403,7 @@
     "beacon": null,
     "implCodeHash": "a5c5dc2c4ed8ba01"
    },
-   "seenAt": "2026-11-19T15:44:29.271Z",
+   "seenAt": "2026-11-20T15:26:41.754Z",
    "changedAt": "2026-11-16T15:41:03.810Z"
   },
   "hub-registry-hyperevm": {
@@ -425,7 +425,7 @@
      "0x35e63ea3eb0fb7a3bc543c71fb66412e1f6b0e04"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.275Z",
+   "seenAt": "2026-11-20T15:26:41.763Z",
    "changedAt": "2026-11-16T15:41:03.862Z"
   },
   "paused-worldchain": {
@@ -441,7 +441,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.284Z",
+   "seenAt": "2026-11-20T15:26:41.898Z",
    "changedAt": "2026-11-16T15:41:03.979Z"
   },
   "spokepool-worldchain": {
@@ -458,7 +458,7 @@
     "beacon": null,
     "implCodeHash": "b3ecc15dcc125b76"
    },
-   "seenAt": "2026-11-19T15:44:29.336Z",
+   "seenAt": "2026-11-20T15:26:41.916Z",
    "changedAt": "2026-11-16T15:41:04.065Z"
   },
   "paused-hyperevm": {
@@ -474,7 +474,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.524Z",
+   "seenAt": "2026-11-20T15:26:42.042Z",
    "changedAt": "2026-11-16T15:41:04.108Z"
   },
   "hub-registry-megaeth": {
@@ -496,7 +496,7 @@
      "0x3db06da8f0a24a525f314eec954fc5c6a973d40e"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.288Z",
+   "seenAt": "2026-11-20T15:26:41.910Z",
    "changedAt": "2026-11-16T15:41:04.117Z"
   },
   "spokepool-megaeth": {
@@ -513,7 +513,7 @@
     "beacon": null,
     "implCodeHash": "c79db4b0cc0f9ad1"
    },
-   "seenAt": "2026-11-19T15:44:29.667Z",
+   "seenAt": "2026-11-20T15:26:41.983Z",
    "changedAt": "2026-11-16T15:41:04.265Z"
   },
   "spokepool-robinhood": {
@@ -530,7 +530,7 @@
     "beacon": null,
     "implCodeHash": "01044c08dfdc94ed"
    },
-   "seenAt": "2026-11-19T15:44:29.585Z",
+   "seenAt": "2026-11-20T15:26:44.091Z",
    "changedAt": "2026-11-16T15:41:04.266Z"
   },
   "paused-megaeth": {
@@ -546,7 +546,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.473Z",
+   "seenAt": "2026-11-20T15:26:41.962Z",
    "changedAt": "2026-11-16T15:41:04.273Z"
   },
   "paused-robinhood": {
@@ -562,7 +562,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.478Z",
+   "seenAt": "2026-11-20T15:26:41.987Z",
    "changedAt": "2026-11-16T15:41:04.312Z"
   },
   "hub-registry-robinhood": {
@@ -584,7 +584,7 @@
      "0xd29c85f15df544ba632c9e25829fd29d767d7978"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.341Z",
+   "seenAt": "2026-11-20T15:26:41.962Z",
    "changedAt": "2026-11-16T15:41:04.323Z"
   },
   "paused-zksync": {
@@ -600,7 +600,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.206Z",
+   "seenAt": "2026-11-20T15:26:41.860Z",
    "changedAt": "2026-11-16T15:41:04.358Z"
   },
   "hub-registry-arc": {
@@ -622,7 +622,7 @@
      "0x9b4a302a548c7e313c2b74c461db7b84d3074a84"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.482Z",
+   "seenAt": "2026-11-20T15:26:41.991Z",
    "changedAt": "2026-11-16T15:41:04.364Z"
   },
   "hub-registry-base": {
@@ -644,7 +644,7 @@
      "0x09aea4b2242abc8bb4bb78d537a67a245a7bec64"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.561Z",
+   "seenAt": "2026-11-20T15:26:42.022Z",
    "changedAt": "2026-11-16T15:41:04.416Z"
   },
   "paused-arc": {
@@ -660,7 +660,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.557Z",
+   "seenAt": "2026-11-20T15:26:42.024Z",
    "changedAt": "2026-11-16T15:41:04.435Z"
   },
   "spokepool-base": {
@@ -677,7 +677,7 @@
     "beacon": null,
     "implCodeHash": "9c3297d6f085c634"
    },
-   "seenAt": "2026-11-19T15:44:29.559Z",
+   "seenAt": "2026-11-20T15:26:42.014Z",
    "changedAt": "2026-11-16T15:41:04.442Z"
   },
   "paused-base": {
@@ -693,7 +693,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.571Z",
+   "seenAt": "2026-11-20T15:26:42.032Z",
    "changedAt": "2026-11-16T15:41:04.455Z"
   },
   "spokepool-arc": {
@@ -710,7 +710,7 @@
     "beacon": null,
     "implCodeHash": "025fdc5b59487b66"
    },
-   "seenAt": "2026-11-19T15:44:29.615Z",
+   "seenAt": "2026-11-20T15:26:42.045Z",
    "changedAt": "2026-11-16T15:41:04.471Z"
   },
   "spokepool-hyperevm": {
@@ -727,7 +727,7 @@
     "beacon": null,
     "implCodeHash": "dd127610e870b1e8"
    },
-   "seenAt": "2026-11-19T15:44:29.832Z",
+   "seenAt": "2026-11-20T15:26:42.487Z",
    "changedAt": "2026-11-16T15:41:04.482Z"
   },
   "hub-registry-plasma": {
@@ -749,7 +749,7 @@
      "0x50039faefebef707cfd94d6d462fe6d10b39207a"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.575Z",
+   "seenAt": "2026-11-20T15:26:42.041Z",
    "changedAt": "2026-11-16T15:41:04.493Z"
   },
   "paused-arbitrum": {
@@ -765,7 +765,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.627Z",
+   "seenAt": "2026-11-20T15:26:42.059Z",
    "changedAt": "2026-11-16T15:41:04.519Z"
   },
   "hub-registry-arbitrum": {
@@ -787,7 +787,7 @@
      "0xe35e9842fceaca96570b734083f4a58e8f7c5f2a"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.617Z",
+   "seenAt": "2026-11-20T15:26:42.053Z",
    "changedAt": "2026-11-16T15:41:04.533Z"
   },
   "spokepool-arbitrum": {
@@ -804,7 +804,7 @@
     "beacon": null,
     "implCodeHash": "82a0d8dbc0d1c74d"
    },
-   "seenAt": "2026-11-19T15:44:29.613Z",
+   "seenAt": "2026-11-20T15:26:42.061Z",
    "changedAt": "2026-11-16T15:41:04.546Z"
   },
   "hub-registry-avalanche": {
@@ -826,7 +826,7 @@
      "0xfe9d541c92e4e90437c7152a00244886de37a658"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.631Z",
+   "seenAt": "2026-11-20T15:26:42.069Z",
    "changedAt": "2026-11-16T15:41:04.584Z"
   },
   "paused-plasma": {
@@ -842,7 +842,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.755Z",
+   "seenAt": "2026-11-20T15:26:42.101Z",
    "changedAt": "2026-11-16T15:41:04.587Z"
   },
   "spokepool-plasma": {
@@ -859,7 +859,7 @@
     "beacon": null,
     "implCodeHash": "b41e81a661054d49"
    },
-   "seenAt": "2026-11-19T15:44:29.826Z",
+   "seenAt": "2026-11-20T15:26:42.130Z",
    "changedAt": "2026-11-16T15:41:04.612Z"
   },
   "paused-avalanche": {
@@ -875,7 +875,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.730Z",
+   "seenAt": "2026-11-20T15:26:42.093Z",
    "changedAt": "2026-11-16T15:41:04.622Z"
   },
   "hub-registry-ink": {
@@ -897,7 +897,7 @@
      "0xef684c38f94f48775959ecf2012d7e864ffb9dd4"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.733Z",
+   "seenAt": "2026-11-20T15:26:42.110Z",
    "changedAt": "2026-11-16T15:41:04.638Z"
   },
   "hub-registry-linea": {
@@ -919,7 +919,7 @@
      "0x7e63a5f1a8f0b4d0934b2f2327daed3f6bb2ee75"
     ]
    },
-   "seenAt": "2026-11-19T15:44:29.830Z",
+   "seenAt": "2026-11-20T15:26:42.162Z",
    "changedAt": "2026-11-16T15:41:04.690Z"
   },
   "spokepool-avalanche": {
@@ -936,7 +936,7 @@
     "beacon": null,
     "implCodeHash": "dfca819d7f7aa775"
    },
-   "seenAt": "2026-11-19T15:44:29.937Z",
+   "seenAt": "2026-11-20T15:26:42.151Z",
    "changedAt": "2026-11-16T15:41:04.730Z"
   },
   "paused-linea": {
@@ -952,7 +952,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:29.947Z",
+   "seenAt": "2026-11-20T15:26:42.212Z",
    "changedAt": "2026-11-16T15:41:04.791Z"
   },
   "spokepool-linea": {
@@ -969,7 +969,7 @@
     "beacon": null,
     "implCodeHash": "49a5c22dceac888b"
    },
-   "seenAt": "2026-11-19T15:44:30.071Z",
+   "seenAt": "2026-11-20T15:26:42.264Z",
    "changedAt": "2026-11-16T15:41:04.832Z"
   },
   "paused-ink": {
@@ -985,7 +985,7 @@
     "call": "pausedDeposits()",
     "result": false
    },
-   "seenAt": "2026-11-19T15:44:30.188Z",
+   "seenAt": "2026-11-20T15:26:42.409Z",
    "changedAt": "2026-11-16T15:41:05.087Z"
   },
   "spokepool-ink": {
@@ -1002,7 +1002,7 @@
     "beacon": null,
     "implCodeHash": "3154b1e2aac16cca"
    },
-   "seenAt": "2026-11-19T15:44:30.548Z",
+   "seenAt": "2026-11-20T15:26:42.637Z",
    "changedAt": "2026-11-16T15:41:05.331Z"
   },
   "spokepool-zksync": {
@@ -1019,7 +1019,7 @@
     "beacon": null,
     "implCodeHash": "bde382282c89a49d"
    },
-   "seenAt": "2026-11-19T15:44:29.274Z",
+   "seenAt": "2026-11-20T15:26:41.953Z",
    "changedAt": "2026-11-16T15:41:06.409Z"
   }
  }
