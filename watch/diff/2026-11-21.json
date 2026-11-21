@@ -1,0 +1,109 @@
+{
+ "date": "2026-11-21",
+ "modules": 30,
+ "sources": 766,
+ "changes": [
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "address-book",
+   "label": "Aave address book releases",
+   "type": "github-releases",
+   "what": "v4.77.8 → v4.77.9 (2026-11-21)",
+   "link": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.9",
+   "before": {
+    "tag": "v4.77.8",
+    "name": "v4.77.8",
+    "at": "2026-11-16",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.8",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "v4.77.9",
+    "name": "v4.77.9",
+    "at": "2026-11-21",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.9",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-fynd",
+   "id": "router-registry",
+   "label": "Tycho router registry (the router Fynd swaps must settle through)",
+   "type": "github-file",
+   "what": "file changed e9be7bca55 → 3b063050e6",
+   "link": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json",
+   "before": {
+    "sha": "e9be7bca55",
+    "url": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json"
+   },
+   "after": {
+    "sha": "3b063050e6",
+    "url": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-omniston",
+   "id": "docs-omniston",
+   "label": "STON.fi docs · Omniston",
+   "type": "http-text",
+   "what": "page text changed (3327 → 3327 chars)",
+   "link": "https://docs.ston.fi/docs/developer-section/omniston",
+   "before": {
+    "hash": "b33e49697c27494e",
+    "chars": 3327
+   },
+   "after": {
+    "hash": "c8f1eb192d07da6d",
+    "chars": 3327
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-uniswap",
+   "id": "docs-deployments",
+   "label": "Uniswap docs · v3 deployment addresses",
+   "type": "http-text",
+   "what": "page text changed (2798 → 2802 chars)",
+   "link": "https://docs.uniswap.org/contracts/v3/reference/deployments/",
+   "before": {
+    "hash": "35a57acdf8122365",
+    "chars": 2798
+   },
+   "after": {
+    "hash": "df712f56f56209a1",
+    "chars": 2802
+   }
+  },
+  {
+   "module": "@anywalletkit/wallet-zcash",
+   "id": "zebra-releases",
+   "label": "Zebra node releases (network upgrade activation heights)",
+   "type": "github-releases",
+   "what": "v7.2.0-beta.2 → v7.2.0-beta.3 (2026-11-20) pre-release",
+   "link": "https://github.com/ZcashFoundation/zebra/releases/tag/v7.2.0-beta.3",
+   "before": {
+    "tag": "v7.2.0-beta.2",
+    "name": "Zebra 7.2.0-beta.2",
+    "at": "2026-11-19",
+    "url": "https://github.com/ZcashFoundation/zebra/releases/tag/v7.2.0-beta.2",
+    "prerelease": true
+   },
+   "after": {
+    "tag": "v7.2.0-beta.3",
+    "name": "Zebra 7.2.0-beta.3",
+    "at": "2026-11-20",
+    "url": "https://github.com/ZcashFoundation/zebra/releases/tag/v7.2.0-beta.3",
+    "prerelease": true
+   }
+  }
+ ],
+ "errors": [
+  {
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
+   "id": "docs-api",
+   "label": "Kamino docs · developers API",
+   "error": "HTTP 403",
+   "stale": true
+  }
+ ],
+ "repointed": []
+}
