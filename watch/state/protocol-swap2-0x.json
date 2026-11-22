@@ -14,7 +14,7 @@
     "call": "owner()",
     "result": "0xf36b9f50e59870a24f42f9ba43b2ad0a4b8f2f51"
    },
-   "seenAt": "2026-11-21T14:39:11.934Z",
+   "seenAt": "2026-11-22T14:33:38.678Z",
    "changedAt": "2026-11-15T13:55:22.106Z"
   },
   "settler-in-force-ethereum": {
@@ -33,7 +33,7 @@
     "call": "ownerOf(uint256) [2]",
     "result": "0xaddc26a3854feabfd20d6bf658254088d83a425a"
    },
-   "seenAt": "2026-11-21T14:39:11.933Z",
+   "seenAt": "2026-11-22T14:33:38.679Z",
    "changedAt": "2026-11-15T13:55:22.108Z"
   },
   "permit2-ethereum": {
@@ -47,7 +47,7 @@
     "codeHash": "6edcbff6f4da0cef",
     "bytes": 9152
    },
-   "seenAt": "2026-11-21T14:39:11.983Z",
+   "seenAt": "2026-11-22T14:33:38.691Z",
    "changedAt": "2026-11-15T13:55:22.119Z"
   },
   "wrapped-native-ethereum": {
@@ -61,7 +61,7 @@
     "codeHash": "a9817472fdcc178e",
     "bytes": 3124
    },
-   "seenAt": "2026-11-21T14:39:11.976Z",
+   "seenAt": "2026-11-22T14:33:38.695Z",
    "changedAt": "2026-11-15T13:55:22.122Z"
   },
   "registry-ethereum": {
@@ -78,7 +78,7 @@
     "beacon": null,
     "implCodeHash": "7a2d7f0df27be468"
    },
-   "seenAt": "2026-11-21T14:39:11.981Z",
+   "seenAt": "2026-11-22T14:33:38.696Z",
    "changedAt": "2026-11-15T13:55:22.123Z"
   },
   "registry-owner-optimism": {
@@ -94,7 +94,7 @@
     "call": "owner()",
     "result": "0xf36b9f50e59870a24f42f9ba43b2ad0a4b8f2f51"
    },
-   "seenAt": "2026-11-21T14:39:12.094Z",
+   "seenAt": "2026-11-22T14:33:38.731Z",
    "changedAt": "2026-11-15T13:55:22.176Z"
   },
   "settler-in-force-optimism": {
@@ -113,7 +113,7 @@
     "call": "ownerOf(uint256) [2]",
     "result": "0x11b9a527dfd522888a366c511a7bfd08c7d54df0"
    },
-   "seenAt": "2026-11-21T14:39:12.093Z",
+   "seenAt": "2026-11-22T14:33:38.731Z",
    "changedAt": "2026-11-15T13:55:22.181Z"
   },
   "registry-optimism": {
@@ -130,7 +130,7 @@
     "beacon": null,
     "implCodeHash": "59fef4c65905814f"
    },
-   "seenAt": "2026-11-21T14:39:12.126Z",
+   "seenAt": "2026-11-22T14:33:38.742Z",
    "changedAt": "2026-11-15T13:55:22.184Z"
   },
   "permit2-optimism": {
@@ -144,7 +144,7 @@
     "codeHash": "977d1ac2e903b062",
     "bytes": 9152
    },
-   "seenAt": "2026-11-21T14:39:12.123Z",
+   "seenAt": "2026-11-22T14:33:38.746Z",
    "changedAt": "2026-11-15T13:55:22.190Z"
   },
   "wrapped-native-optimism": {
@@ -158,7 +158,7 @@
     "codeHash": "0f05518544674703",
     "bytes": 2041
    },
-   "seenAt": "2026-11-21T14:39:12.172Z",
+   "seenAt": "2026-11-22T14:33:38.745Z",
    "changedAt": "2026-11-15T13:55:22.194Z"
   },
   "registry-owner-bsc": {
@@ -174,7 +174,7 @@
     "call": "owner()",
     "result": "0xf36b9f50e59870a24f42f9ba43b2ad0a4b8f2f51"
    },
-   "seenAt": "2026-11-21T14:39:12.201Z",
+   "seenAt": "2026-11-22T14:33:38.808Z",
    "changedAt": "2026-11-15T13:55:22.241Z"
   },
   "settler-taker-submitted": {
@@ -188,7 +188,7 @@
     "sha": "369b7859c8",
     "url": "https://github.com/0xProject/0x-settler/blob/master/src/Settler.sol"
    },
-   "seenAt": "2026-11-21T14:39:12.070Z",
+   "seenAt": "2026-11-22T14:33:38.795Z",
    "changedAt": "2026-11-15T13:55:22.243Z"
   },
   "settler-in-force-bsc": {
@@ -207,7 +207,7 @@
     "call": "ownerOf(uint256) [2]",
     "result": "0xd52e8e422a352ac1afdc2bd6ec533d41b20acb7b"
    },
-   "seenAt": "2026-11-21T14:39:12.199Z",
+   "seenAt": "2026-11-22T14:33:38.805Z",
    "changedAt": "2026-11-15T13:55:22.244Z"
   },
   "settler-deployer": {
@@ -221,7 +221,7 @@
     "sha": "cf5a23363a",
     "url": "https://github.com/0xProject/0x-settler/blob/master/src/deployer/Deployer.sol"
    },
-   "seenAt": "2026-11-21T14:39:12.064Z",
+   "seenAt": "2026-11-22T14:33:38.811Z",
    "changedAt": "2026-11-15T13:55:22.250Z"
   },
   "registry-bsc": {
@@ -238,7 +238,7 @@
     "beacon": null,
     "implCodeHash": "2ffbceb58e62bbcd"
    },
-   "seenAt": "2026-11-21T14:39:12.226Z",
+   "seenAt": "2026-11-22T14:33:38.815Z",
    "changedAt": "2026-11-15T13:55:22.253Z"
   },
   "settler-actions": {
@@ -252,7 +252,7 @@
     "sha": "1d46288aed",
     "url": "https://github.com/0xProject/0x-settler/blob/master/src/ISettlerActions.sol"
    },
-   "seenAt": "2026-11-21T14:39:12.008Z",
+   "seenAt": "2026-11-22T14:33:38.868Z",
    "changedAt": "2026-11-15T13:55:22.255Z"
   },
   "permit2-bsc": {
@@ -266,7 +266,7 @@
     "codeHash": "898031e75fd78eae",
     "bytes": 9152
    },
-   "seenAt": "2026-11-21T14:39:12.244Z",
+   "seenAt": "2026-11-22T14:33:38.836Z",
    "changedAt": "2026-11-15T13:55:22.256Z"
   },
   "wrapped-native-bsc": {
@@ -280,7 +280,7 @@
     "codeHash": "fa2cc55695081e99",
     "bytes": 3124
    },
-   "seenAt": "2026-11-21T14:39:12.240Z",
+   "seenAt": "2026-11-22T14:33:38.819Z",
    "changedAt": "2026-11-15T13:55:22.257Z"
   },
   "registry-polygon": {
@@ -297,7 +297,7 @@
     "beacon": null,
     "implCodeHash": "3fa1ea557f55ca94"
    },
-   "seenAt": "2026-11-21T14:39:12.333Z",
+   "seenAt": "2026-11-22T14:33:38.865Z",
    "changedAt": "2026-11-15T13:55:22.329Z"
   },
   "registry-owner-polygon": {
@@ -313,7 +313,7 @@
     "call": "owner()",
     "result": "0xf36b9f50e59870a24f42f9ba43b2ad0a4b8f2f51"
    },
-   "seenAt": "2026-11-21T14:39:12.300Z",
+   "seenAt": "2026-11-22T14:33:38.860Z",
    "changedAt": "2026-11-15T13:55:22.331Z"
   },
   "permit2-polygon": {
@@ -327,7 +327,7 @@
     "codeHash": "9d00ae84c1e424cd",
     "bytes": 9152
    },
-   "seenAt": "2026-11-21T14:39:12.337Z",
+   "seenAt": "2026-11-22T14:33:38.863Z",
    "changedAt": "2026-11-15T13:55:22.342Z"
   },
   "wrapped-native-polygon": {
@@ -341,7 +341,7 @@
     "codeHash": "4215c84e1e3cdd4e",
     "bytes": 3000
    },
-   "seenAt": "2026-11-21T14:39:12.361Z",
+   "seenAt": "2026-11-22T14:33:38.864Z",
    "changedAt": "2026-11-15T13:55:22.345Z"
   },
   "settler-in-force-base": {
@@ -360,7 +360,7 @@
     "call": "ownerOf(uint256) [2]",
     "result": "0x103502909141f7025a94b7b99a276dcd128e21a8"
    },
-   "seenAt": "2026-11-21T14:39:12.408Z",
+   "seenAt": "2026-11-22T14:33:38.915Z",
    "changedAt": "2026-11-15T13:55:22.367Z"
   },
   "registry-owner-base": {
@@ -376,7 +376,7 @@
     "call": "owner()",
     "result": "0xf36b9f50e59870a24f42f9ba43b2ad0a4b8f2f51"
    },
-   "seenAt": "2026-11-21T14:39:12.406Z",
+   "seenAt": "2026-11-22T14:33:38.917Z",
    "changedAt": "2026-11-15T13:55:22.370Z"
   },
   "registry-base": {
@@ -393,7 +393,7 @@
     "beacon": null,
     "implCodeHash": "7b826f15b41aa458"
    },
-   "seenAt": "2026-11-21T14:39:12.407Z",
+   "seenAt": "2026-11-22T14:33:38.921Z",
    "changedAt": "2026-11-15T13:55:22.383Z"
   },
   "permit2-base": {
@@ -407,7 +407,7 @@
     "codeHash": "597df4c55f25c8ef",
     "bytes": 9152
    },
-   "seenAt": "2026-11-21T14:39:12.449Z",
+   "seenAt": "2026-11-22T14:33:38.926Z",
    "changedAt": "2026-11-15T13:55:22.388Z"
   },
   "wrapped-native-base": {
@@ -421,7 +421,7 @@
     "codeHash": "955cbb26fe57de04",
     "bytes": 2041
    },
-   "seenAt": "2026-11-21T14:39:12.448Z",
+   "seenAt": "2026-11-22T14:33:38.925Z",
    "changedAt": "2026-11-15T13:55:22.397Z"
   },
   "settler-in-force-polygon": {
@@ -440,7 +440,7 @@
     "call": "ownerOf(uint256) [2]",
     "result": "0x73dae2fdf839af5f6bc62890f65a4357937ccf04"
    },
-   "seenAt": "2026-11-21T14:39:12.302Z",
+   "seenAt": "2026-11-22T14:33:38.857Z",
    "changedAt": "2026-11-15T13:55:22.398Z"
   },
   "registry-arbitrum": {
@@ -457,7 +457,7 @@
     "beacon": null,
     "implCodeHash": "3fa1ea557f55ca94"
    },
-   "seenAt": "2026-11-21T14:39:12.504Z",
+   "seenAt": "2026-11-22T14:33:38.930Z",
    "changedAt": "2026-11-15T13:55:22.436Z"
   },
   "settler-in-force-arbitrum": {
@@ -476,7 +476,7 @@
     "call": "ownerOf(uint256) [2]",
     "result": "0xf41429fc96ff446b8118359ba16854e07c393591"
    },
-   "seenAt": "2026-11-21T14:39:12.495Z",
+   "seenAt": "2026-11-22T14:33:38.950Z",
    "changedAt": "2026-11-15T13:55:22.440Z"
   },
   "registry-owner-arbitrum": {
@@ -492,7 +492,7 @@
     "call": "owner()",
     "result": "0xf36b9f50e59870a24f42f9ba43b2ad0a4b8f2f51"
    },
-   "seenAt": "2026-11-21T14:39:12.501Z",
+   "seenAt": "2026-11-22T14:33:38.953Z",
    "changedAt": "2026-11-15T13:55:22.442Z"
   },
   "wrapped-native-arbitrum": {
@@ -506,7 +506,7 @@
     "codeHash": "d058f7f80f1da876",
     "bytes": 2092
    },
-   "seenAt": "2026-11-21T14:39:12.485Z",
+   "seenAt": "2026-11-22T14:33:38.940Z",
    "changedAt": "2026-11-15T13:55:22.466Z"
   },
   "permit2-arbitrum": {
@@ -520,7 +520,7 @@
     "codeHash": "6f7371c60f58dcfa",
     "bytes": 9152
    },
-   "seenAt": "2026-11-21T14:39:12.522Z",
+   "seenAt": "2026-11-22T14:33:38.933Z",
    "changedAt": "2026-11-15T13:55:22.466Z"
   },
   "permit2-avalanche": {
@@ -534,7 +534,7 @@
     "codeHash": "0272097335f2fcd9",
     "bytes": 9152
    },
-   "seenAt": "2026-11-21T14:39:12.640Z",
+   "seenAt": "2026-11-22T14:33:38.984Z",
    "changedAt": "2026-11-15T13:55:22.480Z"
   },
   "settler-in-force-avalanche": {
@@ -553,7 +553,7 @@
     "call": "ownerOf(uint256) [2]",
     "result": "0x584a4e93f11331d318165b04099e53708b1fa915"
    },
-   "seenAt": "2026-11-21T14:39:12.605Z",
+   "seenAt": "2026-11-22T14:33:38.979Z",
    "changedAt": "2026-11-15T13:55:22.484Z"
   },
   "registry-owner-avalanche": {
@@ -569,7 +569,7 @@
     "call": "owner()",
     "result": "0xf36b9f50e59870a24f42f9ba43b2ad0a4b8f2f51"
    },
-   "seenAt": "2026-11-21T14:39:12.597Z",
+   "seenAt": "2026-11-22T14:33:38.979Z",
    "changedAt": "2026-11-15T13:55:22.486Z"
   },
   "wrapped-native-avalanche": {
@@ -583,7 +583,7 @@
     "codeHash": "561ff04aed88349c",
     "bytes": 3249
    },
-   "seenAt": "2026-11-21T14:39:12.615Z",
+   "seenAt": "2026-11-22T14:33:38.995Z",
    "changedAt": "2026-11-15T13:55:22.504Z"
   },
   "registry-avalanche": {
@@ -600,7 +600,7 @@
     "beacon": null,
     "implCodeHash": "2b6d30051461134d"
    },
-   "seenAt": "2026-11-21T14:39:12.727Z",
+   "seenAt": "2026-11-22T14:33:39.004Z",
    "changedAt": "2026-11-15T13:55:22.516Z"
   }
  }
