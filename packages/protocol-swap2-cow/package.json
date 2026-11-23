@@ -63,7 +63,7 @@
   },
   "dependencies": {
     "@anywalletkit/protocol-swap2-core": "workspace:*",
-    "viem": "^2.57.2"
+    "viem": "^2.57.20"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"

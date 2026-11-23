@@ -35,7 +35,7 @@
     "@anywalletkit/swap2-assets": "workspace:*",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",
-    "viem": "^2.57.2"
+    "viem": "^2.57.20"
   },
   "peerDependencies": { "@anywalletkit/core": "workspace:*" },
   "devDependencies": {

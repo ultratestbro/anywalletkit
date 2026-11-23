@@ -24,7 +24,7 @@
     "lint": "eslint src",
     "verify:live": "node scripts/verify-live.mjs"
   },
-  "dependencies": { "viem": "^2.57.2" },
+  "dependencies": { "viem": "^2.57.20" },
   "peerDependencies": { "@anywalletkit/core": "workspace:*" },
   "devDependencies": {
     "@anywalletkit/conformance": "workspace:*",

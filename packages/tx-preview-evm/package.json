@@ -25,7 +25,7 @@
     "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
-    "viem": "^2.57.2"
+    "viem": "^2.57.20"
   },
   "devDependencies": {
     "@types/node": "^22",

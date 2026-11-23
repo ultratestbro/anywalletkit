@@ -83,7 +83,7 @@
   "dependencies": {
     "@anywalletkit/swap2-assets": "workspace:*",
     "@anywalletkit/tx-preview-evm": "workspace:*",
-    "viem": "^2.45.0"
+    "viem": "^2.57.20"
   },
   "peerDependencies": {
     "@anywalletkit/core": "workspace:*"

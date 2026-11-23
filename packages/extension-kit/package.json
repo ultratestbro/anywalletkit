@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "vitest": "^5.1.0",
-    "viem": "^2.57.16"
+    "viem": "^2.57.20"
   },
   "publishConfig": { "access": "public", "provenance": true }
 }
