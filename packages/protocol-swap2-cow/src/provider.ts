@@ -402,6 +402,9 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
     name: "cow",
     describeActivity: describeCowActivity,
     supportsSameChain: true,
+    // The eth-flow createOrder (a native-coin sale) goes out with the account's own estimate of exactly that call: on
+    // Arbitrum the gas of a transaction includes its L1 data, so a fixed limit (150k) ran short there (157k measured).
+    ownGasEstimate: true,
     enabled: () => config.enabled ?? false,
     supportsChain: (caip2) => !!offeredChain(caip2),
     supportsChainPair: (fromChain, toChain) => fromChain === toChain && !!offeredChain(fromChain),

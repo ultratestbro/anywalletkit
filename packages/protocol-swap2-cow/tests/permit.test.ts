@@ -183,4 +183,22 @@ describe("simulatePermit", () => {
     await expect(run(world({permitGas: 21_000n + (COW_PERMIT_HOOK_GAS * 10n) / 11n}))).resolves.toBeDefined();
     await expect(run(world({rpcDown: true}))).rejects.toThrow("cow: the signed permit could not be checked (no RPC answered)");
   });
+  it("on Arbitrum takes the estimate's L1 data part off: a hook inside the settlement does not pay it", async () => {
+    const onArb = async (w: ReturnType<typeof world>) => {
+      vi.stubGlobal("fetch", stub(w));
+      await simulatePermit(cowRpc(RPC), 42161, USDC, COW_SETTLEMENT, encodePermitCall(REQUEST, await sign(REQUEST)));
+      return w;
+    };
+    // Measured live 2026-11-23 (verify-live, USDC on Arbitrum): the permit estimated 195 172, 97 327 of it the L1
+    // component; the hook's share, (195 172 − 97 327 − 21 000) × 1.1 ≈ 84 500, fits its 100 000.
+    const w = await onArb(world({permitGas: 195_172n, arbitrumL1Gas: 97_327n}));
+    const nodeCall = w.rpcCalls.find((c) => c.method === "eth_call" && (c.params[0] as {to: string}).to === "0x00000000000000000000000000000000000000C8");
+    expect(nodeCall).toBeDefined();
+    // Too much even without the L1 part, and a NodeInterface that does not answer: refused.
+    await expect(onArb(world({permitGas: 97_327n + 21_000n + 100_000n, arbitrumL1Gas: 97_327n}))).rejects.toThrow(/more than the 100000/);
+    await expect(onArb(world({permitGas: 120_000n, arbitrumL1Gas: "down"}))).rejects.toThrow("no L1 gas component");
+    // Ethereum and Base estimates are taken whole; the NodeInterface is never asked there.
+    const eth = await run(world({permitGas: 100_000n}));
+    expect(eth.rpcCalls.some((c) => c.method === "eth_call" && (c.params[0] as {to: string}).to === "0x00000000000000000000000000000000000000C8")).toBe(false);
+  });
 });

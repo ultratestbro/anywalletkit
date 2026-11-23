@@ -162,7 +162,9 @@ for (const chainId of chains) {
     const sim = await rpc(url, 'eth_call', [{from: account.address, to: tx.to, value: `0x${BigInt(tx.value).toString(16)}`, data: tx.data}, 'latest', override])
     check(chainId, 'eth-flow: createOrder simulated on-chain returns the digest the status id is derived from', same(sim.result, digest), sim.result ?? JSON.stringify(sim.error).slice(0, 160))
     const gas = await rpc(url, 'eth_estimateGas', [{from: account.address, to: tx.to, value: `0x${BigInt(tx.value).toString(16)}`, data: tx.data}, 'latest', override])
-    check(chainId, 'eth-flow: createOrder gas fits the declared limit', !!gas.result && BigInt(gas.result) <= BigInt(tx.gasLimit), `estimate ${gas.result ? BigInt(gas.result) : JSON.stringify(gas.error).slice(0, 120)} ≤ ${tx.gasLimit}`)
+    // The engine sends createOrder with the account's own estimate (ownGasEstimate), not the quoted limit: on Arbitrum a
+    // transaction's gas includes its L1 data, so any fixed limit can run short there.
+    check(chainId, 'eth-flow: createOrder estimates on-chain and goes out with the account\'s own estimate', !!gas.result && provider.ownGasEstimate === true, `estimate ${gas.result ? BigInt(gas.result) : JSON.stringify(gas.error).slice(0, 120)}, ownGasEstimate ${provider.ownGasEstimate}`)
     const stored = await rpc(url, 'eth_call', [{to: d.ethFlow, data: encodeFunctionData({abi: ETH_FLOW_ABI, functionName: 'orders', args: [digest]})}, 'latest'])
     const [owner] = decodeAbiParameters([{type: 'address'}, {type: 'uint32'}], stored.result)
     check(chainId, 'eth-flow: no such order exists yet (nothing was sent); status and refund say so', /^0x0{40}$/.test(owner)

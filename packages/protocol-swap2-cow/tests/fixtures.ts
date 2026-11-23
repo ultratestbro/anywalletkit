@@ -74,6 +74,8 @@ export interface World {
   permitToken: {name: string; version?: string; nonce: bigint; typeHash?: string; separator?: Hex} | null;
   /** Gas `eth_estimateGas` answers for the permit call; "revert" refuses it. */
   permitGas: bigint | "revert";
+  /** What Arbitrum's NodeInterface answers for the L1 part of a gas estimate; "down" = no answer. */
+  arbitrumL1Gas: bigint | "down";
   ethFlowOrders: Map<string, {owner: string; validTo: number}>;
   filled: Map<string, bigint>;
   code: Map<string, string>;
@@ -101,6 +103,7 @@ export function world(over: Partial<World> = {}): World {
     allowance: 0n,
     permitToken: {name: "USD Coin", version: "2", nonce: 0n},
     permitGas: 60_000n,
+    arbitrumL1Gas: 0n,
     ethFlowOrders: new Map(),
     filled: new Map(),
     code: new Map(),
@@ -152,6 +155,10 @@ function rpcResult(w: World, method: string, params: unknown[]): unknown {
   if (method !== "eth_call") return revert();
   const {to, data} = params[0] as {to: string; data: Hex};
   const target = to.toLowerCase();
+  if (target === "0x00000000000000000000000000000000000000c8") {
+    if (w.arbitrumL1Gas === "down") return revert();
+    return encodeAbiParameters([{type: "uint64"}, {type: "uint256"}, {type: "uint256"}], [w.arbitrumL1Gas, 20_000_000n, 300_000_000n]);
+  }
   if (target === D1.ethFlow.toLowerCase()) {
     const call = decodeFunctionData({abi: ETH_FLOW_ABI, data});
     if (call.functionName !== "orders") return revert();

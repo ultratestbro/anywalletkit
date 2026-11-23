@@ -211,6 +211,24 @@ export async function detectPermit(rpc: CowRpc, chainId: number, token: string, 
   }
 }
 
+/** Arbitrum's NodeInterface (a virtual contract nodes answer at this address in `eth_call`). */
+const ARB_NODE_INTERFACE = "0x00000000000000000000000000000000000000C8";
+const ARB_NODE_ABI = parseAbi(["function gasEstimateL1Component(address to, bool contractCreation, bytes data) payable returns (uint64 gasEstimateForL1, uint256 baseFee, uint256 l1BaseFeeEstimate)"]);
+/** Chains whose `eth_estimateGas` counts the L1 data cost in L2 gas units (Arbitrum's gas model). */
+const ARBITRUM_GAS_MODEL = new Set([42161, 42170]);
+
+/**
+ * The part of an Arbitrum gas estimate that pays for posting the transaction's data to L1: it belongs to the outer
+ * transaction, never to a hook that runs inside the settlement. Throws when the node does not answer.
+ */
+async function arbitrumL1Gas(rpc: CowRpc, chainId: number, to: string, data: Hex): Promise<bigint> {
+  const call = encodeFunctionData({abi: ARB_NODE_ABI, functionName: "gasEstimateL1Component", args: [getAddress(to), false, data]});
+  const raw = await rpc.request(chainId, "eth_call", [{to: ARB_NODE_INTERFACE, data: call}, "latest"]);
+  if (typeof raw !== "string" || !/^0x[0-9a-fA-F]{192}$/.test(raw)) throw new Error("malformed NodeInterface answer");
+  const [l1] = decodeAbiParameters([{type: "uint64"}, {type: "uint256"}, {type: "uint256"}], raw as Hex);
+  return l1;
+}
+
 /**
  * Runs the exact `permit` call against the latest block. Resolves when the token accepts it within the hook's gas;
  * throws when it reverts, needs more gas than the hook has, or no RPC answered — the order is then not signed.
@@ -223,7 +241,17 @@ export async function simulatePermit(rpc: CowRpc, chainId: number, token: string
     throw new Error(isRpcAnswer(e) ? "cow: the token refused the signed permit" : "cow: the signed permit could not be checked (no RPC answered)");
   }
   if (typeof estimate !== "string" || !/^0x[0-9a-fA-F]{1,16}$/.test(estimate)) throw new Error("cow: the signed permit could not be checked (malformed gas estimate)");
-  const gas = BigInt(estimate);
+  let gas = BigInt(estimate);
+  // On Arbitrum the estimate also buys the L1 data of a standalone transaction, which a hook inside the settlement
+  // does not pay: without taking it off, USDC's permit (about 70k of execution) read as 190k and was refused.
+  if (ARBITRUM_GAS_MODEL.has(chainId)) {
+    try {
+      const l1 = await arbitrumL1Gas(rpc, chainId, token, callData);
+      gas = gas > l1 ? gas - l1 : 0n;
+    } catch {
+      throw new Error("cow: the signed permit could not be checked (no L1 gas component)");
+    }
+  }
   // The estimate is a whole transaction (21 000 of it is not the hook's); 10 % of room on top.
   const hookGas = gas > 21_000n ? ((gas - 21_000n) * 11n) / 10n : 0n;
   if (hookGas > COW_PERMIT_HOOK_GAS) throw new Error(`cow: the token's permit needs about ${hookGas} gas, more than the ${COW_PERMIT_HOOK_GAS} the order's hook has`);

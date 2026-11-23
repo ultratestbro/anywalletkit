@@ -39,6 +39,11 @@ describe("what the provider offers", () => {
     expect(base.cancelTargets!("eip155:1")).toEqual([D1.settlement, D1.ethFlow]);
     expect(base.cancelTargets!("eip155:100")).toEqual([]);
   });
+  it("has the engine send its calls with the account's own gas estimate: a fixed eth-flow limit ran short on Arbitrum", () => {
+    // createOrder estimated 156 734 gas on Arbitrum (its L1 data counts as gas there) against the quoted 150 000.
+    expect(cowProvider({enabled: true}).ownGasEstimate).toBe(true);
+  });
+
   it("refuses a configuration it could not honour", () => {
     expect(() => cowProvider({validForSeconds: 60})).toThrow(/validForSeconds/);
     expect(() => cowProvider({validForSeconds: 3600})).toThrow(/validForSeconds/);
