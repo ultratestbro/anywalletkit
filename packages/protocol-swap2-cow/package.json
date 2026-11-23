@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-cow",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "CoW Protocol same-chain swaps for Any Wallet Kit: gasless EIP-712 sell orders (EIP-2612 permit where the token has it), native-coin sells through eth-flow, cancellation and status on Ethereum, Base and Arbitrum \u2014 every order rebuilt and checked against the request before it is signed.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

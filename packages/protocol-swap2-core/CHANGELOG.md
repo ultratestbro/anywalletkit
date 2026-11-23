@@ -1,5 +1,20 @@
 # @anywalletkit/protocol-swap2-core
 
+## 0.17.0
+
+### Minor Changes
+
+- 6020956: The router can rank routes net of the source gas (SDK-291). New option `sourceGasUsd` (also on `RouterSwap2Protocol`): the gas a quote's source transaction costs the user in USD, asked once per quote as it arrives and subtracted from its `valueUsd`. `evmSourceGas({prices, rpcUrl})` builds it for EVM sources from the quote (the venue's `txRequest.gasLimit` capped at 3M or 250k, a transfer for a deposit-address route, nothing for a gasless one, plus an ERC-20 approval unless the sender's allowance covers it) at the chain's `eth_gasPrice`. Gas comes off every quote of an auction or none: a quote whose estimate fails or takes over 3 s leaves the auction without gas, as before. `RankedQuote.gasUsd` / `Swap2Route.gasUsd` say what was subtracted. Without `sourceGasUsd` nothing changes.
+  
+  `Quote.gasless` (protocol-swap2-core): the user signs the source leg and a third party sends it and pays its gas. The swap2 server seals it. Omniston sets it on EVM → TON orders, with the order protocol as `providerData.approvalAddress`.
+- ffe1564: Orders that rest before they settle (CoW Protocol), checked at the engine's own gate.
+  
+  - **A GPv2 typed order is bound to the swap before anything is approved or signed** (`assertGpv2Order`): the GPv2Settlement domain on the source chain, the canonical `Order` type and nothing else, sell token, buy token, receiver, the exact input, a minimum at or above the quoted one, zero signed fee, a sell order with no partial fill and plain ERC-20 balances, an expiry within three hours, and the GPv2 vault relayer as the only spender. An account without `signTypedData` is refused before any approval is sent.
+  - **Permit instead of an approval**: a build may offer `permit` (EIP-2612 typed data) and `approvalAmount`. The engine signs the permit only for this account, the source token, the vault relayer, the exact amount and the order's own expiry (`assertGpv2Permit`), hands the signature to the provider's new `applyPermit`, and accepts the returned order only if nothing but `appData` changed. Both fields are refused on anything that is not a GPv2 order; `approvalAmount` must be a finite amount covering the input.
+  - **`cancelSwap2(id, account, { onchain? })`** with provider hooks `buildCancel`, `registerCancel`, `cancelTargets`: a typed cancellation is signed only for this account's own order UIDs (`assertGpv2Cancellation`); an on-chain cancel is plain calldata with no value to a contract the provider declared, never a transfer or an approval.
+  - `registerSignedOrder` may return `{ intentId }` — the id the placed order is tracked by.
+  - Router: the dispatch snapshot carries `applyPermit`, `buildCancel`, `registerCancel` and `cancelTargets`, so a routed order keeps its permit and cancel steps.
+
 ## 0.16.0
 
 ### Minor Changes

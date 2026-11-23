@@ -1,5 +1,13 @@
 # @anywalletkit/protocol-swap2-fynd
 
+## 0.3.3
+
+### Patch Changes
+
+- Updated dependencies [6020956]
+- Updated dependencies [ffe1564]
+  - @anywalletkit/protocol-swap2-core@0.17.0
+
 ## 0.3.2
 
 ### Patch Changes
