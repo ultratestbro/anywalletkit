@@ -525,6 +525,35 @@
    "src": "eip155:1:WBTC",
    "dst": "eip155:42161:WBTC",
    "amount": "0.002"
+  },
+  {
+   "id": "cow:eth-usdc>eth-weth",
+   "provider": "cow",
+   "src": "eip155:1:USDC",
+   "dst": "eip155:1:WETH",
+   "amount": "100"
+  },
+  {
+   "id": "cow:base-usdc>base-weth",
+   "provider": "cow",
+   "src": "eip155:8453:USDC",
+   "dst": "eip155:8453:WETH",
+   "amount": "100"
+  },
+  {
+   "id": "cow:arb-usdc>arb-weth",
+   "provider": "cow",
+   "src": "eip155:42161:USDC",
+   "dst": "eip155:42161:WETH",
+   "amount": "100"
+  },
+  {
+   "id": "cow:base-eth>base-usdc",
+   "provider": "cow",
+   "src": "eip155:8453:ETH",
+   "dst": "eip155:8453:USDC",
+   "amount": "0.05",
+   "note": "eth-flow (native in)"
   }
  ],
  "omniston": {

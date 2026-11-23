@@ -1,0 +1,233 @@
+{
+  "kind": "public-mainnet-funded",
+  "limitations": [
+    "Small capped orders from one test wallet on Base"
+  ],
+  "cases": [
+    {
+      "case": "eth-flow",
+      "at": "2026-11-23T14:55:33.555Z",
+      "chain": "eip155:8453",
+      "account": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "from": "ETH",
+      "to": "USDC",
+      "amountIn": "200000000000000",
+      "before": {
+        "eth": "521534299106686",
+        "usdc": "14092167",
+        "weth": "0"
+      },
+      "id": "awk1.cow.e%3A8453%3A833589fcd6edb6e08f4c7c32d4f71b54bda029138abe813577e47415a3cd0bbc68c7abca2c4c55ba0000000000000000000000000000000000000000000000000000b5e620f4800000000000000000000000000000000000000000000000000000000000000548c01fc7dfb9bfb16e9ba1136920e86cb315962f298f72e605a4f4949828b53715da6b045896000000002ce777aa.0x151338d763ef774bbb77694c85267412aaea845195c9fc0d56448cff9b98e07b",
+      "result": {
+        "id": "awk1.cow.e%3A8453%3A833589fcd6edb6e08f4c7c32d4f71b54bda029138abe813577e47415a3cd0bbc68c7abca2c4c55ba0000000000000000000000000000000000000000000000000000b5e620f4800000000000000000000000000000000000000000000000000000000000000548c01fc7dfb9bfb16e9ba1136920e86cb315962f298f72e605a4f4949828b53715da6b045896000000002ce777aa.0x151338d763ef774bbb77694c85267412aaea845195c9fc0d56448cff9b98e07b",
+        "fees": [
+          {
+            "type": "network",
+            "amount": "6090311279866",
+            "token": "nep141:base.omft.near",
+            "included": true,
+            "description": "Solver network cost — taken from the input, already in the quoted output; no gas is paid for the trade itself"
+          }
+        ],
+        "fromTokenAmount": "200000000000000",
+        "toTokenAmount": "348044",
+        "toTokenAmountMin": "346304",
+        "hash": "0x151338d763ef774bbb77694c85267412aaea845195c9fc0d56448cff9b98e07b",
+        "transactions": [
+          {
+            "hash": "0x151338d763ef774bbb77694c85267412aaea845195c9fc0d56448cff9b98e07b",
+            "type": "source"
+          }
+        ]
+      },
+      "status": {
+        "status": "completed",
+        "transactions": [
+          {
+            "hash": "0x0d4c27275ef41eb76bbe60affccac03c25158d5a89f6a300ec9f7df5d2cf5ff8",
+            "type": "destination"
+          }
+        ]
+      },
+      "after": {
+        "eth": "319269681596394",
+        "usdc": "14448219",
+        "weth": "0"
+      }
+    },
+    {
+      "case": "permit",
+      "at": "2026-11-23T14:56:11.846Z",
+      "chain": "eip155:8453",
+      "account": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "from": "USDC",
+      "to": "WETH",
+      "amountIn": "1000000",
+      "before": {
+        "eth": "319269681596394",
+        "usdc": "14448219",
+        "weth": "0"
+      },
+      "id": "awk1.cow.o%3A8453%3A0x5f0aa015bb64bae6a1fb76ce2710bff917b2d95732ff9c9cf1071237f0eb4d558abe813577e47415a3cd0bbc68c7abca2c4c55ba6b0458bd",
+      "result": {
+        "id": "awk1.cow.o%3A8453%3A0x5f0aa015bb64bae6a1fb76ce2710bff917b2d95732ff9c9cf1071237f0eb4d558abe813577e47415a3cd0bbc68c7abca2c4c55ba6b0458bd",
+        "fees": [
+          {
+            "type": "network",
+            "amount": "15472",
+            "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "included": true,
+            "description": "Solver network cost — taken from the input, already in the quoted output; no gas is paid for the trade itself"
+          }
+        ],
+        "fromTokenAmount": "1000000",
+        "toTokenAmount": "555202508527296",
+        "toTokenAmountMin": "552426495984660"
+      },
+      "status": {
+        "status": "completed",
+        "transactions": [
+          {
+            "hash": "0xfc274c44193650a5b7b40e25b946565a3484363510e9aadf0c8c67c4ce7b4ad6",
+            "type": "destination"
+          }
+        ]
+      },
+      "after": {
+        "eth": "319269681596394",
+        "usdc": "13448219",
+        "weth": "561056846692526"
+      }
+    },
+    {
+      "case": "approve",
+      "at": "2026-11-23T14:56:50.766Z",
+      "chain": "eip155:8453",
+      "account": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "from": "WETH",
+      "to": "USDC",
+      "amountIn": "300000000000000",
+      "before": {
+        "eth": "319269681596394",
+        "usdc": "13448219",
+        "weth": "561056846692526"
+      },
+      "id": "awk1.cow.o%3A8453%3A0x7bcdd29df31f59b836b54d1165180b117c7e73fb9d049b7860b66a43a478b6d28abe813577e47415a3cd0bbc68c7abca2c4c55ba6b0458e4",
+      "result": {
+        "id": "awk1.cow.o%3A8453%3A0x7bcdd29df31f59b836b54d1165180b117c7e73fb9d049b7860b66a43a478b6d28abe813577e47415a3cd0bbc68c7abca2c4c55ba6b0458e4",
+        "fees": [
+          {
+            "type": "network",
+            "amount": "7930765556658",
+            "token": "0x4200000000000000000000000000000000000006",
+            "included": true,
+            "description": "Solver network cost — taken from the input, already in the quoted output; no gas is paid for the trade itself"
+          }
+        ],
+        "fromTokenAmount": "300000000000000",
+        "toTokenAmount": "526894",
+        "toTokenAmountMin": "524260"
+      },
+      "status": {
+        "status": "completed",
+        "transactions": [
+          {
+            "hash": "0x93dd25368567c12a562a26e999a5d7ed748007a28c9fc976e310cf57206c972a",
+            "type": "destination"
+          }
+        ]
+      },
+      "after": {
+        "eth": "317648210138696",
+        "usdc": "13984118",
+        "weth": "261056846692526"
+      }
+    },
+    {
+      "case": "cancel",
+      "at": "2026-11-23T14:58:02.031Z",
+      "chain": "eip155:8453",
+      "account": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "from": "USDC",
+      "to": "WETH",
+      "amountIn": "1000000",
+      "before": {
+        "eth": "317648210138696",
+        "usdc": "13984118",
+        "weth": "261056846692526"
+      },
+      "id": "awk1.cow.o%3A8453%3A0x021b98afc92a197cde8e76f548d9ae8f06dd736e5590a6ec48b5cf6896bb85818abe813577e47415a3cd0bbc68c7abca2c4c55ba6b04592b",
+      "result": {
+        "id": "awk1.cow.o%3A8453%3A0x021b98afc92a197cde8e76f548d9ae8f06dd736e5590a6ec48b5cf6896bb85818abe813577e47415a3cd0bbc68c7abca2c4c55ba6b04592b",
+        "fees": [
+          {
+            "type": "network",
+            "amount": "11247",
+            "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "included": true,
+            "description": "Solver network cost — taken from the input, already in the quoted output; no gas is paid for the trade itself"
+          }
+        ],
+        "fromTokenAmount": "1000000",
+        "toTokenAmount": "555963256520031",
+        "toTokenAmountMin": "553183440237431"
+      },
+      "cancel": {
+        "mode": "offchain",
+        "id": "awk1.cow.o%3A8453%3A0x021b98afc92a197cde8e76f548d9ae8f06dd736e5590a6ec48b5cf6896bb85818abe813577e47415a3cd0bbc68c7abca2c4c55ba6b04592b"
+      },
+      "status": {
+        "status": "cancelled"
+      },
+      "after": {
+        "eth": "317648210138696",
+        "usdc": "13984118",
+        "weth": "261056846692526"
+      }
+    },
+    {
+      "case": "cancel-onchain",
+      "at": "2026-11-23T14:58:56.754Z",
+      "chain": "eip155:8453",
+      "account": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "from": "USDC",
+      "to": "WETH",
+      "amountIn": "1000000",
+      "before": {
+        "eth": "317648210138696",
+        "usdc": "13984118",
+        "weth": "261056846692526"
+      },
+      "id": "awk1.cow.o%3A8453%3A0x931ef6b91fcd43e526e0cf107b2aff597738c48e67449424540c1b99e029a7098abe813577e47415a3cd0bbc68c7abca2c4c55ba6b045963",
+      "result": {
+        "id": "awk1.cow.o%3A8453%3A0x931ef6b91fcd43e526e0cf107b2aff597738c48e67449424540c1b99e029a7098abe813577e47415a3cd0bbc68c7abca2c4c55ba6b045963",
+        "fees": [
+          {
+            "type": "network",
+            "amount": "10327",
+            "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "included": true,
+            "description": "Solver network cost — taken from the input, already in the quoted output; no gas is paid for the trade itself"
+          }
+        ],
+        "fromTokenAmount": "1000000",
+        "toTokenAmount": "557259764362051",
+        "toTokenAmountMin": "554473465540241"
+      },
+      "cancel": {
+        "mode": "onchain",
+        "hash": "0xcd4cc4826cfe018b7782750e8f4e23807cfc7b59f2536e7dc36fa4f26cf42411",
+        "chain": "eip155:8453",
+        "id": "awk1.cow.o%3A8453%3A0x931ef6b91fcd43e526e0cf107b2aff597738c48e67449424540c1b99e029a7098abe813577e47415a3cd0bbc68c7abca2c4c55ba6b045963"
+      },
+      "status": {
+        "status": "cancelled"
+      },
+      "after": {
+        "eth": "316061743481968",
+        "usdc": "13984118",
+        "weth": "261056846692526"
+      }
+    }
+  ]
+}

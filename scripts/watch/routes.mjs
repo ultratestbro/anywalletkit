@@ -74,6 +74,7 @@ if (want("wrap")) providers.wrap = (await dist("protocol-swap2-wrap", "provider.
 if (want("balancer")) providers.balancer = (await dist("protocol-swap2-balancer", "provider.js")).balancerProvider({enabled: true, rpcUrls: venueRpc});
 if (want("curve")) providers.curve = (await dist("protocol-swap2-curve", "provider.js")).curveProvider({enabled: true, rpcUrls: venueRpc, onWarning: () => {}});
 if (want("relay")) providers.relay = (await dist("protocol-swap2-relay", "provider.js")).relayProvider({enabled: true, ...(env.RELAY_API_KEY ? {apiKey: env.RELAY_API_KEY} : {})});
+if (want("cow")) providers.cow = (await dist("protocol-swap2-cow", "provider.js")).cowProvider({enabled: true});
 if (want("fynd") && env.FYND_API_KEY) providers.fynd = (await dist("protocol-swap2-fynd", "provider.js")).fyndProvider({enabled: true, apiKey: env.FYND_API_KEY});
 // 0x needs a key on every request: without ZEROEX_API_KEY the provider is not built, so its corridors are not probed and
 // nothing transitions (a dry /price quote needs no RPC). The key travels only in the request header.

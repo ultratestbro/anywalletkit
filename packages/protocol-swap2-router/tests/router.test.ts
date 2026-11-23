@@ -203,6 +203,33 @@ describe("router dispatch snapshot", () => {
     expect(r.getProvider("own")!.ownGasEstimate).toBe(true);
     expect(r.getProvider("quoted")!.ownGasEstimate).toBeUndefined();
   });
+
+  it("keeps a resting-order provider's permit, signed-order and cancel steps", async () => {
+    const calls: string[] = [];
+    const SETTLEMENT = "0x9008D19f58AAbD9eD0D60971565AA8510560ab41";
+    const p = {
+      name: "resting",
+      enabled: () => true,
+      supportsRoute: () => true,
+      getQuote: async () => null,
+      buildDeposit: async () => ({chain: "", to: "0x", value: "0"}),
+      trackIntent: async () => ({state: "pending" as const}),
+      registerSignedOrder: async (id: string) => { calls.push(`placed ${id}`); return {intentId: "uid"}; },
+      applyPermit: async (id: string) => { calls.push(`permit ${id}`); return {chain: "eip155:1", to: SETTLEMENT, value: "0"}; },
+      buildCancel: async (ref: {intentId: string}) => { calls.push(`cancel ${ref.intentId}`); return null; },
+      registerCancel: async (id: string) => { calls.push(`cancelled ${id}`); },
+      cancelTargets: () => [SETTLEMENT],
+    };
+    const got = new CrossChainRouter([p]).getProvider("resting")!;
+    // Without these the engine sends an approval where a signature would do, loses the placed order's id, and
+    // answers "no cancel step" / "declares no cancelTargets" for an order the router placed.
+    expect(await got.registerSignedOrder!("q", "0xsig")).toEqual({intentId: "uid"});
+    await got.applyPermit!("q", "0xsig");
+    await got.buildCancel!({intentId: "uid"}, {owner: "0x4444444444444444444444444444444444444444", onchain: false});
+    await got.registerCancel!("uid", "0xsig");
+    expect(got.cancelTargets!("eip155:1")).toEqual([SETTLEMENT]);
+    expect(calls).toEqual(["placed q", "permit q", "cancel uid", "cancelled uid"]);
+  });
 });
 
 describe("ranking, route picker, progressive quotes", () => {

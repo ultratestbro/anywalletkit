@@ -1,0 +1,28 @@
+{
+  "note": "GPv2Settlement invalidateOrder (0x15337bc0) on Arbitrum — a signed order cancelled on-chain (public tx)",
+  "own": [
+    "0x4f6f32e1692566d335e7498a1ff9a1c1af43106b"
+  ],
+  "tx": {
+    "chain": "eip155:42161",
+    "hash": "0x74018b0b0786f77638e050c1558256e806795b53e2d1767b77433e5ac359544d",
+    "time": 1794253114,
+    "status": "confirmed",
+    "address": "0x4f6f32e1692566d335e7498a1ff9a1c1af43106b",
+    "from": "0x4f6f32e1692566d335e7498a1ff9a1c1af43106b",
+    "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+    "nativeValue": "0",
+    "transfers": [],
+    "block": "522770304",
+    "fee": "1923966864000",
+    "call": {
+      "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+      "selector": "0x15337bc0",
+      "data": "0x15337bc000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000038b65681f321ed85bfcc627f8f15f976bde15d7dba1d39e3a6542658ce9896e2c14f6f32e1692566d335e7498a1ff9a1c1af43106b6af2218f0000000000000000"
+    }
+  },
+  "expect": {
+    "kind": "contract",
+    "title": "Cancelled a CoW order"
+  }
+}

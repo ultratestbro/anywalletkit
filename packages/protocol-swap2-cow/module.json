@@ -1,0 +1,18 @@
+{
+  "name": "@anywalletkit/protocol-swap2-cow",
+  "type": "swap2",
+  "chains": [
+    "eip155:1",
+    "eip155:42161",
+    "eip155:8453"
+  ],
+  "tier": "core",
+  "maintainers": [
+    "@ultratestbro"
+  ],
+  "conformance": "0.x",
+  "repo": "https://github.com/ultratestbro/anywalletkit",
+  "path": "packages/protocol-swap2-cow",
+  "description": "CoW Protocol same-chain swaps as signed orders: EIP-712 typed orders with an EIP-2612 permit for the allowance where the token has one, native-coin sells through eth-flow, on-chain and off-chain cancellation; public orderbook, no key, no partner fee; contracts pinned, every quote rebuilt locally.",
+  "addedAt": "2026-11-10"
+}

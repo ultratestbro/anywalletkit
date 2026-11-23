@@ -31,6 +31,7 @@
     "@anywalletkit/protocol-swap2-cctp": "workspace:*",
     "@anywalletkit/protocol-swap2-chainflip": "workspace:*",
     "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/protocol-swap2-cow": "workspace:*",
     "@anywalletkit/protocol-swap2-curve": "workspace:*",
     "@anywalletkit/protocol-swap2-fynd": "workspace:*",
     "@anywalletkit/protocol-swap2-jupiter": "workspace:*",
