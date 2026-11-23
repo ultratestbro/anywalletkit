@@ -11,7 +11,7 @@
     "hash": "0d54f30b06c71af5",
     "chars": 22089
    },
-   "seenAt": "2026-11-22T14:33:36.563Z",
+   "seenAt": "2026-11-23T18:03:27.626Z",
    "changedAt": "2026-11-18T15:38:15.404Z"
   },
   "monad-bft-releases": {
@@ -27,7 +27,7 @@
     "url": "https://github.com/category-labs/monad-bft/releases/tag/v0.16.7",
     "prerelease": false
    },
-   "seenAt": "2026-11-22T14:33:36.651Z",
+   "seenAt": "2026-11-23T18:03:27.771Z",
    "changedAt": "2026-11-19T15:44:24.750Z"
   },
   "docs-staking-api": {
@@ -40,7 +40,7 @@
     "hash": "93cc782501773ffd",
     "chars": 55201
    },
-   "seenAt": "2026-11-22T14:33:36.582Z",
+   "seenAt": "2026-11-23T18:03:27.980Z",
    "changedAt": "2026-11-18T15:38:15.425Z"
   }
  }

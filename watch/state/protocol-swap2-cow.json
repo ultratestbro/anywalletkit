@@ -1,0 +1,519 @@
+{
+ "module": "@anywalletkit/protocol-swap2-cow",
+ "sources": {
+  "settlement-domain-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+    "signature": "domainSeparator()",
+    "decode": "bytes32"
+   },
+   "value": "\"0xc078f884a2676e1345748b1feace7b0abee5d00ecadb6e574dcdd109a63e8943\"",
+   "meta": {
+    "call": "domainSeparator()",
+    "result": "0xc078f884a2676e1345748b1feace7b0abee5d00ecadb6e574dcdd109a63e8943"
+   },
+   "seenAt": "2026-11-23T18:03:35.048Z",
+   "changedAt": "2026-11-23T18:03:35.048Z"
+  },
+  "settlement-relayer-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+    "signature": "vaultRelayer()",
+    "decode": "address"
+   },
+   "value": "\"0xc92e8bdf79f0507f65a392b0ab4667716bfe0110\"",
+   "meta": {
+    "call": "vaultRelayer()",
+    "result": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
+   },
+   "seenAt": "2026-11-23T18:03:35.049Z",
+   "changedAt": "2026-11-23T18:03:35.049Z"
+  },
+  "eth-flow-settlement-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0xba3cb449bd2b4adddbc894d8697f5170800eadec",
+    "signature": "cowSwapSettlement()",
+    "decode": "address"
+   },
+   "value": "\"0x9008d19f58aabd9ed0d60971565aa8510560ab41\"",
+   "meta": {
+    "call": "cowSwapSettlement()",
+    "result": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
+   },
+   "seenAt": "2026-11-23T18:03:35.049Z",
+   "changedAt": "2026-11-23T18:03:35.049Z"
+  },
+  "vault-relayer-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
+   },
+   "value": "5e1417ce3c871b1b",
+   "meta": {
+    "codeHash": "5e1417ce3c871b1b",
+    "bytes": 4590
+   },
+   "seenAt": "2026-11-23T18:03:35.050Z",
+   "changedAt": "2026-11-23T18:03:35.050Z"
+  },
+  "eth-flow-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0xba3cb449bd2b4adddbc894d8697f5170800eadec"
+   },
+   "value": "3ab2f47d893883b2",
+   "meta": {
+    "codeHash": "3ab2f47d893883b2",
+    "bytes": 6177
+   },
+   "seenAt": "2026-11-23T18:03:35.050Z",
+   "changedAt": "2026-11-23T18:03:35.050Z"
+  },
+  "settlement-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
+   },
+   "value": "ff9de93cb289c511",
+   "meta": {
+    "codeHash": "ff9de93cb289c511",
+    "bytes": 16165
+   },
+   "seenAt": "2026-11-23T18:03:35.051Z",
+   "changedAt": "2026-11-23T18:03:35.051Z"
+  },
+  "eth-flow-wrapped-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0xba3cb449bd2b4adddbc894d8697f5170800eadec",
+    "signature": "wrappedNativeToken()",
+    "decode": "address"
+   },
+   "value": "\"0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2\"",
+   "meta": {
+    "call": "wrappedNativeToken()",
+    "result": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+   },
+   "seenAt": "2026-11-23T18:03:35.057Z",
+   "changedAt": "2026-11-23T18:03:35.057Z"
+  },
+  "vault-relayer-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
+   },
+   "value": "5e1417ce3c871b1b",
+   "meta": {
+    "codeHash": "5e1417ce3c871b1b",
+    "bytes": 4590
+   },
+   "seenAt": "2026-11-23T18:03:35.059Z",
+   "changedAt": "2026-11-23T18:03:35.059Z"
+  },
+  "settlement-domain-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+    "signature": "domainSeparator()",
+    "decode": "bytes32"
+   },
+   "value": "\"0xd72ffa789b6fae41254d0b5a13e6e1e92ed947ec6a251edf1cf0b6c02c257b4b\"",
+   "meta": {
+    "call": "domainSeparator()",
+    "result": "0xd72ffa789b6fae41254d0b5a13e6e1e92ed947ec6a251edf1cf0b6c02c257b4b"
+   },
+   "seenAt": "2026-11-23T18:03:35.059Z",
+   "changedAt": "2026-11-23T18:03:35.059Z"
+  },
+  "eth-flow-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0xba3cb449bd2b4adddbc894d8697f5170800eadec"
+   },
+   "value": "e7c2e813ce294f02",
+   "meta": {
+    "codeHash": "e7c2e813ce294f02",
+    "bytes": 6177
+   },
+   "seenAt": "2026-11-23T18:03:35.060Z",
+   "changedAt": "2026-11-23T18:03:35.060Z"
+  },
+  "settlement-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
+   },
+   "value": "f974235fe21a7d1d",
+   "meta": {
+    "codeHash": "f974235fe21a7d1d",
+    "bytes": 16165
+   },
+   "seenAt": "2026-11-23T18:03:35.061Z",
+   "changedAt": "2026-11-23T18:03:35.061Z"
+  },
+  "settlement-relayer-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+    "signature": "vaultRelayer()",
+    "decode": "address"
+   },
+   "value": "\"0xc92e8bdf79f0507f65a392b0ab4667716bfe0110\"",
+   "meta": {
+    "call": "vaultRelayer()",
+    "result": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
+   },
+   "seenAt": "2026-11-23T18:03:35.065Z",
+   "changedAt": "2026-11-23T18:03:35.065Z"
+  },
+  "settlement-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
+   },
+   "value": "185d5d5d5dfa47d8",
+   "meta": {
+    "codeHash": "185d5d5d5dfa47d8",
+    "bytes": 16165
+   },
+   "seenAt": "2026-11-23T18:03:35.067Z",
+   "changedAt": "2026-11-23T18:03:35.067Z"
+  },
+  "eth-flow-settlement-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0xba3cb449bd2b4adddbc894d8697f5170800eadec",
+    "signature": "cowSwapSettlement()",
+    "decode": "address"
+   },
+   "value": "\"0x9008d19f58aabd9ed0d60971565aa8510560ab41\"",
+   "meta": {
+    "call": "cowSwapSettlement()",
+    "result": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
+   },
+   "seenAt": "2026-11-23T18:03:35.068Z",
+   "changedAt": "2026-11-23T18:03:35.068Z"
+  },
+  "eth-flow-wrapped-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0xba3cb449bd2b4adddbc894d8697f5170800eadec",
+    "signature": "wrappedNativeToken()",
+    "decode": "address"
+   },
+   "value": "\"0x4200000000000000000000000000000000000006\"",
+   "meta": {
+    "call": "wrappedNativeToken()",
+    "result": "0x4200000000000000000000000000000000000006"
+   },
+   "seenAt": "2026-11-23T18:03:35.068Z",
+   "changedAt": "2026-11-23T18:03:35.068Z"
+  },
+  "vault-relayer-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
+   },
+   "value": "5e1417ce3c871b1b",
+   "meta": {
+    "codeHash": "5e1417ce3c871b1b",
+    "bytes": 4590
+   },
+   "seenAt": "2026-11-23T18:03:35.070Z",
+   "changedAt": "2026-11-23T18:03:35.070Z"
+  },
+  "settlement-domain-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+    "signature": "domainSeparator()",
+    "decode": "bytes32"
+   },
+   "value": "\"0x69d78e7a7cafcaf924483f99f65e8f4e303a99a446db7ab319f9d40e940bced2\"",
+   "meta": {
+    "call": "domainSeparator()",
+    "result": "0x69d78e7a7cafcaf924483f99f65e8f4e303a99a446db7ab319f9d40e940bced2"
+   },
+   "seenAt": "2026-11-23T18:03:35.073Z",
+   "changedAt": "2026-11-23T18:03:35.073Z"
+  },
+  "settlement-relayer-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+    "signature": "vaultRelayer()",
+    "decode": "address"
+   },
+   "value": "\"0xc92e8bdf79f0507f65a392b0ab4667716bfe0110\"",
+   "meta": {
+    "call": "vaultRelayer()",
+    "result": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
+   },
+   "seenAt": "2026-11-23T18:03:35.074Z",
+   "changedAt": "2026-11-23T18:03:35.074Z"
+  },
+  "eth-flow-settlement-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0xba3cb449bd2b4adddbc894d8697f5170800eadec",
+    "signature": "cowSwapSettlement()",
+    "decode": "address"
+   },
+   "value": "\"0x9008d19f58aabd9ed0d60971565aa8510560ab41\"",
+   "meta": {
+    "call": "cowSwapSettlement()",
+    "result": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
+   },
+   "seenAt": "2026-11-23T18:03:35.075Z",
+   "changedAt": "2026-11-23T18:03:35.075Z"
+  },
+  "eth-flow-wrapped-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0xba3cb449bd2b4adddbc894d8697f5170800eadec",
+    "signature": "wrappedNativeToken()",
+    "decode": "address"
+   },
+   "value": "\"0x82af49447d8a07e3bd95bd0d56f35241523fbab1\"",
+   "meta": {
+    "call": "wrappedNativeToken()",
+    "result": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1"
+   },
+   "seenAt": "2026-11-23T18:03:35.078Z",
+   "changedAt": "2026-11-23T18:03:35.078Z"
+  },
+  "eth-flow-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0xba3cb449bd2b4adddbc894d8697f5170800eadec"
+   },
+   "value": "eb9aa4891c518894",
+   "meta": {
+    "codeHash": "eb9aa4891c518894",
+    "bytes": 6177
+   },
+   "seenAt": "2026-11-23T18:03:35.079Z",
+   "changedAt": "2026-11-23T18:03:35.079Z"
+  },
+  "contracts-networks": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/contracts",
+    "path": "networks.json"
+   },
+   "value": "389e00d9ebe6be1effe4b290456f716cce087116",
+   "meta": {
+    "sha": "389e00d9eb",
+    "url": "https://github.com/cowprotocol/contracts/blob/main/networks.json"
+   },
+   "seenAt": "2026-11-23T18:03:35.200Z",
+   "changedAt": "2026-11-23T18:03:35.200Z"
+  },
+  "contracts-order": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/contracts",
+    "path": "src/contracts/libraries/GPv2Order.sol"
+   },
+   "value": "e05c800a5a209cef469293566d66f142da9deb09",
+   "meta": {
+    "sha": "e05c800a5a",
+    "url": "https://github.com/cowprotocol/contracts/blob/main/src/contracts/libraries/GPv2Order.sol"
+   },
+   "seenAt": "2026-11-23T18:03:35.240Z",
+   "changedAt": "2026-11-23T18:03:35.240Z"
+  },
+  "eth-flow-deployment-base": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/ethflowcontract",
+    "path": "broadcast/Deploy.sol/8453/deployment.prod.json"
+   },
+   "value": "7a7335d080a2360bdb7b914b8608ec976e0d1218",
+   "meta": {
+    "sha": "7a7335d080",
+    "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/broadcast/Deploy.sol/8453/deployment.prod.json"
+   },
+   "seenAt": "2026-11-23T18:03:35.274Z",
+   "changedAt": "2026-11-23T18:03:35.274Z"
+  },
+  "eth-flow-deployment-arbitrum": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/ethflowcontract",
+    "path": "broadcast/Deploy.sol/42161/deployment.prod.json"
+   },
+   "value": "f0f29e18ea768f8bc4ee14d3736404e4b90731a9",
+   "meta": {
+    "sha": "f0f29e18ea",
+    "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/broadcast/Deploy.sol/42161/deployment.prod.json"
+   },
+   "seenAt": "2026-11-23T18:03:35.276Z",
+   "changedAt": "2026-11-23T18:03:35.276Z"
+  },
+  "eth-flow-deployment-ethereum": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/ethflowcontract",
+    "path": "broadcast/Deploy.sol/1/deployment.prod.json"
+   },
+   "value": "012fe24875677646eebfdb1feed4359d9c59af84",
+   "meta": {
+    "sha": "012fe24875",
+    "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/broadcast/Deploy.sol/1/deployment.prod.json"
+   },
+   "seenAt": "2026-11-23T18:03:35.286Z",
+   "changedAt": "2026-11-23T18:03:35.286Z"
+  },
+  "contracts-signing": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/contracts",
+    "path": "src/contracts/mixins/GPv2Signing.sol"
+   },
+   "value": "16ac6502a2caac5823ab18a215dfdc4fef2ee830",
+   "meta": {
+    "sha": "16ac6502a2",
+    "url": "https://github.com/cowprotocol/contracts/blob/main/src/contracts/mixins/GPv2Signing.sol"
+   },
+   "seenAt": "2026-11-23T18:03:35.308Z",
+   "changedAt": "2026-11-23T18:03:35.308Z"
+  },
+  "eth-flow-source": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/ethflowcontract",
+    "path": "src/CoWSwapEthFlow.sol"
+   },
+   "value": "69f24583330e4bde0f5ad8ca8a84eebac2d1a82d",
+   "meta": {
+    "sha": "69f2458333",
+    "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/src/CoWSwapEthFlow.sol"
+   },
+   "seenAt": "2026-11-23T18:03:35.395Z",
+   "changedAt": "2026-11-23T18:03:35.395Z"
+  },
+  "orderbook-openapi": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/services",
+    "path": "crates/orderbook/openapi.yml"
+   },
+   "value": "206467f64cb9fcb20ebc1bf7d251d9f830a10e1c",
+   "meta": {
+    "sha": "206467f64c",
+    "url": "https://github.com/cowprotocol/services/blob/main/crates/orderbook/openapi.yml"
+   },
+   "seenAt": "2026-11-23T18:03:35.422Z",
+   "changedAt": "2026-11-23T18:03:35.422Z"
+  },
+  "eth-flow-order": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/ethflowcontract",
+    "path": "src/libraries/EthFlowOrder.sol"
+   },
+   "value": "076eaeceda97f671b9fb42c5b63718cf6e23b63c",
+   "meta": {
+    "sha": "076eaeceda",
+    "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/src/libraries/EthFlowOrder.sol"
+   },
+   "seenAt": "2026-11-23T18:03:35.458Z",
+   "changedAt": "2026-11-23T18:03:35.458Z"
+  },
+  "app-data-schema": {
+   "type": "github-file",
+   "target": {
+    "repo": "cowprotocol/cow-sdk",
+    "path": "packages/app-data/src/schemas/v1.16.0.json"
+   },
+   "value": "5c9439fcc17e814c28dfa707fa6bcad8b8e8cd4f",
+   "meta": {
+    "sha": "5c9439fcc1",
+    "url": "https://github.com/cowprotocol/cow-sdk/blob/main/packages/app-data/src/schemas/v1.16.0.json"
+   },
+   "seenAt": "2026-11-23T18:03:35.610Z",
+   "changedAt": "2026-11-23T18:03:35.610Z"
+  },
+  "services-releases": {
+   "type": "github-releases",
+   "target": {
+    "repo": "cowprotocol/services"
+   },
+   "value": "v2.389.0",
+   "meta": {
+    "tag": "v2.389.0",
+    "name": "Weekly Release v2.389.0",
+    "at": "2026-11-23",
+    "url": "https://github.com/cowprotocol/services/releases/tag/v2.389.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-11-23T18:03:35.634Z",
+   "changedAt": "2026-11-23T18:03:35.634Z"
+  },
+  "docs-eth-flow": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.cow.fi/cow-protocol/reference/contracts/periphery/eth-flow"
+   },
+   "value": "93b9ef530c1f435eaf0ae4bb964748d16e965063dacf812b6de82f4a0e0cf84b",
+   "meta": {
+    "hash": "93b9ef530c1f435e",
+    "chars": 9904
+   },
+   "seenAt": "2026-11-23T18:03:35.690Z",
+   "changedAt": "2026-11-23T18:03:35.690Z"
+  },
+  "docs-signing-schemes": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.cow.fi/cow-protocol/reference/core/signing-schemes"
+   },
+   "value": "a8a8349a6578a6942d3d6fd265c666aeba77868fa46a80baffd6ec0ff339b409",
+   "meta": {
+    "hash": "a8a8349a6578a694",
+    "chars": 7249
+   },
+   "seenAt": "2026-11-23T18:03:35.700Z",
+   "changedAt": "2026-11-23T18:03:35.700Z"
+  },
+  "eth-flow-releases": {
+   "type": "github-releases",
+   "target": {
+    "repo": "cowprotocol/ethflowcontract"
+   },
+   "value": "v1.3.0",
+   "meta": {
+    "tag": "v1.3.0",
+    "url": "https://github.com/cowprotocol/ethflowcontract/releases/tag/v1.3.0",
+    "note": "tags only"
+   },
+   "seenAt": "2026-11-23T18:03:35.746Z",
+   "changedAt": "2026-11-23T18:03:35.746Z"
+  }
+ }
+}

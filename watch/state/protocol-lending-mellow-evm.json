@@ -15,7 +15,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-22T14:33:31.242Z",
+   "seenAt": "2026-11-23T18:03:23.486Z",
    "changedAt": "2026-10-14T15:10:30.832Z"
   },
   "vault-lido-earn-eth": {
@@ -32,7 +32,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-22T14:33:31.220Z",
+   "seenAt": "2026-11-23T18:03:23.470Z",
    "changedAt": "2026-10-14T15:10:30.850Z"
   },
   "vault-lido-conservative-earn-usd": {
@@ -49,7 +49,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-22T14:33:31.223Z",
+   "seenAt": "2026-11-23T18:03:23.479Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-earn-usd": {
@@ -66,7 +66,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-22T14:33:31.219Z",
+   "seenAt": "2026-11-23T18:03:23.471Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-strategy": {
@@ -83,7 +83,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-22T14:33:31.222Z",
+   "seenAt": "2026-11-23T18:03:23.477Z",
    "changedAt": "2026-10-14T15:10:30.854Z"
   },
   "registry-vaults": {
@@ -186,7 +186,7 @@
      "0xf785a3637Fb8DC057a2a23c925e83859Ef212c8d"
     ]
    },
-   "seenAt": "2026-11-22T14:33:31.294Z",
+   "seenAt": "2026-11-23T18:03:24.109Z",
    "changedAt": "2026-11-18T15:38:07.606Z"
   },
   "docs": {
@@ -199,7 +199,7 @@
     "hash": "bbb595e50a6c75a7",
     "chars": 1080
    },
-   "seenAt": "2026-11-22T14:33:31.519Z",
+   "seenAt": "2026-11-23T18:03:24.022Z",
    "changedAt": "2026-10-14T15:10:31.059Z"
   },
   "flexible-vaults": {
@@ -214,7 +214,7 @@
     "url": "https://github.com/mellow-finance/flexible-vaults/commit/1c4555af769ba099be30bb182b8f23e6ad1ef5f0",
     "note": "default branch: fix"
    },
-   "seenAt": "2026-11-22T14:33:31.863Z",
+   "seenAt": "2026-11-23T18:03:24.151Z",
    "changedAt": "2026-11-13T14:33:28.179Z"
   }
  }
