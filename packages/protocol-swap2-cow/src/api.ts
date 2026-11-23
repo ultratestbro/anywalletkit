@@ -4,6 +4,7 @@
  * the API's error types into refusals a person can read.
  */
 import {anySignal, redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {httpRefusal, refusal, withReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {COW_API_BASE} from "./deployments.js";
 
 /** The largest response body read (a page of an account's orders with their appData documents is the biggest one). */
@@ -96,7 +97,7 @@ export function cowApi(config: CowApiConfig = {}): CowApi {
       });
       text = await res.text();
     } catch (e) {
-      throw new Error(`cow: the orderbook is unreachable (${e instanceof Error ? e.name : "error"})`);
+      throw refusal("upstream_unavailable", `cow: the orderbook is unreachable (${e instanceof Error ? e.name : "error"})`);
     }
     if (text.length > MAX_BODY_CHARS) throw new Error("cow: the orderbook's answer is too large");
     let json: unknown;
@@ -108,7 +109,11 @@ export function cowApi(config: CowApiConfig = {}): CowApi {
     if (res.status < 200 || res.status >= 300) {
       const err = json && typeof json === "object" ? (json as {errorType?: unknown; description?: unknown}) : {};
       const type = typeof err.errorType === "string" && /^[A-Za-z0-9_]{1,60}$/.test(err.errorType) ? err.errorType : `HTTP ${res.status}`;
-      throw new CowApiError(res.status, type, tidy(err.description));
+      // Classified like every provider's HTTP refusal: 429 is rate_limited with the orderbook's Retry-After (quotes are
+      // limited to 1 a second and ~500 an hour per IP), 401/403 key_rejected, 408/425/5xx upstream_unavailable.
+      const info = httpRefusal(res.status, res.headers?.get?.("retry-after") ?? null);
+      const error = new CowApiError(res.status, type, tidy(err.description));
+      throw info ? withReason(error, info) : error;
     }
     if (json === undefined) throw new Error("cow: malformed orderbook answer");
     return {status: res.status, json};

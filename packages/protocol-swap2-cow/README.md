@@ -115,6 +115,15 @@ After the fills the vault relayer's allowance was 0 on both tokens: the permit a
 order's input. Not covered with funds: the refund of an expired eth-flow order (an order cannot be made to stay
 unfilled: its minimum may not exceed the quote).
 
+## Orderbook limits
+
+`api.cow.fi` is free without a key within its published limits, per IP and network
+([rate limits](https://docs.cow.fi/cow-protocol/integrate/rate-limits)): quotes and prices 1 a second and about 500 an
+hour, everything else 5 a second; a client far over is blocked for an hour. Running on the device, each user is their
+own IP. A throttled answer is refused as `rate_limited` with the orderbook's `Retry-After` (`onRefusal`, the router's
+`lastRefusals`), so an app can wait instead of asking again; refresh an on-screen quote at most every 30 seconds and
+poll a status at most every 2. Every order names its app in appData (`appCode`), as CoW asks of integrations.
+
 ## Not supported (yet)
 
 - Buy (exact-output) orders, limit and TWAP orders, partial fills.
@@ -123,5 +132,7 @@ unfilled: its minimum may not exceed the quote).
 - Partner fees.
 - Tokens whose permit is not EIP-2612 (DAI's original form, Permit2) take the approval path.
 - Running behind `remoteProvider`: the module is meant to run on the device; the remote stub does not carry the permit and cancel steps.
+
+CoW Protocol, CoW Swap and CoW DAO are names of CoW DAO; this package is an independent integration, not affiliated with or endorsed by CoW DAO. It contains no CoW code: the order, permit and eth-flow encodings are written from the public contracts and API reference linked above.
 
 Apache-2.0.

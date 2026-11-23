@@ -1,5 +1,6 @@
 import {concat, decodeAbiParameters, encodeFunctionData, getAddress, keccak256, parseAbi, stringToHex, type Hex} from "viem";
 import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {refusalOf, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {describeCowActivity} from "./activity.js";
 import {cowApi, CowApiError, type CowApi, type CowApiConfig} from "./api.js";
@@ -413,8 +414,8 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
     supportsRoute: (from: Asset, to: Asset) => from.chain === to.chain && !!offeredChain(from.chain),
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const refuse = (why: string): null => {
-        params.onRefusal?.(`cow: ${why}`);
+      const refuse = (why: string, info?: Swap2RefusalInfo): null => {
+        params.onRefusal?.(`cow: ${why}`, info);
         return null;
       };
       if (params.flex) return refuse("amount-flexible deposits are not supported");
@@ -581,7 +582,8 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
         }
         return {...common(q, floor, "order", {appData: plain.hash, permit: permit ? "offered" : "none"}), intentId};
       } catch (e) {
-        return refuse(reasonOf(e));
+        // The orderbook's classified refusals (rate_limited with its wait, upstream_unavailable) reach the router.
+        return refuse(reasonOf(e), refusalOf(e));
       }
     },
 
