@@ -97,6 +97,24 @@ The same addresses on every supported chain, from [`cowprotocol/contracts`](http
 - **Off-chain** (default): the account signs `OrderCancellations` and the orderbook stops offering the order. Free; a solver that already holds the order may still fill it.
 - **On-chain** (`{ onchain: true }`): `GPv2Settlement.invalidateOrder(uid)` for a signed order, `CoWSwapEthFlow.invalidateOrder(order)` for a native-coin order (which also returns the coin). Binding, costs gas.
 
+## Checked on mainnet
+
+Read-only on Ethereum, Base and Arbitrum (`scripts/verify-live.mjs`: pinned contracts, quotes, signed order and permit
+verified locally, the permit hook and eth-flow `createOrder` simulated). With funds, on Base (2026-11-23,
+`scripts/verify-mainnet.mjs`, every case capped, report in `mainnet-report.json`):
+
+| Case | Sold | Received | Gas paid | Filled |
+|---|---|---|---|---|
+| eth-flow (native in) | 0.0002 ETH | 0.356052 USDC (quoted 0.348044) | 0.0000023 ETH, the `createOrder` | 21 s |
+| permit (USDC, no gas) | 1 USDC | 0.000561057 WETH (quoted 0.000555203) | none | 21 s |
+| approve (WETH) | 0.0003 WETH | 0.535899 USDC (quoted 0.526894) | 0.0000016 ETH, the exact approval | 21 s |
+| cancel off-chain | 1 USDC order | — | none | cancelled at once, `executedSellAmount` 0 |
+| cancel on-chain | 1 USDC order | — | 0.0000016 ETH, `invalidateOrder` | `filledAmount` = max |
+
+After the fills the vault relayer's allowance was 0 on both tokens: the permit and the approval were exactly the
+order's input. Not covered with funds: the refund of an expired eth-flow order (an order cannot be made to stay
+unfilled: its minimum may not exceed the quote).
+
 ## Not supported (yet)
 
 - Buy (exact-output) orders, limit and TWAP orders, partial fills.

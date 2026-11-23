@@ -75,6 +75,24 @@ describe("ERC-20 quote", () => {
     expect(q.txRequest).toBeUndefined();
   });
 
+  it("a price-only quote without any address is priced for a placeholder owner; an execution quote still needs the real one", async () => {
+    // Funded run 2026-11-23: quoteSwap2 without a recipient (a route list before the account is known) was refused.
+    const {quote, w, refusals} = setup({}, {permit: false});
+    const dry = (await quote(usdcToWeth({destAddress: "", refundAddress: undefined, dry: true})))!;
+    expect(dry).not.toBeNull();
+    expect(w.quotes.at(-1)).toMatchObject({from: "0x1111111111111111111111111111111111111111", receiver: "0x1111111111111111111111111111111111111111"});
+    refusals.length = 0;
+    expect(await quote(usdcToWeth({destAddress: "", refundAddress: undefined, dry: false}))).toBeNull();
+    expect(refusals[0]).toMatch(/recipient must be an EVM address/);
+  });
+
+  it("names the native coin's network cost as \"native\", like every other provider", async () => {
+    // Funded run 2026-11-23: an eth-flow quote named it by the catalog's 1Click asset id (nep141:…omft.near).
+    const {quote} = setup({}, {permit: false});
+    const q = (await quote(ethToUsdc()))!;
+    expect(q.fees).toEqual([expect.objectContaining({type: "network", token: "native", included: true})]);
+  });
+
   it("the caller's slippage and a tighter minimum of its own are what the order signs", async () => {
     const {quote} = setup({}, {permit: false});
     expect((await quote(usdcToWeth({slippageBps: 100})))!.minDestAmount).toBe("9900");

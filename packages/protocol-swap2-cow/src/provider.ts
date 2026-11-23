@@ -54,6 +54,8 @@ import {cowRpc, type CowRpc} from "./rpc.js";
  */
 
 const ZERO = "0x0000000000000000000000000000000000000000";
+/** The owner a price-only quote without any address is priced for: no code, no key anyone holds. Never signed for. */
+const DRY_QUOTE_OWNER = "0x1111111111111111111111111111111111111111";
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const DECIMAL = /^(?:0|[1-9][0-9]{0,77})$/;
 const BYTES32 = /^0x[0-9a-fA-F]{64}$/;
@@ -437,9 +439,12 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
       if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps >= 10_000) return refuse("slippage must be whole basis points below 10000");
 
       const valid = (a: string | undefined): a is string => typeof a === "string" && ADDRESS.test(a) && !/^0x0{40}$/.test(a);
-      if (!valid(params.destAddress) && !valid(params.refundAddress)) return refuse("recipient must be an EVM address");
+      // A price-only (dry) quote may come without any address (a route list before the account is known): CoW prices
+      // for a placeholder owner then. An execution quote always needs the real one.
+      const placeholder = params.dry === true && !valid(params.destAddress) && !valid(params.refundAddress);
+      if (!placeholder && !valid(params.destAddress) && !valid(params.refundAddress)) return refuse("recipient must be an EVM address");
       // The account that signs (or sends) is where a failed swap refunds; the receiver is the recipient the caller named.
-      const owner = getAddress(valid(params.refundAddress) ? params.refundAddress : params.destAddress);
+      const owner = getAddress(placeholder ? DRY_QUOTE_OWNER : valid(params.refundAddress) ? params.refundAddress! : params.destAddress);
       const receiver = getAddress(valid(params.destAddress) ? params.destAddress : owner);
       const t = nowSeconds();
 
@@ -472,7 +477,8 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
           fees: [{
             type: "network" as const,
             amount: q.feeAmount.toString(),
-            token: source.contract ?? (source.assetId || "native"),
+            // The native coin is named "native" like every other provider names it, not by a catalog asset id.
+            token: source.contract ?? "native",
             included: true,
             description: "Solver network cost — taken from the input, already in the quoted output; no gas is paid for the trade itself",
           }],

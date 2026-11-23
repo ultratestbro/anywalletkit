@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // PUBLIC MAINNET (Base). Without --send it only quotes. `--send <case>` places one small, capped order from the test
 // wallet and follows it to the end: eth-flow (native ETH → USDC), permit (USDC → WETH, the permit pre-hook, no gas),
-// approve (WETH → USDC, one exact approval), cancel (USDC → WETH at the quoted price, cancelled off-chain at once).
+// approve (WETH → USDC, one exact approval), cancel (USDC → WETH, cancelled off-chain at once), cancel-onchain (the same,
+// cancelled with GPv2Settlement.invalidateOrder).
 // The signer phrase comes from COW_ENV_FILE (TEST_WALLET_MNEMONIC=...) and is never printed.
 import {readFile, writeFile} from 'node:fs/promises'
 import {createPublicClient, http, parseAbi, formatUnits} from 'viem'
@@ -65,8 +66,9 @@ const amountFor = {
   permit: () => { const a = before.usdc / 2n; return a < CAP.usdc ? a : CAP.usdc },
   approve: () => (before.weth < CAP.weth ? before.weth : CAP.weth),
   cancel: () => { const a = before.usdc / 2n; return a < CAP.usdc ? a : CAP.usdc },
+  'cancel-onchain': () => { const a = before.usdc / 2n; return a < CAP.usdc ? a : CAP.usdc },
 }
-const pairs = {'eth-flow': ['ETH', 'USDC'], permit: ['USDC', 'WETH'], approve: ['WETH', 'USDC'], cancel: ['USDC', 'WETH']}
+const pairs = {'eth-flow': ['ETH', 'USDC'], permit: ['USDC', 'WETH'], approve: ['WETH', 'USDC'], cancel: ['USDC', 'WETH'], 'cancel-onchain': ['USDC', 'WETH']}
 
 if (!send) {
   for (const [name, [from, to]] of Object.entries(pairs)) {
@@ -88,13 +90,13 @@ const plans = []
 swaps.on?.('phase', (p) => console.log('  phase', JSON.stringify(p)))
 const q = await swaps.quoteSwap2({fromToken: from, toToken: to, toChain: CHAIN_ID, fromTokenAmount: amount, recipient: me})
 console.log(`quote: ${amount} ${from} → ${q.toTokenAmount} ${to} (min ${q.toTokenAmountMin})`)
-const options = {fromToken: from, toToken: to, toChain: CHAIN_ID, fromTokenAmount: amount, ...(send === 'cancel' ? {minAmountOut: q.toTokenAmount} : {})}
+const options = {fromToken: from, toToken: to, toChain: CHAIN_ID, fromTokenAmount: amount, minAmountOut: (q.toTokenAmountMin * 99n) / 100n, recipient: me}
 const result = await swaps.swap2(options)
 entry.id = result.id
 entry.result = JSON.parse(JSON.stringify(result, (_, v) => (typeof v === 'bigint' ? v.toString() : v)))
 console.log('placed', JSON.stringify(entry.result))
-if (send === 'cancel') {
-  const cancelled = await swaps.cancelSwap2(result.id, account)
+if (send === 'cancel' || send === 'cancel-onchain') {
+  const cancelled = await swaps.cancelSwap2(result.id, account, {onchain: send === 'cancel-onchain'})
   entry.cancel = cancelled
   console.log('cancel', JSON.stringify(cancelled))
 }
