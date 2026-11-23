@@ -28,6 +28,11 @@
       "import": "./dist/value.js",
       "require": "./dist/value.cjs"
     },
+    "./gas": {
+      "types": "./dist/gas.d.ts",
+      "import": "./dist/gas.js",
+      "require": "./dist/gas.cjs"
+    },
     "./swap2/router": {
       "types": "./dist/swap2/router.d.ts",
       "import": "./dist/swap2/router.js",

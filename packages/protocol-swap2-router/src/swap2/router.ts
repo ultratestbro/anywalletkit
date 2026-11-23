@@ -38,6 +38,8 @@ export interface Swap2Route {
   quote: Swap2Quote;
   /** Net USD value when the router prices routes (`valueUsd`), else null. */
   netValueUsd: number | null;
+  /** The source gas subtracted from `netValueUsd` (`sourceGasUsd`), else null. */
+  gasUsd: number | null;
   /** Value against the best route, 0..1. */
   relativeValue: number;
   /** `best` (most value within the tie band) and/or `fastest` (lowest ETA). */
@@ -62,6 +64,8 @@ export interface RouterSwap2Config extends Swap2EngineConfig {
   weights?: string;
   /** Net USD value of a quote for a router built from `providers` — see `usdValue(prices)`. */
   valueUsd?: RouterOptions["valueUsd"];
+  /** Source gas in USD per quote for a router built from `providers` — see `evmSourceGas`. */
+  sourceGasUsd?: RouterOptions["sourceGasUsd"];
   /** Fraction of the best value inside which routes tie on price (default 0.002). */
   tieBand?: number;
   /** What `swap2()` / `quoteSwap2()` execute when several routes answer: the best (default) or the fastest. */
@@ -98,6 +102,7 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
     this.router = config.router ?? new CrossChainRouter(config.providers!, {
       ...(config.weights !== undefined ? {weights: config.weights} : {}),
       ...(config.valueUsd ? {valueUsd: config.valueUsd} : {}),
+      ...(config.sourceGasUsd ? {sourceGasUsd: config.sourceGasUsd} : {}),
       ...(config.tieBand !== undefined ? {tieBand: config.tieBand} : {}),
     });
     this.account = account;
@@ -133,7 +138,7 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
     const view = (set: RouteSet): Swap2Route[] =>
       set.quotes.flatMap((q) => {
         const quote = this.routeQuote(q, snapshot);
-        return quote ? [{provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), quote, netValueUsd: q.netValueUsd, relativeValue: q.relativeValue, tags: [...q.tags]}] : [];
+        return quote ? [{provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), quote, netValueUsd: q.netValueUsd, gasUsd: q.gasUsd, relativeValue: q.relativeValue, tags: [...q.tags]}] : [];
       });
     const set = await this.router.getQuotes(this.toParams(snapshot, true), opts?.onUpdate
       ? {onUpdate: (partial) => opts.onUpdate!(view(partial), partial.pending)}

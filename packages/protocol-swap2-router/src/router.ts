@@ -36,12 +36,22 @@ export interface RouterOptions {
   valueUsd?: (quote: Quote, params: QuoteParams) => number | null;
   /** Fraction of the best net value inside which quotes tie on price (default 0.002). */
   tieBand?: number;
+  /**
+   * The source gas a quote costs the user, in USD, subtracted from its `valueUsd` (SDK-291): a route whose swap a
+   * third party pays for (`quote.gasless`: a CoW solver, an Omniston resolver) is then compared on what the user
+   * actually gets. `evmSourceGas({prices, rpcUrl})` reads the chain's gas price and the sender's allowance. Asked
+   * once per quote as it arrives (at most 3 s); when any quote of the auction has no answer (null, an error, a
+   * timeout), no quote's gas is subtracted, so the comparison stays like for like.
+   */
+  sourceGasUsd?: (quote: Quote, params: QuoteParams, signal?: AbortSignal) => Promise<number | null>;
 }
 
 /** A validated quote with its place in the auction. */
 export interface RankedQuote extends Quote {
-  /** Net USD value (`valueUsd`), or null when the auction compared raw outputs. */
+  /** Net USD value (`valueUsd`, minus `gasUsd` when the auction subtracted gas), or null when it compared raw outputs. */
   netValueUsd: number | null;
+  /** The source gas subtracted from `netValueUsd` (`sourceGasUsd`), or null when the auction subtracted none. */
+  gasUsd: number | null;
   /** This quote's value against the best one, 0..1 (1 = the best price). */
   relativeValue: number;
   /** "best": the pick (best price; faster/more reliable among equal prices). "fastest": the lowest ETA. */
@@ -68,6 +78,8 @@ export interface RouteSet {
 const QUOTE_TIMEOUT_MS = 8000;
 /** Pinned single-venue (execution) budget — see the comment at the call site. */
 const SOLO_QUOTE_TIMEOUT_MS = 25_000;
+/** The most one quote's gas estimate may take before the auction values it without gas. */
+const GAS_TIMEOUT_MS = 3000;
 
 function parseWeights(spec?: string): ScoreWeights {
   if (!spec) return DEFAULT_WEIGHTS;
@@ -127,6 +139,7 @@ export class CrossChainRouter {
   }
   private readonly weights: ScoreWeights;
   private readonly valueUsd: RouterOptions["valueUsd"];
+  private readonly sourceGasUsd: RouterOptions["sourceGasUsd"];
   private readonly tieBand: number;
   private readonly options: RouterOptions;
 
@@ -181,6 +194,7 @@ export class CrossChainRouter {
     }));
     this.weights = parseWeights(opts.weights);
     this.valueUsd = opts.valueUsd;
+    this.sourceGasUsd = opts.sourceGasUsd;
     this.tieBand = opts.tieBand ?? DEFAULT_TIE_BAND;
     this.options = opts;
   }
@@ -249,7 +263,7 @@ export class CrossChainRouter {
     const set = await this.getQuotes(params, options);
     if (!set) return null;
     const pick = options?.prefer === "fastest" ? set.fastest ?? set.best : set.best;
-    const {netValueUsd: _n, relativeValue: _r, tags: _t, ...quote} = pick;
+    const {netValueUsd: _n, gasUsd: _g, relativeValue: _r, tags: _t, ...quote} = pick;
     return {
       ...quote,
       routeScore: {
@@ -325,12 +339,14 @@ export class CrossChainRouter {
     const refusals: (string | undefined)[] = [];
     const refusalInfos: (Swap2RefusalInfo | undefined)[] = [];
     const accepted: Quote[] = [];
+    /** Each accepted quote's source gas in USD (`sourceGasUsd`), null when it could not be said. */
+    const gas = new Map<Quote, number | null>();
     const pending = new Set(eligible.map((p) => p.name));
     const publish = () => {
       if (!options?.onUpdate || accepted.length === 0) return;
       const active = accepted.filter((q) => validQuote(q, snapshot, q.provider));
       if (active.length === 0) return;
-      const set = this.rank(active, snapshot, [...pending], rejections, classified);
+      const set = this.rank(active, snapshot, [...pending], rejections, classified, gas);
       try { options.onUpdate(set); } catch { /* an observer must not break the auction */ }
     };
     await Promise.all(eligible.map(async (p, i) => {
@@ -393,6 +409,20 @@ export class CrossChainRouter {
       } finally {
         controller.abort();
       }
+      if (this.sourceGasUsd && ownAccepted.length > 0) {
+        const estimate = this.sourceGasUsd;
+        await Promise.all(ownAccepted.map(async (q) => {
+          const controller = new AbortController();
+          try {
+            const v = await withTimeout(estimate(copyQuote(q), snapshot, controller.signal), GAS_TIMEOUT_MS);
+            gas.set(q, typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+          } catch {
+            gas.set(q, null);
+          } finally {
+            controller.abort();
+          }
+        }));
+      }
       pending.delete(p.name);
       // Provider identity is an execution security boundary. Never trust the
       // provider field returned by an untrusted adapter; bind it to its slot.
@@ -401,7 +431,7 @@ export class CrossChainRouter {
     }));
     const active = accepted.filter((q) => validQuote(q, snapshot, q.provider));
     if (active.length === 0) return null;
-    return this.rank(active, snapshot, [], rejections, classified);
+    return this.rank(active, snapshot, [], rejections, classified, gas);
   }
 
   /** Status from the named provider; `failed` when it is not installed. */
@@ -422,14 +452,14 @@ export class CrossChainRouter {
   }
 
   /**
-   * Price first: each quote's value is its net USD (`valueUsd`) — or, when any
+   * Price first: each quote's value is its net USD (`valueUsd`, minus `sourceGasUsd` when every quote has it) — or, when any
    * quote cannot be priced, its guaranteed output — against the best one.
    * Quotes within `tieBand` of the best are the same price; among those the
    * weights order speed and reliability. A $0.01 edge no longer beats a route
    * that lands in seconds instead of twenty minutes, and a route that charges
    * a native bridge fee on top no longer wins on its gross output.
    */
-  private rank(quotes: Quote[], params: QuoteParams, pending: string[], rejections: string[], refusals: Swap2Refusal[]): RouteSet {
+  private rank(quotes: Quote[], params: QuoteParams, pending: string[], rejections: string[], refusals: Swap2Refusal[], gas: ReadonlyMap<Quote, number | null>): RouteSet {
     const usd = this.valueUsd ? quotes.map((q) => {
       try {
         const v = this.valueUsd!(copyQuote(q), params);
@@ -437,6 +467,10 @@ export class CrossChainRouter {
       } catch { return null; }
     }) : quotes.map(() => null);
     const priced = usd.every((v) => v !== null);
+    // Gas is subtracted from every quote or from none: one route valued without its gas would beat the rest on it.
+    const gasUsd = quotes.map((q) => gas.get(q) ?? null);
+    const withGas = priced && this.sourceGasUsd !== undefined && gasUsd.every((g) => g !== null);
+    if (withGas) for (let i = 0; i < usd.length; i++) usd[i] = usd[i]! - gasUsd[i]!;
     let relative: number[];
     if (priced) {
       const values = usd as number[];
@@ -450,6 +484,7 @@ export class CrossChainRouter {
     const ranked: RankedQuote[] = quotes.map((q, i) => ({
       ...copyQuote(q),
       netValueUsd: priced ? usd[i]! : null,
+      gasUsd: withGas ? gasUsd[i]! : null,
       relativeValue: relative[i]!,
       tags: [],
     }));
