@@ -1,6 +1,6 @@
 import { UserRejectedError, isUnlimitedAllowance, type IWalletAccount, type TransferOptions, type WriteOptions } from '@anywalletkit/core'
 import { canonicalNamespace, isConcreteChain, ruleCovers, sameChain } from './chain-id.js'
-import { canonicalAddress, erc20Transfer, hexData, namedArray, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations, type NearAccountChange } from './destinations.js'
+import { canonicalAddress, erc20Transfer, hexData, isZcashBech32Address, namedArray, sendDestinations, tonRawAddress, tronCallData, tronRawIntent, type Destinations, type NearAccountChange } from './destinations.js'
 import { evmSignMessage } from './message-bytes.js'
 import { snapshot } from './snapshot.js'
 export type { NearAccountChange } from './destinations.js'
@@ -748,9 +748,10 @@ function intentOf(chain: string, from: string, method: WriteMethod, arg: unknown
   // TON: a destination in a spelling the lists cannot compare ('+0:…', ' 0:…', '0.0:…') is not a
   // known one, whatever the chain package makes of it (scan 2026-10-27 F18).
   if (canonicalNamespace(chain.split(':')[0]!) === 'ton' && intent.destinations.some((d) => tonRawAddress(d) === null)) intent.destinationUnknown = true
-  // Zcash: a recipient that is not plain base58 (padded with a space or U+FEFF) is not a known one, however
-  // the chain package would read it (scan 2026-10-27 F19).
-  if (chain.startsWith('zcash:') && intent.destinations.some((d) => !/^[1-9A-HJ-NP-Za-km-z]+$/.test(d))) intent.destinationUnknown = true
+  // Zcash: a recipient that is neither plain base58 (transparent t1/t3) nor a checksummed shielded / unified /
+  // TEX bech32(m) address — padded with a space or U+FEFF, mixed-case, another chain's — is not a known one,
+  // however the chain package would read it (scan 2026-10-27 F19; zs1/u1/tex1 were refused before SDK-371).
+  if (chain.startsWith('zcash:') && intent.destinations.some((d) => !/^[1-9A-HJ-NP-Za-km-z]+$/.test(d) && !isZcashBech32Address(d))) intent.destinationUnknown = true
   return intent
 }
 

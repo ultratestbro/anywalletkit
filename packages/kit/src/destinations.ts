@@ -164,6 +164,43 @@ export function tonRawAddress(address: string): string | null {
 /** Bitcoin / Zcash bech32 and bech32m HRPs (segwit, Sapling, unified, TEX). */
 const BECH32_ADDRESS = /^(bc|tb|bcrt|zs|ztestsapling|zregtestsapling|u|utest|uregtest|tex|textest)1[02-9ac-hj-np-z]+$/
 
+/** Zcash shielded / unified / TEX HRPs (mainnet, testnet, regtest). */
+const ZCASH_BECH32_HRP = /^(zs|ztestsapling|zregtestsapling|u|utest|uregtest|tex|textest)$/
+const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
+
+/** BIP-173 checksum residue over the HRP and the data part: 1 for bech32, 0x2bc830a3 for bech32m. */
+function bech32Polymod(hrp: string, data: number[]): number {
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+  let chk = 1
+  const values = [...[...hrp].map((c) => c.charCodeAt(0) >> 5), 0, ...[...hrp].map((c) => c.charCodeAt(0) & 31), ...data]
+  for (const v of values) {
+    const top = chk >>> 25
+    chk = (((chk & 0x1ffffff) << 5) ^ v) >>> 0
+    for (let i = 0; i < 5; i++) if ((top >>> i) & 1) chk = (chk ^ GEN[i]!) >>> 0
+  }
+  return chk
+}
+
+/**
+ * A Zcash shielded (Sapling `zs1…`), unified (`u1…`) or TEX (`tex1…`) address, mainnet or test: one case
+ * throughout, a Zcash HRP and a valid bech32 or bech32m checksum. Unified addresses run past BIP-173's
+ * 90 characters, so there is no length cap. Anything padded, mixed-case or of another chain is not one.
+ */
+export function isZcashBech32Address(address: string): boolean {
+  if (address !== address.toLowerCase() && address !== address.toUpperCase()) return false
+  const a = address.toLowerCase()
+  const sep = a.lastIndexOf('1')
+  if (sep < 1 || a.length - sep - 1 < 6 || !ZCASH_BECH32_HRP.test(a.slice(0, sep))) return false
+  const data: number[] = []
+  for (const c of a.slice(sep + 1)) {
+    const v = BECH32_CHARSET.indexOf(c)
+    if (v < 0) return false
+    data.push(v)
+  }
+  const residue = bech32Polymod(a.slice(0, sep), data)
+  return residue === 1 || residue === 0x2bc830a3
+}
+
 /**
  * The form the allow/block lists compare in, per chain namespace: EVM, NEAR, Aptos and Starknet lowercase
  * (their addresses are hex or lowercase ids), Tron hex, TON raw, a Bitcoin / Zcash bech32 address lowercase
