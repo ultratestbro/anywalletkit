@@ -414,6 +414,10 @@ function normalizeQuote(v: unknown, intentMax: number): Quote {
     validUntilMs: num(q.validUntilMs, "quote.validUntilMs"),
   };
   if (q.txRequest !== undefined) out.txRequest = txRequest(q.txRequest);
+  if (q.gasless !== undefined) {
+    if (typeof q.gasless !== "boolean") bad("quote.gasless", "expected a boolean");
+    if (q.gasless) out.gasless = true;
+  }
   if (q.destDecimals !== undefined) {
     const decimals = num(q.destDecimals, "quote.destDecimals", 0, 36);
     if (!Number.isInteger(decimals)) bad("quote.destDecimals", "expected whole decimals");

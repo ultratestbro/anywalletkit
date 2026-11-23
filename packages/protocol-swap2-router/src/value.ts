@@ -6,7 +6,7 @@ import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 const PAR = /^(USDC|USDT|USDT0|USD₮0|DAI|USDC\.E)$/i;
 
 /** symbol → USD, trying the exact symbol, upper case, the unwrapped native (WETH → ETH, wS → S), then par for stables. */
-function priceOf(prices: Readonly<Record<string, number>>, symbol: string): number | null {
+export function priceOf(prices: Readonly<Record<string, number>>, symbol: string): number | null {
   const tries = [symbol, symbol.toUpperCase()];
   if (/^w/i.test(symbol) && symbol.length > 2) tries.push(symbol.slice(1), symbol.slice(1).toUpperCase());
   for (const t of tries) {

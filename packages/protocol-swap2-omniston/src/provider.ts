@@ -2967,6 +2967,9 @@ export function omnistonProvider(opts: OmnistonProviderOptions = {}): CrossChain
         etaSeconds: 240,
         reliability: 0.9,
         validUntilMs: Math.min(Date.now() + QUOTE_TTL_MS, deadlineMs),
+        // EVM → TON: the trader signs the order and a resolver fills it, so the swap costs the trader no gas; the
+        // order protocol is the spender its approval goes to (the router's source-gas estimate, SDK-291).
+        ...(evmSource ? {gasless: true, providerData: {approvalAddress: srcContract}} : {}),
       };
     },
 

@@ -529,6 +529,8 @@ describe("SDK-306: a TON → EVM order on rev1 in flight when the app upgrades",
     const quote = await before.getQuote({sourceChain: "ton:-239", sourceToken: "USDT", destChain: "eip155:8453", destToken: BASE_USDC,
       amountIn: "5000000", destAddress: RECIPIENT, refundAddress: TRADER, slippageBps: 100, dry: true});
     expect(quote).not.toBeNull();
+    // TON → EVM: the trader sends the escrow transfer and pays its gas (SDK-291: not gasless).
+    expect(quote!.gasless).toBeUndefined();
     const after = omnistonProvider({...shared, trustedSettlementContracts: AUDITED_OMNISTON_SETTLEMENT_CONTRACTS});
     await expect(after.buildDeposit(quote!)).rejects.toThrow(`omniston: untrusted TON settlement contract ${REV1}`);
     expect(calls.build).toBeUndefined();

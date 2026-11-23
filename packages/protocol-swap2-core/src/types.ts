@@ -111,6 +111,12 @@ export interface Quote {
   feeUsd: number; // normalized fee for scoring
   /** Honest itemized fees when the provider exposes base-unit amounts. */
   fees?: {type: "network" | "protocol" | "affiliate" | "other"; amount: string; token: string; included: boolean; description?: string}[];
+  /**
+   * The user signs this route's source leg and a third party sends it and pays its gas (a CoW solver settles the
+   * order, an Omniston resolver fills it). An approval may still be the user's. The router counts no swap gas for it
+   * (`sourceGasUsd`); nothing in execution reads it.
+   */
+  gasless?: boolean;
   /** Estimated time to delivery, or null when no defensible estimate is available. */
   etaSeconds: number | null;
   /** Provider's reliability hint, 0 to 1. */

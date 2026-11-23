@@ -28,12 +28,13 @@ const swap2 = new LifiSwap2Protocol(account, {fromChain: "eip155:1"});
 same way and executes the winner.
 
 ```ts
-import {RouterSwap2Protocol, usdValue} from "@anywalletkit/protocol-swap2-router";
+import {RouterSwap2Protocol, evmSourceGas, usdValue} from "@anywalletkit/protocol-swap2-router";
 
 const swap2 = new RouterSwap2Protocol(account, {
   fromChain: "eip155:1",
   providers: [lifiProvider({}), nearIntentsProvider({}), cctpProvider({rpcUrls})],
   valueUsd: usdValue(prices),   // optional: rank on net USD (see below)
+  sourceGasUsd: evmSourceGas({prices, rpcUrl: (chain) => rpcUrls[chain]}), // optional: and net of the source gas
   prefer: "best",               // or "fastest"
 });
 await swap2.swap2({fromToken: "USDC", toToken, toChain: "eip155:8453", fromTokenAmount, minAmountOut});
@@ -86,6 +87,16 @@ does not validate a transaction's behavior.
    no transaction (a dry LI.FI quote without the sender), declares it as `providerData.nativeFee`, read only
    when there is no `txRequest` (a value that is not a base-unit integer leaves the quote unpriced).
    Without prices for every quote the auction compares guaranteed outputs.
+   With `sourceGasUsd` the source gas comes off too (EVM sources), so a route whose swap a third party
+   pays for (`quote.gasless`: a CoW solver, an Omniston resolver) is compared on what the user really gets.
+   `evmSourceGas({prices, rpcUrl})` counts the venue's `txRequest.gasLimit` (capped at 3M; 250k when it names
+   none) for a calldata route, a transfer (21k native, 65k ERC-20) for a deposit-address route, nothing for a
+   gasless one, plus 50k for an ERC-20 approval of the route's spender unless `params.sender`'s allowance
+   already covers the amount; at the chain's `eth_gasPrice` (cached 15 s) and the native coin's price. It is
+   an estimate from the quote, not a dry run (a dry quote has no funded sender to run it from), and leaves out
+   an L2's L1 data fee. Each quote is asked once as it arrives (3 s at most); when any quote of the auction
+   has no answer, gas comes off no quote, so the comparison stays like for like. `RankedQuote.gasUsd` and
+   `Swap2Route.gasUsd` say what was subtracted.
 2. **Price first.** Quotes within `tieBand` (default 0.2%) of the best value are the same price.
 3. **Speed and reliability inside the tie.** Among equal prices the faster, then the more reliable,
    route wins (`weights`, default `price:0.6,speed:0.3,reliability:0.1`). A sliver of extra output no

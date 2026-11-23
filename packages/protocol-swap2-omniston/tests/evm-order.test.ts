@@ -109,6 +109,8 @@ describe("Omniston EVM → TON orders (live 2026-10-16 fixtures)", () => {
     const q = await provider(clientFor(quote())).getQuote(params());
     expect(q).toMatchObject({provider: "omniston", sourceAmount: "20000000", destAmount: "20344594", minDestAmount: "20344594", depositAddress: ""});
     expect(q!.fees).toEqual([{type: "protocol", amount: "2034", token: expect.any(String), included: true}]);
+    // SDK-291: a resolver fills the order, so the swap costs the trader no gas; the approval goes to the order protocol.
+    expect(q).toMatchObject({gasless: true, providerData: {approvalAddress: LOP}});
   });
 
   it("names its refusals: untrusted order protocol, missing trader address, non-TON destination", async () => {
