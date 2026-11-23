@@ -59,4 +59,4 @@ const balance = await wallet.getBalance()   // balance.ironwood.spendable …
 Needs a react-native-zcash build with NU7 support (as of 2026-11-17 only the `jon/zcash-nu7-sdks`
 branch, built from source with `npm run update-sources`).
 
-License: MIT OR Apache-2.0.
+License: Apache-2.0.

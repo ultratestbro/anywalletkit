@@ -15,7 +15,7 @@ react-native-zcash.
 
 ```
 React Native app (Hermes, New Architecture)
- └─ @anywalletkit/wallet-zcash-shielded  TypeScript, MIT OR Apache-2.0
+ └─ @anywalletkit/wallet-zcash-shielded  TypeScript, Apache-2.0
      │   config checks, bigint balances, ZIP-316 address checks, AWK policies (M2)
      └─ react-native-zcash                Edge, RN native module (Swift / Kotlin)
          └─ ZODL Zcash SDK                zodl-swift-wallet-sdk / zodl-android-wallet-sdk
@@ -77,7 +77,7 @@ the "Serious" thermal state during the 2026-10-16 run, so its figures may includ
    AGPL-3.0-only and grant no App Store permission; distribution through the App Store needs a ZODL
    commercial licence. The only MIT path (ECC SDKs, react-native-zcash 0.13.6) has no NU7. Our plan:
    ask ZODL for an App Store exception for the React Native wrapper (or a licence for AWK users), and
-   keep our TypeScript layer MIT OR Apache-2.0 either way.
+   keep our TypeScript layer Apache-2.0 either way.
 2. **App size.** The native library adds ≈ 56 MB uncompressed per ABI, mostly Tor, coinholder voting
    and Keystone code the light wallet does not use. We propose Cargo features upstream.
 3. **Toolchain.** Until ZODL tags an NU7 release, the wrapper builds the SDKs from source (Rust

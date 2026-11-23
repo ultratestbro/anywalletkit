@@ -137,7 +137,7 @@ iPhone 16 Pro — high-end; mid-range iPhone нет.
   приложения должен быть доступен пользователям под AGPL.
 - MIT-путь (master 0.13.6 на ECC SDK) — без NU7, на mainnet после 6.11 не годится для отправки.
 - librustzcash (Rust-крейты) — MIT/Apache, к ним вопросов нет.
-- Наш TS-слой — MIT OR Apache-2.0 и кода ZODL не содержит.
+- Наш TS-слой — Apache-2.0 и кода ZODL не содержит.
 
 **Что это значит:** выпустить Vaulty с этим модулем в App Store без договорённости с ZODL нельзя.
 Эту dev-сборку нельзя отдавать в TestFlight / App Store. Для заявки ZCG варианты:

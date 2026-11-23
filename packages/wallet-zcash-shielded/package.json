@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "PROTOTYPE (SDK-229, not published): shielded Zcash (Ironwood) for React Native wallets on Any Wallet Kit \u2014 a thin TypeScript layer over react-native-zcash (ZODL Zcash SDKs, librustzcash). Unified address, sync from a birthday height, balance per pool. Sending, shielding and the Orchard \u2192 Ironwood migration are typed but not implemented yet.",
-  "license": "MIT OR Apache-2.0",
+  "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
   "repository": {
     "type": "git",
@@ -29,8 +29,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE-MIT",
-    "LICENSE-APACHE"
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
