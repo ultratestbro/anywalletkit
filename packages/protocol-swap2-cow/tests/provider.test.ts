@@ -9,7 +9,7 @@ import {decodeEthFlowCall, ethFlowOrderId, ETH_FLOW_CREATE_SELECTOR} from "../sr
 import {orderDigest, orderUid, type CowOrder} from "../src/order.js";
 import {PERMIT_SELECTOR, permitDigest, signedBy, splitSignature} from "../src/permit.js";
 import {cowProvider, parseCowIntent} from "../src/provider.js";
-import {D1, ME, NOW, OTHER, USDC, USDT, WETH, ZERO, ethToUsdc, listedOrder, other, setup, signTyped, uidOfPosted, usdcToWeth} from "./fixtures.js";
+import {D1, ME, NOW, RPC, OTHER, USDC, USDT, WETH, ZERO, ethToUsdc, listedOrder, other, setup, signTyped, uidOfPosted, usdcToWeth} from "./fixtures.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -84,6 +84,23 @@ describe("ERC-20 quote", () => {
     refusals.length = 0;
     expect(await quote(usdcToWeth({destAddress: "", refundAddress: undefined, dry: false}))).toBeNull();
     expect(refusals[0]).toMatch(/recipient must be an EVM address/);
+  });
+
+  it("a token sale is gasless and names the vault relayer for the approval; a permit sale names none; eth-flow is the user's transaction", async () => {
+    // SDK-291: the router subtracts the source gas from every route but a gasless one, and counts an approval only for
+    // the spender a quote names.
+    const {quote} = setup({}, {permit: false});
+    const order = (await quote(usdcToWeth()))!;
+    expect(order.gasless).toBe(true);
+    expect(order.providerData?.approvalAddress).toBe(D1.vaultRelayer);
+    const flow = (await quote(ethToUsdc()))!;
+    expect(flow.gasless).toBeUndefined();
+    expect(flow.txRequest).toBeDefined();
+    const withPermit = setup({}, {rpcUrls: RPC});
+    const signed = (await withPermit.quote(usdcToWeth({dry: false})))!;
+    expect(signed.providerData?.permit).toBe("offered");
+    expect(signed.gasless).toBe(true);
+    expect(signed.providerData?.approvalAddress).toBeUndefined();
   });
 
   it("names the native coin's network cost as \"native\", like every other provider", async () => {

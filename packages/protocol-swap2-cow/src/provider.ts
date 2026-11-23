@@ -580,7 +580,13 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
             ...(permit ? {permit: {...permit, deadline: q.validTo}} : {}),
           });
         }
-        return {...common(q, floor, "order", {appData: plain.hash, permit: permit ? "offered" : "none"}), intentId};
+        // A solver settles a signed order and pays its gas (the router counts none for the swap, SDK-291); without a permit
+        // the vault relayer's approval may still be the user's, so it is named for the router's allowance check.
+        return {
+          ...common(q, floor, "order", {appData: plain.hash, permit: permit ? "offered" : "none", ...(permit ? {} : {approvalAddress: getAddress(d.vaultRelayer)})}),
+          intentId,
+          gasless: true,
+        };
       } catch (e) {
         // The orderbook's classified refusals (rate_limited with its wait, upstream_unavailable) reach the router.
         return refuse(reasonOf(e), refusalOf(e));

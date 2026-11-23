@@ -337,8 +337,13 @@ tagged `best` (99.989 USDC guaranteed, ~3 minutes), LI.FI tagged `fastest` (99.7
 seconds), then NEAR Intents and THORChain. For 25 USDT from Ethereum to USDT0 on Arbitrum,
 USDT0 came out `best` (exactly 25 guaranteed, ~17 minutes) and LI.FI `fastest`.
 
-Pass `valueUsd: usdValue(prices)` to the router to rank on net USD value. Gas and native
-bridge fees are then subtracted.
+Pass `valueUsd: usdValue(prices)` to the router to rank on net USD value: native bridge fees
+are then subtracted. Add `sourceGasUsd: evmSourceGas({prices, rpcUrl})` to subtract the source
+gas too (EVM sources): the venue's gas limit for a calldata route, a transfer for a deposit
+route, nothing for a gasless one (a CoW order, an Omniston EVM → TON order), plus an ERC-20
+approval unless the sender's allowance already covers it, at the chain's gas price. On Ethereum
+at small amounts this moves the pick (a $50 USDC bridge: a plain deposit over approve + burn); on
+L2s gas is cents and rarely changes it.
 
 ## 6. Execute
 

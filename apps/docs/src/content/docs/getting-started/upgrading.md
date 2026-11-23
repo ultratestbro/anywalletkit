@@ -10,6 +10,26 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## 2026-11-23: CoW Protocol, gas in the router's value, Zcash shielded recipients
+
+Nothing to change in code unless you opt in.
+
+- **New: `@anywalletkit/protocol-swap2-cow`** — CoW Protocol same-chain swaps as signed orders on Ethereum, Base and
+  Arbitrum, **off by default** (`cowProvider({enabled: true, enabledChains: [8453]})`). Token sells need no gas
+  (EIP-2612 permit) or one exact approval; native sells go through eth-flow. A swap is `pending` until a solver fills
+  it; `cancelSwap2(id, account, {onchain?})` cancels. Runs on the device, not behind `remoteProvider`. See
+  [Swaps → CoW Protocol](/guides/swaps/#cow-protocol).
+- **protocol-swap2-core (minor):** resting orders at the engine gate (GPv2 order, EIP-2612 permit and cancellation
+  checks), `cancelSwap2`, and `Quote.gasless` (the user signs, a third party sends and pays the gas). A provider's
+  `registerSignedOrder` may return the placed order's id. Core minor republishes every swap2 provider (patch).
+- **protocol-swap2-router (minor):** optional `sourceGasUsd` (and `evmSourceGas({prices, rpcUrl})`) subtracts each
+  route's source gas from its net value; gas comes off every quote of an auction or none. `RankedQuote.gasUsd` /
+  `Swap2Route.gasUsd` say what was subtracted. Without it nothing changes.
+- **protocol-swap2-omniston (patch):** EVM → TON orders are marked `gasless`, with the order protocol as
+  `providerData.approvalAddress`.
+- **kit 0.9.2 (released earlier today):** Zcash shielded (`zs1…`), unified (`u1…`) and TEX (`tex1…`) recipients are
+  known destinations again; an allowlist no longer refuses them.
+
 ## 2026-11-20: CCTP Standard route, a failed dry run after an approval is re-quoted, Permit2 allowances stay
 
 Nothing to change in code. Bump `protocol-swap2-core` to 0.16.0 for fewer approval transactions when a swap fails,
