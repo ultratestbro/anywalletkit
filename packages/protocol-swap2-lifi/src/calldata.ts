@@ -174,7 +174,20 @@ export interface DiamondExpectation {
   evmDestination: boolean;
 }
 
-interface SwapStep {sendingAssetId: string; receivingAssetId: string; fromAmount: bigint; requiresDeposit: boolean}
+interface SwapStep {sendingAssetId: string; receivingAssetId: string; fromAmount: bigint; requiresDeposit: boolean; selector: string}
+
+/**
+ * GasZipPeriphery's deposits ("LI.Fuel", `fromAmountForGas`): a source swap step that sells part of the input for
+ * native gas paid to a receiver written only in that step's own callData — not the BridgeData receiver this file
+ * checks. This module never asks for gas, so a route carrying one is refused (recorded live 2026-11-24: a changed gas
+ * receiver passed every other check).
+ */
+const GAS_DEPOSIT_SELECTORS: ReadonlySet<string> = new Set([
+  "0x8b71ae6c", // depositToGasZipERC20((address,address,address,address,uint256,bytes,bool),(bytes32,uint256))
+  "0xc4af5a74", // depositToGasZipNative((bytes32,uint256),uint256)
+  "0x3d86ea87", // depositToGasZipERC20(SwapData,uint256,address) (earlier periphery)
+  "0x24cd1b9c", // depositToGasZipNative(uint256,address) (earlier periphery)
+]);
 
 class Reader {
   private readonly b: Uint8Array;
@@ -227,10 +240,10 @@ function swapAt(r: Reader, at: number): SwapStep {
   r.address(at); r.address(at + 32);
   const step = {sendingAssetId: r.address(at + 64), receivingAssetId: r.address(at + 96), fromAmount: r.word(at + 128), requiresDeposit: false};
   const bytesAt = at + r.small(at + 160);
-  r.small(bytesAt); // length within the calldata
+  const length = r.small(bytesAt); // length within the calldata
   // The Diamond pulls `fromAmount` of `sendingAssetId` from the user for every step that requires a deposit.
   step.requiresDeposit = r.bool(at + 192);
-  return step;
+  return {...step, selector: length >= 4 ? r.raw(bytesAt + 32, 4) : "0x"};
 }
 
 /** SwapData[] whose offset word sits at `head`, relative to `base`. */
@@ -256,6 +269,7 @@ function checkSteps(steps: SwapStep[], e: DiamondExpectation, finalAsset: string
   let deposited = 0n;
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]!;
+    if (GAS_DEPOSIT_SELECTORS.has(step.selector)) return note(`step ${i} sends part of the input as gas to an address only its own call names (a LI.FI gas step this wallet never asks for)`, "recipient_unverifiable");
     if (i > 0 && !same(step.sendingAssetId, steps[i - 1]!.receivingAssetId)) return note(`step ${i} spends ${step.sendingAssetId}, which step ${i - 1} does not deliver`, "policy_refused");
     if (!step.requiresDeposit) continue;
     if (!same(step.sendingAssetId, e.fromToken)) return note(`step ${i} pulls ${step.sendingAssetId} from the wallet, not the input ${e.fromToken}`, "policy_refused");
