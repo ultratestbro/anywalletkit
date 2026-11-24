@@ -24,6 +24,7 @@
  */
 export {CrossChainRouter, type RouterOptions, type RankedQuote, type RouteSet} from "./router.js";
 export {usdValue, quoteValues} from "./value.js";
+export {suggestTwoStep, defaultHubs, type TwoStepPlan, type TwoStepOptions, type TwoStepHub, type TwoStepGas} from "./twostep.js";
 export {evmSourceGas, swapGasUnits, sourceContract, SOURCE_GAS_UNITS, type SourceGasOptions} from "./gas.js";
 export type {QuoteValue, QuoteValueOptions} from "./value.js";
 export {RouterSwap2Protocol, type RouterSwap2Config, type Swap2Route} from "./swap2/router.js";

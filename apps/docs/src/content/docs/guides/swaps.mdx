@@ -345,6 +345,15 @@ approval unless the sender's allowance already covers it, at the chain's gas pri
 at small amounts this moves the pick (a $50 USDC bridge: a plain deposit over approve + burn); on
 L2s gas is cents and rarely changes it.
 
+### No route? Two steps
+
+When `getQuotes` returns `null`, `router.suggestTwoStep(params, {ownAddress, lacksGas})` prices two ordinary
+swaps through a hub token (the chain's native coin or main stablecoin): X → Y, then Y → Z. It executes
+nothing; show the plan and let the user start each swap on its own. Step 1 always delivers to the user's own
+address (`ownAddress`), step 2 is priced on step 1's guaranteed output and must be quoted again with what
+arrived. `gasOnHubChain` says whether step 2 needs native gas on the hub's chain (`none`, `from-hub`,
+`needed`); a gas-free plan within 0.5% goes first when the user lacks gas there.
+
 ## 6. Execute
 
 <Snippet file="swap/src/swap.ts" region="execute" />

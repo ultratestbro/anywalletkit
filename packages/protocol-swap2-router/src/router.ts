@@ -3,6 +3,7 @@
  * over whichever providers the caller installed and passed in. Protocol
  * modules never need it — each one runs standalone on @anywalletkit/protocol-swap2-core.
  */
+import {suggestTwoStep, type TwoStepOptions, type TwoStepPlan} from "./twostep.js";
 import type {
   CrossChainProvider,
   IntentRef,
@@ -286,6 +287,14 @@ export class CrossChainRouter {
         })),
       },
     };
+  }
+
+  /**
+   * Two ordinary swaps through a hub token when this auction has no route for `params` (see {@link suggestTwoStep}):
+   * nothing is executed, both legs are dry quotes, best plan first.
+   */
+  suggestTwoStep(params: QuoteParams, options?: TwoStepOptions): Promise<TwoStepPlan[]> {
+    return suggestTwoStep(this, params, options);
   }
 
   /**

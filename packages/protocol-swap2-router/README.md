@@ -107,6 +107,42 @@ does not validate a transaction's behavior.
 to the best route when no estimate exists. Every quote passes the engine's checks before it is ranked, and
 the executed route is re-validated against its sealed quote before anything is signed.
 
+## When there is no route: two steps
+
+`router.suggestTwoStep(params, options?)` (or `suggestTwoStep(router, params, options?)`) is for the request
+`getQuotes` found no route for. It prices two ordinary swaps through a hub token — X → Y, then Y → Z — and
+executes nothing: the app shows the plan, and the user starts each swap on its own (its own review, checks
+and history). After the first swap the funds sit in a common token on the user's own address, so nothing new
+is trusted.
+
+```ts
+const set = await router.getQuotes(params)
+if (!set) {
+  const plans = await router.suggestTwoStep(params, {
+    ownAddress: (chain) => myAddressOn(chain),      // where the hub lands: always the user's own address
+    lacksGas: (chain) => nativeBalance(chain) < oneTxGas(chain),
+  })
+  // plans[0].first / .second: RouteSets; .guaranteedOut, .estimatedOut, .etaSeconds, .gasOnHubChain
+}
+```
+
+- **Hubs.** The native coin and the first listed stablecoin (USDC, USDT, USDT0, USDC.e) of the source chain
+  (`shape: "source-hub"`: swap there, then bridge) and of the destination chain (`"destination-hub"`: bridge,
+  then swap there); `options.hubs` replaces them. The request's own tokens are never hubs.
+- **Pricing.** Step 2 is quoted on step 1's *guaranteed* output, so `guaranteedOut` is what the pair
+  guarantees; `estimatedOut` scales it to step 1's expected output. Both legs are dry quotes: quote step 2
+  again with what actually arrived before executing it.
+- **Gas on the hub's chain.** `gasOnHubChain` is `none` (both swaps start on the source chain, or step 2 is
+  gasless — a CoW order), `from-hub` (the hub is that chain's native coin) or `needed`. When the best plan needs
+  gas the user lacks (`lacksGas`), a gas-free plan within `gasSafeBandBps` (default 50) goes first.
+- **Recipient.** Step 1 delivers to `ownAddress(chain)` — by default `refundAddress` on the source chain and
+  `destAddress` on the destination chain. When `destAddress` is someone else, pass `ownAddress`: only step 2
+  pays the other recipient.
+- Plans under the caller's `minAmountOut` are dropped; up to `maxPlans` (default 2) come back, best first.
+
+Measured on 360 live auctions (2026-11-24): 81% of the pairs no venue claimed directly got a two-step plan,
+mostly from NEAR, Tron, Solana, TON and Bitcoin into tail tokens on EVM chains.
+
 ## Activity
 
 The router executes through whichever provider wins, so it has no transactions
