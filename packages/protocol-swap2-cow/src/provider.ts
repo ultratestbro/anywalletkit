@@ -1,6 +1,6 @@
 import {concat, decodeAbiParameters, encodeFunctionData, getAddress, keccak256, parseAbi, stringToHex, type Hex} from "viem";
 import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
-import {refusalOf, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
+import {refusalOf, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {describeCowActivity} from "./activity.js";
 import {cowApi, CowApiError, type CowApi, type CowApiConfig} from "./api.js";
@@ -414,36 +414,36 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
     supportsRoute: (from: Asset, to: Asset) => from.chain === to.chain && !!offeredChain(from.chain),
 
     async getQuote(params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> {
-      const refuse = (why: string, info?: Swap2RefusalInfo): null => {
-        params.onRefusal?.(`cow: ${why}`, info);
+      const refuse = (why: string, info?: Swap2RefusalReason | Swap2RefusalInfo): null => {
+        params.onRefusal?.(`cow: ${why}`, typeof info === "string" ? {reason: info} : info);
         return null;
       };
-      if (params.flex) return refuse("amount-flexible deposits are not supported");
-      if (params.sourceChain !== params.destChain) return refuse("CoW Protocol swaps stay on one chain");
+      if (params.flex) return refuse("amount-flexible deposits are not supported", "unsupported_pair");
+      if (params.sourceChain !== params.destChain) return refuse("CoW Protocol swaps stay on one chain", "unsupported_pair");
       const d = offeredChain(params.sourceChain);
-      if (!d) return refuse(`${params.sourceChain} is not offered`);
+      if (!d) return refuse(`${params.sourceChain} is not offered`, "unsupported_pair");
       const source = sourceAssetOf(params);
-      if (!source) return refuse(`unknown source token '${params.sourceToken}'`);
+      if (!source) return refuse(`unknown source token '${params.sourceToken}'`, "unsupported_pair");
       const sellNative = !source.contract;
-      if (!sellNative && !ADDRESS.test(source.contract!)) return refuse("the source token is not an EVM token");
-      if (!ADDRESS.test(params.destToken)) return refuse("the destination token is not an EVM token");
+      if (!sellNative && !ADDRESS.test(source.contract!)) return refuse("the source token is not an EVM token", "unsupported_pair");
+      if (!ADDRESS.test(params.destToken)) return refuse("the destination token is not an EVM token", "unsupported_pair");
       const buyNative = /^0x0{40}$/.test(params.destToken) || same(params.destToken, COW_NATIVE);
       const sellToken = getAddress(sellNative ? d.wrappedNative : source.contract!);
       const buyToken = buyNative ? COW_NATIVE : getAddress(params.destToken);
-      if (same(sellToken, COW_NATIVE) || same(sellToken, ZERO)) return refuse("the native coin is sold through eth-flow, not as a token");
-      if (sellNative && buyNative) return refuse("same token in and out");
-      if (sellNative && same(buyToken, d.wrappedNative)) return refuse("wrapping the native coin is not a swap");
-      if (!sellNative && same(sellToken, d.wrappedNative) && buyNative) return refuse("unwrapping the native coin is not a swap");
-      if (same(sellToken, buyToken)) return refuse("same token in and out");
-      if (!DECIMAL.test(params.amountIn) || BigInt(params.amountIn) <= 0n) return refuse("the amount must be a positive whole number of base units");
+      if (same(sellToken, COW_NATIVE) || same(sellToken, ZERO)) return refuse("the native coin is sold through eth-flow, not as a token", "unsupported_pair");
+      if (sellNative && buyNative) return refuse("same token in and out", "unsupported_pair");
+      if (sellNative && same(buyToken, d.wrappedNative)) return refuse("wrapping the native coin is not a swap", "unsupported_pair");
+      if (!sellNative && same(sellToken, d.wrappedNative) && buyNative) return refuse("unwrapping the native coin is not a swap", "unsupported_pair");
+      if (same(sellToken, buyToken)) return refuse("same token in and out", "unsupported_pair");
+      if (!DECIMAL.test(params.amountIn) || BigInt(params.amountIn) <= 0n) return refuse("the amount must be a positive whole number of base units", "policy_refused");
       const slippageBps = params.slippageBps ?? defaultSlippage;
-      if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps >= 10_000) return refuse("slippage must be whole basis points below 10000");
+      if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps >= 10_000) return refuse("slippage must be whole basis points below 10000", "price_check_failed");
 
       const valid = (a: string | undefined): a is string => typeof a === "string" && ADDRESS.test(a) && !/^0x0{40}$/.test(a);
       // A price-only (dry) quote may come without any address (a route list before the account is known): CoW prices
       // for a placeholder owner then. An execution quote always needs the real one.
       const placeholder = params.dry === true && !valid(params.destAddress) && !valid(params.refundAddress);
-      if (!placeholder && !valid(params.destAddress) && !valid(params.refundAddress)) return refuse("recipient must be an EVM address");
+      if (!placeholder && !valid(params.destAddress) && !valid(params.refundAddress)) return refuse("recipient must be an EVM address", "recipient_mismatch");
       // The account that signs (or sends) is where a failed swap refunds; the receiver is the recipient the caller named.
       const owner = getAddress(placeholder ? DRY_QUOTE_OWNER : valid(params.refundAddress) ? params.refundAddress! : params.destAddress);
       const receiver = getAddress(valid(params.destAddress) ? params.destAddress : owner);
@@ -453,7 +453,7 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
         // A settlement pays the native coin with a plain transfer: an address with code may not be able to take it.
         if (buyNative && rpc.has(d.chainId)) {
           const code = await rpc.request(d.chainId, "eth_getCode", [receiver, "latest"]).catch(() => "0x");
-          if (typeof code === "string" && code !== "0x" && code !== "0x0") return refuse("the receiver is a contract and may not accept the native coin from a settlement — receive the wrapped token instead");
+          if (typeof code === "string" && code !== "0x" && code !== "0x0") return refuse("the receiver is a contract and may not accept the native coin from a settlement — receive the wrapped token instead", "policy_refused");
         }
         const plain = appDataOf(slippageBps);
         const floorOf = (buyAmount: bigint): bigint | null => {
@@ -500,9 +500,9 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
 
         if (sellNative) {
           const q = await quoted(d, {sellToken, buyToken, receiver, from: owner, signingScheme: "eip1271", appData: plain, amountIn: params.amountIn, validForSeconds: validFor, nowSeconds: t}, true, signal);
-          if (q.id === null) return refuse("the orderbook returned no quote id for an on-chain order");
+          if (q.id === null) return refuse("the orderbook returned no quote id for an on-chain order", "upstream_unavailable");
           const floor = floorOf(q.buyAmount);
-          if (floor === null) return refuse("the quote is below the requested minimum");
+          if (floor === null) return refuse("the quote is below the requested minimum", "price_check_failed");
           let data: EthFlowData = {buyToken, receiver, sellAmount: params.amountIn, buyAmount: floor.toString(), appData: plain.hash, validTo: q.validTo, quoteId: q.id};
           if (!params.dry && rpc.has(d.chainId)) {
             // The contract holds one order per digest, and the digest ignores the expiry and the quote id: the same
@@ -516,7 +516,7 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
               }
               if (!taken) break;
               const next = BigInt(data.buyAmount) + 1n;
-              if (step >= MAX_COLLISION_STEPS || next > q.buyAmount) return refuse("an identical order was placed already — change the amount slightly");
+              if (step >= MAX_COLLISION_STEPS || next > q.buyAmount) return refuse("an identical order was placed already — change the amount slightly", "policy_refused");
               data = {...data, buyAmount: next.toString()};
             }
           }
@@ -550,7 +550,7 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
         }
         const q = await quoted(d, {sellToken, buyToken, receiver, from: owner, signingScheme: "eip712", appData: quoteDoc, amountIn: params.amountIn, validForSeconds: validFor, nowSeconds: t}, false, signal);
         const floor = floorOf(q.buyAmount);
-        if (floor === null) return refuse("the quote is below the requested minimum");
+        if (floor === null) return refuse("the quote is below the requested minimum", "price_check_failed");
         const order: CowOrder = {
           sellToken,
           buyToken,

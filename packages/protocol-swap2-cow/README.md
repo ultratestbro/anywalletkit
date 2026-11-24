@@ -124,6 +124,11 @@ own IP. A throttled answer is refused as `rate_limited` with the orderbook's `Re
 `lastRefusals`), so an app can wait instead of asking again; refresh an on-screen quote at most every 30 seconds and
 poll a status at most every 2. Every order names its app in appData (`appCode`), as CoW asks of integrations.
 
+Every refusal carries core's reason, not only text: the orderbook's error types map through `COW_ERROR_REASONS`
+(`NoLiquidity` → `no_route`, `InsufficientLiquidity` → `insufficient_liquidity`, `SellAmountDoesNotCoverFee` →
+`amount_too_small`, `UnsupportedToken` → `unsupported_pair`, `QuoteNotVerified` → `simulation_failed`, …), and the
+checks before any request name theirs (another chain, an unknown token, wrapping → `unsupported_pair`).
+
 ## Not supported (yet)
 
 - Buy (exact-output) orders, limit and TWAP orders, partial fills.

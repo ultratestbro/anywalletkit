@@ -4,7 +4,7 @@
  * the API's error types into refusals a person can read.
  */
 import {anySignal, redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
-import {httpRefusal, refusal, withReason} from "@anywalletkit/protocol-swap2-core/errors";
+import {httpRefusal, refusal, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {COW_API_BASE} from "./deployments.js";
 
 /** The largest response body read (a page of an account's orders with their appData documents is the biggest one). */
@@ -33,6 +33,35 @@ const FRIENDLY: Readonly<Record<string, string>> = {
   OrderFullyExecuted: "the order has been filled already",
   OrderExpired: "the order has expired already",
 };
+
+/**
+ * The refusal reason each orderbook error type stands for, so a router or UI can tell "no liquidity" from "not traded"
+ * without reading text. On a 4xx (not 429) this wins over the status; a 429 or 5xx is classified by its status.
+ */
+export const COW_ERROR_REASONS: Readonly<Record<string, Swap2RefusalReason>> = Object.freeze({
+  NoLiquidity: "no_route",
+  InsufficientLiquidity: "insufficient_liquidity",
+  SellAmountDoesNotCoverFee: "amount_too_small",
+  UnsupportedToken: "unsupported_pair",
+  TokenTemporarilySuspended: "unsupported_pair",
+  SameBuyAndSellToken: "unsupported_pair",
+  InvalidNativeSellToken: "unsupported_pair",
+  UnsupportedBuyTokenDestination: "unsupported_pair",
+  UnsupportedSellTokenSource: "unsupported_pair",
+  UnsupportedOrderType: "unsupported_pair",
+  QuoteNotVerified: "simulation_failed",
+  TransferSimulationFailed: "simulation_failed",
+  InsufficientBalance: "simulation_failed",
+  InsufficientAllowance: "simulation_failed",
+  TradingOutsideAllowedWindow: "policy_refused",
+  TooManyLimitOrders: "policy_refused",
+  Forbidden: "policy_refused",
+  DuplicatedOrder: "policy_refused",
+  InsufficientValidTo: "quote_expired",
+  ExcessiveValidTo: "policy_refused",
+  QuoteNotFound: "quote_expired",
+  InvalidQuote: "quote_expired",
+});
 
 /** An answer of the orderbook that is not a success. `errorType` is the API's own (letters, digits, underscore) or `HTTP <status>`. */
 export class CowApiError extends Error {
@@ -111,7 +140,10 @@ export function cowApi(config: CowApiConfig = {}): CowApi {
       const type = typeof err.errorType === "string" && /^[A-Za-z0-9_]{1,60}$/.test(err.errorType) ? err.errorType : `HTTP ${res.status}`;
       // Classified like every provider's HTTP refusal: 429 is rate_limited with the orderbook's Retry-After (quotes are
       // limited to 1 a second and ~500 an hour per IP), 401/403 key_rejected, 408/425/5xx upstream_unavailable.
-      const info = httpRefusal(res.status, res.headers?.get?.("retry-after") ?? null);
+      const known = Object.prototype.hasOwnProperty.call(COW_ERROR_REASONS, type) ? COW_ERROR_REASONS[type] : undefined;
+      // A known error type on a 4xx names the reason better than the status (CoW's 403 "Forbidden" is about the wallet, not a key).
+      const byStatus = httpRefusal(res.status, res.headers?.get?.("retry-after") ?? null);
+      const info = known && res.status >= 400 && res.status < 500 && res.status !== 429 ? {reason: known, httpStatus: res.status} : byStatus ?? (known ? {reason: known, httpStatus: res.status} : undefined);
       const error = new CowApiError(res.status, type, tidy(err.description));
       throw info ? withReason(error, info) : error;
     }

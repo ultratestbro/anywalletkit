@@ -5,7 +5,7 @@ export * from "./ethflow.js";
 export * from "./permit.js";
 export * from "./provider.js";
 export * from "./activity.js";
-export {CowApiError} from "./api.js";
+export {COW_ERROR_REASONS, CowApiError} from "./api.js";
 export type {CowApi, CowApiConfig} from "./api.js";
 export type {CowRpc} from "./rpc.js";
 export {CowSwap2Protocol} from "./protocol.js";
