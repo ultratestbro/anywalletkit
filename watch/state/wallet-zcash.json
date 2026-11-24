@@ -14,7 +14,7 @@
     "url": "https://github.com/ZcashFoundation/zebra/releases/tag/v7.2.0-beta.3",
     "prerelease": true
    },
-   "seenAt": "2026-11-23T18:03:49.505Z",
+   "seenAt": "2026-11-24T17:41:35.603Z",
    "changedAt": "2026-11-21T14:39:32.004Z"
   },
   "branch-id": {
@@ -22,16 +22,16 @@
    "target": {},
    "value": "0x77190ad9 0x77190ad9",
    "meta": {
-    "height": 3604186,
-    "txid": "8ab5be755f5797f35189ba7378a229524257fdbc8d6e70dcb5b3278ef5835db5",
-    "version": 6,
+    "height": 3607584,
+    "txid": "510b5df166367d80e9645073f2a0d3544dea98d8822e0bcbd19bcf75a4056c22",
+    "version": 5,
     "branchId": "0x77190ad9",
     "upgrade": "NU7",
     "expected": "0x77190ad9",
     "expectedUpgrade": "NU7",
-    "url": "https://blockchair.com/zcash/transaction/8ab5be755f5797f35189ba7378a229524257fdbc8d6e70dcb5b3278ef5835db5"
+    "url": "https://blockchair.com/zcash/transaction/510b5df166367d80e9645073f2a0d3544dea98d8822e0bcbd19bcf75a4056c22"
    },
-   "seenAt": "2026-11-23T18:03:50.649Z",
+   "seenAt": "2026-11-24T17:41:36.700Z",
    "changedAt": "2026-11-07T12:58:21.398Z"
   }
  }

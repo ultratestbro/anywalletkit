@@ -11,7 +11,7 @@
     "hash": "a9533293a3d55b02",
     "chars": 3269
    },
-   "seenAt": "2026-11-23T18:03:28.039Z",
+   "seenAt": "2026-11-24T17:41:14.848Z",
    "changedAt": "2026-11-09T16:13:31.555Z"
   },
   "docs-staking-tokens": {
@@ -24,7 +24,7 @@
     "hash": "8e7c00174471c211",
     "chars": 7619
    },
-   "seenAt": "2026-11-23T18:03:28.040Z",
+   "seenAt": "2026-11-24T17:41:14.839Z",
    "changedAt": "2026-11-09T16:13:31.598Z"
   },
   "docs-gas": {
@@ -37,7 +37,7 @@
     "hash": "803b61063bdbda59",
     "chars": 12977
    },
-   "seenAt": "2026-11-23T18:03:28.099Z",
+   "seenAt": "2026-11-24T17:41:14.883Z",
    "changedAt": "2026-11-11T14:17:57.485Z"
   },
   "docs-epoch": {
@@ -50,7 +50,7 @@
     "hash": "57069f82a0e7d0b5",
     "chars": 2682
    },
-   "seenAt": "2026-11-23T18:03:28.069Z",
+   "seenAt": "2026-11-24T17:41:14.856Z",
    "changedAt": "2026-11-09T16:13:31.632Z"
   },
   "staking-pool-source": {
@@ -65,7 +65,7 @@
     "sha": "4c6ab0b68b",
     "url": "https://github.com/near/core-contracts/blob/master/staking-pool/src/lib.rs"
    },
-   "seenAt": "2026-11-23T18:03:28.151Z",
+   "seenAt": "2026-11-24T17:41:14.937Z",
    "changedAt": "2026-11-09T16:13:31.654Z"
   },
   "nearcore-releases": {
@@ -73,16 +73,16 @@
    "target": {
     "repo": "near/nearcore"
    },
-   "value": "2.14.1",
+   "value": "2.15.0-rc.1",
    "meta": {
-    "tag": "2.14.1",
-    "name": "2.14.1",
-    "at": "2026-11-11",
-    "url": "https://github.com/near/nearcore/releases/tag/2.14.1",
-    "prerelease": false
+    "tag": "2.15.0-rc.1",
+    "name": "2.15.0-rc.1",
+    "at": "2026-11-24",
+    "url": "https://github.com/near/nearcore/releases/tag/2.15.0-rc.1",
+    "prerelease": true
    },
-   "seenAt": "2026-11-23T18:03:28.261Z",
-   "changedAt": "2026-11-11T14:17:57.711Z"
+   "seenAt": "2026-11-24T17:41:15.186Z",
+   "changedAt": "2026-11-24T17:41:15.186Z"
   },
   "staking-farm": {
    "type": "github-releases",
@@ -96,7 +96,7 @@
     "url": "https://github.com/referencedev/staking-farm/commit/f0b0e69134aa88c59343607b844b0c4fb2f8cd44",
     "note": "default branch: chore: Added explicit MIT or Apache-2.0 licensing - this has been always the int"
    },
-   "seenAt": "2026-11-23T18:03:28.696Z",
+   "seenAt": "2026-11-24T17:41:15.744Z",
    "changedAt": "2026-11-09T16:13:32.324Z"
   }
  }

@@ -1,0 +1,214 @@
+{
+ "date": "2026-11-24",
+ "modules": 31,
+ "sources": 802,
+ "changes": [
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "address-book",
+   "label": "Aave address book releases",
+   "type": "github-releases",
+   "what": "v4.77.11 → v4.77.12 (2026-11-24)",
+   "link": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.12",
+   "before": {
+    "tag": "v4.77.11",
+    "name": "v4.77.11",
+    "at": "2026-11-23",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.11",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "v4.77.12",
+    "name": "v4.77.12",
+    "at": "2026-11-24",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.12",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
+   "id": "sdks",
+   "label": "Morpho SDKs releases",
+   "type": "github-releases",
+   "what": "@morpho-org/morpho-sdk-v10.0.2 → @morpho-org/morpho-ts-v4.6.0-next.0 (2026-11-24) pre-release",
+   "link": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-ts-v4.6.0-next.0",
+   "before": {
+    "tag": "@morpho-org/morpho-sdk-v10.0.2",
+    "name": "@morpho-org/morpho-sdk-v10.0.2",
+    "at": "2026-11-23",
+    "url": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-sdk-v10.0.2",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "@morpho-org/morpho-ts-v4.6.0-next.0",
+    "name": "@morpho-org/morpho-ts-v4.6.0-next.0",
+    "at": "2026-11-24",
+    "url": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-ts-v4.6.0-next.0",
+    "prerelease": true
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
+   "id": "docs-addresses",
+   "label": "Morpho docs · deployed addresses",
+   "type": "http-text",
+   "what": "page text changed (81483 → 81472 chars)",
+   "link": "https://docs.morpho.org/get-started/resources/addresses/",
+   "before": {
+    "hash": "a365004f9a16f5de",
+    "chars": 81483
+   },
+   "after": {
+    "hash": "5f0dd805f55a2783",
+    "chars": 81472
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-lido-evm",
+   "id": "docs-deployed-contracts",
+   "label": "Lido docs · deployed contracts",
+   "type": "http-text",
+   "what": "page text changed (51987 → 52620 chars)",
+   "link": "https://docs.lido.fi/deployed-contracts/",
+   "before": {
+    "hash": "ac986023c8a230e2",
+    "chars": 51987
+   },
+   "after": {
+    "hash": "0b3a1f6a0914cb14",
+    "chars": 52620
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-liquid-near",
+   "id": "nearcore-releases",
+   "label": "NEAR node releases (nearcore): protocol upgrades, gas price and epoch parameters",
+   "type": "github-releases",
+   "what": "2.14.1 → 2.15.0-rc.1 (2026-11-24) pre-release",
+   "link": "https://github.com/near/nearcore/releases/tag/2.15.0-rc.1",
+   "before": {
+    "tag": "2.14.1",
+    "name": "2.14.1",
+    "at": "2026-11-11",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.1",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "2.15.0-rc.1",
+    "name": "2.15.0-rc.1",
+    "at": "2026-11-24",
+    "url": "https://github.com/near/nearcore/releases/tag/2.15.0-rc.1",
+    "prerelease": true
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-native-monad",
+   "id": "docs-staking-api",
+   "label": "Monad docs · staking precompile API",
+   "type": "http-text",
+   "what": "page text changed (55201 → 55202 chars)",
+   "link": "https://docs.monad.xyz/reference/staking/api.md",
+   "before": {
+    "hash": "93cc782501773ffd",
+    "chars": 55201
+   },
+   "after": {
+    "hash": "4cba2928bb45b4cb",
+    "chars": 55202
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-native-near",
+   "id": "nearcore-releases",
+   "label": "NEAR node releases (nearcore): protocol upgrades, gas price and epoch parameters",
+   "type": "github-releases",
+   "what": "2.14.1 → 2.15.0-rc.1 (2026-11-24) pre-release",
+   "link": "https://github.com/near/nearcore/releases/tag/2.15.0-rc.1",
+   "before": {
+    "tag": "2.14.1",
+    "name": "2.14.1",
+    "at": "2026-11-11",
+    "url": "https://github.com/near/nearcore/releases/tag/2.14.1",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "2.15.0-rc.1",
+    "name": "2.15.0-rc.1",
+    "at": "2026-11-24",
+    "url": "https://github.com/near/nearcore/releases/tag/2.15.0-rc.1",
+    "prerelease": true
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-staking-native-solana",
+   "id": "docs-stake-accounts",
+   "label": "Solana docs · stake accounts (source)",
+   "type": "github-file",
+   "what": "file changed 38bb13b720 → f31839ac3f",
+   "link": "https://github.com/solana-foundation/solana-com/blob/main/apps/docs/content/docs/en/references/staking/stake-accounts.mdx",
+   "before": {
+    "sha": "38bb13b720",
+    "url": "https://github.com/solana-foundation/solana-com/blob/main/apps/docs/content/docs/en/references/staking/stake-accounts.mdx"
+   },
+   "after": {
+    "sha": "f31839ac3f",
+    "url": "https://github.com/solana-foundation/solana-com/blob/main/apps/docs/content/docs/en/references/staking/stake-accounts.mdx"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-0x",
+   "id": "settler-actions",
+   "label": "0x Settler action ABI (the Permit2 actions this module recognizes as a swap's first action)",
+   "type": "github-file",
+   "what": "file changed 1d46288aed → 3de9f84695",
+   "link": "https://github.com/0xProject/0x-settler/blob/master/src/ISettlerActions.sol",
+   "before": {
+    "sha": "1d46288aed",
+    "url": "https://github.com/0xProject/0x-settler/blob/master/src/ISettlerActions.sol"
+   },
+   "after": {
+    "sha": "3de9f84695",
+    "url": "https://github.com/0xProject/0x-settler/blob/master/src/ISettlerActions.sol"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-fynd",
+   "id": "fynd-releases",
+   "label": "Fynd releases",
+   "type": "github-releases",
+   "what": "0.127.0 → 0.129.0 (2026-11-24)",
+   "link": "https://github.com/propeller-heads/fynd/releases/tag/0.129.0",
+   "before": {
+    "tag": "0.127.0",
+    "name": "0.127.0",
+    "at": "2026-11-20",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.127.0",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "0.129.0",
+    "name": "0.129.0",
+    "at": "2026-11-24",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.129.0",
+    "prerelease": false
+   }
+  }
+ ],
+ "errors": [
+  {
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
+   "id": "docs-api",
+   "label": "Kamino docs · developers API",
+   "error": "HTTP 403",
+   "stale": true
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-cow",
+   "id": "docs-order-book-api",
+   "label": "CoW docs · Order Book API",
+   "error": "page text too short (12 chars) — selector or JS-rendered page",
+   "stale": false
+  }
+ ],
+ "repointed": []
+}
