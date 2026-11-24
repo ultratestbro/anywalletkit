@@ -27,6 +27,7 @@ let packed = 0
 // Unfinished packages that stay private on purpose; publish.mjs skips them. Each entry names its blocker.
 const UNRELEASED = new Map([
   ['@anywalletkit/protocol-swap2-layerzero', 'SDK-330/331: authenticated Value Transfer API responses and userSteps execution'],
+  ['@anywalletkit/protocol-swap2-kyberswap', 'awaits KyberSwap written consent (Terms of Use §8.3) before npm'],
 ])
 
 const targets = (node, acc = []) => {
