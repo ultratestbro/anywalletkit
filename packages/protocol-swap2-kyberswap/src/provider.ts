@@ -89,7 +89,7 @@ const apiToken = (t: string): string => (t === ZERO ? KYBER_NATIVE : t);
 /** An API text as it may appear in a refusal: one line, at most 120 characters. */
 const short = (s: unknown): string => String(s ?? "").replace(/\s+/g, " ").slice(0, 120);
 
-const ERC20_READS = parseAbi(["function balanceOf(address) view returns (uint256)", "function allowance(address, address) view returns (uint256)"]);
+const ERC20_READS = parseAbi(["function balanceOf(address) view returns (uint256)", "function allowance(address, address) view returns (uint256)", "function approve(address, uint256) returns (bool)"]);
 
 /** The revert data an RPC error carries, at most 4 KB of it. */
 function revertData(e: unknown): Hex | null {
@@ -234,6 +234,55 @@ export function kyberswapProvider(config: KyberswapProviderConfig = {}): CrossCh
     return null;
   }
 
+  /**
+   * A token sale is checked before the user pays for an approval: with the allowance already in place the exact call
+   * runs against the latest block; without it the approval and the swap run as one simulated block (eth_simulateV1),
+   * so a route that reverts never asks for an approval. A wallet without the input, or an RPC that cannot simulate a
+   * block, skips the check (`null` with the reason in `skipped`) — preflightDeposit still simulates before signing.
+   */
+  async function tokenSwapCheck(chainId: number, sender: string, token: string, amount: bigint, data: Hex): Promise<{refusal: ReturnType<typeof refuseRevert> | null; simulated: string}> {
+    const word = (v: unknown): bigint | null => (typeof v === "string" && /^0x[0-9a-fA-F]{1,64}$/.test(v) ? BigInt(v) : null);
+    const read = (call: Hex) => rpc(chainId, "eth_call", [{to: token, data: call}, "latest"]);
+    const [balance, allowance] = (await Promise.all([
+      read(encodeFunctionData({abi: ERC20_READS, functionName: "balanceOf", args: [sender as Hex]})),
+      read(encodeFunctionData({abi: ERC20_READS, functionName: "allowance", args: [sender as Hex, KYBER_ROUTER_V2]})),
+    ])).map(word);
+    if (balance == null || allowance == null) return {refusal: null, simulated: "none"};
+    if (balance < amount) return {refusal: null, simulated: "none"};
+    if (allowance >= amount) {
+      try {
+        await rpc(chainId, "eth_call", [{from: sender, to: KYBER_ROUTER_V2, data, value: "0x0"}, "latest"]);
+        return {refusal: null, simulated: "swap"};
+      } catch (e) {
+        if ((e as {rpc?: boolean}).rpc) return {refusal: refuseRevert(revertString(e)), simulated: "swap"};
+        throw e;
+      }
+    }
+    const approve = (n: bigint) => ({from: sender, to: token, data: encodeFunctionData({abi: ERC20_READS, functionName: "approve", args: [KYBER_ROUTER_V2, n]})});
+    // A token that refuses to change a non-zero allowance (USDT) is reset first, as the wallet's own approval does.
+    const calls = [...(allowance > 0n ? [approve(0n)] : []), approve(amount), {from: sender, to: KYBER_ROUTER_V2, data, value: "0x0"}];
+    let result: unknown;
+    try {
+      result = await rpc(chainId, "eth_simulateV1", [{blockStateCalls: [{calls}], validation: false}, "latest"]);
+    } catch {
+      return {refusal: null, simulated: "none"};
+    }
+    type Call = {status?: unknown; returnData?: unknown; error?: {message?: unknown; data?: unknown}};
+    const out = (Array.isArray(result) ? (result[0] as {calls?: Call[]} | undefined)?.calls : undefined) ?? [];
+    if (out.length !== calls.length || out.slice(0, -1).some((c) => c.status !== "0x1")) return {refusal: null, simulated: "none"};
+    const swap = out[out.length - 1]!;
+    if (swap.status === "0x1") return {refusal: null, simulated: "approve+swap"};
+    const err = {data: swap.error?.data ?? swap.returnData, message: typeof swap.error?.message === "string" ? swap.error.message : ""};
+    return {refusal: refuseRevert(revertString(Object.assign(new Error(err.message), {data: err.data}))), simulated: "approve+swap"};
+  }
+
+  function refuseRevert(why: string | null): {why: string; reason: Swap2RefusalReason} {
+    return {
+      why: `the route does not execute on-chain right now${why ? ` (${short(why)})` : ""}`,
+      reason: why && /return amount is not enough/i.test(why) ? "price_check_failed" : "simulation_failed",
+    };
+  }
+
   return {
     name: "kyberswap",
     describeActivity: describeKyberActivity,
@@ -368,7 +417,17 @@ export function kyberswapProvider(config: KyberswapProviderConfig = {}): CrossCh
         return refuse(e instanceof Error ? e.message.replace(/^kyberswap: /, "") : String(e), refusalOf(e));
       }
       // Native input needs no allowance: the exact call runs against the latest block now, so a route that would revert
-      // never reaches the user. (Token input is simulated in preflightDeposit, once the approval exists.)
+      // never reaches the user. Token input is checked the same way before any approval (tokenSwapCheck).
+      let simulated = "swap";
+      if (tokenIn !== ZERO) {
+        try {
+          const check = await tokenSwapCheck(chainId, sender, tokenIn, amountIn, tx.data as Hex);
+          if (check.refusal) return refuse(check.refusal.why, check.refusal.reason);
+          simulated = check.simulated;
+        } catch (e) {
+          return refuse(e instanceof Error ? e.message.replace(/^kyberswap: /, "") : String(e), refusalOf(e) ?? "upstream_unavailable");
+        }
+      }
       if (tokenIn === ZERO) {
         try {
           await rpc(chainId, "eth_call", [{from: sender, to: KYBER_ROUTER_V2, data: tx.data, value: `0x${value.toString(16)}`}, "latest", {[sender]: {balance: `0x${(value + 10n ** 18n).toString(16)}`}}]);
@@ -390,7 +449,7 @@ export function kyberswapProvider(config: KyberswapProviderConfig = {}): CrossCh
           chainId,
           ...(tokenIn === ZERO ? {} : {approvalAddress: KYBER_ROUTER_V2}),
         },
-        providerData: {...providerData, sender, minOut: decoded.minReturnAmount.toString()},
+        providerData: {...providerData, sender, minOut: decoded.minReturnAmount.toString(), simulated},
       };
     },
 

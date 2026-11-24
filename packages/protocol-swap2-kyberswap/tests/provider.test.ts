@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {decodeFunctionData, type Hex} from "viem";
+import {decodeFunctionData, parseAbi, type Hex} from "viem";
 import {describeProtocolBehaviour, describeProtocolModule} from "@anywalletkit/conformance";
 import type {Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import {refusalOf} from "@anywalletkit/protocol-swap2-core/errors";
@@ -150,6 +150,48 @@ describe("kyberswapProvider.getQuote — execution", () => {
     expect((await quote(exec({sourceToken: "ETH", destToken: USDC, amountIn: "1000000000000000000"}), {out: 3_000_000_000n, ethCall: "revert-min"})).reason).toBe("price_check_failed");
     expect((await quote(exec({sourceToken: "ETH", destToken: USDC, amountIn: "1000000000000000000"}), {out: 3_000_000_000n, ethCall: "revert-other"})).reason).toBe("simulation_failed");
     expect((await quote(exec({sourceToken: "ETH", destToken: USDC, amountIn: "1000000000000000000"}), {out: 3_000_000_000n, ethCall: "down"})).reason).toBe("upstream_unavailable");
+  });
+
+  it("checks a token sale before any approval: approval + swap simulated in one block, a revert refuses it", async () => {
+    const calls: NonNullable<Stub["calls"]> = [];
+    const sims = () => calls.filter((c) => (c.body as {method?: string})?.method === "eth_simulateV1");
+    const ok = await quote(exec(), {calls, allowance: 0n});
+    expect(ok.q!.txRequest!.approvalAddress).toBe(KYBER_ROUTER_V2);
+    expect(ok.q!.providerData!.simulated).toBe("approve+swap");
+    const block = (sims()[0]!.body as {params: [{blockStateCalls: [{calls: {from: string; to: string; data: string}[]}]; validation: boolean}]}).params[0];
+    expect(block.validation).toBe(false);
+    const [approve, swap] = block.blockStateCalls[0].calls;
+    expect(block.blockStateCalls[0].calls).toHaveLength(2);
+    expect(approve!.to.toLowerCase()).toBe(USDC.toLowerCase());
+    expect(decodeFunctionData({abi: parseAbi(["function approve(address, uint256) returns (bool)"]), data: approve!.data as Hex}).args).toEqual([KYBER_ROUTER_V2, 1_000_000_000n]);
+    expect(swap).toMatchObject({from: ME, to: KYBER_ROUTER_V2, data: ok.q!.txRequest!.data});
+    expect((await quote(exec(), {allowance: 0n, simulate: "revert-other"})).reason).toBe("simulation_failed");
+    expect((await quote(exec(), {allowance: 0n, simulate: "revert-other"})).why).toMatch(/TRANSFER_FROM_FAILED/);
+    expect((await quote(exec(), {allowance: 0n, simulate: "revert-min"})).reason).toBe("price_check_failed");
+  });
+
+  it("resets a partial allowance first (USDT-style tokens), and uses a plain call when the allowance is already there", async () => {
+    const calls: NonNullable<Stub["calls"]> = [];
+    await quote(exec(), {calls, allowance: 5n});
+    const sim = calls.find((c) => (c.body as {method?: string})?.method === "eth_simulateV1")!;
+    const sent = (sim.body as {params: [{blockStateCalls: [{calls: {data: string}[]}]}]}).params[0].blockStateCalls[0].calls;
+    expect(sent).toHaveLength(3);
+    expect(decodeFunctionData({abi: parseAbi(["function approve(address, uint256) returns (bool)"]), data: sent[0]!.data as Hex}).args[1]).toBe(0n);
+    const plain: NonNullable<Stub["calls"]> = [];
+    const ok = await quote(exec(), {calls: plain});
+    expect(ok.q!.providerData!.simulated).toBe("swap");
+    expect(plain.some((c) => (c.body as {method?: string})?.method === "eth_simulateV1")).toBe(false);
+    expect((await quote(exec(), {ethCall: "revert-other"})).reason).toBe("simulation_failed");
+  });
+
+  it("skips the check (preflight still simulates) without the input, on an RPC that cannot simulate a block, or when the approval itself fails", async () => {
+    for (const o of [{balance: 1n, allowance: 0n}, {allowance: 0n, simulate: "unsupported" as const}, {allowance: 0n, simulate: "approve-fails" as const}]) {
+      const r = await quote(exec(), {...o, ethCall: "revert-other"});
+      expect(r.q, JSON.stringify(o, (_, v) => (typeof v === "bigint" ? v.toString() : v))).not.toBeNull();
+      expect(r.q!.providerData!.simulated).toBe("none");
+    }
+    // No RPC answers the reads at all: refused, as for native input.
+    expect((await quote(exec(), {ethCall: "down"})).reason).toBe("upstream_unavailable");
   });
 
   it("maps a build error", async () => {

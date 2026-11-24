@@ -55,9 +55,13 @@ returns is checked on the device against the pinned router and the app's own req
 - The quote's minimum is KyberSwap's own: `floor(amountOut × (1 − slippage)) − 1` (the build lands one unit under the
   plain floor on every chain). `destAmount` is KyberSwap's `amountOut`, the route's ceiling: executed outputs come a few
   basis points under it, and KyberSwap keeps any output above the quote.
-- A native input is simulated at quote time (balance override); every swap is simulated from the account at the latest
-  block right before signing (`preflightDeposit`). A revert, or no RPC answering, refuses the swap — nothing is sent
-  unsimulated. Gas is the account's own estimate of the exact call (`ownGasEstimate`).
+- Every execution quote is simulated before the user pays for anything: a native input with a balance override; a
+  token input with its approval and the swap as one simulated block (`eth_simulateV1`), or as the plain call when the
+  allowance is already there — so a route that reverts never asks for an approval. A wallet without the input, or an
+  RPC without `eth_simulateV1` (Monad, Avalanche, HyperEVM on 2026-11-25), skips that early check
+  (`providerData.simulated: "none"`). Every swap is simulated again from the account at the latest block right before
+  signing (`preflightDeposit`). A revert, or no RPC answering, refuses the swap — nothing is sent unsimulated. Gas is
+  the account's own estimate of the exact call (`ownGasEstimate`).
 - Token inputs approve exactly the amount to the router (the engine default), spent in the same transaction.
 
 ## Router owner

@@ -2,7 +2,7 @@
 // the live endpoint does (2026-11-24: executor callTarget, no approve target, flags 0x200, the minimum one unit under
 // floor(amountOut × (1 − slippage))). `tamper` rewrites what the "API" answers, for the hostile cases.
 import {vi} from "vitest";
-import {encodeFunctionData, type Hex} from "viem";
+import {encodeErrorResult, encodeFunctionData, type Hex} from "viem";
 import {KYBER_EXECUTOR, KYBER_NATIVE, KYBER_ROUTER_ABI, KYBER_ROUTER_V2, kyberMinimum} from "../src/router.js";
 
 export const ZERO = "0x0000000000000000000000000000000000000000";
@@ -66,6 +66,11 @@ export interface Stub {
   tamper?: (a: SwapArgs) => SwapArgs;
   tamperBuild?: (b: Record<string, unknown>) => Record<string, unknown>;
   ethCall?: "ok" | "revert-min" | "revert-other" | "down";
+  /** The wallet's input-token balance and allowance to the router (default 10^30 each). */
+  balance?: bigint;
+  allowance?: bigint;
+  /** eth_simulateV1 (approval + swap in one block): the swap's outcome, an approval that fails, or no such method. */
+  simulate?: "ok" | "revert-min" | "revert-other" | "approve-fails" | "unsupported";
   calls?: {url: string; method: string; body?: Record<string, unknown>; headers: Record<string, string>}[];
 }
 
@@ -100,10 +105,22 @@ export function stub(o: Stub = {}): typeof fetch {
     if (o.ethCall === "down") throw new TypeError("fetch failed");
     if (rpc.method === "eth_call") {
       const to = ((body as {params: [{to: string}]}).params[0].to ?? "").toLowerCase();
-      if (to !== KYBER_ROUTER_V2.toLowerCase()) return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result: `0x${(10n ** 30n).toString(16).padStart(64, "0")}`}));
+      if (to !== KYBER_ROUTER_V2.toLowerCase()) {
+        const data = (body as {params: [{data: string}]}).params[0].data;
+        const v = data.startsWith("0xdd62ed3e") ? (o.allowance ?? 10n ** 30n) : (o.balance ?? 10n ** 30n);
+        return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result: `0x${v.toString(16).padStart(64, "0")}`}));
+      }
       if (o.ethCall === "revert-min") return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, error: {message: "execution reverted: Return amount is not enough"}}));
       if (o.ethCall === "revert-other") return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, error: {message: "execution reverted: pool locked"}}));
       return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result: "0x"}));
+    }
+    if (rpc.method === "eth_simulateV1") {
+      if (o.simulate === "unsupported") return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, error: {code: -32601, message: "the method eth_simulateV1 does not exist/is not available"}}));
+      const calls = (body as {params: [{blockStateCalls: [{calls: unknown[]}]}]}).params[0].blockStateCalls[0].calls;
+      const revert = (msg: string) => ({status: "0x0", returnData: encodeErrorResult({abi: [{type: "error", name: "Error", inputs: [{type: "string", name: "message"}]}], errorName: "Error", args: [msg]}), error: {code: 3, message: "execution reverted"}});
+      const swap = o.simulate === "revert-min" ? revert("Return amount is not enough") : o.simulate === "revert-other" ? revert("TRANSFER_FROM_FAILED") : {status: "0x1", returnData: "0x"};
+      const out = calls.map((_, i) => (i === calls.length - 1 ? swap : o.simulate === "approve-fails" ? {status: "0x0", returnData: "0x"} : {status: "0x1", returnData: `0x${"1".padStart(64, "0")}`}));
+      return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result: [{calls: out}]}));
     }
     if (rpc.method === "eth_getBalance") return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result: `0x${(10n ** 30n).toString(16)}`}));
     if (rpc.method === "eth_getTransactionReceipt") return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result: {status: "0x1"}}));
