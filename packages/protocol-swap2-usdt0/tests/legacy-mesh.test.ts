@@ -131,8 +131,8 @@ describe("routes", () => {
     expect(p.supportsRoute({chain: "eip155:42161", token: "USDT0"}, {chain: "tron:728126428", token: "USDT"})).toBe(true);
     expect(p.supportsRoute({chain: "eip155:1", token: "USDT"}, {chain: "ton:-239", token: TON.token})).toBe(true);
     expect(p.supportsRoute({chain: "eip155:42220", token: CELO.token}, {chain: "tron:728126428", token: TRON.token})).toBe(true);
-    // Celo's catalog "USDT" is a bridged token, not the one the mesh pool takes.
-    expect(p.supportsRoute({chain: "eip155:42220", token: "USDT"}, {chain: "tron:728126428", token: "USDT"})).toBe(false);
+    // Celo's catalog "USDT" is the native USD₮ the mesh pool takes (the bridged 0x617f… it listed before 2026-11-25 was not).
+    expect(p.supportsRoute({chain: "eip155:42220", token: "USDT"}, {chain: "tron:728126428", token: "USDT"})).toBe(true);
     expect(p.supportsRoute({chain: "eip155:42161", token: "USDC"}, {chain: "tron:728126428", token: "USDT"})).toBe(false);
     expect(p.supportsRoute({chain: "eip155:42161", token: "USDT0"}, {chain: "tron:728126428", token: "TRX"})).toBe(false);
     expect(p.supportsRoute({chain: "tron:728126428", token: "USDT"}, {chain: "eip155:42161", token: "USDT0"})).toBe(false);
@@ -186,7 +186,8 @@ describe("quote", () => {
     const celo = await quote({sourceChain: "eip155:42220", sourceToken: CELO.token});
     expect(celo.reasons).toEqual([]);
     expect(celo.q).toMatchObject({intentId: "usdt0-mesh:30125:30420", txRequest: {to: CELO.oft, approvalAddress: CELO.oft, chainId: 42220}});
-    expect((await quote({sourceChain: "eip155:42220", sourceToken: "USDT"})).reasons).toEqual([`source token USDT is not USDT0 (${CELO.token}) on Celo`]);
+    expect((await quote({sourceChain: "eip155:42220", sourceToken: "USDT"})).q).toMatchObject({intentId: "usdt0-mesh:30125:30420", txRequest: {to: CELO.oft, chainId: 42220}});
+    expect((await quote({sourceChain: "eip155:42220", sourceToken: "0x617f3112bf5397D0467D315cC709EF968D9ba546"})).q).toBeNull();
   });
 
   it("a dry quote without a recipient prices the zero account and carries no send; a live one without a recipient is refused", async () => {

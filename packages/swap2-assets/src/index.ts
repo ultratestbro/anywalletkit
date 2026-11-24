@@ -541,7 +541,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         // Not in the 1Click registry — LI.FI (and THORChain where pooled) quote it.
         symbol: "WBTC",
         assetId: "",
-        contract: "0x0555e30da8f98308edb960aa94c0db47230d2b9c",
+        contract: "0x68f180fcCe6836688e9084f035309E29Bf0A2095",
         decimals: 8,
         icon: cmcIcon(3717),
       },
@@ -590,7 +590,6 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "USDT0", assetId: "nep245:v2_1.omni.hot.tg:10_2R1RXDBxCyJTeMEsdXydh7xsHmz", contract: "0x01bff41798a0bcf287b996046ca68b395dbc1071", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/53705/large/usdt0.jpg?1737086183"},
       {symbol: "ENA", assetId: "", contract: "0x58538e6a46e07434d7e7375bc268d3cb839c0133", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36530/large/ethena.png?1711701436"},
       {symbol: "WLD", assetId: "", contract: "0xdc6ff44d5d932cbd77b52e5612ba0529dc6226f1", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/31069/large/worldcoin.jpeg?1696529903"},
-      {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
       // 2026-11-05: Curve tokens for the Curve swap provider and scrvUSD earn. Verified on-chain (code, symbol,
       // decimals, name, supply: 608k crvUSD, 5.8k scrvUSD, 6.5M CRV); bridged ERC-20s, not in the 1Click registry.
       {symbol: "crvUSD", assetId: "", contract: "0xC52D7F23a2e460248Db6eE192Cb23dD12bDDCbf6", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30118/large/crvusd.jpg?1746670973"},
@@ -757,7 +756,6 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "SAFE", assetId: "nep141:gnosis-0x4d18815d14fe5c3304e87b3fa18318baa5c23820.omft.near", contract: "0x4d18815d14fe5c3304e87b3fa18318baa5c23820", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/27032/large/Artboard_1_copy_8circle-1.png?1696526084"},
       {symbol: "YFI", assetId: "", contract: "0xbf65bfcb5da067446cee6a706ba3fe2fb1a9fdfd", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/11849/large/yearn.jpg?1696511720"},
       {symbol: "COW", assetId: "nep141:gnosis-0x177127622c4a00f3d409b75571e12cb3c8973d3c.omft.near", contract: "0x177127622c4a00f3d409b75571e12cb3c8973d3c", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/24384/large/CoW-token_logo.png?1719524382"},
-      {symbol: "TRB", assetId: "", contract: "0xaad66432d27737ecf6ed183160adc5ef36ab99f2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/9644/large/TRB-New_Logo.png?1737722143"},
     ],
   },
   {
@@ -798,7 +796,6 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "USD1", assetId: "", contract: "0x111111d2bf19e43c34263401e0cad979ed1cdb61", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/54977/large/USD1_1000x1000_transparent.png?1749297002"},
       {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
       {symbol: "GHO", assetId: "", contract: "0xfc421ad3c883bf9e7c4f42de845c4e4405799e73", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30663/large/gho-token-logo.png?1720517092"},
-      {symbol: "SolvBTC", assetId: "", contract: "0xae4efbc7736f963982aacb17efa37fcbab924cb3", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36800/large/solvBTC.png?1719810684"},
     ],
   },
   {
@@ -825,9 +822,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
       {symbol: "wstETH", assetId: "", contract: "0xc02fe7317d4eb8753a02c35fe019786854a92001", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/18834/large/wstETH.png?1696518295"},
       {symbol: "weETH", assetId: "", contract: "0x7dcc39b4d1c53cb31e1abc0e358b43987fef80f7", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
-      {symbol: "JUP", assetId: "", contract: "0xbe51a5e8fa434f09663e8fb4cce79d0b2381afad", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/34188/large/jup.png?1704266489"},
       {symbol: "rETH", assetId: "", contract: "0x94cac393f3444cef63a651ffc18497e7e8bd036a", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/20764/large/reth.png?1696520159"},
-      {symbol: "uniBTC", assetId: "", contract: "0xd3c8da379d71a33bfee8875f87ac2748beb1d58d", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/39599/large/uniBTC_200px.png?1723064455"},
     ],
   },
   {
@@ -859,7 +854,6 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
         icon: cmcIcon(29470),
       },
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
-      {symbol: "LINK", assetId: "", contract: "0x1ac2ee68b8d038c982c1e1f73f596927dd70de59", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405"},
       {symbol: "weETH", assetId: "", contract: "0xa3d68b74bf0528fdd07263c60d6488749044914b", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
       {symbol: "AAVE0", assetId: "", contract: "0xaa3871e64ca8c09fbdded327b1269224643cb83c", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/102175743/large/aave0.png?1787293474"},
       {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
@@ -919,11 +913,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
       {symbol: "LINK", assetId: "", contract: "0x548c6944cba02b9d1c0570102c89de64d258d3ac", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405"},
       {symbol: "weETH", assetId: "", contract: "0x01f0a31698c4d065659b9bdc21b3610292a1c506", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
-      {symbol: "ENA", assetId: "", contract: "0x58538e6a46e07434d7e7375bc268d3cb839c0133", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36530/large/ethena.png?1711701436"},
-      {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
       {symbol: "ETHFI", assetId: "", contract: "0x056a5fa5da84ceb7f93d36e545c5905607d8bd81", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/35958/large/etherfi.jpeg?1710254562"},
-      {symbol: "frxUSD", assetId: "", contract: "0x397f939c3b91a74c321ea7129396492ba9cdce82", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/53963/large/frxUSD.png?1737792154"},
-      {symbol: "rswETH", assetId: "", contract: "0x89f17ab70cafb1468d633056161573efefea0713", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/34489/large/rswETH_Icon.png?1706865484"},
     ],
   },
   {
@@ -949,7 +939,6 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "SolvBTC", assetId: "", contract: "0x541fd749419ca806a8bc7da8ac23d346f2df8b77", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36800/large/solvBTC.png?1719810684"},
       {symbol: "PENDLE", assetId: "", contract: "0xff9c599d51c407a45d631c6e89cb047efb88aef6", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/15069/large/Pendle_Logo_Normal-03.png?1696514728"},
       {symbol: "uniBTC", assetId: "", contract: "0xc3827a4bc8224ee2d116637023b124ced6db6e90", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/39599/large/uniBTC_200px.png?1723064455"},
-      {symbol: "frxUSD", assetId: "", contract: "0x80eede496655fb9047dd39d9f418d5483ed600df", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/53963/large/frxUSD.png?1737792154"},
     ],
   },
   // ── Address-only L1s (no wallet adapter — exchange / any-wallet deposits),
@@ -1111,11 +1100,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "LINK", assetId: "", contract: "0x52869bae3e091e36b0915941577f2d47d8d8b534", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405"},
       {symbol: "weETH", assetId: "", contract: "0xc1fa6e2e8667d9be0ca938a54c7e0285e9df924a", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
       {symbol: "USDe", assetId: "", contract: "0x39fe7a0dacce31bd90418e3e659fb0b5f0b3db0d", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33613/large/usde.png?1733810059"},
-      {symbol: "ENA", assetId: "", contract: "0x686b311f82b407f0be842652a98e5619f64cc25f", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36530/large/ethena.png?1711701436"},
-      {symbol: "sUSDe", assetId: "", contract: "0xad17da2f6ac76746ef261e835c50b2651ce36da8", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
       {symbol: "Cake", assetId: "", contract: "0x3a287a06c66f9e95a56327185ca2bdf5f031cecd", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/12632/large/pancakeswap-cake-logo_%281%29.png?1696512440"},
-      {symbol: "SolvBTC", assetId: "", contract: "0x74ed17608cc2b5f30a59d6af07c9ad1b1ab3a5b1", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36800/large/solvBTC.png?1719810684"},
-      {symbol: "frxUSD", assetId: "", contract: "0xea77c590bb36c43ef7139ce649cfbcfd6163170d", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/53963/large/frxUSD.png?1737792154"},
     ],
   },
   {
@@ -1128,7 +1113,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
     assets: [
       {symbol: "CELO", assetId: "", contract: "0x471EcE3750Da237f93B8E339c536989b8978a438", decimals: 18, icon: cmcIcon(5567)},
       {symbol: "USDC", assetId: "", contract: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C", decimals: 6, icon: cmcIcon(3408)},
-      {symbol: "USDT", assetId: "", contract: "0x617f3112bf5397D0467D315cC709EF968D9ba546", decimals: 6, icon: cmcIcon(825)},
+      {symbol: "USDT", assetId: "", contract: "0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e", decimals: 6, icon: cmcIcon(825)},
       {symbol: "USDm", assetId: "", contract: "0x765DE816845861e75A25fCA122bb6898B8B1282a", decimals: 18, icon: cmcIcon(7236)},
       {symbol: "WETH", assetId: "", contract: "0xD221812de1BD094f35587EE8E174B07B6167D9Af", decimals: 18, icon: cmcIcon(2396)},
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
@@ -1268,11 +1253,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "MEGA", assetId: "", contract: "0x28B7E77f82B25B95953825F1E3eA0E36c1c29861", decimals: 18},
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
       {symbol: "wstETH", assetId: "", contract: "0x601ac63637933d88285a025c685ac4e9a92a98da", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/18834/large/wstETH.png?1696518295"},
-      {symbol: "LINK", assetId: "", contract: "0xee85aefb15b9489563a6a29891ebe0750aa1a7ae", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405"},
       {symbol: "BTC.b", assetId: "", contract: "0xb0f70c0bd6fd87dbeb7c10dc692a2a6106817072", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/26115/large/BTC.b.png?1772210755"},
-      {symbol: "sUSDe", assetId: "", contract: "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2", decimals: 18, icon: "https://static.debank.com/image/eth_token/logo_url/0x9d39a5de30e57443bff2a8307a4256c8797a3497/613e3c4b4b079a18bf8d7170d5b038bf.png"},
-      {symbol: "rsETH", assetId: "", contract: "0xc3eACf0612346366Db554C991D7858716db09f58", decimals: 18, icon: "https://static.debank.com/image/stable_token/logo_url/0x9ecaf80c1303cca8791afbc0ad405c8a35e8d9f1/9b29efed86aff5a64f238d6d30032f40.png"},
-      {symbol: "LBTC", assetId: "", contract: "0xecAc9C5F704e954931349Da37F60E39f515c11c1", decimals: 8},
     ],
   },
   {
@@ -1290,10 +1271,8 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "USDe", assetId: "", contract: "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", decimals: 18, icon: cmcIcon(29470)},
       {symbol: "WETH", assetId: "", contract: "0x9895D81bB462A195b4922ED7De0e3ACD007c32CB", decimals: 18, icon: cmcIcon(2396)},
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
-      {symbol: "LINK", assetId: "", contract: "0x76a443768a5e3b8d1aed0105fc250877841deb40", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405"},
       {symbol: "weETH", assetId: "", contract: "0xa3d68b74bf0528fdd07263c60d6488749044914b", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
       {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
-      {symbol: "rsETH", assetId: "", contract: "0x9ecaf80c1303cca8791afbc0ad405c8a35e8d9f1", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33800/large/Icon___Dark.png?1702991855"},
       {symbol: "GHO", assetId: "", contract: "0xb77e872a68c62cfc0dfb02c067ecc3da23b4bbf3", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30663/large/gho-token-logo.png?1720517092"},
       {symbol: "XAUt0", assetId: "", contract: "0x1b64b9025eebb9a6239575df9ea4b9ac46d4d193", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/66560/large/XAUt0_Token_Icon_Gold.png?1749747942"},
     ],
@@ -1314,13 +1293,11 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "LINEA", assetId: "", contract: "0x1789e0043623282D5DCc7F213d703C6D8BAfBB04", decimals: 18},
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
       {symbol: "weETH", assetId: "", contract: "0x1bf74c010e6320bab11e2e5a532b5ac15e0b8aa6", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
-      {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
       {symbol: "Cake", assetId: "", contract: "0x0d1e753a25ebda689453309112904807625befbe", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/12632/large/pancakeswap-cake-logo_%281%29.png?1696512440"},
       {symbol: "M-BTC", assetId: "", contract: "0xe4d584ae9b753e549cae66200a6475d2f00705f7", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/36566/large/photo_2024-03-25_22-04-42.jpg?1711936162"},
       {symbol: "frxETH", assetId: "", contract: "0xb1afd04774c02ae84692619448b08ba79f19b1ff", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/28284/large/frxETH_icon.png?1696527284"},
       {symbol: "ezETH", assetId: "", contract: "0x2416092f143378750bb29b79ed961ab195cceea5", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/34753/large/Ezeth_logo_circle.png?1713496404"},
       {symbol: "frxUSD", assetId: "", contract: "0xc7346783f5e645aa998b106ef9e7f499528673d8", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/53963/large/frxUSD.png?1737792154"},
-      {symbol: "xSolvBTC", assetId: "", contract: "0xcc0966d8418d412c599a6421b760a847eb169a8c", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/39384/large/xSolvBTC.png?1744170824"},
     ],
   },
   {
@@ -1338,13 +1315,9 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "WBTC", assetId: "", contract: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c", decimals: 8, icon: cmcIcon(3717)},
       {symbol: "stS", assetId: "", contract: "0xE5DA20F15420aD15DE0fa650600aFc998bbE3955", decimals: 18},
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
-      {symbol: "LINK", assetId: "", contract: "0x71052bae71c25c78e37fd12e5ff1101a71d9018f", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405"},
-      {symbol: "weETH", assetId: "", contract: "0xa3d68b74bf0528fdd07263c60d6488749044914b", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
       {symbol: "rsETH", assetId: "", contract: "0xd75787ba9aba324420d522bda84c08c87e5099b1", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33800/large/Icon___Dark.png?1702991855"},
       {symbol: "LBTC", assetId: "", contract: "0xecac9c5f704e954931349da37f60e39f515c11c1", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/39969/large/lbtc-token-circle-200.png?1786635984"},
-      {symbol: "FBTC", assetId: "", contract: "0xc96de26018a54d51c097160568752c4e3bd6c364", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/39182/large/Function_Token_%282%29.png?1760254065"},
       {symbol: "PENDLE", assetId: "", contract: "0xf1ef7d2d4c0c881cd634481e0586ed5d2871a74b", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/15069/large/Pendle_Logo_Normal-03.png?1696514728"},
-      {symbol: "uniBTC", assetId: "", contract: "0xc3827a4bc8224ee2d116637023b124ced6db6e90", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/39599/large/uniBTC_200px.png?1723064455"},
       {symbol: "frxUSD", assetId: "", contract: "0x80eede496655fb9047dd39d9f418d5483ed600df", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/53963/large/frxUSD.png?1737792154"},
       // 2026-11-05: Curve tokens for the Curve swap provider and scrvUSD earn. Verified on-chain (code, symbol,
       // decimals, name, supply: 16k crvUSD); bridged ERC-20, not in the 1Click registry. scrvUSD left out (7 supply).
@@ -1380,7 +1353,6 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "WBTC", assetId: "", contract: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c", decimals: 8, icon: cmcIcon(3717)},
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
       {symbol: "SolvBTC", assetId: "", contract: "0x541FD749419CA806a8bc7da8ac23D346f2dF8B77", decimals: 18, icon: "https://static.debank.com/image/bob_token/logo_url/0x59889b7021243db5b1e065385f918316cd90d46c/31a6cb7216c2b772a41a8913cc36f2c0.png"},
-      {symbol: "USDT", assetId: "", contract: "0xB75D0B03c06A926e488e2659DF1A861F860bD3d1", decimals: 6, icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png"},
       {symbol: "iSEI", assetId: "", contract: "0x5Cf6826140C1C56Ff49C808A1A75407Cd1DF9423", decimals: 6, icon: "https://static.debank.com/image/sei_token/logo_url/0x5cf6826140c1c56ff49c808a1a75407cd1df9423/f4b3731501343f4ac86c9bcdaf02ed2a.png"},
       {symbol: "fastUSD", assetId: "", contract: "0x37a4dD9CED2b19Cfe8FAC251cd727b5787E45269", decimals: 18, icon: "https://static.debank.com/image/sei_token/logo_url/0x37a4dd9ced2b19cfe8fac251cd727b5787e45269/97f1966c1e35a9b6783994ce90e1d76e.png"},
     ],
@@ -1401,10 +1373,7 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
       {symbol: "weETH", assetId: "", contract: "0xa3d68b74bf0528fdd07263c60d6488749044914b", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33033/large/weETH.png?1701438396"},
       {symbol: "USDG", assetId: "", contract: "0xe343167631d89b6ffc58b88d6b7fb0228795491d", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/51281/large/GDN_USDG_Token_200x200.png?1730484111"},
-      {symbol: "PYUSD", assetId: "", contract: "0x142cdc44890978b506e745bb3bd11607b7f7faef", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/31212/large/PYUSD_Token_Logo_2x.png?1765987788"},
-      {symbol: "rsETH", assetId: "", contract: "0xc3eacf0612346366db554c991d7858716db09f58", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33800/large/Icon___Dark.png?1702991855"},
       {symbol: "GHO", assetId: "", contract: "0xfc421ad3c883bf9e7c4f42de845c4e4405799e73", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/30663/large/gho-token-logo.png?1720517092"},
-      {symbol: "reUSD", assetId: "", contract: "0x5bcf6b008bf80b9296238546bace1797657b05d6", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/66291/large/Points_Program_Group_91.png?1749676055"},
       {symbol: "uniBTC", assetId: "", contract: "0xd3c8da379d71a33bfee8875f87ac2748beb1d58d", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/39599/large/uniBTC_200px.png?1723064455"},
       {symbol: "XAUt0", assetId: "", contract: "0xf50258d3c1dd88946c567920b986a12e65b50dac", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/66560/large/XAUt0_Token_Icon_Gold.png?1749747942"},
     ],
@@ -1448,12 +1417,6 @@ export const CC_SOURCE_CHAINS: CcChain[] = [
       {symbol: "WBTC", assetId: "", contract: "0xEA034fb02eB1808C2cc3adbC15f447B93CbE08e1", decimals: 8, icon: cmcIcon(3717)},
       // Top tokens by market cap (CoinGecko 2026-10-13), verified on-chain (symbol, decimals), routable via LI.FI / 1Click / Omniston.
       {symbol: "USDG", assetId: "", contract: "0x4ae46a509f6b1d9056937ba4500cb143933d2dc8", decimals: 6, icon: "https://coin-images.coingecko.com/coins/images/51281/large/GDN_USDG_Token_200x200.png?1730484111"},
-      {symbol: "sUSDe", assetId: "", contract: "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33669/large/sUSDe-Symbol-Color.png?1716307680"},
-      {symbol: "rsETH", assetId: "", contract: "0x1b3a9a689ba7555f9d7984d7ad4025574ed5a0f9", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/33800/large/Icon___Dark.png?1702991855"},
-      {symbol: "uniBTC", assetId: "", contract: "0xd3c8da379d71a33bfee8875f87ac2748beb1d58d", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/39599/large/uniBTC_200px.png?1723064455"},
-      {symbol: "frxUSD", assetId: "", contract: "0x80eede496655fb9047dd39d9f418d5483ed600df", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/53963/large/frxUSD.png?1737792154"},
-      {symbol: "brBTC", assetId: "", contract: "0xa161132371c94299d215915d4cbc3b629e2059be", decimals: 8, icon: "https://coin-images.coingecko.com/coins/images/53039/large/brBTC_200.png?1735074374"},
-      {symbol: "sfrxUSD", assetId: "", contract: "0x5bff88ca1442c2496f7e475e9e7786383bc070c0", decimals: 18, icon: "https://coin-images.coingecko.com/coins/images/53964/large/sfrxUSD.png?1737792232"},
     ],
   },
 ];

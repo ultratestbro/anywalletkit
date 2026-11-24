@@ -20,8 +20,8 @@ describe('assessToken', () => {
     expect(codes(info({ symbol: 'USDC.e2' }))).not.toContain('impersonation')
   })
   it("a catalog symbol of the same chain is impersonation; another chain's listed token is not (only majors are global)", () => {
-    expect(codes(info({ symbol: 'JUP' }), 'solana:mainnet')).not.toContain('impersonation') // real JUP; the catalog lists a bridged JUP on Unichain
-    expect(codes(info({ symbol: 'JUP' }), 'eip155:130')).toContain('impersonation')
+    expect(codes(info({ symbol: 'MORPHO' }), 'solana:mainnet')).not.toContain('impersonation') // the catalog lists MORPHO on Base only
+    expect(codes(info({ symbol: 'MORPHO' }), 'eip155:8453')).toContain('impersonation')
     expect(codes(info({ symbol: 'LINK' }), 'eip155:1')).toContain('impersonation')
     expect(codes(info({ symbol: 'LINK' }), 'eip155:143')).not.toContain('impersonation')
     expect(codes(info({ symbol: 'LINK' }))).not.toContain('impersonation')
