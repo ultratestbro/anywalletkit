@@ -73,6 +73,8 @@ interface RouteSummary {
   amountIn?: string;
   tokenOut?: string;
   amountOut?: string;
+  amountInUsd?: string;
+  amountOutUsd?: string;
   gas?: string;
   extraFee?: {feeAmount?: string; feeReceiver?: string; chargeFeeBy?: string; isInBps?: boolean};
   route?: {pool?: string; exchange?: string}[][];
@@ -98,6 +100,18 @@ function revertData(e: unknown): Hex | null {
   for (const v of [err.data, nested]) if (typeof v === "string" && /^0x(?:[0-9a-fA-F]{2}){4,4096}$/.test(v)) return v as Hex;
   return null;
 }
+/**
+ * KyberSwap's own USD value of the output against the input, as basis points lost (pool impact and pool fees together).
+ * Information for the user's "be careful" warning, never a refusal. null when KyberSwap does not price either side
+ * ("0" means unpriced, not worthless) or the numbers are not plain decimals.
+ */
+export function kyberValueLossBps(amountInUsd: unknown, amountOutUsd: unknown): number | null {
+  const num = (v: unknown) => (typeof v === "string" && /^\d{1,15}(\.\d{1,30})?$/.test(v) ? Number(v) : null);
+  const vin = num(amountInUsd), vout = num(amountOutUsd);
+  if (vin === null || vout === null || vin <= 0 || vout <= 0) return null;
+  return Math.min(10_000, Math.max(0, Math.round(((vin - vout) / vin) * 10_000)));
+}
+
 /** `Error(string)` from revert data, if that is what it is. */
 function revertString(e: unknown): string | null {
   const data = revertData(e);
@@ -384,6 +398,9 @@ export function kyberswapProvider(config: KyberswapProviderConfig = {}): CrossCh
         ...(typeof r.summary.routeID === "string" ? {routeId: r.summary.routeID.slice(0, 80)} : {}),
         ...(r.sources.length ? {sources: r.sources.join(",")} : {}),
       };
+      // The router's quoteValues reads priceImpactBps into the user's "be careful" warning (Unichain USDC → JUP: −78 %).
+      const lossBps = kyberValueLossBps(r.summary.amountInUsd, r.summary.amountOutUsd);
+      if (lossBps !== null) providerData.priceImpactBps = String(lossBps);
       if (dry) {
         // A token sale approves the router first; the auction's gas estimate reads the spender from here.
         return {...base, providerData: tokenIn === ZERO ? providerData : {...providerData, approvalAddress: KYBER_ROUTER_V2}};

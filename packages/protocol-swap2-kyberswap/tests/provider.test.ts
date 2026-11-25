@@ -194,6 +194,17 @@ describe("kyberswapProvider.getQuote — execution", () => {
     expect((await quote(exec(), {ethCall: "down"})).reason).toBe("upstream_unavailable");
   });
 
+  it("passes KyberSwap's own USD valuation on as priceImpactBps for the value warning, never as a refusal", async () => {
+    // 2026-11-25 Unichain USDC → JUP: $100.01 in, $21.76 out.
+    const bad = await quote(params(), {usd: {in: "100.014793617151", out: "21.763944933921106"}});
+    expect(bad.q!.providerData!.priceImpactBps).toBe("7824");
+    // A gain is 0 bps; "0" is KyberSwap not pricing the token (Polygon PYUSD), not a total loss; junk is ignored.
+    expect((await quote(params(), {usd: {in: "999.22", out: "999.48"}})).q!.providerData!.priceImpactBps).toBe("0");
+    for (const usd of [{in: "999.76", out: "0"}, {in: "1e3", out: "5"}, {}, {in: "-1", out: "1"}]) {
+      expect((await quote(params(), {usd})).q!.providerData!.priceImpactBps, JSON.stringify(usd)).toBeUndefined();
+    }
+  });
+
   it("maps a build error", async () => {
     expect((await quote(exec(), {error: {status: 400, code: 4227, onBuild: true}})).reason).toBe("simulation_failed");
     expect((await quote(exec(), {error: {status: 400, code: 4000, message: "field \"wallets\" invalid", onBuild: true}})).reason).toBe("policy_refused");

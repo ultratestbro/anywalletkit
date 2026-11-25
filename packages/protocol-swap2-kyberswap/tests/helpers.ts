@@ -57,6 +57,8 @@ export function swapData(a: SwapArgs): Hex {
 export interface Stub {
   /** The route's amountOut. */
   out?: bigint;
+  /** KyberSwap's own USD values of the input and the output (strings, as the API sends them). */
+  usd?: {in?: string; out?: string};
   routerAddress?: string;
   /** HTTP status + Kyber error code on /routes (or on /route/build with `onBuild`). */
   error?: {status: number; code?: number; message?: string; onBuild?: boolean};
@@ -85,6 +87,7 @@ export function stub(o: Stub = {}): typeof fetch {
         tokenIn: q.get("tokenIn")!.toLowerCase(), amountIn: q.get("amountIn"), tokenOut: q.get("tokenOut")!.toLowerCase(),
         amountOut: (o.out ?? 400_000_000_000_000_000n).toString(), gas: "330498", extraFee: o.extraFee ?? {feeAmount: "", chargeFeeBy: "", isInBps: false, feeReceiver: ""},
         route: [[{pool: "0xpool", exchange: "uniswapv3"}]], routeID: "r-1", checksum: "123", timestamp: 1795528620,
+        ...(o.usd ? {amountInUsd: o.usd.in, amountOutUsd: o.usd.out} : {}),
       };
       if (o.tamperSummary) summary = o.tamperSummary(summary);
       return new Response(JSON.stringify({code: 0, message: "successfully", data: {routeSummary: summary, routerAddress: o.routerAddress ?? KYBER_ROUTER_V2}}));

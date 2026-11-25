@@ -63,6 +63,10 @@ returns is checked on the device against the pinned router and the app's own req
   signing (`preflightDeposit`). A revert, or no RPC answering, refuses the swap — nothing is sent unsimulated. Gas is
   the account's own estimate of the exact call (`ownGasEstimate`).
 - Token inputs approve exactly the amount to the router (the engine default), spent in the same transaction.
+- KyberSwap's own USD values of the input and the output (`amountInUsd` / `amountOutUsd`) reach the router's
+  `quoteValues` as `providerData.priceImpactBps` — the value lost to pool impact and pool fees — so a near-total loss
+  gets the "be careful" warning even when the app has no price for the token (2026-11-25 Unichain USDC → JUP: 7 824 bps).
+  Information only, never a refusal; a token KyberSwap does not price carries none.
 
 ## Router owner
 
