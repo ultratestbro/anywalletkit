@@ -86,7 +86,9 @@ does not validate a transaction's behavior.
    the source gas. The fee is the transaction's `txRequest.nativeFee`; a price-only quote, which carries
    no transaction (a dry LI.FI quote without the sender), declares it as `providerData.nativeFee`, read only
    when there is no `txRequest` (a value that is not a base-unit integer leaves the quote unpriced).
-   Without prices for every quote the auction compares guaranteed outputs.
+   Without prices for every quote the auction compares guaranteed outputs. US-dollar stablecoins the map does not
+   price (USDC, USDT, DAI, USDS, PYUSD, USDe, GHO, crvUSD, frxUSD, …; not yield-bearing wrappers like sUSDe) count
+   at $1, so `quoteValues` still shows a loss into one of them.
    With `sourceGasUsd` the source gas comes off too (EVM sources), so a route whose swap a third party
    pays for (`quote.gasless`: a CoW solver, an Omniston resolver) is compared on what the user really gets.
    `evmSourceGas({prices, rpcUrl})` counts the venue's `txRequest.gasLimit` (capped at 3M; 250k when it names

@@ -3,7 +3,13 @@ import {ccAssetByToken, ccChain} from "@anywalletkit/swap2-assets";
 import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 
 /** Stables priced at par when the map has no entry for them. */
-const PAR = /^(USDC|USDT|USDT0|USD₮0|DAI|USDC\.E)$/i;
+/**
+ * US-dollar stablecoins priced at $1 when the caller's map has no price for them: a loss into or out of one is then
+ * still shown (2026-11-25: Polygon USDC → PYUSD paid 0.08 % of the value, Arbitrum ETH → USDS 87 USDS for $100k, and
+ * neither had a price, so nothing warned). Yield-bearing wrappers (sUSDS, sUSDe, scrvUSD, sfrxUSD, USDY) are worth more
+ * than $1 and are not here. The caller's own price always wins.
+ */
+const PAR = /^(USDC|USDC\.E|USDBC|USDT|USD₮|USDT0|USD₮0|DAI|XDAI|WXDAI|USDS|PYUSD|FDUSD|USD1|USDG|AUSD|GHO|CRVUSD|FRXUSD|USDE|USDM|FASTUSD|RLUSD|LUSD|TUSD)$/i;
 
 /** symbol → USD, trying the exact symbol, upper case, the unwrapped native (WETH → ETH, wS → S), then par for stables. */
 export function priceOf(prices: Readonly<Record<string, number>>, symbol: string): number | null {

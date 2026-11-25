@@ -414,6 +414,20 @@ describe("quoteValues (SDK-127): USD in / out / loss and the better alternative 
     expect(v[1]!.betterAlternative).toBeUndefined();
   });
 
+  it("prices a US-dollar stablecoin at par when the map has none, so a lone near-total loss still shows (2026-11-25 Polygon USDC → PYUSD)", async () => {
+    const {quoteValues, priceOf} = await import("../src/value.js");
+    const [v] = quoteValues({}, {sourceChain: "eip155:137", sourceToken: "USDC", destChain: "eip155:137", destToken: "0x99af3eea856556646c98c8b9b2548fe815240750", amountIn: "1000000000"}, [
+      {provider: "kyberswap", destAmount: "785732"},
+    ]);
+    expect(v!.valueUsdIn).toBeCloseTo(1000, 6);
+    expect(v!.valueUsdOut).toBeCloseTo(0.786, 3);
+    expect(v!.lossPct).toBeGreaterThan(99.9);
+    for (const s of ["USDS", "PYUSD", "USDe", "GHO", "crvUSD", "frxUSD", "USD1", "WXDAI"]) expect(priceOf({}, s), s).toBe(1);
+    // Yield-bearing wrappers and non-dollar stables are not par; the caller's own price wins over par.
+    for (const s of ["sUSDS", "sUSDe", "scrvUSD", "sfrxUSD", "USDY", "EURC"]) expect(priceOf({}, s), s).toBeNull();
+    expect(priceOf({USDe: 0.97}, "USDe")).toBe(0.97);
+  });
+
   it("names the better alternative by raw output when the destination has no price (Oct 16 Base USDT→ENA: Uniswap 19.2 vs LI.FI 24.5)", async () => {
     const {quoteValues} = await import("../src/value.js");
     const v = quoteValues({USDT: 1}, {sourceChain: "eip155:8453", sourceToken: "USDT", destChain: "eip155:8453", destToken: "0x58538e6a46e07434d7e7375bc268d3cb839c0133", amountIn: "5000000"}, [
