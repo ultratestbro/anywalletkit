@@ -2,296 +2,296 @@
  "lido": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "ssv": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "jito": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "tonstakers": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:1:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:1:lido": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "mellow:lido-earn-eth": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:1:etherfi": {
   "status": "warn",
   "note": "quoteSupply → AaveError weETH: supply cap reached (0 base units left).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:10:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:56:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError Cake: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:100:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:137:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "mellow:lido-earn-usd": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:146:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:1868:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:324:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError USDC: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:1088:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError m.DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:5000:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:8453:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:9745:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:42161:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:42220:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:43114:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError DAI.e: supply cap reached (0 base units left).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:57073:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:534352:core": {
   "status": "warn",
   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "aave:59144:core": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:10": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:137": {
   "status": "warn",
   "note": " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached or the receiver is gated).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:130": {
   "status": "warn",
   "note": " quoteSupply → MorphoError Gauntlet WETH: deposits are closed right now (caps reached or the receiver is gated).",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:4663": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:999": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:143": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "morpho:747474": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "approvals:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "approvals:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "approvals:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "kamino": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "native-stake": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "native-monad": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "curve:10": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "curve:1": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "curve:100": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "curve:196": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "curve:9745": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "curve:143": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "scrvusd": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "curve:8453": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "curve:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "liquid-near": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "native-near": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "relay": {
-  "status": "ok",
-  "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "status": "fail",
+  "note": "ok quote Linea ETH → Base ETH out 4984204696909686 min 4884520602971493 · 0x49290c1c → 0x59916da825d2d2ec1bf878d71c88826f6633ecca · ~1s · router ok | ok quote HyperEVM HYPE → Elysium HYPE out 498397889875575551 min 488429932078064041 · 0x49290c1c → 0x4cd00e387622c35bddb9b4c962c136462338bc31 · ~1s · ",
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "zeroex": {
-  "status": "ok",
-  "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "status": "fail",
+  "note": "NEW chain 42161 Arbitrum Settler 0x2a5db34853e857b488e9bac92f01a42370d685e6 (deployment 21; pinned 20 / previous 19, token sales up to 22), previous 0xf41429fc96ff446b8118359ba16854e07c393591 (deployment 20) · registry impl 0xcb1b022408de59d126c0d1397e69fd8e9f082d80 owner 0xf36b9f50e59870a24f42f9ba4",
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "across": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "cow:42161": {
   "status": "ok",
   "note": "",
-  "at": "2026-11-24T17:43:51.768Z"
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "cow:1": {
   "status": "fail",
-  "note": "ok 1 native buy: USDC → native coin dry quote — 25000000 → 14854589252070765 (min 14780316305810412), verified=true | FAIL 1 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | FAIL 1 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — uid 0x422",
-  "at": "2026-11-24T17:43:51.768Z"
+  "note": "ok 1 native buy: USDC → native coin dry quote — 25000000 → 15075151927920793 (min 14999776168281190), verified=true | FAIL 1 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | FAIL 1 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — uid 0x1d3",
+  "at": "2026-11-25T17:14:10.591Z"
  },
  "cow:8453": {
   "status": "fail",
-  "note": "ok 8453 native buy: USDC → native coin dry quote — 25000000 → 14852488653875047 (min 14778226210605672), verified=true | FAIL 8453 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | ok 8453 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — ui",
-  "at": "2026-11-24T17:43:51.768Z"
+  "note": "ok 8453 native buy: USDC → native coin dry quote — 25000000 → 15066312474328480 (min 14990980911956838), verified=true | FAIL 8453 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | FAIL 8453 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — ",
+  "at": "2026-11-25T17:14:10.591Z"
  }
 }

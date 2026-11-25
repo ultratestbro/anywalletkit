@@ -1,0 +1,461 @@
+{
+ "date": "2026-11-25",
+ "counts": {
+  "ok": 42,
+  "warn": 13,
+  "fail": 4
+ },
+ "transitions": [
+  {
+   "id": "zeroex",
+   "module": "zeroex",
+   "from": "ok",
+   "to": "fail",
+   "note": "NEW chain 42161 Arbitrum Settler 0x2a5db34853e857b488e9bac92f01a42370d685e6 (deployment 21; pinned 20 / previous 19, token sales up to 22), previous 0xf41429fc96ff446b8118359ba16854e07c393591 (deployment 20) · registry impl 0xcb1b022408de59d126c0d1397e69fd8e9f082d80 owner 0xf36b9f50e59870a24f42f9ba4"
+  },
+  {
+   "id": "relay",
+   "module": "relay",
+   "from": "ok",
+   "to": "fail",
+   "note": "ok quote Linea ETH → Base ETH out 4984204696909686 min 4884520602971493 · 0x49290c1c → 0x59916da825d2d2ec1bf878d71c88826f6633ecca · ~1s · router ok | ok quote HyperEVM HYPE → Elysium HYPE out 498397889875575551 min 488429932078064041 · 0x49290c1c → 0x4cd00e387622c35bddb9b4c962c136462338bc31 · ~1s · "
+  }
+ ],
+ "failing": [
+  {
+   "id": "zeroex",
+   "status": "fail",
+   "note": "NEW chain 42161 Arbitrum Settler 0x2a5db34853e857b488e9bac92f01a42370d685e6 (deployment 21; pinned 20 / previous 19, token sales up to 22), previous 0xf41429fc96ff446b8118359ba16854e07c393591 (deployment 20) · registry impl 0xcb1b022408de59d126c0d1397e69fd8e9f082d80 owner 0xf36b9f50e59870a24f42f9ba4"
+  },
+  {
+   "id": "relay",
+   "status": "fail",
+   "note": "ok quote Linea ETH → Base ETH out 4984204696909686 min 4884520602971493 · 0x49290c1c → 0x59916da825d2d2ec1bf878d71c88826f6633ecca · ~1s · router ok | ok quote HyperEVM HYPE → Elysium HYPE out 498397889875575551 min 488429932078064041 · 0x49290c1c → 0x4cd00e387622c35bddb9b4c962c136462338bc31 · ~1s · "
+  },
+  {
+   "id": "cow:1",
+   "status": "fail",
+   "note": "ok 1 native buy: USDC → native coin dry quote — 25000000 → 15075151927920793 (min 14999776168281190), verified=true | FAIL 1 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | FAIL 1 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — uid 0x1d3"
+  },
+  {
+   "id": "cow:8453",
+   "status": "fail",
+   "note": "ok 8453 native buy: USDC → native coin dry quote — 25000000 → 15066312474328480 (min 14990980911956838), verified=true | FAIL 8453 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | FAIL 8453 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — "
+  }
+ ],
+ "results": [
+  {
+   "id": "jito",
+   "module": "spl-stake-pool",
+   "status": "ok",
+   "ms": 904,
+   "note": ""
+  },
+  {
+   "id": "ssv",
+   "module": "ssv",
+   "status": "ok",
+   "ms": 1186,
+   "note": ""
+  },
+  {
+   "id": "lido",
+   "module": "lido",
+   "status": "ok",
+   "ms": 1624,
+   "note": ""
+  },
+  {
+   "id": "tonstakers",
+   "module": "tonstakers",
+   "status": "ok",
+   "ms": 2400,
+   "note": ""
+  },
+  {
+   "id": "native-stake",
+   "module": "native-stake",
+   "status": "ok",
+   "ms": 1564,
+   "note": ""
+  },
+  {
+   "id": "mellow:lido-earn-eth",
+   "module": "mellow",
+   "status": "ok",
+   "ms": 2259,
+   "note": ""
+  },
+  {
+   "id": "liquid-near",
+   "module": "liquid-near",
+   "status": "ok",
+   "ms": 2930,
+   "note": ""
+  },
+  {
+   "id": "native-monad",
+   "module": "native-monad",
+   "status": "ok",
+   "ms": 5517,
+   "note": ""
+  },
+  {
+   "id": "mellow:lido-earn-usd",
+   "module": "mellow",
+   "status": "ok",
+   "ms": 3366,
+   "note": ""
+  },
+  {
+   "id": "aave:1:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2848,
+   "note": ""
+  },
+  {
+   "id": "aave:1:lido",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1607,
+   "note": ""
+  },
+  {
+   "id": "aave:1:etherfi",
+   "module": "aave",
+   "status": "warn",
+   "ms": 719,
+   "note": "quoteSupply → AaveError weETH: supply cap reached (0 base units left)."
+  },
+  {
+   "id": "aave:10:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 655,
+   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:56:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 743,
+   "note": "quoteSupply → AaveError Cake: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:137:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 716,
+   "note": ""
+  },
+  {
+   "id": "aave:146:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 738,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:324:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 690,
+   "note": "quoteSupply → AaveError USDC: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:1868:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 522,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:1088:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1254,
+   "note": "quoteSupply → AaveError m.DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:5000:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 591,
+   "note": ""
+  },
+  {
+   "id": "aave:8453:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 628,
+   "note": ""
+  },
+  {
+   "id": "aave:100:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 3135,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:9745:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 708,
+   "note": ""
+  },
+  {
+   "id": "aave:42161:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 662,
+   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:42220:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 687,
+   "note": ""
+  },
+  {
+   "id": "aave:43114:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 905,
+   "note": "quoteSupply → AaveError DAI.e: supply cap reached (0 base units left)."
+  },
+  {
+   "id": "aave:57073:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 812,
+   "note": ""
+  },
+  {
+   "id": "aave:59144:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 624,
+   "note": ""
+  },
+  {
+   "id": "aave:534352:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 686,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "morpho:8453",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 1862,
+   "note": ""
+  },
+  {
+   "id": "morpho:1",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3114,
+   "note": ""
+  },
+  {
+   "id": "morpho:42161",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 2756,
+   "note": ""
+  },
+  {
+   "id": "morpho:10",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 2277,
+   "note": ""
+  },
+  {
+   "id": "morpho:130",
+   "module": "morpho",
+   "status": "warn",
+   "ms": 1768,
+   "note": " quoteSupply → MorphoError Gauntlet WETH: deposits are closed right now (caps reached or the receiver is gated)."
+  },
+  {
+   "id": "morpho:137",
+   "module": "morpho",
+   "status": "warn",
+   "ms": 1928,
+   "note": " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached or the receiver is gated)."
+  },
+  {
+   "id": "morpho:999",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3184,
+   "note": ""
+  },
+  {
+   "id": "morpho:143",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 2701,
+   "note": ""
+  },
+  {
+   "id": "morpho:747474",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3095,
+   "note": ""
+  },
+  {
+   "id": "approvals:8453",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 518,
+   "note": ""
+  },
+  {
+   "id": "approvals:1",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 1098,
+   "note": ""
+  },
+  {
+   "id": "approvals:42161",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 403,
+   "note": ""
+  },
+  {
+   "id": "morpho:4663",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3851,
+   "note": ""
+  },
+  {
+   "id": "kamino",
+   "module": "kamino",
+   "status": "ok",
+   "ms": 3119,
+   "note": ""
+  },
+  {
+   "id": "curve:10",
+   "module": "curve",
+   "status": "ok",
+   "ms": 1147,
+   "note": ""
+  },
+  {
+   "id": "curve:1",
+   "module": "curve",
+   "status": "ok",
+   "ms": 8676,
+   "note": ""
+  },
+  {
+   "id": "curve:143",
+   "module": "curve",
+   "status": "ok",
+   "ms": 5599,
+   "note": ""
+  },
+  {
+   "id": "curve:100",
+   "module": "curve",
+   "status": "ok",
+   "ms": 6468,
+   "note": ""
+  },
+  {
+   "id": "curve:196",
+   "module": "curve",
+   "status": "ok",
+   "ms": 2096,
+   "note": ""
+  },
+  {
+   "id": "curve:9745",
+   "module": "curve",
+   "status": "ok",
+   "ms": 2031,
+   "note": ""
+  },
+  {
+   "id": "scrvusd",
+   "module": "scrvusd",
+   "status": "ok",
+   "ms": 1243,
+   "note": ""
+  },
+  {
+   "id": "curve:8453",
+   "module": "curve",
+   "status": "ok",
+   "ms": 5076,
+   "note": ""
+  },
+  {
+   "id": "curve:42161",
+   "module": "curve",
+   "status": "ok",
+   "ms": 22891,
+   "note": ""
+  },
+  {
+   "id": "zeroex",
+   "module": "zeroex",
+   "status": "fail",
+   "ms": 732,
+   "note": "NEW chain 42161 Arbitrum Settler 0x2a5db34853e857b488e9bac92f01a42370d685e6 (deployment 21; pinned 20 / previous 19, token sales up to 22), previous 0xf41429fc96ff446b8118359ba16854e07c393591 (deployment 20) · registry impl 0xcb1b022408de59d126c0d1397e69fd8e9f082d80 owner 0xf36b9f50e59870a24f42f9ba4"
+  },
+  {
+   "id": "relay",
+   "module": "relay",
+   "status": "fail",
+   "ms": 5208,
+   "note": "ok quote Linea ETH → Base ETH out 4984204696909686 min 4884520602971493 · 0x49290c1c → 0x59916da825d2d2ec1bf878d71c88826f6633ecca · ~1s · router ok | ok quote HyperEVM HYPE → Elysium HYPE out 498397889875575551 min 488429932078064041 · 0x49290c1c → 0x4cd00e387622c35bddb9b4c962c136462338bc31 · ~1s · "
+  },
+  {
+   "id": "across",
+   "module": "across",
+   "status": "ok",
+   "ms": 14544,
+   "note": ""
+  },
+  {
+   "id": "native-near",
+   "module": "native-near",
+   "status": "ok",
+   "ms": 81042,
+   "note": ""
+  },
+  {
+   "id": "cow:42161",
+   "module": "cow",
+   "status": "ok",
+   "ms": 16230,
+   "note": ""
+  },
+  {
+   "id": "cow:1",
+   "module": "cow",
+   "status": "fail",
+   "ms": 4598,
+   "note": "ok 1 native buy: USDC → native coin dry quote — 25000000 → 15075151927920793 (min 14999776168281190), verified=true | FAIL 1 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | FAIL 1 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — uid 0x1d3"
+  },
+  {
+   "id": "cow:8453",
+   "module": "cow",
+   "status": "fail",
+   "ms": 3573,
+   "note": "ok 8453 native buy: USDC → native coin dry quote — 25000000 → 15066312474328480 (min 14990980911956838), verified=true | FAIL 8453 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | FAIL 8453 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — "
+  }
+ ]
+}

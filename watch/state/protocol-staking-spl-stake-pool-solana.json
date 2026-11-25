@@ -14,7 +14,7 @@
     "url": "https://github.com/solana-program/stake-pool/releases/tag/program%40v2.2.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-24T17:41:16.465Z",
+   "seenAt": "2026-11-25T17:11:37.098Z",
    "changedAt": "2026-10-14T15:10:37.328Z"
   },
   "jito-stakenet": {
@@ -30,7 +30,7 @@
     "url": "https://github.com/jito-foundation/stakenet/releases/tag/validator-history%400.3.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-24T17:41:16.515Z",
+   "seenAt": "2026-11-25T17:11:37.054Z",
    "changedAt": "2026-10-20T10:23:39.621Z"
   },
   "docs-spl-stake-pool": {
@@ -43,7 +43,7 @@
     "hash": "da4036da16a21d11",
     "chars": 3158
    },
-   "seenAt": "2026-11-24T17:41:16.258Z",
+   "seenAt": "2026-11-25T17:11:37.252Z",
    "changedAt": "2026-10-14T15:10:37.958Z"
   },
   "spl-stake-pool-program": {
@@ -57,7 +57,7 @@
     "slot": 469669929,
     "authority": "dPpFfahSWhm5M2RB3nVaHsXfnh9ooz5bWtR3WeUguDH"
    },
-   "seenAt": "2026-11-24T17:41:16.146Z",
+   "seenAt": "2026-11-25T17:11:36.826Z",
    "changedAt": "2026-11-15T13:55:20.857Z"
   }
  }

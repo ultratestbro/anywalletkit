@@ -14,7 +14,7 @@
     "call": "domainSeparator()",
     "result": "0xc078f884a2676e1345748b1feace7b0abee5d00ecadb6e574dcdd109a63e8943"
    },
-   "seenAt": "2026-11-24T17:41:22.633Z",
+   "seenAt": "2026-11-25T17:11:43.391Z",
    "changedAt": "2026-11-23T18:03:35.048Z"
   },
   "settlement-relayer-ethereum": {
@@ -30,7 +30,7 @@
     "call": "vaultRelayer()",
     "result": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
    },
-   "seenAt": "2026-11-24T17:41:22.634Z",
+   "seenAt": "2026-11-25T17:11:43.390Z",
    "changedAt": "2026-11-23T18:03:35.049Z"
   },
   "eth-flow-settlement-ethereum": {
@@ -46,7 +46,7 @@
     "call": "cowSwapSettlement()",
     "result": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
    },
-   "seenAt": "2026-11-24T17:41:22.632Z",
+   "seenAt": "2026-11-25T17:11:43.392Z",
    "changedAt": "2026-11-23T18:03:35.049Z"
   },
   "vault-relayer-ethereum": {
@@ -60,7 +60,7 @@
     "codeHash": "5e1417ce3c871b1b",
     "bytes": 4590
    },
-   "seenAt": "2026-11-24T17:41:22.634Z",
+   "seenAt": "2026-11-25T17:11:43.394Z",
    "changedAt": "2026-11-23T18:03:35.050Z"
   },
   "eth-flow-ethereum": {
@@ -74,7 +74,7 @@
     "codeHash": "3ab2f47d893883b2",
     "bytes": 6177
    },
-   "seenAt": "2026-11-24T17:41:22.635Z",
+   "seenAt": "2026-11-25T17:11:43.394Z",
    "changedAt": "2026-11-23T18:03:35.050Z"
   },
   "settlement-ethereum": {
@@ -88,7 +88,7 @@
     "codeHash": "ff9de93cb289c511",
     "bytes": 16165
    },
-   "seenAt": "2026-11-24T17:41:22.635Z",
+   "seenAt": "2026-11-25T17:11:43.395Z",
    "changedAt": "2026-11-23T18:03:35.051Z"
   },
   "eth-flow-wrapped-ethereum": {
@@ -104,7 +104,7 @@
     "call": "wrappedNativeToken()",
     "result": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
    },
-   "seenAt": "2026-11-24T17:41:22.643Z",
+   "seenAt": "2026-11-25T17:11:43.404Z",
    "changedAt": "2026-11-23T18:03:35.057Z"
   },
   "vault-relayer-base": {
@@ -118,7 +118,7 @@
     "codeHash": "5e1417ce3c871b1b",
     "bytes": 4590
    },
-   "seenAt": "2026-11-24T17:41:22.646Z",
+   "seenAt": "2026-11-25T17:11:43.410Z",
    "changedAt": "2026-11-23T18:03:35.059Z"
   },
   "settlement-domain-base": {
@@ -134,7 +134,7 @@
     "call": "domainSeparator()",
     "result": "0xd72ffa789b6fae41254d0b5a13e6e1e92ed947ec6a251edf1cf0b6c02c257b4b"
    },
-   "seenAt": "2026-11-24T17:41:22.645Z",
+   "seenAt": "2026-11-25T17:11:43.408Z",
    "changedAt": "2026-11-23T18:03:35.059Z"
   },
   "eth-flow-base": {
@@ -148,7 +148,7 @@
     "codeHash": "e7c2e813ce294f02",
     "bytes": 6177
    },
-   "seenAt": "2026-11-24T17:41:22.647Z",
+   "seenAt": "2026-11-25T17:11:43.409Z",
    "changedAt": "2026-11-23T18:03:35.060Z"
   },
   "settlement-base": {
@@ -162,7 +162,7 @@
     "codeHash": "f974235fe21a7d1d",
     "bytes": 16165
    },
-   "seenAt": "2026-11-24T17:41:22.654Z",
+   "seenAt": "2026-11-25T17:11:43.410Z",
    "changedAt": "2026-11-23T18:03:35.061Z"
   },
   "settlement-relayer-base": {
@@ -178,7 +178,7 @@
     "call": "vaultRelayer()",
     "result": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
    },
-   "seenAt": "2026-11-24T17:41:22.653Z",
+   "seenAt": "2026-11-25T17:11:43.418Z",
    "changedAt": "2026-11-23T18:03:35.065Z"
   },
   "settlement-arbitrum": {
@@ -192,7 +192,7 @@
     "codeHash": "185d5d5d5dfa47d8",
     "bytes": 16165
    },
-   "seenAt": "2026-11-24T17:41:22.665Z",
+   "seenAt": "2026-11-25T17:11:43.426Z",
    "changedAt": "2026-11-23T18:03:35.067Z"
   },
   "eth-flow-settlement-base": {
@@ -208,7 +208,7 @@
     "call": "cowSwapSettlement()",
     "result": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
    },
-   "seenAt": "2026-11-24T17:41:22.654Z",
+   "seenAt": "2026-11-25T17:11:43.420Z",
    "changedAt": "2026-11-23T18:03:35.068Z"
   },
   "eth-flow-wrapped-base": {
@@ -224,7 +224,7 @@
     "call": "wrappedNativeToken()",
     "result": "0x4200000000000000000000000000000000000006"
    },
-   "seenAt": "2026-11-24T17:41:22.655Z",
+   "seenAt": "2026-11-25T17:11:43.422Z",
    "changedAt": "2026-11-23T18:03:35.068Z"
   },
   "vault-relayer-arbitrum": {
@@ -238,7 +238,7 @@
     "codeHash": "5e1417ce3c871b1b",
     "bytes": 4590
    },
-   "seenAt": "2026-11-24T17:41:22.661Z",
+   "seenAt": "2026-11-25T17:11:43.427Z",
    "changedAt": "2026-11-23T18:03:35.070Z"
   },
   "settlement-domain-arbitrum": {
@@ -254,7 +254,7 @@
     "call": "domainSeparator()",
     "result": "0x69d78e7a7cafcaf924483f99f65e8f4e303a99a446db7ab319f9d40e940bced2"
    },
-   "seenAt": "2026-11-24T17:41:22.660Z",
+   "seenAt": "2026-11-25T17:11:43.439Z",
    "changedAt": "2026-11-23T18:03:35.073Z"
   },
   "settlement-relayer-arbitrum": {
@@ -270,7 +270,7 @@
     "call": "vaultRelayer()",
     "result": "0xc92e8bdf79f0507f65a392b0ab4667716bfe0110"
    },
-   "seenAt": "2026-11-24T17:41:22.666Z",
+   "seenAt": "2026-11-25T17:11:43.435Z",
    "changedAt": "2026-11-23T18:03:35.074Z"
   },
   "eth-flow-settlement-arbitrum": {
@@ -286,7 +286,7 @@
     "call": "cowSwapSettlement()",
     "result": "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
    },
-   "seenAt": "2026-11-24T17:41:22.672Z",
+   "seenAt": "2026-11-25T17:11:43.441Z",
    "changedAt": "2026-11-23T18:03:35.075Z"
   },
   "eth-flow-wrapped-arbitrum": {
@@ -302,7 +302,7 @@
     "call": "wrappedNativeToken()",
     "result": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1"
    },
-   "seenAt": "2026-11-24T17:41:22.670Z",
+   "seenAt": "2026-11-25T17:11:43.438Z",
    "changedAt": "2026-11-23T18:03:35.078Z"
   },
   "eth-flow-arbitrum": {
@@ -316,7 +316,7 @@
     "codeHash": "eb9aa4891c518894",
     "bytes": 6177
    },
-   "seenAt": "2026-11-24T17:41:22.666Z",
+   "seenAt": "2026-11-25T17:11:43.430Z",
    "changedAt": "2026-11-23T18:03:35.079Z"
   },
   "contracts-networks": {
@@ -330,7 +330,7 @@
     "sha": "389e00d9eb",
     "url": "https://github.com/cowprotocol/contracts/blob/main/networks.json"
    },
-   "seenAt": "2026-11-24T17:41:22.881Z",
+   "seenAt": "2026-11-25T17:11:43.646Z",
    "changedAt": "2026-11-23T18:03:35.200Z"
   },
   "contracts-order": {
@@ -344,7 +344,7 @@
     "sha": "e05c800a5a",
     "url": "https://github.com/cowprotocol/contracts/blob/main/src/contracts/libraries/GPv2Order.sol"
    },
-   "seenAt": "2026-11-24T17:41:22.891Z",
+   "seenAt": "2026-11-25T17:11:43.615Z",
    "changedAt": "2026-11-23T18:03:35.240Z"
   },
   "eth-flow-deployment-base": {
@@ -358,7 +358,7 @@
     "sha": "7a7335d080",
     "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/broadcast/Deploy.sol/8453/deployment.prod.json"
    },
-   "seenAt": "2026-11-24T17:41:22.831Z",
+   "seenAt": "2026-11-25T17:11:43.563Z",
    "changedAt": "2026-11-23T18:03:35.274Z"
   },
   "eth-flow-deployment-arbitrum": {
@@ -372,7 +372,7 @@
     "sha": "f0f29e18ea",
     "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/broadcast/Deploy.sol/42161/deployment.prod.json"
    },
-   "seenAt": "2026-11-24T17:41:22.855Z",
+   "seenAt": "2026-11-25T17:11:43.655Z",
    "changedAt": "2026-11-23T18:03:35.276Z"
   },
   "eth-flow-deployment-ethereum": {
@@ -386,7 +386,7 @@
     "sha": "012fe24875",
     "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/broadcast/Deploy.sol/1/deployment.prod.json"
    },
-   "seenAt": "2026-11-24T17:41:22.869Z",
+   "seenAt": "2026-11-25T17:11:43.658Z",
    "changedAt": "2026-11-23T18:03:35.286Z"
   },
   "contracts-signing": {
@@ -400,7 +400,7 @@
     "sha": "16ac6502a2",
     "url": "https://github.com/cowprotocol/contracts/blob/main/src/contracts/mixins/GPv2Signing.sol"
    },
-   "seenAt": "2026-11-24T17:41:22.905Z",
+   "seenAt": "2026-11-25T17:11:43.639Z",
    "changedAt": "2026-11-23T18:03:35.308Z"
   },
   "eth-flow-source": {
@@ -414,7 +414,7 @@
     "sha": "69f2458333",
     "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/src/CoWSwapEthFlow.sol"
    },
-   "seenAt": "2026-11-24T17:41:23.033Z",
+   "seenAt": "2026-11-25T17:11:43.819Z",
    "changedAt": "2026-11-23T18:03:35.395Z"
   },
   "orderbook-openapi": {
@@ -428,7 +428,7 @@
     "sha": "206467f64c",
     "url": "https://github.com/cowprotocol/services/blob/main/crates/orderbook/openapi.yml"
    },
-   "seenAt": "2026-11-24T17:41:23.084Z",
+   "seenAt": "2026-11-25T17:11:43.961Z",
    "changedAt": "2026-11-23T18:03:35.422Z"
   },
   "eth-flow-order": {
@@ -442,7 +442,7 @@
     "sha": "076eaeceda",
     "url": "https://github.com/cowprotocol/ethflowcontract/blob/main/src/libraries/EthFlowOrder.sol"
    },
-   "seenAt": "2026-11-24T17:41:23.008Z",
+   "seenAt": "2026-11-25T17:11:43.811Z",
    "changedAt": "2026-11-23T18:03:35.458Z"
   },
   "app-data-schema": {
@@ -456,7 +456,7 @@
     "sha": "5c9439fcc1",
     "url": "https://github.com/cowprotocol/cow-sdk/blob/main/packages/app-data/src/schemas/v1.16.0.json"
    },
-   "seenAt": "2026-11-24T17:41:23.096Z",
+   "seenAt": "2026-11-25T17:11:43.912Z",
    "changedAt": "2026-11-23T18:03:35.610Z"
   },
   "services-releases": {
@@ -464,16 +464,16 @@
    "target": {
     "repo": "cowprotocol/services"
    },
-   "value": "v2.389.0",
+   "value": "v2.389.2",
    "meta": {
-    "tag": "v2.389.0",
-    "name": "Weekly Release v2.389.0",
-    "at": "2026-11-23",
-    "url": "https://github.com/cowprotocol/services/releases/tag/v2.389.0",
+    "tag": "v2.389.2",
+    "name": "Hotfix v2.389.2",
+    "at": "2026-11-25",
+    "url": "https://github.com/cowprotocol/services/releases/tag/v2.389.2",
     "prerelease": false
    },
-   "seenAt": "2026-11-24T17:41:23.224Z",
-   "changedAt": "2026-11-23T18:03:35.634Z"
+   "seenAt": "2026-11-25T17:11:43.936Z",
+   "changedAt": "2026-11-25T17:11:43.936Z"
   },
   "docs-eth-flow": {
    "type": "http-text",
@@ -485,7 +485,7 @@
     "hash": "93b9ef530c1f435e",
     "chars": 9904
    },
-   "seenAt": "2026-11-24T17:41:23.157Z",
+   "seenAt": "2026-11-25T17:11:44.040Z",
    "changedAt": "2026-11-23T18:03:35.690Z"
   },
   "docs-signing-schemes": {
@@ -498,7 +498,7 @@
     "hash": "a8a8349a6578a694",
     "chars": 7249
    },
-   "seenAt": "2026-11-24T17:41:23.207Z",
+   "seenAt": "2026-11-25T17:11:44.037Z",
    "changedAt": "2026-11-23T18:03:35.700Z"
   },
   "eth-flow-releases": {
@@ -512,7 +512,7 @@
     "url": "https://github.com/cowprotocol/ethflowcontract/releases/tag/v1.3.0",
     "note": "tags only"
    },
-   "seenAt": "2026-11-24T17:41:23.518Z",
+   "seenAt": "2026-11-25T17:11:44.142Z",
    "changedAt": "2026-11-23T18:03:35.746Z"
   }
  }
