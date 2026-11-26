@@ -281,3 +281,68 @@ describe("LIVE-VR-3 with v4 on: one set of gas bounds per quote, shared by v3 an
     expect(r!.heard).toEqual([[`uniswap: every Uniswap v3 and v4 route for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${AVAX} may have (15000000) — its pools are too thin for this amount`, {reason: "insufficient_liquidity"}]]);
   });
 });
+
+describe("V4RANK-1: v4Unexecutable on a quote that never took the bounds goes by the caps alone, whenever the block read lands", () => {
+  // The best route has no gas figure (quoter gas 0), so the quote never takes the bounds. Another v4 route needs
+  // 16,957,500 gas, over the 15M block but within Avalanche's caps (none). The probe answers at 200 ms. The count must
+  // not turn on when the block read lands (before: "1" when it was in by the time the quote was built, absent when it
+  // answered at 300 ms; 28df2022 waited for it and always said "1").
+  const v4 = {[P500]: {out: USD(3_000), gas: 0n}, [P3000]: {out: USD(2_900), gas: 16_000_000n}};
+  /** When the read lands: in hand before the quote (a read a minute old), during the probe, after it. */
+  const timings = [
+    {when: "in hand", reads: [{limit: 15_000_000n, ms: 0}] as Read[], at: [0, MIN]},
+    {when: "at 0 ms", reads: [{limit: 15_000_000n, ms: 0}] as Read[], at: [0]},
+    {when: "at 300 ms", reads: [{limit: 15_000_000n, ms: 300}] as Read[], at: [0]},
+  ];
+  const last = async (v3: Record<number, V3Leg>, pools: Record<string, PricedPool>, t: (typeof timings)[number], config: Partial<UniswapProviderConfig> = {}, how: "quote" | "quotes" = "quote"): Promise<Run> => (await quotes(node(v3, pools, t.reads, 200), t.at, config, how)).at(-1)!;
+
+  it('"best", the v4 winner: the same quote whenever the read lands', async () => {
+    for (const t of timings) {
+      const r = await last({}, v4, t);
+      expect(r.heard).toEqual([]);
+      expect(r.q).toMatchObject({destAmount: USD(3_000).toString(), providerData: {venue: "v4", route: "v4 direct 0.05%/10"}});
+      expect([t.when, r.q!.txRequest!.gasLimit, r.q!.providerData!.v4Unexecutable]).toEqual([t.when, undefined, undefined]);
+      took(r.ms, 200);
+    }
+  });
+
+  it('"best", the v3 winner (no gas figure): the same count whenever the read lands', async () => {
+    for (const t of timings) {
+      const r = await last({3000: {out: USD(3_100), gas: 0n}}, v4, t);
+      expect(r.heard).toEqual([]);
+      expect(r.q).toMatchObject({destAmount: USD(3_100).toString(), txRequest: {to: D3.router}, providerData: {route: "direct 0.3%"}});
+      expect([t.when, r.q!.providerData!.v4Unexecutable]).toEqual([t.when, undefined]);
+    }
+  });
+
+  it('"both", the v4 row: the same count whenever the read lands', async () => {
+    for (const t of timings) {
+      const r = await last({}, v4, t, {venueRoutes: "both"}, "quotes");
+      expect(r.heard).toEqual([]);
+      expect([t.when, r.qs!.map((q) => [q.routeId, q.destAmount, q.providerData!.v4Unexecutable])]).toEqual([t.when, [["v4", USD(3_000).toString(), undefined]]]);
+    }
+  });
+
+  it("a winner with a gas figure takes the bounds: the route they refuse is counted, whenever the read lands", async () => {
+    for (const t of timings) {
+      const r = await last({}, {[P500]: {out: USD(3_000), gas: 1_000_000n}, [P3000]: {out: USD(2_900), gas: 16_000_000n}}, t);
+      expect([t.when, r.q]).toMatchObject([t.when, {destAmount: USD(3_000).toString(), txRequest: {gasLimit: "1650000"}, providerData: {venue: "v4", route: "v4 direct 0.05%/10", v4Unexecutable: "1"}}]);
+    }
+  });
+
+  it("a refusal goes by what the walk ranked its routes out by: the lone v4 route the read refuses is named for gas, whenever the read lands", async () => {
+    // In hand, the walk ranks the route out before it is built and never takes the bounds (nothing could stand in for
+    // it); else the route goes on and its gas step takes them. Either way the refusal names the read's bound.
+    const gasText = `uniswap: every Uniswap v3 and v4 route for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${AVAX} may have (15000000) — its pools are too thin for this amount`;
+    for (const t of timings) {
+      const r = await last({}, {[P3000]: {out: USD(2_900), gas: 16_000_000n}}, t);
+      expect(r.q).toBeNull();
+      expect([t.when, r.heard]).toEqual([t.when, [[gasText, {reason: "insufficient_liquidity"}]]]);
+    }
+    for (const t of timings) {
+      const r = await last({}, {[P3000]: {out: USD(2_900), gas: 16_000_000n}}, t, {venueRoutes: "both"}, "quotes");
+      expect(r.qs).toEqual([]);
+      expect([t.when, r.heard]).toEqual([t.when, [[`uniswap: v3: no Uniswap v3 pool route for this pair and amount; v4: every Uniswap v4 route for this pair and amount needs more gas than one transaction on chain ${AVAX} may have (15000000) — its pools are too thin for this amount`, {reason: "insufficient_liquidity"}]]]);
+    }
+  });
+});

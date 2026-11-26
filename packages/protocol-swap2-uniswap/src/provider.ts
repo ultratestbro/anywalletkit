@@ -1565,11 +1565,14 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     /**
      * The v4 candidates (every one the V4Quoter priced, whatever its pools) ranked out because one transaction on the
      * chain cannot carry them, and the cap that did it (with none, the chain's LIVE-1 bound): counted by the pass's
-     * bounds once taken, else by what they are known to be whatever the node answers (`sure`) — never by a block read
-     * the pass did not go by.
+     * bounds once taken — never by a block read the pass did not go by. Before they are taken, `of` says what is
+     * counted. A quote's `providerData.v4Unexecutable` ("quote"): by the caps alone (gasCapsOf) — the walk ranked
+     * nothing out for gas (it would have taken the bounds), and a route with no gas figure never takes them, so the
+     * count of a quote never turns on whether the block read has landed by the time it is built (review V4RANK-1). A
+     * pass's refusal ("refusal"): by `sure`, the bounds the walk ranked every route out by.
      */
-    const v4GasOut = (v4: V4Read, pb: PassBounds): {count: number; cap: bigint | undefined} => {
-      const b = pb.taken() ?? pb.sure();
+    const v4GasOut = (v4: V4Read, pb: PassBounds, of: "quote" | "refusal"): {count: number; cap: bigint | undefined} => {
+      const b = pb.taken() ?? (of === "quote" ? gasCapsOf(chainId) : pb.sure());
       let count = 0;
       let cap: bigint | undefined = v4ReadBoundOf(chainId);
       for (const c of rankedV4Candidates(v4.candidates)) {
@@ -1726,7 +1729,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
      */
     const v4Candidate = async (v4: V4Read, v3Route: boolean, gated: boolean, pb: PassBounds, v3Unread: VenueRefusal | undefined): Promise<VenueAnswer> => {
       const restrict = v3Route && v4Ranked !== "all";
-      const unexecutable = (): number => v4.unexecutable + v4GasOut(v4, pb).count;
+      const unexecutable = (): number => v4.unexecutable + v4GasOut(v4, pb, "quote").count;
       const w = await walk(rankedV4(v4, restrict).map((c): Entry => ({venue: "v4", c})), pb, {
         v4: (c) => finishV4(chainId, v4In!, v4, c, currencyIn4, currencyOut4, amountIn, gated, pb, unexecutable, signal),
       });
@@ -1742,7 +1745,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // outside them can be mined: where the bounds are not taken and one could be, they are taken to tell.
       const all = rankedV4Candidates(v4.candidates);
       if (restrict && pb.taken() === undefined && all.some((c) => measures4(c) && !("refuse" in gasBound4(c.gasEstimate, pb.sure())))) await pb.take();
-      const gas = v4GasOut(v4, pb);
+      const gas = v4GasOut(v4, pb, "refusal");
       // Routes the chain can mine, all through pools outside the ranked set: not offered next to v3's.
       const outside = restrict && all.length > gas.count;
       if (outside && v3Unread) {
@@ -1907,7 +1910,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const r3 = v3Read.ranked;
       const r4 = v4 ? rankedV4(v4, !(r3.length === 0 || v4Ranked === "all")) : [];
       /** The v4 candidates ranked out for gas (with LIVE-1's), carried as information on the quote. */
-      const unexecutable = (): number => (v4 !== undefined ? v4.unexecutable + v4GasOut(v4, pb).count : 0);
+      const unexecutable = (): number => (v4 !== undefined ? v4.unexecutable + v4GasOut(v4, pb, "quote").count : 0);
       const w = await walk(merged(r3, r4), pb, {
         v3: (c) => buildV3(c, block, pb, unexecutable),
         v4: (c) => finishV4(chainId, v4In!, v4!, c, currencyIn4, currencyOut4, amountIn, gated, pb, unexecutable, signal),
@@ -1924,7 +1927,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // No v3 candidate (the walk answers whenever there is one) and no v4 one that stood.
       if (w.setAside) return refuse(w.setAside.refused, w.setAside.info);
       if (v4) partial = partial || v4.partial;
-      const gas4 = v4 !== undefined ? v4GasOut(v4, pb) : undefined;
+      const gas4 = v4 !== undefined ? v4GasOut(v4, pb, "refusal") : undefined;
       if (!partial && v4 !== undefined && v4.unexecutable + gas4!.count > 0) {
         return refuse(`every Uniswap ${d3 ? "v3 and v4 route" : "v4 route"} for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${chainId} may have (${String(gas4!.cap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
       }
