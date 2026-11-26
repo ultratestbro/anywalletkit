@@ -145,6 +145,7 @@ const addrWord = (hex) => (typeof hex === 'string' && /^0x[0-9a-fA-F]{64}$/.test
 async function v3Facts(id, urls, problems, notes) {
   const d = UNISWAP_V3[id]
   if (!d) return
+  const before = problems.length
   const code = await must(urls, 'eth_getCode', [d.factory, 'latest'], 'v3 factory code')
   if (!code || code === '0x') problems.push(`v3: no code at the pinned factory ${d.factory}`)
   const wrapped = d.nativeWrap === false ? NATIVE : getAddress(d.weth)
@@ -154,7 +155,7 @@ async function v3Facts(id, urls, problems, notes) {
     if (f !== getAddress(d.factory)) problems.push(`v3: ${name} reports factory ${f}, pinned ${d.factory}`)
     if (w !== wrapped) problems.push(`v3: ${name} reports WETH9 ${w}, pinned ${wrapped}`)
   }
-  notes.push('v3 router/quoter linkage ok')
+  notes.push(problems.length === before ? 'v3 router/quoter linkage ok' : 'v3 router/quoter linkage drift (see Reason)')
 }
 
 // ── v4 ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -171,6 +172,9 @@ async function v4Facts(id, urls, problems, notes) {
   const d4 = UNISWAP_V4[id]
   if (!d4) return
   const roles = [['PoolManager', d4.poolManager], ['V4Quoter', d4.quoter], ['StateView', d4.stateView], ['Universal Router', d4.universalRouter], ['SwapProxy', d4.swapProxy], ['Permit2', d4.permit2]]
+  // The note says "ok" only when this section added no problem: a FAIL line never reads "ok" beside a Reason line that
+  // says otherwise (review LIVE3-3; a canary note is made from these lines).
+  const before = problems.length
   const codes = {}
   for (const [name, at] of roles) {
     codes[name] = await must(urls, 'eth_getCode', [at, 'latest'], `v4 ${name} code`)
@@ -186,7 +190,8 @@ async function v4Facts(id, urls, problems, notes) {
   }
   const list = UNISWAP_V4_POOLS[id]
   if (list && (getAddress(list.poolManager) !== getAddress(d4.poolManager) || getAddress(list.stateView) !== getAddress(d4.stateView))) problems.push('v4: the shipped pool list was built from another PoolManager / StateView than the pins')
-  notes.push(`v4 linkage + codehashes ok${list ? `, ${list.pools.length} listed pools (block ${list.block})` : ', no shipped pool list (not quoted)'}`)
+  const drift = problems.length - before
+  notes.push(`${drift === 0 ? 'v4 linkage + codehashes ok' : `v4 linkage/codehash drift (${drift} problem${drift === 1 ? '' : 's'}, see Reason)`}${list ? `, ${list.pools.length} listed pools (block ${list.block})` : ', no shipped pool list (not quoted)'}`)
 
   if (d4.quotable === false) {
     notes.push('quotable: false — no canary, not enabled')

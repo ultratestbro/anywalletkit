@@ -4,8 +4,13 @@
 // tests copy these files alone).
 //
 // Source: {id, type: "evm-initialize", chainId, poolManager, stateView, pools: {from: "dist/index.js", export: "UNISWAP_V4_POOLS"},
-//          logsRpc?: "https://…" (a public endpoint with wide eth_getLogs windows), window?: 10000, feeCap?: 100000,
-//          maxCalls?: 300, confirm?: 20}
+//          canary: {block, poolId} (required: the positive control below), logsRpc?: "https://…" (a public endpoint with
+//          wide eth_getLogs windows), window?: 10000, feeCap?: 100000, maxCalls?: 300, confirm?: 20}
+// Positive control (SEC-U4-R3-1): an endpoint that answers [] for a range it does not index (a pruned log index, a
+// gateway that drops results) would read as "no new pools", and lastBlock would move past blocks never read. So every run
+// that scans also asks the same logs endpoint, with the scan's own filter, for the one block of `canary` — the known
+// Initialize log of a pool in the pinned list, at or before the list's block (so before anything the run scans) — and
+// fails the source when that log is not in the answer. Live on 2026-11-26 bsc-rpc.publicnode.com answered [] there.
 // State (the stored meta): lastBlock (the index ends here), seen (qualifying pools not in the pinned list, with their
 // live flag at the last run), deadRuns (per listed pool, consecutive runs it read dead).
 // Compared value: the unlisted qualifying pools (id + live) and the listed pools dead for 3 runs in a row. So the digest
@@ -167,6 +172,37 @@ export async function scanLogs(call, {poolManager, topics, from, to, window, max
   return {logs, scannedTo: to, calls};
 }
 
+/**
+ * The source's positive control, checked: `{block, poolId}` of an Initialize log of a pool in the pinned list, at or
+ * before the block the list was built at. Missing or malformed fails the source — a scan without it could not tell an
+ * endpoint that does not index a range from a range without new pools.
+ */
+export function checkedCanary(canary, listedIds, listBlock) {
+  if (!canary || typeof canary !== "object") throw new Error("no `canary` {block, poolId}: the source has no positive control on eth_getLogs (an endpoint answering [] for a range it does not index would read as no new pools)");
+  const {block, poolId} = canary;
+  if (!Number.isSafeInteger(block) || block < 0) throw new Error("canary.block must be a block number");
+  if (typeof poolId !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(poolId)) throw new Error("canary.poolId must be a PoolId (32 bytes hex)");
+  if (!listedIds.has(lc(poolId))) throw new Error(`canary pool ${poolId.slice(0, 10)}… is not in the pinned list (its log must pass the scan's filter)`);
+  if (listBlock !== undefined && block > listBlock) throw new Error(`canary block ${block} is after the list's block ${listBlock}: it would not cover the blocks the first run scans`);
+  return {block, poolId: lc(poolId)};
+}
+
+/** One eth_getLogs over the canary's block on the logs endpoint, with the scan's own filter: it must hold the canary's
+ *  Initialize log (strictly decoded, from the PoolManager, at that block). Anything else throws (the source fails). */
+export async function checkCanary(logsCall, {poolManager, topics, canary}) {
+  const at = "0x" + canary.block.toString(16);
+  const got = await logsCall("eth_getLogs", [{address: poolManager, topics, fromBlock: at, toBlock: at}]);
+  if (!Array.isArray(got)) throw new Error("eth_getLogs (positive control) answered a non-array");
+  let hit = false;
+  for (const log of got) {
+    const d = decodeInitialize(log, poolManager);
+    if (d.error) throw new Error(`eth_getLogs (positive control): ${d.error}`);
+    if (d.block !== canary.block) throw new Error(`eth_getLogs (positive control): a log at block ${d.block}, asked for ${canary.block}`);
+    if (d.id === canary.poolId) hit = true;
+  }
+  if (!hit) throw new Error(`eth_getLogs positive control failed: the logs endpoint did not return the known Initialize log of the listed pool ${canary.poolId.slice(0, 10)}… at block ${canary.block} (${got.length} logs) — it may not index that range or may drop results; nothing advanced`);
+}
+
 const label = (p) => `${p.currency0.slice(0, 8)}…/${p.currency1.slice(0, 8)}… ${p.fee}/${p.tickSpacing}`;
 const canonicalValue = (pending, dead) => JSON.stringify({dead: dead.map((d) => d.id).sort(), pending: pending.map((p) => `${p.id}:${p.live ? 1 : 0}`).sort()});
 
@@ -183,11 +219,12 @@ export async function runInitializeSource(s, {call, logsCall = call, prev, list}
   const window = s.window ?? 10_000, maxCalls = s.maxCalls ?? 300, confirm = s.confirm ?? 20;
   const tokens = new Set(list.tokens.map(lc));
   const listedIds = new Set(list.pools.map((p) => lc(p.id)));
+  const listBlock = Number.isSafeInteger(list.block) && list.block >= 0 ? list.block : undefined;
+  const canary = checkedCanary(s.canary, listedIds, listBlock);
   const headState = Number(BigInt(await call("eth_blockNumber", [])));
   const headLogs = logsCall === call ? headState : Number(BigInt(await logsCall("eth_blockNumber", [])));
   const target = Math.min(headState, headLogs) - confirm;
   // No stored reading: from the block the pinned list was built at, so nothing initialized since the build is missed.
-  const listBlock = Number.isSafeInteger(list.block) && list.block >= 0 ? list.block : undefined;
   const from = prev?.lastBlock != null ? prev.lastBlock + 1 : (listBlock ?? target) + 1;
 
   // New pools since the last run.
@@ -205,6 +242,9 @@ export async function runInitializeSource(s, {call, logsCall = call, prev, list}
       if (disqualify(d, tokens, feeCap) || listedIds.has(d.id)) continue;
       seen.set(d.id, {currency0: d.currency0, currency1: d.currency1, fee: d.fee, tickSpacing: d.tickSpacing, block: d.block, live: false});
     }
+    // The positive control, on the endpoint that just answered the scan: without the known log, an empty answer above
+    // says nothing, and this run fails instead of moving lastBlock past it (not counted in `calls`).
+    await checkCanary(logsCall, {poolManager: s.poolManager, topics: [INITIALIZE_TOPIC, null, topicList, topicList], canary});
   }
   for (const id of [...seen.keys()]) if (listedIds.has(id)) seen.delete(id); // a rebuild listed it
 

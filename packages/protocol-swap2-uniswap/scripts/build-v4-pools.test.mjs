@@ -237,3 +237,14 @@ test('R2-1: lists only grow — earlier pools kept with their since, new pools m
   assert.ok(mergeEntries(null, [A, B].map(toEntry), { block: 300, baseline: true }).entries.every((e) => e.since === undefined))
   assert.ok(mergeEntries(prev, [C].map(toEntry), { block: 300, baseline: true }).entries.find((e) => e.id === C.id).since === undefined)
 })
+
+test('SEC-U4-R3-2: the shipped index is renderIndex output — every chain list frozen all the way down by freezeChainPools', () => {
+  const dir = new URL('../src/v4pools/', import.meta.url)
+  const ids = readdirSync(dir).map((f) => /^(\d+)\.ts$/.exec(f)?.[1]).filter(Boolean).map(Number)
+  const shipped = readFileSync(new URL('index.ts', dir), 'utf8')
+  assert.equal(renderIndex(ids), shipped, 'src/v4pools/index.ts is exactly what the build writes')
+  assert.match(shipped, /^import \{freezeChainPools\} from "\.\/freeze\.js";$/m)
+  for (const id of ids) assert.match(shipped, new RegExp(`^  ${id}: freezeChainPools\\(V4_POOLS_${id}\\),$`, 'm'))
+  // freeze.ts is written by hand: a full run of the build never removes it (it removes only <chainId>.ts files).
+  assert.ok(readdirSync(dir).includes('freeze.ts'))
+})

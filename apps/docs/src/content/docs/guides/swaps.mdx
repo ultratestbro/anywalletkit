@@ -64,7 +64,8 @@ Universal Router 2.1.2 with the coin as `value`, no approval. `v4: "all"` adds t
 coin) the same way, through Uniswap's SwapProxy: the token is approved to the chain's pinned SwapProxy for exactly the
 input, and the provider simulates that approval and the exact swap from the sender before it returns the quote
 (`eth_simulateV1`, or on Monad an `eth_call` with the allowance set by a state override) — nothing is approved for a
-swap that would revert.
+swap that would revert. A read of that check the RPC did not answer refuses the quote (`rate_limited` /
+`upstream_unavailable`); it never returns the v3 quote in its place.
 
 ```ts
 uniswapProvider({rpcUrls, v4: "all", maxPriceImpactBps: 500}) // or "native-in"; the gate is optional and applies to the winner
@@ -75,6 +76,8 @@ uniswapProvider({rpcUrls, v4: "all", maxPriceImpactBps: 500}) // or "native-in";
   than one transaction on the chain may have (read again at that cap, straight to the quoter) is ranked out and counted
   (`providerData.v4Unexecutable`), never the whole quote refused.
 - With `"native-in"`, token input and native output stay on v3.
+- With v4 on, a recipient the chain's v4 pins name as a sink (a router sentinel, the zero address, a pinned Uniswap v4
+  contract) is refused as `recipient_mismatch` for every venue: output paid there would be stranded.
 - Behind a backend: use `uniswapRemoteProvider({baseUrl})` in the app — the stub with the shipped pins that also
   declares `ownGasEstimate` (a bare `remoteProvider({...uniswapPins})` broadcasts the backend's quoted gas limit). Turn
   v4 on in the server only after every app it serves ships the pins from 0.5.0 or later: older pins name SwapRouter02

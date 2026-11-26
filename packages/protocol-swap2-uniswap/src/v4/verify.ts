@@ -295,6 +295,20 @@ function forbiddenRecipients(d: UniswapV4Deployment): ReadonlySet<string> {
 }
 
 /**
+ * Whether `address` is one the chain's v4 deployment names as a sink — a router sentinel, the zero address, a pinned
+ * Uniswap v4 contract: a swap that pays it strands the output (or leaves it for anyone to sweep from the router),
+ * whichever venue builds the swap. The provider refuses such a recipient for every venue once v4 is on for the chain,
+ * and the app's pins refuse a v3 quote paying it on a chain with v4 pins (review LIVE3-2: the module's own v4 check
+ * refused it while the provider still quoted v3 paying the Universal Router).
+ */
+export function v4StrandedRecipient(d: UniswapV4Deployment, address: string): boolean {
+  return ADDRESS.test(address) && forbiddenRecipients(d).has(getAddress(address));
+}
+
+/** The refusal text for a recipient {@link v4StrandedRecipient} names. */
+export const v4StrandedRecipientText = (recipient: string): string => `the recipient ${getAddress(recipient)} is a router sentinel or a pinned Uniswap contract — output paid there is stranded`;
+
+/**
  * The v4 swap a Uniswap quote's call makes, opened on the client against the app's own request — the whole on-device
  * check list of UNISWAP-V4-RESEARCH §6.5 that can be judged from the quote (rows 1–14, 17, 18; rows 15–16 are the
  * on-chain {@link v4DeploymentReads} / {@link v4DeploymentProblem} and the preflight `eth_call` of {@link v4PreflightCall}
@@ -365,7 +379,7 @@ function check(params: QuoteParams, quote: Quote, options: UniswapV4VerifyOption
   const currencyOut = getAddress(nativeOut ? V4_NATIVE : params.destToken);
   if (currencyIn === currencyOut) return notes.note("same token in and out", "unsupported_pair");
   const recipient = getAddress(params.destAddress);
-  if (forbiddenRecipients(d).has(recipient)) return notes.note(`the recipient ${recipient} is a router sentinel or a pinned Uniswap contract — output paid there is stranded`, "recipient_mismatch");
+  if (forbiddenRecipients(d).has(recipient)) return notes.note(v4StrandedRecipientText(recipient), "recipient_mismatch");
   if (!/^[0-9]+$/.test(params.amountIn) || !/^[0-9]+$/.test(quote.minDestAmount) || !/^[0-9]+$/.test(quote.sourceAmount)) return notes.note("the request or the quote does not carry integer amounts", "policy_refused");
   const amountIn = BigInt(params.amountIn);
   const minOut = BigInt(quote.minDestAmount);

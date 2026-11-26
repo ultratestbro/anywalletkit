@@ -97,6 +97,23 @@ export function isUnsupportedMethod(slot: RpcSlot | undefined): boolean {
   return (typeof e.code === "number" && UNSUPPORTED_METHOD_CODES.has(e.code)) || UNSUPPORTED_METHOD_TEXT.test(e.message);
 }
 
+/**
+ * The node's texts for a call it refused to run because the sender holds less than the call sends (geth "insufficient
+ * funds for transfer", "insufficient funds for gas * price + value" — Monad, Erigon; revm/reth "EVM error: OutOfFunds",
+ * Nethermind "insufficient sender balance", Besu "upfront cost exceeds account balance").
+ */
+const SHORT_OF_FUNDS_TEXT = /insufficient funds|insufficient (?:sender )?balance|\bOutOfFunds\b|lack of funds|upfront cost exceeds/i;
+
+/**
+ * The node's own text (URLs taken out, kept short) when a call it did not run was refused for the sender's balance — an
+ * answer about the wallet, the same on every endpoint and every attempt, not an outage (review R3-3 / LIVE3-1: a v4
+ * dry-run from a wallet short of the native input read as "no RPC answered"); else undefined.
+ */
+export function shortOfFunds(slot: RpcSlot | undefined): string | undefined {
+  if (!slot || !("failed" in slot) || !slot.error) return undefined;
+  return SHORT_OF_FUNDS_TEXT.test(slot.error.message) ? describe(slot.error) : undefined;
+}
+
 function itemError(raw: unknown): RpcItemError {
   const e = (raw && typeof raw === "object" ? raw : {}) as {code?: unknown; message?: unknown; data?: unknown};
   return {

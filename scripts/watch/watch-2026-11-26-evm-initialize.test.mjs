@@ -17,7 +17,7 @@ import {tmpdir} from "node:os";
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {spawn} from "node:child_process";
-import {DEAD_RUNS, INITIALIZE_TOPIC, ZERO, decodeAggregate3, decodeInitialize, describeInitialize, disqualify, encodeAggregate3, namedWindow, poolIdOf, runInitializeSource} from "./evm-initialize.mjs";
+import {DEAD_RUNS, INITIALIZE_TOPIC, ZERO, checkCanary, checkedCanary, decodeAggregate3, decodeInitialize, describeInitialize, disqualify, encodeAggregate3, namedWindow, poolIdOf, runInitializeSource} from "./evm-initialize.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PM = "0x188d586ddcf52439676ca21a244753fa19f9ea8e", SV = "0x77395f3b2e73ae90843717371294fa97cc419d64";
@@ -37,9 +37,10 @@ function encodeResults(list) {
 }
 const slot0 = (live) => "0x" + w(live ? 1n << 96n : 0n) + w(0) + w(0) + w(500);
 const liq = (live) => "0x" + w(live ? 10n ** 18n : 0n);
-/** A fake chain: `logs` (raw), `live` (id → bool), `head`. eth_call answers aggregate3 of getSlot0 / getLiquidity. */
+/** A fake chain: `logs` (raw; the listed pool's Initialize log at block 0, the sources' canary, is always there), `live`
+ *  (id → bool), `head`. eth_call answers aggregate3 of getSlot0 / getLiquidity. */
 function chain({logs = [], live = {}, head = 1000, failCall = false} = {}) {
-  const st = {logs, live, head, calls: []};
+  const st = {logs: [rawLog(LISTED, 0), ...logs], live, head, calls: []};
   st.call = async (method, params) => {
     st.calls.push([method, params]);
     if (method === "eth_blockNumber") return "0x" + st.head.toString(16);
@@ -58,10 +59,12 @@ function chain({logs = [], live = {}, head = 1000, failCall = false} = {}) {
   return st;
 }
 const LISTED = {currency0: ZERO, currency1: AUSD, fee: 500, tickSpacing: 1};
+/** The positive control every source carries: the listed pool's Initialize log, at block 0 of the fake chains. */
+const CANARY = {block: 0, poolId: "0xadaf30776f551bccdfb307c3fd8cdec198ca9a852434c8022ee32d1ccedd8219"};
 const LIST_BARE = {tokens: [ZERO, AUSD, USDC], feeCap: 100000, pools: [{...LISTED, id: poolIdOf(LISTED)}]};
 /** The list as the build writes it: with the block it was built at. */
 const LIST = {...LIST_BARE, block: 0};
-const SRC = {chainId: 143, poolManager: PM, stateView: SV, window: 100, confirm: 10};
+const SRC = {chainId: 143, poolManager: PM, stateView: SV, window: 100, confirm: 10, canary: CANARY};
 
 test("PoolId, the Initialize decoder and the list's rules match the build script", () => {
   assert.equal(poolIdOf(LISTED), "0xadaf30776f551bccdfb307c3fd8cdec198ca9a852434c8022ee32d1ccedd8219", "research vector: Monad NATIVE/AUSD 500/1");
@@ -195,6 +198,54 @@ test("a failed read fails the run; a capped run says it is behind; a refused win
   assert.ok(narrow.calls.filter(([m]) => m === "eth_getLogs").every(([, p]) => Number(BigInt(p[0].toBlock)) - Number(BigInt(p[0].fromBlock)) + 1 <= 100));
 });
 
+// ── SEC-U4-R3-1: a positive control on eth_getLogs ───────────────────────────────────────────────────────────────
+
+const TOKEN_TOPICS = [...new Set(LIST.tokens.map((t) => t.toLowerCase()))].sort().map(topic);
+
+test("SEC-U4-R3-1: a logs endpoint that answers [] for a range it does not index fails the source; nothing advances", async () => {
+  const fresh = {currency0: ZERO, currency1: USDC, fee: 500, tickSpacing: 10};
+  const c = chain({head: 2000, logs: [rawLog(fresh, 1500)], live: {[poolIdOf(fresh)]: true}});
+  const ok = await runInitializeSource(SRC, {call: c.call, prev: {lastBlock: 1000}, list: LIST});
+  assert.deepEqual(ok.meta.pending.map((p) => p.id), [poolIdOf(fresh)]);
+  assert.equal(ok.meta.lastBlock, 1990);
+  // The control: the scan's own filter, over the canary's one block, on the logs endpoint — after the scan.
+  const logs = c.calls.filter(([m]) => m === "eth_getLogs");
+  assert.deepEqual(logs.at(-1)[1][0], {address: PM, topics: [INITIALIZE_TOPIC, null, TOKEN_TOPICS, TOKEN_TOPICS], fromBlock: "0x0", toBlock: "0x0"});
+  assert.equal(ok.meta.calls, logs.length - 1, "the control is not counted among the scan's calls");
+  // Before: an endpoint answering [] everywhere read as "no new pools", and lastBlock moved past the pool for good.
+  const blind = async (m, p) => (m === "eth_getLogs" ? [] : c.call(m, p));
+  await assert.rejects(runInitializeSource(SRC, {call: c.call, logsCall: blind, prev: {lastBlock: 1000}, list: LIST}), /positive control failed: the logs endpoint did not return the known Initialize log of the listed pool 0xadaf3077… at block 0 \(0 logs\)/);
+  // A pruned index: the recent window answered, the old block not.
+  const pruned = async (m, p) => (m === "eth_getLogs" && Number(BigInt(p[0].fromBlock)) < 1000 ? [] : c.call(m, p));
+  await assert.rejects(runInitializeSource(SRC, {call: c.call, logsCall: pruned, prev: {lastBlock: 1000}, list: LIST}), /positive control failed/);
+  // The answer must hold that very log: another pool's log in that block, a log from another block or a malformed one fail too.
+  const answer = (logs2) => async (m, p) => (m === "eth_getLogs" && p[0].fromBlock === "0x0" ? logs2 : c.call(m, p));
+  await assert.rejects(runInitializeSource(SRC, {call: c.call, logsCall: answer([rawLog(fresh, 0)]), prev: {lastBlock: 1000}, list: LIST}), /positive control failed: .*\(1 logs\)/);
+  await assert.rejects(runInitializeSource(SRC, {call: c.call, logsCall: answer([rawLog(LISTED, 7)]), prev: {lastBlock: 1000}, list: LIST}), /positive control\): a log at block 7, asked for 0/);
+  await assert.rejects(runInitializeSource(SRC, {call: c.call, logsCall: answer([{...rawLog(LISTED, 0), address: SV}]), prev: {lastBlock: 1000}, list: LIST}), /positive control\): log from .*not the PoolManager/);
+  await assert.rejects(runInitializeSource(SRC, {call: c.call, logsCall: answer({}), prev: {lastBlock: 1000}, list: LIST}), /positive control\) answered a non-array/);
+  // Nothing to scan (the head has not moved past lastBlock): no control either, nothing advances.
+  const before = c.calls.length;
+  const idle = await runInitializeSource(SRC, {call: c.call, prev: {lastBlock: 1990}, list: LIST});
+  assert.equal(idle.meta.lastBlock, 1990);
+  assert.equal(c.calls.slice(before).filter(([m]) => m === "eth_getLogs").length, 0);
+});
+
+test("SEC-U4-R3-1: the canary is required, a pool of the pinned list, at or before the list's block", async () => {
+  const c = chain({head: 2000});
+  const {canary: _c, ...bare} = SRC;
+  await assert.rejects(runInitializeSource(bare, {call: c.call, prev: {lastBlock: 1000}, list: LIST}), /no `canary` \{block, poolId\}: the source has no positive control/);
+  assert.equal(c.calls.length, 0, "refused before any read");
+  const ids = new Set([CANARY.poolId]);
+  assert.deepEqual(checkedCanary({block: 5, poolId: CANARY.poolId.toUpperCase().replace("0X", "0x")}, ids, 10), {block: 5, poolId: CANARY.poolId});
+  assert.throws(() => checkedCanary({block: 5, poolId: poolIdOf({currency0: ZERO, currency1: USDC, fee: 500, tickSpacing: 10})}, ids, 10), /is not in the pinned list/);
+  assert.throws(() => checkedCanary({block: 11, poolId: CANARY.poolId}, ids, 10), /after the list's block 10/);
+  assert.deepEqual(checkedCanary({block: 11, poolId: CANARY.poolId}, ids, undefined), {block: 11, poolId: CANARY.poolId}, "a list without block: any block");
+  for (const bad of [{block: -1, poolId: CANARY.poolId}, {block: "5", poolId: CANARY.poolId}, {block: 5, poolId: "0x1234"}, {block: 5}, "x"]) assert.throws(() => checkedCanary(bad, ids, 10));
+  // checkCanary on its own: the known log in the answer passes.
+  await checkCanary(async () => [rawLog(LISTED, 0)], {poolManager: PM, topics: [INITIALIZE_TOPIC, null, TOKEN_TOPICS, TOKEN_TOPICS], canary: CANARY});
+});
+
 // ── end to end through watch.mjs ───────────────────────────────────────────
 function sandbox(rpcUrl, list = LIST_BARE) {
   const root = mkdtempSync(join(tmpdir(), "watch-1126-"));
@@ -204,7 +255,7 @@ function sandbox(rpcUrl, list = LIST_BARE) {
   mkdirSync(join(pkg, "dist"), {recursive: true});
   writeFileSync(join(pkg, "dist/v4pools.js"), `export const UNISWAP_V4_POOLS = ${JSON.stringify({1: list})};\n`);
   writeFileSync(join(pkg, "watch.json"), JSON.stringify({module: "@anywalletkit/protocol-swap2-uniswap", sources: [
-    {id: "v4-pools-ethereum", type: "evm-initialize", chainId: 1, poolManager: PM, stateView: SV, pools: {from: "dist/v4pools.js", export: "UNISWAP_V4_POOLS"}, window: 100, confirm: 10, label: "Uniswap v4 pools · test"},
+    {id: "v4-pools-ethereum", type: "evm-initialize", chainId: 1, poolManager: PM, stateView: SV, pools: {from: "dist/v4pools.js", export: "UNISWAP_V4_POOLS"}, canary: CANARY, window: 100, confirm: 10, label: "Uniswap v4 pools · test"},
   ]}));
   return root;
 }
@@ -253,10 +304,22 @@ test("watch.mjs: the evm-initialize state carries over, the digest names a new p
     assert.match(quiet.out, /0 changed/);
     c.head = 2200;
     const broken = chain({failCall: true, head: 2300});
+    const healthy = c.call;
     c.call = broken.call;
     const down = await run(root, srv.url);
     assert.match(down.out, /1 unreachable/);
     assert.equal(stateOf(root).meta.lastBlock, 2090, "a failed run does not advance the index");
+    // SEC-U4-R3-1: the node answers every eth_getLogs with [] (it does not index the range) — the positive control fails
+    // the source; before, the run read as "no new pools" and lastBlock moved past the blocks for good.
+    c.logs.push(rawLog({currency0: ZERO, currency1: USDC, fee: 3000, tickSpacing: 60}, 2150));
+    c.call = async (method, params) => (method === "eth_getLogs" ? [] : healthy(method, params));
+    const blind = await run(root, srv.url);
+    assert.match(blind.out, /1 unreachable/);
+    assert.match(`${blind.out}${blind.err}`, /positive control failed/);
+    assert.equal(stateOf(root).meta.lastBlock, 2090, "a blind logs endpoint does not advance the index");
+    c.call = healthy;
+    const back = await run(root, srv.url);
+    assert.match(back.out, /new hookless pool .* 3000\/60 .* at block 2150/, "the pool in the range the blind node skipped is reported");
   } finally {
     srv.close();
   }
@@ -299,7 +362,8 @@ test("coverage: every chain the uniswap module ships a v4 pool list for has an e
   const lists = readdirSync(dir).filter((f) => /^\d+\.ts$/.test(f)).map((f) => {
     const text = readFileSync(join(dir, f), "utf8");
     const field = (k) => new RegExp(`^  ${k}: "?([0-9a-fA-Fx]+)"?,$`, "m").exec(text)?.[1];
-    return {chainId: Number(field("chainId")), poolManager: field("poolManager")?.toLowerCase(), stateView: field("stateView")?.toLowerCase()};
+    const ids = new Set([...text.matchAll(/ id: "(0x[0-9a-f]{64})"/g)].map((m) => m[1]));
+    return {chainId: Number(field("chainId")), poolManager: field("poolManager")?.toLowerCase(), stateView: field("stateView")?.toLowerCase(), block: Number(field("block")), ids};
   });
   assert.ok(lists.length >= 6, `${lists.length} lists`);
   const manifest = JSON.parse(readFileSync(join(ROOT, "packages/protocol-swap2-uniswap/watch.json"), "utf8"));
@@ -312,6 +376,10 @@ test("coverage: every chain the uniswap module ships a v4 pool list for has an e
     assert.equal(s.stateView.toLowerCase(), l.stateView, `chain ${l.chainId} StateView`);
     assert.deepEqual(s.pools, {from: "dist/v4pools.js", export: "UNISWAP_V4_POOLS"});
     if (s.logsRpc) assert.match(s.logsRpc, /^https:\/\/[a-z0-9.-]+(\/[a-z0-9/_-]*)?$/i, "a public endpoint, no key in the manifest");
+    // SEC-U4-R3-1: the positive control, checked as the source checks it (a listed pool, at or before the list's block).
+    assert.ok(s.canary, `chain ${l.chainId} has a canary`);
+    assert.ok(l.ids.size > 0 && Number.isSafeInteger(l.block), `chain ${l.chainId}: the list's pools and block parse`);
+    assert.deepEqual(checkedCanary(s.canary, l.ids, l.block), {block: s.canary.block, poolId: s.canary.poolId}, `chain ${l.chainId} canary`);
   }
   assert.deepEqual(sources.map((s) => s.chainId).sort((a, b) => a - b), lists.map((l) => l.chainId).sort((a, b) => a - b), "no source for a chain without a list");
 });

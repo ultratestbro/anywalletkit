@@ -1438,6 +1438,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 26495301,
+        "poolId": "0x6dd38143b1bed2fb236805810868b67fcea5af8b6e41cc1ca52b5ab8ad901611"
+      },
       "window": 10000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Ethereum"
     },
@@ -1450,6 +1454,10 @@
       "pools": {
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
+      },
+      "canary": {
+        "block": 159427683,
+        "poolId": "0x2acf2b7d5e9caededafa006f596e405a039225404bf50803c25020b3d7b046c9"
       },
       "logsRpc": "https://mainnet.optimism.io",
       "window": 10000,
@@ -1465,6 +1473,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 133761877,
+        "poolId": "0xf11a4e753dfe26ce02aa3470f53c2e0473fb3db3968bd028550d1d505d63a1ef"
+      },
       "window": 10000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · BNB Chain"
     },
@@ -1477,6 +1489,10 @@
       "pools": {
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
+      },
+      "canary": {
+        "block": 56534440,
+        "poolId": "0x7a67991cd40674fd95acd96b40034ea3d469f51c8f66f4c1e1cfba27917e6e70"
       },
       "logsRpc": "https://unichain.gateway.tenderly.co",
       "window": 1000000,
@@ -1492,6 +1508,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 97665623,
+        "poolId": "0x54a83901bbf303047137883e085206586a7a950783920312d39294611859011e"
+      },
       "window": 10000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Polygon"
     },
@@ -1504,6 +1524,10 @@
       "pools": {
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
+      },
+      "canary": {
+        "block": 122823240,
+        "poolId": "0xb0931e734c4be0dbcf96775028b76bea541c0cc690db9bb228b58b397aa74018"
       },
       "logsRpc": "https://rpc2.monad.xyz",
       "window": 20000,
@@ -1519,6 +1543,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 76842217,
+        "poolId": "0xc8a3e0db0322b05d7d9c7577eb91666a14a8f94805649331ad0f73b51f913cd8"
+      },
       "window": 10000,
       "maxCalls": 1000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · X Layer"
@@ -1532,6 +1560,10 @@
       "pools": {
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
+      },
+      "canary": {
+        "block": 37406979,
+        "poolId": "0x5bdd1dbc9d78c82dd4dbef7b977121caa46a709e47fe54c4aa7aee45bbdfc1d9"
       },
       "window": 10000,
       "maxCalls": 600,
@@ -1547,6 +1579,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 29537299,
+        "poolId": "0xf7250ab8d98c317387e993f416cddf74b3452b83ef37e5699ca916d5e8f0be16"
+      },
       "logsRpc": "https://mainnet.megaeth.com/rpc",
       "window": 1000000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · MegaETH"
@@ -1561,6 +1597,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 100192163,
+        "poolId": "0x47da3636be4ae2ddb9bea0adf18022a6901b8d6f95f16cf3b197c2f421d5973f"
+      },
       "window": 10000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Robinhood Chain"
     },
@@ -1573,6 +1613,10 @@
       "pools": {
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
+      },
+      "canary": {
+        "block": 31531858,
+        "poolId": "0xb587e86f28440aafc8bc6d91cde1e003ce624374810d4daf7f37490bc74cc1ce"
       },
       "window": 10000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Arc"
@@ -1587,6 +1631,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 60621817,
+        "poolId": "0x310547003f85d9de39a42e0489d7fc3c43383df78a2225d67168edda44c974d6"
+      },
       "window": 10000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Base"
     },
@@ -1599,6 +1647,10 @@
       "pools": {
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
+      },
+      "canary": {
+        "block": 520588800,
+        "poolId": "0xa28e2de04b9ede4fe9aba73e6281079b196fdeb5ee9524fc2a36d41bb7bcba6f"
       },
       "logsRpc": "https://arb1.arbitrum.io/rpc",
       "window": 1000000,
@@ -1614,6 +1666,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 75819096,
+        "poolId": "0x0cfde73451b6746a0245dcef86703e25409516642baafbbd0ee1a56792ee5a0d"
+      },
       "window": 5000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Celo"
     },
@@ -1627,6 +1683,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 98952198,
+        "poolId": "0x5e60d84192bafeae3808e735482ee32d38837145ffae83c755dde82f934e84fc"
+      },
       "window": 50000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Avalanche"
     },
@@ -1639,6 +1699,10 @@
       "pools": {
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
+      },
+      "canary": {
+        "block": 61084724,
+        "poolId": "0x69b7ffdbaba1b2f0c4984cbe6c0823a609de9cbce5247cea64fff9eb70fefe2f"
       },
       "window": 10000,
       "maxCalls": 200,
@@ -1654,6 +1718,10 @@
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
       },
+      "canary": {
+        "block": 32710677,
+        "poolId": "0x38d2e3f766ecb5ae7531d846eb5d84baea1eb559950297ad5eb4656328636732"
+      },
       "window": 10000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Linea"
     },
@@ -1666,6 +1734,10 @@
       "pools": {
         "from": "dist/v4pools.js",
         "export": "UNISWAP_V4_POOLS"
+      },
+      "canary": {
+        "block": 5416536,
+        "poolId": "0xf8422f86d1aee24bd814ecc8b1b34c6d4393f53d045a2a9bdb4ea32557a9bd75"
       },
       "window": 1000000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Elysium"

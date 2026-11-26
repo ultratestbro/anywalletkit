@@ -474,6 +474,38 @@ describe("v4 preflight: the same route re-quoted, then the exact transaction dry
     await expect(provider.preflightDeposit!(q, await provider.buildDeposit(q))).rejects.toMatchObject({reason: "upstream_unavailable"});
   });
 
+  it("review R3-3 / LIVE3-1: the wallet holds less than it sends → simulation_failed naming the balance, asked once — never 'no RPC answered'", async () => {
+    const {q, provider} = await v4Quote();
+    const tx = await provider.buildDeposit(q);
+    // The nodes' own answers, live 2026-11-26: Monad (-32003), Unichain's reth (revm OutOfFunds), geth, Erigon.
+    for (const e of [
+      {code: -32003, message: "Insufficient funds for gas * price + value"},
+      {code: -32003, message: "EVM error: OutOfFunds"},
+      {code: -32000, message: "insufficient funds for transfer"},
+      {code: -32000, message: "insufficient funds for gas * price + value: address 0x4444444444444444444444444444444444444444 have 0 want 62000000000000000000000"},
+    ]) {
+      const seen = node(quoted(676_608_109n), {error: e});
+      const t0 = Date.now();
+      await expect(provider.preflightDeposit!(q, tx), e.message).rejects.toMatchObject({
+        reason: "simulation_failed",
+        message: expect.stringMatching(new RegExp(`^uniswap: the wallet 0x4444444444444444444444444444444444444444 holds less than the ${q.txRequest!.value} \\(base units of the native coin\\) this swap sends — the node refused the dry-run \\(${e.code} `)),
+      });
+      expect(seen.filter((r) => r.method === "eth_call" && getAddress((r.params[0] as {to: string}).to) === getAddress(D4.universalRouter)), e.message).toHaveLength(1); // an answer: not retried
+      expect(Date.now() - t0, e.message).toBeLessThan(250); // before: ~2 s of back-off, then "no RPC answered"
+    }
+    // A transient failure first, then the balance answer on the retry: still the balance, never the outage.
+    let n = 0;
+    vi.stubGlobal("fetch", (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as {id: number; params: unknown[]}[];
+      return new Response(JSON.stringify(batch.map((req) => {
+        const c = req.params[0] as {to: string};
+        if (getAddress(c.to) === getAddress(D4.quoter)) return {jsonrpc: "2.0", id: req.id, ...quoted(676_608_109n)};
+        return {jsonrpc: "2.0", id: req.id, error: n++ === 0 ? {code: -32007, message: "50/second request limit reached"} : {code: -32003, message: "Insufficient funds for gas * price + value"}};
+      })));
+    }) as typeof fetch);
+    await expect(provider.preflightDeposit!(q, tx)).rejects.toMatchObject({reason: "simulation_failed"});
+  }, 20_000);
+
   it("refuses what it cannot dry-run: no sender, another target, an unknown venue, v4 off on this side", async () => {
     const {q, provider} = await v4Quote();
     node(quoted(676_608_109n), {result: "0x"});

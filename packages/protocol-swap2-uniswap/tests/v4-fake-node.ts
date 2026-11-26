@@ -41,8 +41,10 @@ const V3_QUOTER = parseAbi([
 const word = (a: string) => `0x${a.slice(2).toLowerCase().padStart(64, "0")}` as Hex;
 const uint = (n: bigint) => `0x${n.toString(16).padStart(64, "0")}` as Hex;
 const Q96 = 1n << 96n;
-/** The fees of the shipped Monad list's pools, by PoolId: each reads initialized and live. */
-const LISTED_FEE = (): Map<string, number> => new Map(UNISWAP_V4_POOLS[CHAIN]!.pools.map((p) => [p.id.toLowerCase(), p.fee]));
+/** The fees of a shipped list's pools (Monad's by default), by PoolId: each reads initialized and live. */
+const LISTED_FEE = (chainId: number = CHAIN): Map<string, number> => new Map(UNISWAP_V4_POOLS[chainId]!.pools.map((p) => [p.id.toLowerCase(), p.fee]));
+/** The shipped v4 pins with the fake node's router and SwapProxy code hashed into the row of `chainId` (same addresses). */
+export const v4PinsFor = (chainId: number) => ({...UNISWAP_V4, [chainId]: {...UNISWAP_V4[chainId]!, routerCodehash: keccak256(ROUTER_CODE), swapProxyCodehash: keccak256(PROXY_CODE)}});
 
 type Answer = {result: unknown} | {error: {code: number; message: string; data?: Hex}};
 const REVERT: Answer = {error: {code: 3, message: "execution reverted", data: "0x"}};
@@ -57,6 +59,8 @@ export interface PricedPool {
 }
 
 export interface FakeNodeOptions {
+  /** The chain the node serves (default Monad, 143): its v3 row, its v4 row of {@link v4PinsFor} and its shipped list. */
+  chainId?: number | undefined;
   /** The amount `out` figures are for (pro rata for the probe). */
   amount: bigint;
   /** v3's direct route for tokenOut at a fee: its output for `amount` (none: v3 has no route). */
@@ -71,6 +75,9 @@ export interface FakeNodeOptions {
   balance?: bigint | undefined;
   /** The PoolIds whose simulated swap reverts V4TooLittleReceived (eth_simulateV1). */
   simulateReverts?: ReadonlySet<string> | undefined;
+  /** The PoolIds whose V4Quoter call fails without revert data, in an aggregate and alone (a route needing more gas
+   *  than the call was given: LIVE-1). */
+  emptyQuotes?: ReadonlySet<string> | undefined;
 }
 
 /** The PoolId of the single pool a SwapProxy (or router) call's V4_SWAP input swaps through, if it is a single-pool one. */
@@ -87,8 +94,11 @@ function poolOfSwap(data: Hex): string | undefined {
 }
 
 export function fakeNode(o: FakeNodeOptions) {
-  const listed = LISTED_FEE();
-  const seen: {method: string; to?: string; data?: string}[] = [];
+  const chainId = o.chainId ?? CHAIN;
+  const D3 = UNISWAP_V3[chainId]!;
+  const D4 = v4PinsFor(chainId)[chainId]!;
+  const listed = LISTED_FEE(chainId);
+  const seen: {method: string; to?: string; data?: string; gas?: string}[] = [];
   const stateView = (data: Hex): {success: boolean; returnData: Hex} => {
     const d = decodeFunctionData({abi: STATE_VIEW, data});
     const fee = listed.get((d.args[0] as Hex).toLowerCase());
@@ -99,6 +109,7 @@ export function fakeNode(o: FakeNodeOptions) {
     const d = decodeFunctionData({abi: V4_QUOTER_ABI, data});
     if (d.functionName === "quoteExactInputSingle") {
       const p = d.args[0] as {poolKey: {currency0: Hex; currency1: Hex; fee: number; tickSpacing: number; hooks: Hex}; exactAmount: bigint};
+      if (o.emptyQuotes?.has(poolIdOf(p.poolKey).toLowerCase())) return {success: false, returnData: "0x"};
       const priced = o.v4.get(poolIdOf(p.poolKey).toLowerCase());
       if (priced) return {success: true, returnData: encodeAbiParameters([{type: "uint256"}, {type: "uint256"}], [(priced.out * p.exactAmount) / o.amount, priced.gas])};
     }
@@ -121,10 +132,10 @@ export function fakeNode(o: FakeNodeOptions) {
       })}]};
     }
     if (method !== "eth_call") return {error: {code: -32601, message: "method not found"}};
-    const c = params[0] as {to: string; data: Hex};
+    const c = params[0] as {to: string; data: Hex; gas?: string};
     const to = getAddress(c.to);
     const sel = c.data.slice(0, 10);
-    seen.push({method, to, data: c.data});
+    seen.push({method, to, data: c.data, ...(c.gas !== undefined ? {gas: c.gas} : {})});
     // v3 deployment check: factory() / WETH9() of the router and the quoter.
     if ((to === getAddress(D3.router) || to === getAddress(D3.quoter)) && sel === "0xc45a0155") return {result: word(D3.factory)};
     if ((to === getAddress(D3.router) || to === getAddress(D3.quoter)) && sel === "0x4aa4a4fc") return {result: word(D3.weth)};

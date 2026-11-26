@@ -1,11 +1,12 @@
 import {decodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
+import {frozenRows} from "./freeze.js";
 import {sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {refusalNotes} from "@anywalletkit/protocol-swap2-core/errors";
 import {UNISWAP_V4, uniswapV4DeploymentOf} from "./v4/addresses.js";
 import {UNISWAP_V4_POOL_KEYS} from "./v4/listed.js";
 import {checkedV4ExtraPools, type V4PoolKey} from "./v4/pool.js";
-import {V4_MAX_CLOCK_SKEW_SECONDS, uniswapV4ReasonOf, uniswapV4VerifyQuote} from "./v4/verify.js";
+import {V4_MAX_CLOCK_SKEW_SECONDS, uniswapV4ReasonOf, uniswapV4VerifyQuote, v4StrandedRecipient, v4StrandedRecipientText} from "./v4/verify.js";
 
 /**
  * Uniswap v3 deployments this module trusts: the UniswapV3Factory, QuoterV2 and
@@ -27,7 +28,7 @@ export interface UniswapDeployment {
   nativeWrap?: false;
 }
 
-export const UNISWAP_V3: Readonly<Record<number, UniswapDeployment>> = Object.freeze({
+export const UNISWAP_V3: Readonly<Record<number, UniswapDeployment>> = frozenRows({
   1: {factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984", quoter: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e", router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"},
   10: {factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984", quoter: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e", router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45", weth: "0x4200000000000000000000000000000000000006"},
   56: {factory: "0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7", quoter: "0x78D78E420Da98ad378D7799bE8f4AF69033EB077", router: "0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2", weth: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"},
@@ -224,6 +225,10 @@ export function uniswapPinsWith(options: UniswapPinsOptions = {}): RemotePins {
       if (d4 && typeof to === "string" && /^0x[0-9a-fA-F]{40}$/.test(to) && (getAddress(to) === getAddress(d4.universalRouter) || getAddress(to) === getAddress(d4.swapProxy))) {
         return uniswapV4VerifyQuote(params, quote, v4Options);
       }
+      // A v3 quote on a chain with v4 pins never pays one of the v4 sinks (a router sentinel, the zero address, a pinned
+      // Uniswap v4 contract): the v4 check refuses that recipient, and v3 output paid there is stranded just the same
+      // (review LIVE3-2).
+      if (d4 && typeof params.destAddress === "string" && v4StrandedRecipient(d4, params.destAddress)) return notes.note(v4StrandedRecipientText(params.destAddress), "recipient_mismatch");
       return uniswapV3VerifyQuote(params, quote);
     },
     reasonOf: (refusal: string) => notes.reasonOf(refusal) ?? uniswapV4ReasonOf(refusal),

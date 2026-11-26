@@ -1,4 +1,5 @@
 import {parseAbi, parseAbiParameters} from "viem";
+import {frozenRows} from "../freeze.js";
 
 /**
  * Uniswap v4 deployments this module trusts, and the byte values of the Universal Router 2.1.x it writes for.
@@ -62,7 +63,7 @@ const SWAP_PROXY = SWAP_PROXY_ADDRESS;
  * A chain here is pinned, not enabled: the provider quotes v4 only when its `v4` option is on, and never on a chain
  * marked `quotable: false`.
  */
-export const UNISWAP_V4: Readonly<Record<number, UniswapV4Deployment>> = Object.freeze({
+export const UNISWAP_V4: Readonly<Record<number, UniswapV4Deployment>> = frozenRows({
   1: {poolManager: "0x000000000004444c5dc75cB358380D2e3dE08A90", quoter: "0x99bd42B2B22e531f283b7F8a86dFf631EB16A9D1", stateView: "0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227", positionManager: "0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e", universalRouter: "0x23617e59A5925b2A4Bf75d73ff6711cD0b29De85", routerBuild: "2.1.2", routerCodehash: "0x55e6b334152096d60367d7ab24241948b31e8d0e66adc8b81cba049a19f9d2ac", swapProxy: SWAP_PROXY, swapProxyCodehash: SWAP_PROXY_CODEHASH, permit2: PERMIT2, permit2Codehash: "0xc67d1657868aa5146eaf24fb879fb1fdec3d2d493b3683a61c9c2f4fb2851131", weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"}, // Ethereum
   10: {poolManager: "0x9a13F98Cb987694C9F086b1F5eB990EeA8264Ec3", quoter: "0xd673F731EDFe5AaF1bDa7FD43D13Bbb5150B87Ca", stateView: "0xc18a3169788F4F75A170290584ECA6395C75Ecdb", positionManager: "0x3C3Ea4B57a46241e54610e5f022E5c45859A1017", universalRouter: "0xC09255D86DB563cBc11C2fCf4a0C512e160111B4", routerBuild: "2.1.2", routerCodehash: "0xba894f04adabac264993bc9ef53287533533d1448b8c20704db67d04ef514ef2", swapProxy: SWAP_PROXY, swapProxyCodehash: SWAP_PROXY_CODEHASH, permit2: PERMIT2, permit2Codehash: "0x375714c2c948abd47bf468552c0a842d0e8002ca721efd85061a1297d6824617", weth: "0x4200000000000000000000000000000000000006"}, // Optimism
   56: {poolManager: "0x28e2Ea090877bF75740558f6BFB36A5ffeE9e9dF", quoter: "0x95C086d7fE28AdD842ee220fef225a777474d781", stateView: "0xd13Dd3D6E93f276FAfc9Db9E6BB47C1180aeE0c4", positionManager: "0x7A4a5c919aE2541AeD11041A1AEeE68f1287f95b", universalRouter: "0xDc264714F68d84CF29BC605589405E78bDBE7C9f", routerBuild: "2.1.2", routerCodehash: "0xe867d0c9a826a351e9d8cefc0fa947d71a497b9ecb0395380814a064fc8465a4", swapProxy: SWAP_PROXY, swapProxyCodehash: SWAP_PROXY_CODEHASH, permit2: PERMIT2, permit2Codehash: "0x48774d936722dd7002887f307f58bcddb3eeabad39149e7dcb5c08e4ebe3310f", weth: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"}, // BNB Chain

@@ -192,12 +192,18 @@ const notSettled = failed(encodeErrorResult({abi: ERR, errorName: "CurrencyNotSe
 const tooLittle = failed(encodeErrorResult({abi: ERR, errorName: "V4TooLittleReceived", args: [589426009489926496n, 1n]}));
 const transferFromFailed = encodeErrorResult({abi: ERR, errorName: "Error", args: ["TRANSFER_FROM_FAILED"]});
 const isSim = (s: SeenRequest) => s.method === "eth_simulateV1";
-/** Base's eth_simulateV1 answer with the swap step replaced. */
+/**
+ * Base's eth_simulateV1 answer with the swap step replaced — for every v4 candidate the provider builds: the recorded
+ * answer for the best route's simulation, and the same shape (approvals succeeding) for a later candidate's, which the
+ * recording does not hold. (Review R3-1: a later candidate's simulation left unanswered is a read no endpoint answered,
+ * which refuses the quote with the node's reason; these vectors are about how the swap's own revert is classified.)
+ */
 function simWith(step: Record<string, unknown>): Odd {
   return (s) => {
     if (!isSim(s)) return undefined;
-    const rec = BASE_TOKEN.calls[s.key] as {result: [{calls: Record<string, unknown>[]}]};
-    const blocks = structuredClone(rec.result);
+    const rec = BASE_TOKEN.calls[s.key] as {result: [{calls: Record<string, unknown>[]}]} | undefined;
+    const sent = (s.params[0] as {blockStateCalls: [{calls: unknown[]}]}).blockStateCalls[0].calls;
+    const blocks: [{calls: Record<string, unknown>[]}] = rec ? structuredClone(rec.result) : [{calls: sent.map(() => ({status: "0x1", returnData: `0x${"0".repeat(63)}1`, gasUsed: "0x1", logs: []}) as Record<string, unknown>)}];
     blocks[0].calls[blocks[0].calls.length - 1] = {...blocks[0].calls[blocks[0].calls.length - 1], ...step};
     return {result: blocks};
   };
@@ -267,17 +273,18 @@ describe("the approve + swap check refuses before any approval", () => {
     expect(q).toBeNull();
     expect(heard[0]![1]).toEqual({reason: "rate_limited"});
   }, 15_000);
-  it("Monad: no eth_simulateV1, no access list, and the executor's eth_call unanswered → refused (never a silent skip)", async () => {
+  it("Monad: no eth_simulateV1, no access list, and the executor's eth_call unanswered → refused (never a silent skip, never the v3 quote)", async () => {
     const unsupported = {error: {code: -32601, message: "the method eth_createAccessList does not exist/is not available"}};
+    // The executor's eth_call is not in the recording: the replay answers it -32603 on every attempt — no endpoint answered.
     const noSim: Odd = (s) => (s.method === "eth_createAccessList" ? unsupported : undefined);
-    // Review R2-2: with v3 on the chain the unsimulable v4 build is set aside and the v3 quote stands (before, v4 on made
-    // this pair unquotable while v4 off quoted it on v3); the v4 SwapProxy quote is still never returned unsimulated.
+    // Review R3-1: with v3 on the chain too, a read of the check that went unanswered refuses the quote with the node's
+    // reason — the v3 quote (1.13 AUSD for 700 USDC at the live1 block) is never offered in its place. (Round 2 set the
+    // build aside and quoted v3; that is kept for facts about the endpoint, the next test.)
     const warned: Array<[string, unknown]> = [];
     const both = await quote(MONAD_TOKEN, USDC_AUSD(), {onV4Warning: (t, i) => { warned.push([t, i]); }}, noSim);
-    expect(both.heard).toEqual([]);
-    expect(both.q).toMatchObject({txRequest: {to: UNISWAP_V3[143]!.router}});
-    expect(both.q!.providerData!.venue).toBeUndefined();
-    expect(warned).toEqual([[expect.stringMatching(/best Uniswap v4 route on chain 143 was set aside .* — quoted v3/), {chainId: 143, reason: "upstream_unavailable"}]]);
+    expect(both.q).toBeNull();
+    expect(both.heard).toEqual([[expect.stringMatching(/^uniswap: no RPC answered on chain 143 \(-32603 not in the recording\)/), {reason: "upstream_unavailable"}]]);
+    expect(warned).toEqual([]);
     // v4 alone: refused with the node's reason.
     const {q, heard, seen} = await quote(MONAD_TOKEN, USDC_AUSD(), {deployments: {}}, noSim);
     expect(q).toBeNull();
@@ -287,6 +294,75 @@ describe("the approve + swap check refuses before any approval", () => {
     expect(exec).toBeDefined();
     expect(overrideOf(exec!)![HOLDER.toLowerCase()] ?? overrideOf(exec!)![HOLDER]).toMatchObject({code: expect.stringMatching(/^0x3615603b57.*ca11bde05977b3631167028862be2a173976ca11.*5b00$/)});
   }, 15_000);
+});
+
+describe("review R3-1: a read of the approve + swap check that went unanswered refuses the quote (decision 5), ranked with v3", () => {
+  // Monad 700 USDC → AUSD with v3 on the chain: v4 pays 700.075685 AUSD through the SwapProxy. Before, any of these reads
+  // answered -32007 on every attempt set the v4 build aside and returned v3's quote; onRefusal heard nothing.
+  const limited = {error: {code: -32007, message: "50/second request limit reached"}};
+  const dataOf = (s: SeenRequest) => String((s.params[0] as {data?: string}).data ?? "");
+  const isProxyCall143 = isProxyCall(D143);
+  const reads: [string, (s: SeenRequest) => boolean][] = [
+    ["the balance read", (s) => s.method === "eth_call" && dataOf(s).startsWith("0x70a08231")],
+    ["the allowance read", (s) => s.method === "eth_call" && dataOf(s).startsWith("0xdd62ed3e") && overrideOf(s) === undefined],
+    ["the access list", (s) => s.method === "eth_createAccessList"],
+    ["the slot read-back under the override", (s) => s.method === "eth_call" && dataOf(s).startsWith("0xdd62ed3e") && overrideOf(s) !== undefined],
+    ["the swap's eth_call with the allowance set by stateDiff", (s) => isProxyCall143(s) && overrideOf(s) !== undefined],
+  ];
+  for (const [what, match] of reads) {
+    it(`${what} rate-limited on every attempt → refused rate_limited, never the v3 quote`, async () => {
+      const warned: Array<[string, unknown]> = [];
+      const {q, heard} = await quote(MONAD_TOKEN, USDC_AUSD(), {onV4Warning: (t, i) => { warned.push([t, i]); }}, (s) => (match(s) ? limited : undefined));
+      expect(q).toBeNull();
+      expect(heard).toEqual([[expect.stringMatching(/no RPC answered on chain 143 \(-32007 50\/second request limit reached\)/), {reason: "rate_limited"}]]);
+      expect(warned).toEqual([]);
+    }, 15_000);
+  }
+  it("the executor's eth_call rate-limited (no eth_simulateV1, no access list) → refused rate_limited", async () => {
+    const unsupported = {error: {code: -32601, message: "the method eth_createAccessList does not exist/is not available"}};
+    const isExec = (s: SeenRequest) => s.method === "eth_call" && getAddress((s.params[0] as {to: string}).to) === HOLDER;
+    const {q, heard} = await quote(MONAD_TOKEN, USDC_AUSD(), {}, (s) => (s.method === "eth_createAccessList" ? unsupported : isExec(s) ? limited : undefined));
+    expect(q).toBeNull();
+    expect(heard[0]![1]).toEqual({reason: "rate_limited"});
+  }, 15_000);
+  it("an HTTP 429 of every endpoint on the swap's eth_call (thrown, not a slot) → refused rate_limited", async () => {
+    const r = tokenReplay([MONAD_TOKEN]);
+    const proxy = isProxyCall(D143);
+    vi.stubGlobal("fetch", (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as {method: string; params: unknown[]}[];
+      if (batch.some((b) => proxy({method: b.method, params: b.params, key: ""}) && overrideOf({method: b.method, params: b.params, key: ""}) !== undefined)) return new Response("{}", {status: 429});
+      return r.fetch(url, init);
+    }) as typeof fetch);
+    const heard: Array<[string, unknown]> = [];
+    const q = await uniswapProvider({rpcUrls: RPC, v4: "all"}).getQuote({...USDC_AUSD(), onRefusal: (t: string, i?: Swap2RefusalInfo) => { heard.push([t, i]); }});
+    expect(q).toBeNull();
+    expect(heard).toEqual([[expect.stringMatching(/no RPC answered on chain 143 \(HTTP 429\)/), expect.objectContaining({reason: "rate_limited", httpStatus: 429})]]);
+  });
+  it("the healthy baseline on the same recording is the v4 quote (so each refusal above is the read's, not the pair's)", async () => {
+    const {q, heard} = await quote(MONAD_TOKEN, USDC_AUSD());
+    expect(heard).toEqual([]);
+    expect(q).toMatchObject({destAmount: "700075685", txRequest: {to: D143.swapProxy}});
+  });
+  it("facts about the endpoint still fall back to v3 (review R2-2): the override not run (the executor answers 0x), or refused (-32602)", async () => {
+    const unsupported = {error: {code: -32601, message: "the method eth_createAccessList does not exist/is not available"}};
+    const isExec = (s: SeenRequest) => s.method === "eth_call" && getAddress((s.params[0] as {to: string}).to) === HOLDER;
+    for (const [what, answer, reason] of [
+      ["the override ignored", {result: "0x"}, "upstream_unavailable"],
+      ["the override refused", {error: {code: -32602, message: "invalid argument 2: json: cannot unmarshal object into Go value of type string"}}, "upstream_unavailable"],
+    ] as const) {
+      const warned: Array<[string, unknown]> = [];
+      const {q, heard} = await quote(MONAD_TOKEN, USDC_AUSD(), {onV4Warning: (t, i) => { warned.push([t, i]); }}, (s) => (s.method === "eth_createAccessList" ? unsupported : isExec(s) ? answer : undefined));
+      expect(heard, what).toEqual([]);
+      expect(q?.txRequest?.to, what).toBe(UNISWAP_V3[143]!.router);
+      expect(uniswapV3VerifyQuote(USDC_AUSD(), q!), what).toBeNull();
+      expect(warned, what).toEqual([[expect.stringMatching(/best Uniswap v4 route on chain 143 was set aside .* — quoted v3/), {chainId: 143, reason}]]);
+    }
+    // An access list the gateway refuses with -32602 is the same fact: the executor runs (here it succeeds: the v4 quote).
+    const refused = {error: {code: -32602, message: "invalid params"}};
+    const viaExecutor = await quote(MONAD_TOKEN, USDC_AUSD(), {}, (s) => (s.method === "eth_createAccessList" ? refused : isExec(s) ? {result: encodeAbiParameters([{type: "tuple[]", components: [{name: "success", type: "bool"}, {name: "returnData", type: "bytes"}]}], [[{success: true, returnData: "0x"}, {success: true, returnData: "0x"}]])} : undefined));
+    expect(viaExecutor.q?.providerData?.simulated).toBe("approve+swap (executor override)");
+    expect(viaExecutor.seen.filter((s) => s.method === "eth_createAccessList")).toHaveLength(1); // a fact: not retried
+  }, 30_000);
 });
 
 describe("the executor fallback (no eth_simulateV1, no allowance slot)", () => {

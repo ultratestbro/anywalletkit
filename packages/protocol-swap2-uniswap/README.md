@@ -74,17 +74,24 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   allowance back; the account's own code kept); with no slot that verifies, a 61-byte executor installed as the
   account's code by an override runs approve → swap through Multicall3. A revert is decoded and mapped as in the
   preflight; a balance under the input, an unanswered read or nothing simulable refuses that v4 quote — the check is
-  never skipped, so nobody approves a swap that would revert. `providerData.simulated` says how (`"approve+swap"`,
+  never skipped, so nobody approves a swap that would revert. A read of the check that no endpoint answered after the
+  retries (the balance, the allowance, the access list, the slot read-back, the swap's or the executor's `eth_call`)
+  refuses the whole quote with the node's reason, `rate_limited` / `upstream_unavailable` — never v3 in its place
+  (decision 5: on Monad one `-32007` on the allowance read used to return v3's 1.13 AUSD for 700 USDC, v4 paying 700.08). `providerData.simulated` says how (`"approve+swap"`,
   `"swap"` when the allowance already stood, `"approve+swap (allowance override)"`, `"approve+swap (executor
   override)"`, or `"none"` on a quote without a sender — a price quote nothing is approved on).
 - **v4 on never costs a pair its v3 route.** A v4 build refused for a reason of the build falls back instead of
   refusing the quote: when the best v4 route's own pools fail its simulated swap (`V4TooLittleReceived`,
   `CurrencyNotSettled`…), its encoding or the module's own check refuses it, the next v4 candidate is built (at most 3);
-  when what every v4 build shares fails — the RPC cannot simulate the approval and the swap, the approval or the
-  token's pull into the SwapProxy fails — the quote goes straight to v3, and with no v3 route the best route's reason
-  refuses it. The trade's own verdicts still refuse the quote outright (no route could pass them): the impact gate, a
+  when what every v4 build shares fails — the endpoint cannot simulate the approval and the swap (a method or a state
+  override it does not take, an answer in another shape), the approval or the token's pull into the SwapProxy fails —
+  the quote goes straight to v3, and with no v3 route the best route's reason refuses it. A read that went unanswered
+  is no such fact: it refuses the quote (above). The trade's own verdicts still refuse the quote outright (no route could pass them): the impact gate, a
   minimum that rounds to 0, the caller's floor, a wallet holding less than the input, a recipient that cannot take
-  the native coin. A candidate whose gas need is above the chain's bound (per-transaction cap or block gas limit) is
+  the native coin, and a recipient the chain's v4 pins name as a sink — a router sentinel, the zero address, the
+  Universal Router, SwapProxy, PoolManager, PositionManager, V4Quoter, StateView or Permit2 — refused before any read
+  for every venue once v4 is on (v3 output paid there is stranded too; the 0.5.0 pins refuse a v3 quote paying one on
+  a chain with v4 pins). A candidate whose gas need is above the chain's bound (per-transaction cap or block gas limit) is
   ranked out before ranking, like the LIVE-1 ones, and counted in `providerData.v4Unexecutable`. Live on Monad
   (2026-11-26, fault injection): 700 USDC → AUSD from a funded holder on an RPC with no access list and no
   `eth_call` state overrides now quotes v3 (before: refused), and on v4 alone is still refused with the node's reason.
@@ -104,7 +111,8 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   Monad pool to HTTP 429 reported a route 14% worse).
 - **A route no transaction can carry is not a route.** A quoter call that comes back without revert data even alone in
   its aggregate is read once more, straight to the V4Quoter, with exactly the chain's per-transaction gas cap named
-  (where `KNOWN_TX_GAS_CAP` knows it: 2²⁴, 2²⁵, Monad's 30M). Still empty there, the route needs more gas than any
+  (where the module knows it: `KNOWN_TX_GAS_CAP` — 2²⁴, 2²⁵, Monad's 30M — else the execution cap
+  `KNOWN_EXECUTION_GAS_CAP`, 32M on Arbitrum and Robinhood Chain, whose Nitro never runs more in one transaction). Still empty there, the route needs more gas than any
   transaction on the chain may have — it can never be mined (§6.5 row 17) — so it is ranked out and counted
   (`providerData.v4Unexecutable`); the other candidates quote as usual. A re-read the node does not answer, or answers
   under a gas cap of its own, still refuses; so does an empty call on a chain whose cap is not known. Live on Monad
@@ -130,7 +138,9 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   sender (`QuoteParams.sender`, kept as `providerData.sender`): a revert is decoded and mapped (`V4TooLittleReceived` →
   `price_check_failed`, `CurrencyNotSettled` / `NotEnoughLiquidity` → `insufficient_liquidity`, `NativeTransferFailed`
   → `recipient_mismatch`, an expired deadline → `quote_expired`, a token's own `TRANSFER_FROM_FAILED` →
-  `simulation_failed`), and no answer refuses.
+  `simulation_failed`), and no answer refuses. A node refusing the dry-run because the sender holds less than it sends
+  ("insufficient funds for transfer", Monad's `-32003`, reth's `OutOfFunds`) is read as that answer — `simulation_failed`
+  naming the balance, at once — never as "no RPC answered" after the retries.
 - **Gas.** The provider — and `uniswapRemoteProvider`, an app's stub for it — declares `ownGasEstimate`: the engine
   sends every Uniswap call (v3 too) with the account's own estimate of that exact call, dry-run right before broadcast —
   never the quoted limit. Monad charges the gas limit, not the gas used: a v3 quote there carried 16.3M for 62,000 MON,
