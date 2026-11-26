@@ -4,7 +4,8 @@
 // gas arithmetic on values above 2^53 (core bigintToNumber); the v4 activity row. U2, the SwapProxy branch: a token input
 // over the recorded Monad answers at block 125,499,326 with v4 "all" — the approve + swap check down Monad's fallback
 // (eth_simulateV1 not served → the allowance slot from the access list, set by stateDiff) — the SwapProxy call decoded
-// strictly and accepted by the shipped pins, and a recorded SwapProxy swap's activity row. Synthetic transport only.
+// strictly and accepted by the shipped pins, and a recorded SwapProxy swap's activity row. venueRoutes "both": v3 and v4 as
+// two candidates over the same recording, each bound to its venue by the pins. Synthetic transport only.
 import {encodeAbiParameters, encodeErrorResult, getAddress, parseAbi, type Hex} from 'viem'
 import {bigintToNumber} from '@anywalletkit/core'
 import {parseActivityFixture, type ActivityFixtureJson} from '@anywalletkit/conformance'
@@ -106,6 +107,16 @@ export async function smokeUniswap(check: Check): Promise<void> {
     check('uniswap: v4 native-in wins (676.608109 AUSD via USDC, G = 23) and passes the 500 gate', v4?.destAmount === '676608109' && v4.providerData?.venue === 'v4' && v4.providerData?.valueLossBps === '23' && v4.txRequest?.to === UNISWAP_V4[143]!.universalRouter, `${v4?.destAmount} ${JSON.stringify(v4?.providerData ?? null).slice(0, 160)} misses ${node.misses.join(',')}`)
     const pins = v4 ? uniswapVerifyQuote(params, v4) : 'no quote'
     check('uniswap: the v4 quote passes the shipped pins (strict decode, canonical re-encode, pinned pools)', pins === null && uniswapPins.callTargets('eip155:143').includes(UNISWAP_V4[143]!.universalRouter), pins ?? '')
+
+    // venueRoutes "both": Uniswap v3 and v4 as two candidates of one pass, each bound to its venue by the pins.
+    const both = uniswapProvider({rpcUrls: {143: ['https://monad.fixture']}, v4: 'native-in', venueRoutes: 'both'})
+    const rows = both.getQuotes ? await both.getQuotes(params) : []
+    check('uniswap: venueRoutes "both" — getQuotes gives v3 (1.130999 AUSD) and v4 (676.608109 AUSD) as two routes', rows.map((q) => `${q.routeId}:${q.destAmount}`).join(',') === 'v3:1130999,v4:676608109', `${rows.map((q) => `${q.routeId}:${q.destAmount}`).join(',')} misses ${node.misses.join(',')}`)
+    const bound = rows.map((q) => uniswapVerifyQuote(params, q))
+    const relabelled = rows.map((q) => uniswapVerifyQuote(params, {...q, routeId: q.routeId === 'v3' ? 'v4' : 'v3'}))
+    check('uniswap: each route passes the shipped pins, and the same calldata under the other routeId is refused', rows.length === 2 && bound.every((x) => x === null) && relabelled.every((x) => x !== null), JSON.stringify([bound, relabelled]).slice(0, 200))
+    const picked = await both.getQuote({...params, routeId: 'v3'})
+    check('uniswap: a picked routeId "v3" is quoted on v3 alone (SwapRouter02), never v4', picked?.routeId === 'v3' && picked.destAmount === '1130999' && picked.txRequest?.to === UNISWAP_V3[143]!.router, `${picked?.routeId} ${picked?.destAmount}`)
 
     // U2: 700 USDC → AUSD through the SwapProxy, simulated with its approval before the quote (Monad: stateDiff fallback).
     const holder = (tokenRecording as {holder: string}).holder

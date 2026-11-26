@@ -45,6 +45,10 @@ more clock skew on a v4 deadline (default 60 s); `uniswapPins` is `uniswapPinsWi
   (`uniswapV3VerifyQuote`).
 - to the Universal Router (native input) or the SwapProxy (token input): `uniswapV4VerifyQuote` (below).
 
+A quote that names its route (`routeId: "v3"` / `"v4"`, from a server whose provider runs with `venueRoutes: "both"`) gets
+only that venue's check: the routeId the app shows is the venue the calldata runs on. `uniswapRemoteProvider({baseUrl,
+multiQuotes: true})` asks such a server for both venues as two candidates ([below](#uniswap-v3-and-v4-as-two-routes-venueroutes)).
+
 ## Uniswap v4 (opt-in)
 
 ```ts
@@ -182,6 +186,66 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   on the hookless AUSD/USDC 0.005%/1 pool, simulated with the allowance set by `stateDiff`. Live on 2026-11-26 the
   approve + swap from a funded holder paid exactly the quote (≥ the minimum) on Monad (→ AUSD and → MON) and Base
   (1,000 USDC → ETH), the SwapProxy allowance back to 0 and the router's and the SwapProxy's balances unchanged.
+
+## Uniswap v3 and v4 as two routes (`venueRoutes`)
+
+By default (`venueRoutes: "best"`) the provider returns one quote per request: v3 and v4 ranked together, the larger
+output returned. An app that shows the two venues as separate rows — "Uniswap v3" and "Uniswap v4" — sets
+`venueRoutes: "both"` (v4 must be on: with `v4: "off"` the provider throws when it is made). The route-picking policy
+stays in the app; the provider only offers both.
+
+```ts
+// The provider in the app:
+const uniswap = uniswapProvider({ rpcUrls, v4: "all", venueRoutes: "both" })
+const swap2 = new RouterSwap2Protocol(account, { fromChain: "eip155:143", providers: [uniswap /* , … */] })
+const routes = await swap2.quoteSwap2Routes(options)
+// [{provider: "uniswap", routeId: "v4", …}, {provider: "uniswap", routeId: "v3", …}, …the other venues]
+const label = (r: Swap2Route) => (r.provider === "uniswap" ? `Uniswap ${r.routeId}` : r.provider)
+await swap2.using(picked.provider, picked.routeId).swap2(options)
+
+// Behind a backend — the server's provider runs with venueRoutes "both", the app's stub asks for /quotes:
+createSwap2Handler({ providers: [uniswapProvider({ rpcUrls, v4: "all", venueRoutes: "both" })], sealSecret, guard })
+uniswapRemoteProvider({ baseUrl: "/api/v2/swap2", multiQuotes: true })
+```
+
+- **Two candidates, one pass.** `getQuotes(params)` returns up to two quotes: `routeId: "v3"`, the best v3 route, and
+  `routeId: "v4"`, the best v4 route. Both come from the reads one `"best"` quote makes — the deployment checks, v3 and
+  v4 at the same block (pinned with `maxPriceImpactBps`, else `latest`), one batch set — plus the 1/1000 probe of the
+  venue that would have lost (and, for a token input, its approve + swap simulation). Live on 2026-11-26 (read-only,
+  each comparison at one pinned block): 18–38 JSON-RPC calls for both candidates against 17–49 for one `"best"` quote,
+  a ratio of 0.78–1.14.
+- **Each one as if it had won.** A candidate is built and checked exactly as a winning quote is: the impact gate of
+  `maxPriceImpactBps` on each venue's own best route, the minimum and the caller's floor, the gas bound, the module's
+  own strict v4 check, the token-input simulation before any approval, the fallback to the next v4 route when the best
+  one's build is refused (at most 3). Each equals what that venue alone returns at the same block (v4 off for v3, no v3
+  deployment for v4) — checked live on Monad, Robinhood Chain, Base and Unichain.
+- **One venue refusing never drops the other.** A v4 read rate-limited, a v4 deployment that does not match its pins,
+  every v4 simulation reverting, a wallet short of the input for the v4 simulation, the gate refusing v3's thin pool:
+  the other candidate still stands. With both refused, `getQuotes` returns `[]` and `onRefusal` hears one refusal that
+  names both reasons (`"v3: …; v4: …"`), classified by the first one that says more than "no route here".
+- **Pool provenance as before.** The v4 candidate keeps the `v4RankedPools` rule: where v3 has a route (or may: v3's
+  reads unanswered), only the ranked pools compete — so an app on the shipped pins never receives a v4 candidate it
+  would refuse; a route through a grid, extra or newer-list pool is the v4 candidate only where v3 has no route.
+- **`getQuote` and `routeId`.** Without a `routeId`, `getQuote` returns the `"best"` winner, now naming its route
+  (`"v3"` or `"v4"`), as the swap2 contract asks of a provider with `getQuotes`. With `routeId: "v3"` it quotes v3 alone
+  (no v4 read at all); with `"v4"` v4 alone (v3 is read only for the provenance rule) — a picked venue is quoted or
+  refused with its own reason, never the other venue in its place. Any other `routeId` is refused (`policy_refused`)
+  before any read. `buildDeposit` and `preflightDeposit` hold a routed quote to its venue (a `"v3"` quote calling the
+  Universal Router or the SwapProxy, or a `"v4"` one calling SwapRouter02, is refused `vault_mismatch`); the v4
+  preflight re-quote, tracking and activity work for both.
+- **The pins bind `routeId` to the calldata.** `uniswapPins` / `uniswapPinsWith(…)` check a `"v3"` quote with the v3
+  check alone (a call to the Universal Router or the SwapProxy refused) and a `"v4"` quote with the v4 check alone (a
+  call to anything but the chain's pinned Universal Router 2.1.2 or SwapProxy refused); an unknown `routeId`, or one
+  other than the request's, is refused; without a `routeId` the dispatch on `tx.to` is unchanged. A backend that
+  swapped the labels gets neither candidate past the app.
+- **Labels.** Label rows from `routeId` ("Uniswap v3" / "Uniswap v4"). `providerData.venue` is unchanged (`"v4"` on a
+  v4 quote, absent on a v3 one). The router ranks each candidate as its own row with the other venues (`best` /
+  `fastest` tags included) and executes the one picked with `using("uniswap", routeId)`; a quote refreshed after a long
+  approval keeps its route.
+- **Rollout.** A server sets `venueRoutes: "both"` first (once v4 is on for its apps): `/quote` answers as before, the
+  winner now naming its route, so apps without `multiQuotes` keep one Uniswap row. Then apps opt in with
+  `uniswapRemoteProvider({ baseUrl, multiQuotes: true })`. A `multiQuotes` app against a server without `"both"` has its
+  `/quotes` refused and shows no Uniswap row.
 
 ## Price impact: information, or a refusal you opt into
 
