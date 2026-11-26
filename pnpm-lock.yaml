@@ -320,6 +320,9 @@ importers:
       '@anywalletkit/protocol-swap2-thorchain':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-thorchain
+      '@anywalletkit/protocol-swap2-uniswap':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-uniswap
       '@anywalletkit/protocol-swap2-usdt0':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-usdt0

@@ -7,6 +7,7 @@
  */
 import { createMockAccount, parseActivityFixture, type ActivityFixtureJson } from '@anywalletkit/conformance'
 import { smokeStargate } from './stargate.js'
+import { smokeUniswap } from './uniswap.js'
 import { bigintToNumber, bigintToUnits } from '@anywalletkit/core'
 import { Address } from '@ton/core'
 import { RouterSwap2Protocol } from '@anywalletkit/protocol-swap2-router/swap2/router'
@@ -120,6 +121,7 @@ async function tolerates(check: Check, what: string, fn: () => Promise<unknown>)
 
 export async function smokeProtocols(check: Check): Promise<void> {
   await smokeStargate(check)
+  await smokeUniswap(check)
   const evm = createMockAccount({ chain: 'eip155:1', address: '0x000000000000000000000000000000000000dEaD' }).toReadOnlyAccount()
   const ton = createMockAccount({ chain: 'ton:-239', address: 'UQBHyu-oZVDHRYQ1-rKlGqpHy5yAqanPBirEQNMNOmfHLtaT' }).toReadOnlyAccount()
   const sol = createMockAccount({ chain: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp', address: 'HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk' }).toReadOnlyAccount()

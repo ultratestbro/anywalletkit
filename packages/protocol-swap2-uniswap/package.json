@@ -1,7 +1,7 @@
 {
   "name": "@anywalletkit/protocol-swap2-uniswap",
   "version": "0.4.11",
-  "description": "Uniswap v3 same-chain swaps straight from the contracts: on-chain QuoterV2 quotes, SwapRouter02 execution, no API, no frontend.",
+  "description": "Uniswap v3 and v4 same-chain swaps straight from the contracts: on-chain QuoterV2 / V4Quoter quotes, SwapRouter02 / Universal Router 2.1.2 execution, no API, no frontend.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
@@ -69,6 +69,7 @@
   },
   "keywords": [
     "uniswap",
+    "uniswap-v4",
     "swap",
     "permissionless",
     "anywalletkit"

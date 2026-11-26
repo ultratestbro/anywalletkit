@@ -10,6 +10,22 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Uniswap 0.5.0: Uniswap v4 (opt-in), the price-impact gate (opt-in)
+
+Nothing to change in code unless you opt in; read the rollout note if you serve Uniswap through `remoteProvider`.
+
+- **protocol-swap2-uniswap (minor):** `v4: "native-in"` quotes a native-coin input on the chain's pinned hookless v4
+  pools as well and executes the better of v3 and v4; the default `"off"` keeps every quote as before. `uniswapPins`
+  now lists the Universal Router 2.1.2 as a call target and `uniswapVerifyQuote` checks its calls
+  (`uniswapV4VerifyQuote`); the v3 check alone is `uniswapV3VerifyQuote`. See [Swaps → Uniswap v4](/guides/swaps/#uniswap-v4).
+- **Rollout:** bump the app's pins first, then set `v4: "native-in"` on the server. An app on 0.4.x pins drops a
+  Universal Router quote and loses Uniswap on that pair while the server has v4 on.
+- **`maxPriceImpactBps` (opt-in):** refuses a quote that loses that many bps or more to price impact (the larger of the
+  1/1000 probe and the spot value loss at one block) as `insufficient_liquidity`; unset, impact stays information.
+- **Always on:** a swap whose gas need is above the chain's per-transaction cap or block gas limit is refused; per-item
+  RPC errors are retried and refused as `rate_limited` / `upstream_unavailable`, never read as "no pool". The provider
+  declares `ownGasEstimate`, so the engine sends each Uniswap call with the account's own gas estimate.
+
 ## 2026-11-23: CoW Protocol, gas in the router's value, Zcash shielded recipients
 
 Nothing to change in code unless you opt in.
