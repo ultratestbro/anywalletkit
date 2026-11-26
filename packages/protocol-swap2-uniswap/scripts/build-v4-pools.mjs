@@ -32,7 +32,8 @@
 //      chain's first file carries `since` on every pool (apps on earlier releases have no list for it at all), unless
 //      --baseline. A server ranks a pool with `since` against v3 only once its `v4RankedListBlock` reaches that block.
 // RPC: the public endpoints in CHAINS; RPC_<chainId> (or UNISWAP_V4_RPC_<chainId>) adds keyed endpoints, used first
-// for state reads and as a failover (or extra workers) for logs. URLs are never printed or written: labels only.
+// for state reads and as a failover (or extra workers) for logs. URLs are never printed or written: labels only, and
+// every spelling of every endpoint (and any other scheme://…) is taken out of the error texts printed (redactUrls).
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync, renameSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -250,8 +251,42 @@ export function classifyRpcError(status, message, code) {
   return 'other'
 }
 
+/**
+ * Every spelling of every endpoint a `Rpc` was made for — as given, without its scheme, host + path (+ query), path
+ * (+ query), user:pass, and each path segment or query value long enough to be a key — longest first (TOOLING-2: only
+ * the exact URL was taken out, so a node's 404 body "Cannot POST /v2/<key>" printed the key). `redactUrls` takes them
+ * out of a text, and any other `scheme://…` too, as scripts/verify-live.mjs does.
+ */
+const SPELLINGS = new Set()
+let spellingsByLength = []
+export function addUrlSpellings(raw) {
+  const add = (s) => { if (s && s.length >= 6) SPELLINGS.add(s) }
+  const u = String(raw).trim()
+  const bare = u.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^\/\//, '')
+  add(u)
+  add(bare)
+  for (const text of [u, `https://${bare}`]) {
+    try {
+      const p = new URL(text)
+      add(p.href)
+      add(p.href.replace(/^[a-z][a-z0-9+.-]*:\/\//i, ''))
+      add(`${p.host}${p.pathname}${p.search}`)
+      if (p.pathname.length > 1 || p.search) add(`${p.pathname}${p.search}`)
+      if (p.username || p.password) add(`${p.username}:${p.password}`)
+      for (const seg of p.pathname.split('/')) if (seg.length >= 16) add(seg)
+      for (const v of p.searchParams.values()) if (v.length >= 16) add(v)
+    } catch { /* not a URL: the spellings above */ }
+  }
+  spellingsByLength = [...SPELLINGS].sort((a, b) => b.length - a.length)
+}
+export function redactUrls(s) {
+  let t = String(s)
+  for (const u of spellingsByLength) if (t.includes(u)) t = t.split(u).join('<url>')
+  return t.replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, '<url>')
+}
+
 export class Rpc {
-  constructor(url, label) { this.url = url; this.label = label; this.requests = 0; this.errors = {} }
+  constructor(url, label) { this.url = url; this.label = label; this.requests = 0; this.errors = {}; addUrlSpellings(url) }
   async call(method, params, { retries = 6, timeoutMs = 60_000 } = {}) {
     let last
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -261,20 +296,21 @@ export class Rpc {
         const r = await fetch(this.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: this.requests, method, params }), signal: AbortSignal.timeout(timeoutMs) })
         status = r.status
         const text = await r.text()
-        if (!r.ok) message = text.slice(0, 200)
+        // Every text the error may carry is redacted before it is cut, so no part of an endpoint survives the cut.
+        if (!r.ok) message = redactUrls(text).slice(0, 200)
         else {
           let j
-          try { j = JSON.parse(text) } catch { message = `bad JSON: ${text.slice(0, 80)}` }
-          if (j && j.error) { message = String(j.error.message ?? JSON.stringify(j.error)); code = j.error.code }
+          try { j = JSON.parse(text) } catch { message = `bad JSON: ${redactUrls(text).slice(0, 80)}` }
+          if (j && j.error) { message = redactUrls(String(j.error.message ?? JSON.stringify(j.error))); code = j.error.code }
           else if (j && 'result' in j) return j.result
           else if (j) message = 'no result'
         }
       } catch (e) {
-        message = String(e?.message ?? e)
+        message = redactUrls(String(e?.message ?? e))
       }
       const kind = classifyRpcError(status, message, code)
       this.errors[kind] = (this.errors[kind] ?? 0) + 1
-      last = Object.assign(new Error(`${this.label}: ${method} ${status ? `HTTP ${status} ` : ''}${message.replaceAll(this.url, '<url>').slice(0, 160)}`), { kind })
+      last = Object.assign(new Error(`${this.label}: ${method} ${status ? `HTTP ${status} ` : ''}${message.slice(0, 160)}`), { kind })
       if (kind === 'range' || kind === 'too-many' || kind === 'no-state' || kind === 'revert') throw last
       if (attempt < retries) await sleep(Math.min(30_000, (kind === 'rate-limit' ? 1500 : 600) * 2 ** attempt) + Math.random() * 300)
     }
@@ -621,7 +657,7 @@ async function main() {
   await Promise.all(chains.map(async (cfg) => {
     console.error(`== ${cfg.name} (${cfg.chainId})`)
     let r
-    try { r = await buildChain(cfg, catalog, { feeCap, cacheDir }) } catch (e) { console.error(`  ${cfg.name} FAILED: ${e.message}`); failed.add(cfg.chainId); rows.push({ chain: cfg.name, chainId: cfg.chainId, error: e.message }); return }
+    try { r = await buildChain(cfg, catalog, { feeCap, cacheDir }) } catch (e) { const why = redactUrls(e?.message ?? e); console.error(`  ${cfg.name} FAILED: ${why}`); failed.add(cfg.chainId); rows.push({ chain: cfg.name, chainId: cfg.chainId, error: why }); return }
     rows.push(r.summary)
     const reasons = {}
     for (const [, why] of r.dropped) reasons[why] = (reasons[why] ?? 0) + 1
@@ -630,7 +666,7 @@ async function main() {
     // Step 5: the previous file, read back; lists only grow.
     const file = join(OUT_DIR, `${cfg.chainId}.ts`)
     let previous = null
-    try { previous = existsSync(file) ? parseChainFile(readFileSync(file, 'utf8')) : null } catch (e) { console.error(`  ${cfg.name} FAILED: ${e.message}`); failed.add(cfg.chainId); rows.push({ chain: cfg.name, chainId: cfg.chainId, error: e.message }); return }
+    try { previous = existsSync(file) ? parseChainFile(readFileSync(file, 'utf8')) : null } catch (e) { const why = redactUrls(e?.message ?? e); console.error(`  ${cfg.name} FAILED: ${why}`); failed.add(cfg.chainId); rows.push({ chain: cfg.name, chainId: cfg.chainId, error: why }); return }
     const merged = mergeEntries(previous, r.final, { block: r.block, baseline })
     console.error(`  ${cfg.name}: ${merged.added} added${merged.added && !baseline ? ` (since ${r.block})` : ''}, ${merged.kept} kept from earlier builds although not live now`)
     if (!merged.entries.length) { console.error(`  ${cfg.name}: nothing passed, no file`); return }

@@ -3,6 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { encodeAbiParameters, encodeFunctionResult, decodeFunctionData } from 'viem'
 import {
   CHAINS, FEE_CAP, INITIALIZE_TOPIC, MC3_ABI, Rpc, ZERO, atBound, classifyRpcError, decodeAggregate, decodeInitializeLog, gate, gateVerdict,
@@ -247,4 +248,33 @@ test('SEC-U4-R3-2: the shipped index is renderIndex output — every chain list 
   for (const id of ids) assert.match(shipped, new RegExp(`^  ${id}: freezeChainPools\\(V4_POOLS_${id}\\),$`, 'm'))
   // freeze.ts is written by hand: a full run of the build never removes it (it removes only <chainId>.ts files).
   assert.ok(readdirSync(dir).includes('freeze.ts'))
+})
+
+test('TOOLING-2: no spelling of an endpoint reaches an error text — a node echoing its path, another URL, or a body cut through one', async () => {
+  const KEY = 'SECRETKEY1234567890abcdef'
+  const OTHER = 'OTHERSECRET0987654321zyxw'
+  // A node that answers each request as the test says: a 404 echoing the path, a JSON-RPC error naming URLs, a long body.
+  const answers = [
+    (req) => ({ status: 404, body: `Cannot POST ${req.url}` }),
+    () => ({ status: 200, body: JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: -32000, message: `upgrade at https://rpc.example/key/${OTHER} or /v2/${KEY}` } }) }),
+    (req) => ({ status: 502, body: `${'x'.repeat(190)} ${req.url} gateway` }),
+    (req) => ({ status: 200, body: `not json ${'y'.repeat(70)} ${req.headers.host}${req.url}` }),
+  ]
+  let n = 0
+  const server = createServer((req, res) => {
+    req.resume()
+    req.on('end', () => { const a = answers[n++](req); res.statusCode = a.status; res.end(a.body) })
+  })
+  await new Promise((r) => server.listen(0, '127.0.0.1', r))
+  try {
+    const rpc = new Rpc(`http://127.0.0.1:${server.address().port}/v2/${KEY}`, 'env#0')
+    for (let i = 0; i < answers.length; i++) {
+      const e = await rpc.call('eth_blockNumber', [], { retries: 0 }).then(() => null, (x) => x)
+      assert.ok(e instanceof Error, `answer ${i} is an error`)
+      assert.match(e.message, /^env#0: eth_blockNumber /)
+      for (const leak of [KEY, KEY.slice(0, 12), OTHER, '/v2/', '127.0.0.1:']) assert.ok(!e.message.includes(leak), `answer ${i}: "${leak}" in "${e.message}"`)
+    }
+  } finally {
+    server.close()
+  }
 })
