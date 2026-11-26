@@ -46,8 +46,9 @@ export const V4_MAX_CLOCK_SKEW_SECONDS = 3_600;
  * Monad), one table for the build and the check. A limit above can never be mined.
  */
 export const V4_KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = KNOWN_TX_GAS_CAP;
-/** Catalog symbols a two-hop route may pass through, besides the native coin and the wrapped native (§6.5 row 8). */
-export const V4_HOP_SYMBOLS = ["USDC", "USDT", "USDT0"] as const;
+/** Catalog symbols a two-hop route may pass through, besides the native coin and the wrapped native (§6.5 row 8).
+ *  Frozen (review FUNDS-3): the pins read it at call time, so code in the process must not widen the hop set they accept. */
+export const V4_HOP_SYMBOLS: readonly ["USDC", "USDT", "USDT0"] = Object.freeze(["USDC", "USDT", "USDT0"] as const);
 
 export interface UniswapV4VerifyOptions {
   /** The pinned table (default {@link UNISWAP_V4}). */
