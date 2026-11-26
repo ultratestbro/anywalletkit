@@ -35,6 +35,7 @@
     "@anywalletkit/protocol-swap2-curve": "workspace:*",
     "@anywalletkit/protocol-swap2-fynd": "workspace:*",
     "@anywalletkit/protocol-swap2-jupiter": "workspace:*",
+    "@anywalletkit/protocol-swap2-kyberswap": "workspace:*",
     "@anywalletkit/protocol-swap2-layerzero": "workspace:*",
     "@anywalletkit/protocol-swap2-lifi": "workspace:*",
     "@anywalletkit/protocol-swap2-near-intents": "workspace:*",
