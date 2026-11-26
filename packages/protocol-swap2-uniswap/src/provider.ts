@@ -1,4 +1,4 @@
-import {decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, parseAbi, type Hex} from "viem";
+import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, parseAbi, type Hex} from "viem";
 import {describeUniswapActivity} from "./activity.js";
 import {ccAsset, ccAssetByToken, resolveAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
@@ -6,14 +6,14 @@ import {refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2Refusal
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
-import {MIN_CALLS_PER_SECOND, QUOTE_WAIT_MAX_MS, isUnsupportedMethod, shortOfFunds, uniswapRpc, type RpcCall, type RpcSlot, type SlotOptions} from "./rpc.js";
+import {MIN_CALLS_PER_SECOND, MIN_CALLS_PER_SECOND_V4, QUOTE_WAIT_MAX_MS, isUnsupportedMethod, shortOfFunds, uniswapRpc, type RpcCall, type RpcSlot, type SlotOptions} from "./rpc.js";
 import {KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, hopsOf, impactRefusalText, probeImpactBps, spotImpactNetOfFeesBps, spotValueLossBps, validMaxImpactBps} from "./impact.js";
 import {UNISWAP_V4, V4_NATIVE, uniswapV4DeploymentOf, type UniswapV4Deployment} from "./v4/addresses.js";
 import {UNISWAP_V4_POOLS} from "./v4pools/index.js";
 import {v4ServedDeployment, v4ServesFlow} from "./v4/serve.js";
 import {UNISWAP_V4_POOL_KEYS} from "./v4/listed.js";
-import {discoverV4Pools, type V4BlockTag, type V4EthCall} from "./v4/discover.js";
-import {buildV4Routes, decodeV4QuoteAnswer, multicallBatch, quoteCallDataOfKeys, quoteV4Routes, rankedV4Candidates, v4ProbeImpactBps, v4SpotLossBps, type V4CallBatch, type V4CallOutcome, type V4GasBound, type V4QuoteResult} from "./v4/quote.js";
+import {MULTICALL3, discoverV4Pools, type V4BlockTag, type V4EthCall} from "./v4/discover.js";
+import {buildV4Routes, decodeV4QuoteAnswer, multicallBatch, quoteCallDataOfKeys, quoteV4Routes, rankedV4Candidates, v4ProbeImpactBps, v4SpotImpactNetOfFeesBps, v4SpotLossBps, type V4CallBatch, type V4CallOutcome, type V4GasBound, type V4QuoteResult} from "./v4/quote.js";
 import {checkedHooklessKey, checkedMaxFeePips, checkedV4ExtraPools} from "./v4/pool.js";
 import {encodeV4Swap} from "./v4/encode.js";
 import {V4_DEFAULT_DEADLINE_SECONDS, uniswapV4ReasonOf, uniswapV4VerifyQuote, v4DeploymentProblem, v4DeploymentReads, v4HopTokens, v4PreflightCall, v4StorageOverride, v4StrandedRecipient, v4StrandedRecipientText, type UniswapV4Mode} from "./v4/verify.js";
@@ -184,6 +184,38 @@ const QUOTER_ABI = parseAbi([
   "function factory() view returns (address)",
   "function WETH9() view returns (address)",
 ]);
+/**
+ * A v4 candidate's answer (U0-SEC-R3-2 on the v4 path): a V4Quoter call that succeeds answers exactly two words, read
+ * straight (the gas bound's re-read) or inside a Multicall3 aggregate of quoter calls. An answer otherwise — not hex,
+ * not an aggregate3 result, another count, a quoter sub-answer of another size — is no answer: retried like any
+ * unanswered read, then `upstream_unavailable`, as v3's candidates are (it was refused at once before; never "no pool"
+ * either way). The discovery reads and the probe keep their own checks, as v3's measure does.
+ */
+const MC3_SHAPE_ABI = parseAbi([
+  "struct Call3 { address target; bool allowFailure; bytes callData; }",
+  "struct Result { bool success; bytes returnData; }",
+  "function aggregate3(Call3[] calls) payable returns (Result[] returnData)",
+]);
+function v4CandidateAnswerFits(quoter: Hex, c: {to: Hex; data: Hex}, raw: unknown): boolean {
+  if (typeof raw !== "string" || !/^0x(?:[0-9a-fA-F]{2})*$/.test(raw)) return false;
+  const q = getAddress(quoter);
+  if (getAddress(c.to) === q) return raw.length === 2 + 128;
+  if (getAddress(c.to) !== getAddress(MULTICALL3)) return true;
+  let asked: readonly {target: Hex}[];
+  let res: readonly {success: boolean; returnData: Hex}[];
+  try {
+    asked = decodeFunctionData({abi: MC3_SHAPE_ABI, data: c.data}).args[0] as readonly {target: Hex}[];
+  } catch {
+    return true; // not an aggregate3: its caller checks it
+  }
+  try {
+    res = decodeFunctionResult({abi: MC3_SHAPE_ABI, functionName: "aggregate3", data: raw as Hex});
+  } catch {
+    return false;
+  }
+  return res.length === asked.length && res.every((r, i) => !r.success || getAddress(asked[i]!.target) !== q || r.returnData.length === 2 + 128);
+}
+
 /** The v3 factory's pool lookup and a pool's `slot0()` (its mid price, read for the spot measure of `maxPriceImpactBps`). */
 const POOL_ABI = parseAbi([
   "function getPool(address tokenA, address tokenB, uint24 fee) view returns (address pool)",
@@ -269,7 +301,7 @@ export interface UniswapProviderConfig {
    * `slot0()` mid prices (fees included, `providerData.valueLossBps`). The fees count: a limit at or under the route's
    * pool fee (100 on a 1% pool, 60 on two 0.3% pools) refuses that route however deep its pools are — the text then
    * names the fees ("loses 1.0% of the value to price impact and pool fees — the route's fees (1%) bring it to the
-   * limit; …") instead of thin pools. A probe too small to run, reverted, empty or unanswered after the retries leaves
+   * limit; …") instead of thin pools — on a v4 route too, its pools' swap fees (with any protocol fee) counted. A probe too small to run, reverted, empty or unanswered after the retries leaves
    * spot to decide. Spot must be measured (the probe alone is blind to a pool parked past an empty range): when its
    * reads go unanswered after the retries, or come back reverted, zero or in another shape, the quote is refused —
    * `rate_limited` / `upstream_unavailable` (as `insufficient_liquidity` when the probe alone already reaches the
@@ -278,8 +310,9 @@ export interface UniswapProviderConfig {
   maxPriceImpactBps?: number;
   /**
    * Most JSON-RPC calls sent to one endpoint in any one second, across every quote, check and read of this provider (an
-   * integer ≥ 13, MIN_CALLS_PER_SECOND: the least that carries one quote; a server sets the good-item rate its keyed
-   * endpoint serves — QuickNode answered 50 calls a second on Monad and `-32007` the rest, UNISWAP-V4-RESEARCH §5.3).
+   * integer ≥ 13, MIN_CALLS_PER_SECOND: the least that carries one quote — ≥ 22, MIN_CALLS_PER_SECOND_V4, with `v4` on,
+   * whose reads go under the same bound; a server sets the good-item rate its keyed endpoint serves — QuickNode answered
+   * 50 calls a second on Monad and `-32007` the rest, UNISWAP-V4-RESEARCH §5.3).
    * Batches then carry at most 10 calls and wait for their turn on their endpoint, counted at the moment each batch
    * went; turns go to the quote that began first (its later reads before newer quotes' first ones), then first come first
    * served. A batch that would wait more than 4 s, or go later than 5 s after its quote began, is sent to the next
@@ -453,8 +486,13 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const maxImpact = config.maxPriceImpactBps;
   if (maxImpact !== undefined && !validMaxImpactBps(maxImpact)) throw new Error("uniswap: maxPriceImpactBps must be an integer 1..10000");
   const perSecond = config.rpcCallsPerSecond;
-  if (perSecond !== undefined && !(typeof perSecond === "number" && Number.isInteger(perSecond) && perSecond >= MIN_CALLS_PER_SECOND)) {
-    throw new Error(`uniswap: rpcCallsPerSecond must be an integer ≥ ${MIN_CALLS_PER_SECOND} (the least that carries one quote)`);
+  // With v4 on, a quote's v4 reads go under its bound too, and the largest v4 quote needs more (MIN_CALLS_PER_SECOND_V4).
+  const v4On = config.v4 !== undefined && config.v4 !== "off";
+  const minPerSecond = v4On ? MIN_CALLS_PER_SECOND_V4 : MIN_CALLS_PER_SECOND;
+  if (perSecond !== undefined && !(typeof perSecond === "number" && Number.isInteger(perSecond) && perSecond >= minPerSecond)) {
+    throw new Error(v4On
+      ? `uniswap: rpcCallsPerSecond must be an integer ≥ ${minPerSecond} with Uniswap v4 on (the least that carries one v4 quote)`
+      : `uniswap: rpcCallsPerSecond must be an integer ≥ ${minPerSecond} (the least that carries one quote)`);
   }
   const verified = new Map<number, Promise<void>>();
   /** Each chain's block gas read: until when it holds, until when a quote waits for it, and its answer once in. */
@@ -703,12 +741,15 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   /**
    * One `eth_call` for the v4 discovery and quote reads, retried as `all` (a call the node did not answer is retried, then
    * refused classified — never read as "no pool"). A revert of the read itself (a Multicall3 aggregate out of gas) throws
-   * with the node's text, so the quote batcher can split it.
+   * with the node's text, so the quote batcher can split it. `o`: the quote's turns under `rpcCallsPerSecond` (its
+   * v4 reads go by the same bound and order as its v3 reads, U0-LIVE-1). `quoter`: the reads are the candidates'
+   * quoter aggregates, and an answer in a shape they never have ({@link v4CandidateAnswerFits}) is no answer — retried,
+   * then refused.
    */
-  const v4EthCall = (chainId: number, signal?: AbortSignal): V4EthCall => async (c, tag) => {
+  const v4EthCall = (chainId: number, signal: AbortSignal | undefined, o: SlotOptions, quoter?: Hex): V4EthCall => async (c, tag) => {
     const gas = ownKey(V4_READ_GAS, chainId);
     const read: RpcCall = {method: "eth_call", params: [{to: c.to, data: c.data, ...(gas !== undefined ? {gas: `0x${gas.toString(16)}`} : {})}, tag]};
-    const [s] = await net.slots(chainId, [read], "all", signal);
+    const [s] = await net.slots(chainId, [read], "all", signal, quoter === undefined ? o : {...o, accept: (raw) => v4CandidateAnswerFits(quoter, c, raw)});
     if (!s) throw refusal("upstream_unavailable", `uniswap v4: no RPC answered on chain ${chainId}`);
     if ("failed" in s) throw s.failed;
     if (!s.ok) throw withReason(new Error(`uniswap v4: a read reverted on chain ${chainId} (${s.revert.message.slice(0, 160)})`), "upstream_unavailable");
@@ -725,8 +766,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * aggregate; the unlisted-token grid only for a currency the list does not know; every route on the V4Quoter. Any
    * failed read throws (classified).
    */
-  async function quoteV4(chainId: number, d4: UniswapV4Deployment, currencyIn: Hex, currencyOut: Hex, amountIn: bigint, block: V4BlockTag, signal?: AbortSignal): Promise<V4QuoteResult & {batch: V4CallBatch; gridPools: V4PoolKey[]}> {
-    const ethCall = v4EthCall(chainId, signal);
+  async function quoteV4(chainId: number, d4: UniswapV4Deployment, currencyIn: Hex, currencyOut: Hex, amountIn: bigint, block: V4BlockTag, signal: AbortSignal | undefined, o: SlotOptions): Promise<V4QuoteResult & {batch: V4CallBatch; gridPools: V4PoolKey[]}> {
+    const ethCall = v4EthCall(chainId, signal, o);
     const into = getAddress(currencyIn);
     const out = getAddress(currencyOut);
     const hubs = [...v4HopTokens(chainId, d4)].filter((h) => h !== into && h !== out) as Hex[];
@@ -735,7 +776,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     }, ethCall);
     const routes = buildV4Routes({currencyIn: into, currencyOut: out, pools: discovery.pools, hubs, hubName: (h) => symbolOf(chainId, h)});
     const batch = multicallBatch(ethCall, block);
-    const q = await quoteV4Routes({quoter: d4.quoter, routes, amountIn, gasBound: v4GasBound(chainId, block, signal)}, batch);
+    // The candidates' answers are vetted for their shape (retried when off); the probe, read with `batch` later, as v3's.
+    const q = await quoteV4Routes({quoter: d4.quoter, routes, amountIn, gasBound: v4GasBound(chainId, d4, block, signal, o)}, multicallBatch(v4EthCall(chainId, signal, o, d4.quoter), block));
     return {...q, batch, gridPools: discovery.pools.filter((p) => p.source === "grid").map((p) => p.key)};
   }
 
@@ -748,13 +790,15 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * the bound is the block gas limit, which a node's own eth_call gas cap may lie under, so such a call still refuses the
    * quote. A call the node did not answer, or answered as a gas cap of its own, refuses — never "too much gas".
    */
-  function v4GasBound(chainId: number, block: V4BlockTag, signal?: AbortSignal): V4GasBound | undefined {
+  function v4GasBound(chainId: number, d4: UniswapV4Deployment, block: V4BlockTag, signal: AbortSignal | undefined, o: SlotOptions): V4GasBound | undefined {
     const cap = v4ReadBoundOf(chainId);
     if (cap === undefined) return undefined;
     return {
       cap,
       calls: async (cs) => {
-        const slots = await net.slots(chainId, cs.map((c): RpcCall => ({method: "eth_call", params: [{to: c.to, data: c.data, gas: `0x${cap.toString(16)}`}, block]})), "all", signal);
+        // A quoter answer is two words (a revert is an answer too): another shape is no answer, retried, then refused.
+        const accept = (raw: unknown, i: number) => v4CandidateAnswerFits(d4.quoter, cs[i]!, raw);
+        const slots = await net.slots(chainId, cs.map((c): RpcCall => ({method: "eth_call", params: [{to: c.to, data: c.data, gas: `0x${cap.toString(16)}`}, block]})), "all", signal, {...o, accept});
         if (slots.length !== cs.length) throw refusal("upstream_unavailable", `uniswap v4: ${slots.length} answers for ${cs.length} quoter calls on chain ${chainId} — refusing`);
         return slots.map((s): V4CallOutcome => {
           if ("failed" in s) throw s.failed;
@@ -869,7 +913,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    *   method or an override the endpoint does not take is a fact about it and leaves the fallbacks, then v3.
    * Returns how the swap was simulated (`providerData.simulated`).
    */
-  async function v4TokenSwapCheck(chainId: number, d4: UniswapV4Deployment, sender: Hex, token: Hex, amount: bigint, tx: {to: Hex; data: Hex}, signal?: AbortSignal): Promise<string> {
+  async function v4TokenSwapCheck(chainId: number, d4: UniswapV4Deployment, sender: Hex, token: Hex, amount: bigint, tx: {to: Hex; data: Hex}, signal: AbortSignal | undefined, o: SlotOptions): Promise<string> {
     const spender = getAddress(d4.swapProxy);
     const allowanceData = encodeFunctionData({abi: ERC20_ABI, functionName: "allowance", args: [sender, spender]});
     const approveData = (n: bigint) => encodeFunctionData({abi: ERC20_ABI, functionName: "approve", args: [spender, n]});
@@ -889,7 +933,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     };
     /** The check's reads: a batch no endpoint answered (under "items", an HTTP failure of every endpoint is thrown) is
      *  unanswered too; the caller's abort is thrown as it came. */
-    const slots = (calls: RpcCall[], policy: "all" | "items"): Promise<RpcSlot[]> => net.slots(chainId, calls, policy, signal).catch((e: unknown): never => {
+    const slots = (calls: RpcCall[], policy: "all" | "items"): Promise<RpcSlot[]> => net.slots(chainId, calls, policy, signal, o).catch((e: unknown): never => {
       rethrowAbort(e, signal);
       throw unanswered(e);
     });
@@ -924,7 +968,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const step = (data: Hex, to: Hex) => ({from: sender, to, data, value: "0x0"});
       const calls = [...(allowance > 0n ? [step(approveData(0n), token)] : []), step(approveData(amount), token), step(tx.data, tx.to)];
       const sim: RpcCall = {method: "eth_simulateV1", params: [{blockStateCalls: [{calls}], validation: false}, "latest"]};
-      const once = (policy: "none" | "items") => net.slots(chainId, [sim], policy, signal).then(([x]) => x, (e: unknown): RpcSlot => {
+      const once = (policy: "none" | "items") => net.slots(chainId, [sim], policy, signal, o).then(([x]) => x, (e: unknown): RpcSlot => {
         rethrowAbort(e, signal);
         return {ok: false, failed: e instanceof Error ? e : new Error(String(e))};
       });
@@ -949,7 +993,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
     // No eth_simulateV1: the allowance slot by stateDiff, the account's own code kept. allowanceSlotOf throws only for a
     // read no endpoint answered (an endpoint that serves no access list or takes no override gives null).
-    const slot = await allowanceSlotOf(chainId, token, sender, spender, allowanceData, amount, signal).catch((e: unknown): never => {
+    const slot = await allowanceSlotOf(chainId, token, sender, spender, allowanceData, amount, signal, o).catch((e: unknown): never => {
       rethrowAbort(e, signal);
       throw unanswered(e);
     });
@@ -987,16 +1031,16 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * or when the node does not serve the access list or take the override ({@link endpointFact}). Throws only for a read
    * no endpoint answered (the caller refuses the quote on it) and for the caller's abort.
    */
-  async function allowanceSlotOf(chainId: number, token: Hex, owner: Hex, spender: Hex, data: Hex, amount: bigint, signal?: AbortSignal): Promise<Hex | null> {
+  async function allowanceSlotOf(chainId: number, token: Hex, owner: Hex, spender: Hex, data: Hex, amount: bigint, signal: AbortSignal | undefined, o: SlotOptions): Promise<Hex | null> {
     const key = `${chainId}:${token}:${owner}:${spender}`.toLowerCase();
     const hit = allowanceSlots.get(key);
     if (hit) return hit;
     const list1: RpcCall = {method: "eth_createAccessList", params: [{from: owner, to: token, data}, "latest"]};
-    let [al] = await net.slots(chainId, [list1], "none", signal).catch((e: unknown): RpcSlot[] => {
+    let [al] = await net.slots(chainId, [list1], "none", signal, o).catch((e: unknown): RpcSlot[] => {
       rethrowAbort(e, signal);
       return [{ok: false, failed: e instanceof Error ? e : new Error(String(e))}];
     });
-    if (al && "failed" in al && !endpointFact(al)) [al] = await net.slots(chainId, [list1], "items", signal); // a transient failure is retried
+    if (al && "failed" in al && !endpointFact(al)) [al] = await net.slots(chainId, [list1], "items", signal, o); // a transient failure is retried
     if (!al || "failed" in al) {
       if (endpointFact(al)) return null;
       throw al && "failed" in al ? al.failed : refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId}`);
@@ -1011,7 +1055,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     }
     const candidates = [...keys].slice(0, MAX_SLOT_CANDIDATES) as Hex[];
     if (!candidates.length) return null;
-    const answers = await net.slots(chainId, candidates.map((k) => ({method: "eth_call", params: [{to: token, data}, "latest", v4StorageOverride(token, k, amount)]})), "items", signal);
+    const answers = await net.slots(chainId, candidates.map((k) => ({method: "eth_call", params: [{to: token, data}, "latest", v4StorageOverride(token, k, amount)]})), "items", signal, o);
     const at = answers.findIndex((s) => s.ok && uintWord(s.result) === amount);
     if (at < 0) {
       const failed = answers.find((s): s is Extract<RpcSlot, {failed: Error}> => "failed" in s && !endpointFact(s));
@@ -1128,7 +1172,14 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         priceImpactBps = probe;
         valueLossBps = spot;
         const loss = probe === undefined ? spot : Math.max(probe, spot);
-        if (loss >= limit) return no(impactRefusalText(loss, limit, route.label), "insufficient_liquidity", "trade");
+        if (loss >= limit) {
+          // As on v3 (U0C-2): the gate goes by the loss with the pools' fees in it, and the text names what got it
+          // there — thin pools when the price impact alone (the probe, or spot net of the pools' fees) reaches the limit,
+          // else the route's own fees.
+          const net = v4SpotImpactNetOfFeesBps(route, amountIn, out);
+          const thin = (probe ?? 0) >= limit || net === undefined || net >= limit;
+          return no(impactRefusalText(loss, limit, route.label, thin ? undefined : route.poolFee), "insufficient_liquidity", "trade");
+        }
       }
 
       const bps = params.slippageBps ?? slippageDefault;
@@ -1213,7 +1264,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         if (sender === undefined) quote.providerData!.simulated = "none";
         else {
           try {
-            quote.providerData!.simulated = await v4TokenSwapCheck(chainId, d4, sender, getAddress(currencyIn), amountIn, {to: enc.to, data: enc.data}, signal);
+            quote.providerData!.simulated = await v4TokenSwapCheck(chainId, d4, sender, getAddress(currencyIn), amountIn, {to: enc.to, data: enc.data}, signal, turns);
           } catch (e) {
             rethrowAbort(e, signal);
             const err = e instanceof Error ? e : new Error(String(e));
@@ -1558,7 +1609,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
         const gated = maxImpact !== undefined;
         const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
-        const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal) : undefined;
+        const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal, turns) : undefined;
         v4Run?.catch(() => {});
         let v3: {best: V3Best | null; partial: boolean} | undefined;
         if (needV3) {
@@ -1645,7 +1696,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
       // v4 reads go out alongside the v3 ones, at the same block; any of them failing refuses the quote (never a
       // smaller candidate set). Handled here so a v3 failure first leaves no unhandled rejection behind.
-      const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal) : undefined;
+      const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal, turns) : undefined;
       v4Run?.catch(() => {});
       // With v4 on, the v3 reads go out alongside v4's and are retried the same way (a 429 under the doubled load is
       // not a missing route); with it off, as 0.4.11 read them.

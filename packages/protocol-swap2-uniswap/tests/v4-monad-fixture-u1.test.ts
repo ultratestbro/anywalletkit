@@ -141,9 +141,18 @@ describe("Monad 62,000 MON → AUSD at block 125,409,523: v3 and v4 ranked toget
   });
 
   it("the gate is the winner's: 23 refuses at a limit of 23, passes at 24", async () => {
+    // G 23 is the probe's 17 bps and the two pools' 0.05% + 0.005%: net of those fees the route loses 17 bps. At 23
+    // only the fees bring it to the limit, and the text names them (U0C-2 on the v4 path — before, "too thin" for
+    // pools whose own impact is under the limit); at 17 the price impact alone reaches it: too thin.
     const at = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 23});
     expect(at.q).toBeNull();
-    expect(at.heard).toEqual([["uniswap: loses 0.2% of the value to price impact — its pools are too thin for this amount (limit 0.23%; best route v4 via USDC 0.05%/10 → 0.005%/1)", {reason: "insufficient_liquidity"}]]);
+    expect(at.heard).toEqual([["uniswap: loses 0.2% of the value to price impact and pool fees — the route's fees (0.05% + 0.005%) bring it to the limit; its price impact alone is under it (limit 0.23%; best route v4 via USDC 0.05%/10 → 0.005%/1)", {reason: "insufficient_liquidity"}]]);
+    const thin = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 17});
+    expect(thin.heard).toEqual([["uniswap: loses 0.2% of the value to price impact — its pools are too thin for this amount (limit 0.17%; best route v4 via USDC 0.05%/10 → 0.005%/1)", {reason: "insufficient_liquidity"}]]);
+    const fees = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 18});
+    expect(fees.heard[0]![0]).toMatch(/^uniswap: loses 0\.2% of the value to price impact and pool fees — the route's fees \(0\.05% \+ 0\.005%\) bring it to the limit/);
+    // cp0x reads the loss from either text.
+    for (const [t] of [...at.heard, ...thin.heard, ...fees.heard]) expect(/^loses ([\d.]+)% of the value to price impact/.exec(t.replace(/^uniswap: /, ""))?.[1]).toBe("0.2");
     const above = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 24});
     expect(above.q?.destAmount).toBe("676608109");
   });

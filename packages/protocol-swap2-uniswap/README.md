@@ -299,7 +299,8 @@ uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
   1,000 raw units), reverted, empty or unanswered after the retries falls back to spot.
 - The pool fees count toward the limit: a limit at or under a route's fee (100 on a 1% pool, 60 on
   two 0.3% pools) refuses that route however deep its pools are. Set the limit well above the fee
-  tiers you expect (500 refuses no route on fees alone).
+  tiers you expect (500 refuses no route on fees alone). The same holds for a v4 route, its pools'
+  swap fees (the LP fee, and a protocol fee where the PoolManager takes one) counted.
 - Spot must be measured: the probe alone is blind to a pool parked past an empty range. When the
   pool lookups or `slot0()` reads go unanswered after the retries, or come back reverted, zero or in
   another shape, the quote is refused as `rate_limited` / `upstream_unavailable` ("could not measure
@@ -381,7 +382,13 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   next endpoint instead, or with none left is refused as `rate_limited` — a quote is refused by then
   rather than run into the router's 8 s, signal or not. 13 is the least that carries the largest quote (51 calls in five passes
   one after another) on an idle endpoint answering within 0.5 s; a lower value is refused when the
-  provider is built. Unset (the default), nothing is limited.
+  provider is built. With `v4` on, a quote's v4 reads (discovery, quoter aggregates, probe, the
+  token-input check) go by the same turns and bound, and the floor is 22: the largest v4 quote (a
+  gated token input with the sender known on an RPC without `eth_simulateV1`, `venueRoutes:
+  "both"`) is 91 calls in eleven passes, carried by 22 on an idle endpoint answering within 250 ms.
+  Eleven passes alone take the 5 s on an endpoint slower than ~450 ms, so a slow endpoint needs a
+  higher rate, and past that no rate carries such a quote under the limit. Unset (the default),
+  nothing is limited.
 
 ## Activity
 

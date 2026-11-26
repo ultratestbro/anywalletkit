@@ -403,6 +403,38 @@ export function v4SpotLossBps(route: V4Route, amountIn: bigint, amountOut: bigin
 }
 
 /**
+ * One hop's swap fee in pips, as the PoolManager takes it from the input: the LP fee, and where the pool pays a protocol
+ * fee in this direction (12 bits each, low = zeroForOne) both, `protocolFee + lpFee − protocolFee × lpFee / 10⁶` (v4's
+ * ProtocolFeeLibrary.calculateSwapFee). Undefined when it is not a fee a pool can charge.
+ */
+function swapFeePips(hop: V4Hop): number | undefined {
+  const lp = hop.pool.state.lpFee;
+  const pf = hop.pool.state.protocolFee;
+  if (!Number.isInteger(lp) || lp < 0 || lp >= 1_000_000 || !Number.isInteger(pf) || pf < 0) return undefined;
+  const p = hop.zeroForOne ? pf & 0xfff : (pf >> 12) & 0xfff;
+  const fee = p === 0 ? lp : p + lp - Math.floor((p * lp) / 1_000_000);
+  return fee < 1_000_000 ? fee : undefined;
+}
+
+/**
+ * The same value loss net of the pools' fees: against the mid output after each hop's swap fee (`× (1 − fee)` per
+ * pool, the protocol fee included where one is taken), so what is left is the price impact alone (and the pools'
+ * rounding). It tells a route whose pools are too thin from one that reaches a limit only with its fees (U0C-2 on the
+ * v4 path); the gate itself goes by {@link v4SpotLossBps}. Undefined when the mid output rounds to 0.
+ */
+export function v4SpotImpactNetOfFeesBps(route: V4Route, amountIn: bigint, amountOut: bigint): number | undefined {
+  let spot = v4SpotOut(route, amountIn);
+  if (spot <= 0n) return undefined;
+  for (const h of route.hops) {
+    const fee = swapFeePips(h);
+    if (fee === undefined) return undefined;
+    spot = (spot * BigInt(1_000_000 - fee)) / 1_000_000n;
+  }
+  if (spot <= 0n) return undefined;
+  return Math.max(0, bigintToNumber(10_000n - (amountOut * 10_000n) / spot));
+}
+
+/**
  * The v3 probe on the same route: the full-size rate's shortfall against a 1/1000 quote's rate, in bps (pool fees
  * cancel). Tried twice; undefined when it cannot be measured (amount too small to probe, the probe reverted or failed).
  */

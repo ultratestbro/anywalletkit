@@ -207,10 +207,11 @@ describe("Monad 62,000 MON → AUSD (recorded): Uniswap v3 and Uniswap v4 as two
   });
 
   it("both venues refused (the gate at 23): no candidate, one refusal naming both, classified", async () => {
+    // Each candidate gated as if it had won: v3's thin pools, v4's own fees (net of them it loses 17 bps, U0C-2).
     const {qs, heard} = await candidates(MON(62_000n), {maxPriceImpactBps: 23});
     expect(qs).toEqual([]);
     expect(heard).toEqual([[
-      "uniswap: v3: loses 99.8% of the value to price impact — its pools are too thin for this amount (limit 0.23%; best route via USDC 0.3% → 0.01%); v4: loses 0.2% of the value to price impact — its pools are too thin for this amount (limit 0.23%; best route v4 via USDC 0.05%/10 → 0.005%/1)",
+      "uniswap: v3: loses 99.8% of the value to price impact — its pools are too thin for this amount (limit 0.23%; best route via USDC 0.3% → 0.01%); v4: loses 0.2% of the value to price impact and pool fees — the route's fees (0.05% + 0.005%) bring it to the limit; its price impact alone is under it (limit 0.23%; best route v4 via USDC 0.05%/10 → 0.005%/1)",
       {reason: "insufficient_liquidity"},
     ]]);
   });

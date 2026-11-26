@@ -24,7 +24,8 @@ export interface RpcItemError {
 export type RpcSlot =
   | {readonly ok: true; readonly result: unknown}
   | {readonly ok: false; readonly revert: RpcItemError}
-  /** No answer after the retries; `error` is the node's JSON-RPC error object when it sent one for this call. */
+  /** No answer after the retries; `error` is the node's JSON-RPC error object when it sent one for this call (its
+   *  message, like a revert's, with the endpoints taken out). */
   | {readonly ok: false; readonly failed: Error; readonly error?: RpcItemError};
 
 /**
@@ -65,6 +66,20 @@ export const QUOTE_WAIT_MAX_MS = 5_000;
  */
 export const MIN_CALLS_PER_SECOND = 13;
 /**
+ * The lowest `rpcCallsPerSecond` with Uniswap v4 on (`v4: "native-in"` or `"all"`): the least with which the largest v4
+ * quote fits QUOTE_WAIT_MAX_MS on an idle endpoint that answers within 250 ms. A v4 quote's reads go under the same
+ * per-quote bound as its v3 reads (U0-LIVE-1), and the largest — a token input with the sender known, gated, on a chain
+ * whose RPC serves no `eth_simulateV1`, an output token the shipped list does not know, `venueRoutes: "both"` — is 91
+ * calls in eleven passes one after another: the v3 and v4 deployment checks and the block read (4 + 5 + 1); the latest
+ * block; 40 v3 candidates beside the v4 discovery (two Multicall3 reads) and 11 V4Quoter aggregates (104 routes); v3's
+ * pool lookups + probe and slot0() reads (3 + 2) beside v4's probe, balance + allowance, `eth_simulateV1`, the access list,
+ * 16 allowance-slot read-backs and the swap's `eth_call`. At 21 it is refused as `rate_limited` with nothing else in the
+ * queue on a 250 ms endpoint (tests/v4-release-review-merge.test.ts). Eleven passes take the bound's 5 s on their own on
+ * an endpoint slower than ~450 ms: there no rate carries that quote, and such an endpoint needs more than this one does
+ * at 250 ms (35 at 400 ms).
+ */
+export const MIN_CALLS_PER_SECOND_V4 = 22;
+/**
  * Waits before each retry (ms, from..to): long enough for a per-second window to pass, spread at random so that
  * concurrent quotes refused in the same window do not all come back in the next one together.
  */
@@ -76,10 +91,12 @@ const RATE_LIMIT_TEXT = /rate.?limit|too many|request limit|limit (?:reached|exc
 /** The call ran and the EVM stopped it: a revert, or the gas the node lets one call use ran out (an answer either way). */
 const REVERT_TEXT = /revert|out of gas|gas required exceeds|gas limit reached|invalid opcode|invalid jump|stack (?:underflow|overflow|limit reached)|max call depth exceeded|write protection|return data out of bounds|vm execution error/i;
 /**
- * Methods whose answer is never `null`: an `eth_call` returns bytes (`"0x"` at least) and `eth_blockNumber` a number,
- * so `null` from either is no answer (U0C-5: pinBlock took a null block number for an answer and never asked again).
+ * Methods whose answer is never `null`: an `eth_call` returns bytes (`"0x"` at least), `eth_blockNumber` a number and
+ * `eth_getCode` bytes (`"0x"` where there is no code), so `null` from any is no answer (U0C-5: pinBlock took a null block
+ * number for an answer and never asked again; the v4 deployment check took a null code for "not the pinned build" and
+ * turned v4 off for the quote, alerting a mismatch).
  */
-const NEVER_NULL: ReadonlySet<string> = new Set(["eth_call", "eth_blockNumber"]);
+const NEVER_NULL: ReadonlySet<string> = new Set(["eth_call", "eth_blockNumber", "eth_getCode"]);
 /** The node failed to run the call: hex `data` next to these is not revert bytes. */
 const NODE_FAULT_TEXT = /timeout|timed out|unavailable|internal error|overload|busy|try again|header not found|missing trie node/i;
 
@@ -125,7 +142,8 @@ export function isUnsupportedMethod(slot: RpcSlot | undefined): boolean {
 const SHORT_OF_FUNDS_TEXT = /insufficient funds|insufficient (?:sender )?balance|\bOutOfFunds\b|lack of funds|upfront cost exceeds/i;
 
 /**
- * The node's own text (URLs taken out, kept short) when a call it did not run was refused for the sender's balance — an
+ * The node's own text (URLs taken out — the slot's message already has every spelling of the endpoints taken out —
+ * kept short) when a call it did not run was refused for the sender's balance — an
  * answer about the wallet, the same on every endpoint and every attempt, not an outage (review R3-3 / LIVE3-1: a v4
  * dry-run from a wallet short of the native input read as "no RPC answered"); else undefined.
  */
@@ -301,8 +319,11 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
   /** Chunk failures that are only "past the request's waitUntil" on every endpoint (never sent): no news about the calls. */
   const late = new WeakSet<Error>();
 
-  /** Error text as a refusal may carry it: the chain's own endpoints and any URL taken out, kept short. */
-  function clean(chainId: number, text: string): string {
+  /**
+   * Error text with the chain's own endpoints (every spelling) and any URL taken out, not cut — `clean` cuts it, and a
+   * slot carries it so (`carried`).
+   */
+  function scrub(chainId: number, text: string): string {
     let list = spellings.get(chainId);
     if (!list) spellings.set(chainId, (list = urlSpellings(rpcUrls[chainId] ?? [])));
     // Take every spelling out of a generous window first and cut to TEXT_MAX only after: a cut before taking out could
@@ -316,8 +337,17 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
         if (t.endsWith(u.slice(0, k))) { t = `${t.slice(0, t.length - k)}<url>`; break; }
       }
     }
-    return redactUrls(t).slice(0, TEXT_MAX);
+    return redactUrls(t);
   }
+  /** Error text as a refusal may carry it: the chain's own endpoints and any URL taken out, kept short. */
+  const clean = (chainId: number, text: string): string => scrub(chainId, text).slice(0, TEXT_MAX);
+  /**
+   * The node's error object as a slot carries it (`revert`, `error`): code and data as sent, its message scrubbed. The
+   * v4 paths put that message into refusals (a reverted read, a node's gas cap, a wallet short of funds), so a keyed
+   * endpoint echoing its own URL there in a spelling `redactUrls` cannot see (no scheme) never reaches one
+   * (U0-SEC-R3-1 on the v4 paths). Read for its kind before (rpcErrorKind sees the text as the node sent it).
+   */
+  const carried = (chainId: number, e: RpcItemError): RpcItemError => ({...e, message: scrub(chainId, e.message)});
   /** A node's error as refusal text: code and message, cleaned (a keyed endpoint may echo its own URL). */
   const describe = (chainId: number, e: RpcItemError) => clean(chainId, e.code !== undefined ? `${e.code} ${e.message}` : e.message);
 
@@ -494,7 +524,7 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
           const kind = rpcErrorKind(e);
           // The node's own error rides along (`error`): a caller can tell a method the node does not serve (eth_simulateV1
           // on Monad) from a call it failed to answer.
-          out[r.id] = kind === "revert" ? {ok: false, revert: e} : {ok: false, failed: refusal(kind, `uniswap: no RPC answered on chain ${chainId} (${describe(chainId, e)})`), error: e};
+          out[r.id] = kind === "revert" ? {ok: false, revert: carried(chainId, e)} : {ok: false, failed: refusal(kind, `uniswap: no RPC answered on chain ${chainId} (${describe(chainId, e)})`), error: carried(chainId, e)};
         }
         const unanswered = (): RpcSlot => {
           if (idless === undefined) return {ok: false, failed: refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node left a call unanswered)`)};
