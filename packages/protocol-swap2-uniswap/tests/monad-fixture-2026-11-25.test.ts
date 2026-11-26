@@ -27,8 +27,9 @@ const params = (amountIn: string) => ({sourceChain: "eip155:143", destChain: "ei
 /** The deployment check's calls (router / quoter factory() and WETH9()): read once per chain at "latest", not per quote. */
 const DEPLOYMENT_CHECK = /^0x(c45a0155|4aa4a4fc)$/;
 
-/** Serves the recording; every quote read's block tag and every call the recording lacks are kept for the test to check. */
-function replay() {
+/** Serves the recording (an eth_call `odd` answers instead, when it returns one); every quote read's block tag and every
+ *  call the recording lacks are kept for the test to check. */
+function replay(odd?: (data: string) => object | undefined) {
   const tags = new Set<string>();
   const misses: string[] = [];
   const f = (async (_url: RequestInfo | URL, init?: RequestInit) => {
@@ -39,6 +40,8 @@ function replay() {
         const [{to, data}, tag] = req.params as [{to: string; data: string}, string];
         if (!DEPLOYMENT_CHECK.test(data)) tags.add(tag);
         key = `eth_call ${to.toLowerCase()} ${data.toLowerCase()}`;
+        const instead = odd?.(data);
+        if (instead) return {jsonrpc: "2.0", id: req.id, ...instead};
       }
       const answer = fx.calls[key];
       if (!answer) {
@@ -51,8 +54,8 @@ function replay() {
   return {fetch: f, tags, misses};
 }
 
-async function quote(amountIn: string, config: Record<string, unknown> = {}) {
-  const r = replay();
+async function quote(amountIn: string, config: Record<string, unknown> = {}, odd?: (data: string) => object | undefined) {
+  const r = replay(odd);
   vi.stubGlobal("fetch", r.fetch);
   const heard: Array<[string, Swap2RefusalInfo | undefined]> = [];
   const q = await uniswapProvider({rpcUrls: RPC, ...config}).getQuote({...params(amountIn), onRefusal: (t: string, i?: Swap2RefusalInfo) => { heard.push([t, i]); }});
@@ -113,5 +116,19 @@ describe("Monad 62,000 MON → AUSD at block 125,409,523 (v3 only)", () => {
     const at = await quote(MON(62_000n), {maxPriceImpactBps: 9983});
     expect(at.q).toBeNull();
     expect(at.heard[0]![1]).toEqual({reason: "insufficient_liquidity"});
+  });
+
+  // Round 1 (U0-LIVE-4, U0-SEC-1): at a limit between the probe and the spot loss, the full measure refuses; when the
+  // spot reads go unanswered (QuickNode's -32007 on every attempt), the probe alone used to pass the quote.
+  it("a limit above the probe (2016) and under the spot loss: refused, also when the spot reads are rate-limited", async () => {
+    const healthy = await quote(MON(100n), {maxPriceImpactBps: 2017});
+    expect(healthy.misses).toEqual([]);
+    expect(healthy.heard[0]![0]).toMatch(/^uniswap: loses 20\.\d% of the value to price impact/);
+    const limited = {error: {code: -32007, message: "50/second request limit reached"}};
+    for (const selector of ["0x3850c7bd", "0x1698ee82"]) { // slot0(), getPool()
+      const {q, heard} = await quote(MON(100n), {maxPriceImpactBps: 2017}, (data) => (data.startsWith(selector) ? limited : undefined));
+      expect(q).toBeNull();
+      expect(heard).toEqual([["uniswap: could not measure the price impact (maxPriceImpactBps is set) — nothing was quoted; try again", {reason: "rate_limited"}]]);
+    }
   });
 });

@@ -7,10 +7,13 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, parseAbi, type Hex} from "viem";
 import {refusalOf, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import {uniswapProvider} from "../src/provider.js";
-import {RPC_BATCH_MAX, RPC_MAX_IN_FLIGHT, rpcErrorKind, uniswapRpc} from "../src/rpc.js";
+import {RETRY_DELAYS_MS, RPC_BATCH_MAX, RPC_MAX_IN_FLIGHT, rpcErrorKind, uniswapRpc} from "../src/rpc.js";
 import {D, ME, RPC, USDT, rpcStub, type StubOptions} from "./fixtures.js";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 const QUOTER = parseAbi(["function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256, uint160, uint32, uint256)"]);
 const base = {sourceChain: "eip155:1", destChain: "eip155:1", destAddress: ME, refundAddress: ME, sourceToken: "USDC", destToken: USDT, amountIn: "1000000"};
@@ -116,6 +119,23 @@ describe("per-item JSON-RPC errors in the quote batch (maxPriceImpactBps unset)"
     }
   });
 
+  it("U0-SEC-4: a rate limit or internal error carrying hex data on the best pool is not 'no candidate'", async () => {
+    // 0.05% pays 1,000,000, 0.3% 990,000: before, both answers below silently made the 0.3% route win.
+    const shapes: Array<[object, string, Swap2RefusalInfo]> = [
+      [{code: -32000, message: "rate limit exceeded", data: "0x00000000"}, "uniswap: no RPC answered on chain 1 (-32000 rate limit exceeded)", {reason: "rate_limited"}],
+      [{code: -32603, message: "internal error", data: "0x0000000000000000"}, "uniswap: no RPC answered on chain 1 (-32603 internal error)", {reason: "upstream_unavailable"}],
+    ];
+    for (const [error, text, info] of shapes) {
+      const unset = await quote(stub(tiers, (r) => (mainFee(r) === 500 ? {error} : undefined)).fetch);
+      expect(unset.q).toBeNull();
+      expect(unset.heard).toEqual([[text, info]]);
+      const gated = await quote(stub(tiers, (r) => (mainFee(r) === 500 ? {error} : undefined)).fetch, {maxPriceImpactBps: 500});
+      expect(gated.heard).toEqual([[text, info]]); // never "loses …% … best route direct 0.3%"
+      const once = await quote(stub(tiers, (r, seen) => (mainFee(r) === 500 && seen === 0 ? {error} : undefined)).fetch);
+      expect(once.q).toMatchObject({destAmount: "1000000", providerData: {fee: "500"}});
+    }
+  });
+
   it("a batch refused with a JSON-RPC error object is retried, then classified", async () => {
     let n = 0;
     const inner = rpcStub(tiers);
@@ -196,6 +216,18 @@ describe("the RPC layer", () => {
       [{code: -32000, message: "missing trie node"}, "upstream_unavailable"],
       [{code: -32603, message: "Internal error"}, "upstream_unavailable"],
       [{message: "weird"}, "upstream_unavailable"],
+      // Round 1 (U0-SEC-4): a rate limit or a node fault is read from the text before hex `data` is taken for revert
+      // bytes (the research classifier's rule); a revert reason that mentions a rate limit is still a revert.
+      [{code: -32000, message: "rate limit exceeded", data: "0x00000000"}, "rate_limited"],
+      [{code: -32000, message: "Too many requests", data: "0x7a5ed734"}, "rate_limited"],
+      [{code: -32603, message: "internal error", data: "0x0000000000000000"}, "upstream_unavailable"],
+      [{code: -32603, message: "request timed out", data: "0x08c379a0"}, "upstream_unavailable"],
+      [{code: -32000, message: "header not found", data: "0x12345678"}, "upstream_unavailable"],
+      [{code: -32000, message: "service unavailable", data: "0x12345678"}, "upstream_unavailable"],
+      [{code: -32000, message: "execution reverted: rate limit exceeded", data: "0x08c379a0"}, "revert"],
+      // The call ran and the gas the node lets one call use ran out: an answer, never a rate limit.
+      [{code: -32000, message: "gas limit reached"}, "revert"],
+      [{code: -32000, message: "gas required exceeds allowance (50000000)"}, "revert"],
     ];
     for (const [e, kind] of table) expect([e, rpcErrorKind(e)]).toEqual([e, kind]);
   });
@@ -226,6 +258,112 @@ describe("the RPC layer", () => {
     expect(out).toEqual(calls.map((c) => (c.params[0] as {data: string}).data));
     expect(largest).toBe(RPC_BATCH_MAX);
     expect(peak).toBe(RPC_MAX_IN_FLIGHT);
+  });
+
+  it(`U0-R1-3: concurrent quotes share the chain's ${RPC_MAX_IN_FLIGHT} slots (${RPC_MAX_IN_FLIGHT * RPC_BATCH_MAX} calls in flight at most)`, async () => {
+    const inner = rpcStub({multiHop: 990_000n});
+    let batches = 0;
+    let items = 0;
+    let peakBatches = 0;
+    let peakItems = 0;
+    vi.stubGlobal("fetch", (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const n = (JSON.parse(String(init?.body)) as Req[]).length;
+      batches++;
+      items += n;
+      peakBatches = Math.max(peakBatches, batches);
+      peakItems = Math.max(peakItems, items);
+      await new Promise((r) => setTimeout(r, 5));
+      batches--;
+      items -= n;
+      return inner(url, init);
+    }) as typeof fetch);
+    for (const config of [{}, {maxPriceImpactBps: 500}]) {
+      peakBatches = peakItems = 0;
+      const p = uniswapProvider({rpcUrls: RPC, ...config});
+      const quotes = await Promise.all([0, 1, 2].map(() => p.getQuote(base)));
+      for (const q of quotes) expect(q).toMatchObject({destAmount: "1000000", providerData: {fee: "500"}});
+      expect(peakBatches).toBe(RPC_MAX_IN_FLIGHT); // three quotes × 40 candidates: 12 batches, never more than 4 at once
+      expect(peakItems).toBeLessThanOrEqual(RPC_MAX_IN_FLIGHT * RPC_BATCH_MAX);
+    }
+    // Two providers do not share a lane (each is its own server-side budget).
+    peakBatches = 0;
+    const [a, b] = [uniswapProvider({rpcUrls: RPC}), uniswapProvider({rpcUrls: RPC})];
+    await Promise.all([a.getQuote(base), b.getQuote(base)]);
+    expect(peakBatches).toBeGreaterThan(RPC_MAX_IN_FLIGHT);
+  });
+
+  it("U0-R1-3: the retry waits are spread at random over 300–600 ms, then 1000–1500 ms", async () => {
+    expect(RETRY_DELAYS_MS).toEqual([[300, 600], [1000, 1500]]);
+    const waits: number[] = [];
+    const realSetTimeout = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
+      waits.push(ms ?? 0);
+      return realSetTimeout(fn, 0);
+    }) as never);
+    vi.stubGlobal("fetch", (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as Req[];
+      return new Response(JSON.stringify(batch.map((r) => ({jsonrpc: "2.0", id: r.id, error: {code: -32007, message: "50/second request limit reached"}}))));
+    }) as typeof fetch);
+    const ctrl = new AbortController(); // a caller's signal: the only timers are the retry waits
+    for (const [random, want] of [[0, [300, 1000]], [0.999999, [600, 1500]], [0.5, [450, 1250]]] as const) {
+      waits.length = 0;
+      vi.spyOn(Math, "random").mockReturnValue(random);
+      const slots = await uniswapRpc({1: ["https://rpc.test"]}).slots(1, [{method: "eth_blockNumber", params: []}], "all", ctrl.signal);
+      expect(slots[0]).toMatchObject({ok: false});
+      expect(waits).toEqual(want);
+    }
+  });
+
+  it("a request waiting for a slot ends at the caller's abort, unsent and unclassified", async () => {
+    const sent: number[] = [];
+    let open!: () => void;
+    const gate = new Promise<void>((r) => (open = r));
+    vi.stubGlobal("fetch", (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as Req[];
+      sent.push(batch.length);
+      await gate;
+      return new Response(JSON.stringify(batch.map((r) => ({jsonrpc: "2.0", id: r.id, result: "0x1"}))));
+    }) as typeof fetch);
+    const net = uniswapRpc({1: ["https://rpc.test"]});
+    const call = {method: "eth_blockNumber", params: []};
+    const busy = net.results(1, Array.from({length: RPC_MAX_IN_FLIGHT * RPC_BATCH_MAX}, () => call), "none");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sent).toEqual(Array.from({length: RPC_MAX_IN_FLIGHT}, () => RPC_BATCH_MAX));
+    const ctrl = new AbortController();
+    const waiting = net.results(1, [call], "none", ctrl.signal).then(() => null, (e: Error) => e);
+    ctrl.abort();
+    const err = await waiting;
+    expect(err!.message).toBe("uniswap: no RPC answered on chain 1 (This operation was aborted)");
+    expect(refusalOf(err)).toBeUndefined();
+    open();
+    expect(await busy).toHaveLength(RPC_MAX_IN_FLIGHT * RPC_BATCH_MAX);
+    expect(sent).toHaveLength(RPC_MAX_IN_FLIGHT); // the aborted request was never sent
+    // The lane is free again: the next request goes out.
+    expect(await net.results(1, [call], "none")).toEqual(["0x1"]);
+  });
+
+  it("a caller's signal does not lift the request timeout: a hung endpoint frees the chain's slots", async () => {
+    vi.spyOn(AbortSignal, "timeout").mockImplementation(() => {
+      const c = new AbortController();
+      setTimeout(() => c.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError")), 10);
+      return c.signal;
+    });
+    let hang = true;
+    vi.stubGlobal("fetch", (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as Req[];
+      if (hang) {
+        await new Promise((_r, reject) => init!.signal!.addEventListener("abort", () => reject(new DOMException("This operation was aborted", "AbortError"))));
+      }
+      return new Response(JSON.stringify(batch.map((r) => ({jsonrpc: "2.0", id: r.id, result: "0x1"}))));
+    }) as typeof fetch);
+    const net = uniswapRpc({1: ["https://rpc.test"]});
+    const call = {method: "eth_blockNumber", params: []};
+    const ctrl = new AbortController(); // never aborted
+    const stuck = await net.results(1, Array.from({length: RPC_MAX_IN_FLIGHT * RPC_BATCH_MAX}, () => call), "none", ctrl.signal).then(() => null, (e: Error) => e);
+    expect(stuck!.message).toBe("uniswap: no RPC answered on chain 1 (This operation was aborted)");
+    expect(refusalOf(stuck)).toEqual({reason: "upstream_unavailable"});
+    hang = false;
+    expect(await net.results(1, [call], "none", ctrl.signal)).toEqual(["0x1"]);
   });
 
   it("the caller's abort during a retry wait ends it, unclassified", async () => {

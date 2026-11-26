@@ -270,19 +270,49 @@ describe("maxPriceImpactBps set: nothing measurable is a refusal (fail closed)",
     expect(http.heard).toEqual([[COULD_NOT, {reason: "upstream_unavailable", httpStatus: 503}]]);
   });
 
-  it("the probe reverts and no pool has a mid price → insufficient_liquidity", async () => {
+  it("the probe reverts and the pool lookup names no pool for the priced route → the node's fault, upstream_unavailable", async () => {
+    // The quoter just priced the route at the block, so its pool exists there: a zero getPool() is not "no pool".
     const rule: Rule = (r) => (isProbe(r) ? {error: {code: 3, message: "execution reverted"}} : isGetPool(r) ? {result: `0x${"0".repeat(64)}`} : undefined);
     const {q, heard} = await quote(stub({}, rule), {maxPriceImpactBps: 500});
     expect(q).toBeNull();
-    expect(heard).toEqual([["uniswap: the route would not quote a smaller amount; its price impact cannot be measured", {reason: "insufficient_liquidity"}]]);
+    expect(heard).toEqual([[COULD_NOT, {reason: "upstream_unavailable"}]]);
   });
 
-  it("the probe measured, the mid prices unanswered: the probe decides (G = c)", async () => {
+  it("the probe measured, the mid prices unanswered: refused (fail closed) — on the probe when it alone reaches the limit", async () => {
+    // Round 1 (U0-R1-4, U0-SEC-1, U0-LIVE-4): the probe alone is blind to a pool parked past an empty range, so a
+    // spot read the RPC did not serve no longer lets the probe decide a pass.
     const pass = await quote(stub({impactBps: 100}, (r) => (isSlot0(r) ? limited : undefined)), {maxPriceImpactBps: 500});
-    expect(pass.q).toMatchObject({providerData: {priceImpactBps: "100"}});
-    expect(pass.q!.providerData!.valueLossBps).toBeUndefined();
+    expect(pass.q).toBeNull();
+    expect(pass.heard).toEqual([[COULD_NOT, {reason: "rate_limited"}]]);
+    const lookups = await quote(stub({impactBps: 100}, (r) => (isGetPool(r) ? limited : undefined)), {maxPriceImpactBps: 500});
+    expect(lookups.heard).toEqual([[COULD_NOT, {reason: "rate_limited"}]]);
     const refused = await quote(stub({impactBps: 700}, (r) => (isSlot0(r) ? limited : undefined)), {maxPriceImpactBps: 500});
-    expect(refused.heard[0]![0]).toBe(LOSES("7.0", "5"));
+    expect(refused.heard).toEqual([[LOSES("7.0", "5"), {reason: "insufficient_liquidity"}]]);
+    // A transient error on the mid prices is asked again and measured.
+    const again = await quote(stub({impactBps: 100}, (r, seen) => (isSlot0(r) && seen === 0 ? limited : undefined)), {maxPriceImpactBps: 500});
+    expect(again.q).toMatchObject({providerData: {priceImpactBps: "100", valueLossBps: "99"}});
+  });
+
+  it("hostile spot answers on a pool parked past an empty range (U0-SEC-1): never a pass on the probe alone", async () => {
+    // 1 USDC → USDT: the 0.05% pool pays 1,000,000 at the probe and at full size (probe impact 0), but its mid is 4:
+    // the trade loses 75%. Healthy reads refuse it; each odd answer below, alone, used to return the quote.
+    const parked = {byFee: {500: 1_000_000n}, slot0: {500: MID_4}};
+    expect((await quote(stub(parked), {maxPriceImpactBps: 500})).heard).toEqual([[LOSES("75.0", "5"), {reason: "insufficient_liquidity"}]]);
+    const odd: Array<[string, Rule, Swap2RefusalInfo]> = [
+      ["slot0 rate-limited on every attempt", (r) => (isSlot0(r) ? limited : undefined), {reason: "rate_limited"}],
+      ["a getPool word that is not zero-padded", (r) => (isGetPool(r) ? {result: `0x${"00".repeat(19)}01f4`} : undefined), {reason: "upstream_unavailable"}],
+      ["a null getPool result", (r) => (isGetPool(r) ? {result: null} : undefined), {reason: "upstream_unavailable"}],
+      ["a zero getPool result", (r) => (isGetPool(r) ? {result: `0x${"0".repeat(64)}`} : undefined), {reason: "upstream_unavailable"}],
+      ["a reverted getPool", (r) => (isGetPool(r) ? {error: {code: 3, message: "execution reverted"}} : undefined), {reason: "upstream_unavailable"}],
+      ["slot0 answering 0x", (r) => (isSlot0(r) ? {result: "0x"} : undefined), {reason: "upstream_unavailable"}],
+      ["slot0 answering a zero price", (r) => (isSlot0(r) ? {result: `0x${"0".repeat(64 * 7)}`} : undefined), {reason: "upstream_unavailable"}],
+      ["a reverted slot0", (r) => (isSlot0(r) ? {error: {code: 3, message: "execution reverted"}} : undefined), {reason: "upstream_unavailable"}],
+      ["slot0 rate-limited by text with hex data", (r) => (isSlot0(r) ? {error: {code: -32000, message: "rate limit exceeded", data: "0x00000000"}} : undefined), {reason: "rate_limited"}],
+    ];
+    for (const [what, rule, info] of odd) {
+      const {q, heard} = await quote(stub(parked, rule), {maxPriceImpactBps: 500});
+      expect([what, q, heard]).toEqual([what, null, [[COULD_NOT, info]]]);
+    }
   });
 
   it("the latest block cannot be read → refused, classified", async () => {

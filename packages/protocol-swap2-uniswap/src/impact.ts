@@ -87,25 +87,64 @@ export function impactRefusalText(lossBps: number, limitBps: number, routeLabel:
 }
 
 /**
- * Per-transaction gas caps that are lower than a block: Ethereum's EIP-7825 (2²⁴, since Fusaka) and Monad's 30M
- * ("Transaction gas limit 30M gas", docs.monad.xyz). Elsewhere the block gas limit, read on chain, is the cap.
+ * Per-transaction gas-limit caps that are lower than a block: Ethereum's EIP-7825 (2²⁴, since Fusaka) and Monad's 30M
+ * ("Transaction gas limit 30M gas", docs.monad.xyz). A transaction's gasLimit above them is invalid, so a padded limit
+ * is clamped to them. Elsewhere the block gas limit, read on chain, is the cap.
  */
 export const KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = Object.freeze({1: 16_777_216n, 143: 30_000_000n});
 
-/** min(the chain's per-transaction cap, its block gas limit); undefined when neither is known. */
-export function gasCapOf(chainId: number, blockGasLimit: bigint | undefined): bigint | undefined {
-  const known = Object.prototype.hasOwnProperty.call(KNOWN_TX_GAS_CAP, chainId) ? KNOWN_TX_GAS_CAP[chainId] : undefined;
-  if (known === undefined) return blockGasLimit;
-  if (blockGasLimit === undefined) return known;
-  return known < blockGasLimit ? known : blockGasLimit;
+/**
+ * Arbitrum Nitro chains: the most gas one transaction can spend on execution. Their block header carries a 2⁵⁰
+ * placeholder; `ArbGasInfo(0x…6C).getMaxTxGasLimit()` read 32,000,000 on Arbitrum One (42161) and Robinhood Chain
+ * (4663), read-only on 2026-11-26 (`getGasAccountingParams()` = 7M, 32M, 32M). Nitro holds any gas above it back from
+ * execution, but the transaction's gasLimit also pays the L1 posting gas, so the limit may be higher: a swap whose
+ * execution need is above it is refused, and the padded limit is never clamped to it. zkSync Era (324) also reports a
+ * 2⁵⁰ header; its per-transaction limit is not known here (an open question), so only that header applies.
+ */
+export const KNOWN_EXECUTION_GAS_CAP: Readonly<Record<number, bigint>> = Object.freeze({42161: 32_000_000n, 4663: 32_000_000n});
+
+/** What bounds one transaction's gas on a chain: its gasLimit (`limit`, clamped to) and the gas execution may use (refused above). */
+export interface GasBounds {
+  /** min(the chain's per-transaction gas-limit cap, its block gas limit). */
+  limit?: bigint;
+  /** The most gas one transaction's execution may use, when that is not its gasLimit (Arbitrum Nitro). */
+  execution?: bigint;
+}
+
+const own = (table: Readonly<Record<number, bigint>>, chainId: number) => (Object.prototype.hasOwnProperty.call(table, chainId) ? table[chainId] : undefined);
+
+/** The chain's gas bounds from the known caps and its block gas limit (undefined: the node did not say). */
+export function gasBoundsOf(chainId: number, blockGasLimit: bigint | undefined): GasBounds {
+  const known = own(KNOWN_TX_GAS_CAP, chainId);
+  const limit = known === undefined ? blockGasLimit : blockGasLimit === undefined || known < blockGasLimit ? known : blockGasLimit;
+  const execution = own(KNOWN_EXECUTION_GAS_CAP, chainId);
+  return {...(limit !== undefined ? {limit} : {}), ...(execution !== undefined ? {execution} : {})};
 }
 
 /**
- * The gas limit a quote carries, bounded by the chain: `refuse` when the bare need (no headroom) is above the cap — such
- * a transaction can never be mined; else the padded limit, clamped to the cap (never below the need, which is under it).
+ * The share of the bare need (quoter gas + router overhead + unwrap/refund) a transaction is taken to need, in percent.
+ * EIP-150 forwards at most 63/64 of the gas left into a call, and the pool's swap runs two calls deep (the multicall's
+ * delegatecall, then `pool.swap`): (64/63)² ≈ 1.032 before the router's own work. Live, the least gas a swap ran in was
+ * 2.1% over the bare need on Ethereum (USDC → LINK, 16.48M → 16.83M) and 3.5% on Monad (62,000 MON → AUSD, 10.90M →
+ * 11.28M); a cap within 5% of the bare need would send a limit the swap runs out of, mined and paid for.
  */
-export function boundGasLimit(need: bigint, padded: bigint, cap: bigint | undefined): {gasLimit: bigint} | {refuse: {need: bigint; cap: bigint}} {
-  if (cap === undefined) return {gasLimit: padded};
-  if (need > cap) return {refuse: {need, cap}};
-  return {gasLimit: padded > cap ? cap : padded};
+export const GAS_NEED_PCT = 105n;
+
+/** The gas a swap with this bare need is taken to need on chain: GAS_NEED_PCT of it, rounded up. */
+export function gasNeedOf(bare: bigint): bigint {
+  return (bare * GAS_NEED_PCT + 99n) / 100n;
+}
+
+/**
+ * The gas limit a quote carries, bounded by the chain (always on). `refuse` when the need (gasNeedOf(bare)) is above
+ * the gasLimit cap or the execution cap: such a transaction can never complete. Else the padded limit, clamped to the
+ * gasLimit cap (never to the execution cap, which leaves out L1 gas), and never below the need.
+ */
+export function boundGasLimit(bare: bigint, padded: bigint, bounds: GasBounds): {gasLimit: bigint} | {refuse: {need: bigint; cap: bigint}} {
+  const need = gasNeedOf(bare);
+  const caps = [bounds.limit, bounds.execution].filter((c): c is bigint => c !== undefined);
+  const cap = caps.length === 0 ? undefined : caps.reduce((a, b) => (a < b ? a : b));
+  if (cap !== undefined && need > cap) return {refuse: {need, cap}};
+  const clamped = bounds.limit !== undefined && padded > bounds.limit ? bounds.limit : padded;
+  return {gasLimit: clamped < need ? need : clamped};
 }
