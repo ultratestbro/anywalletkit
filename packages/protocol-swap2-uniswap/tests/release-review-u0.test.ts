@@ -149,6 +149,40 @@ describe("U0-SEC-R3-1: an endpoint's key never reaches the refusal, scheme or no
       expect(heard).toEqual([["uniswap: no RPC answered on chain 1 (-32603 internal error at <url> (try later))", {reason: "upstream_unavailable"}]]);
     }
   });
+
+  it("a second echo far into a long error never leaves a piece of the key once the first one is taken out", async () => {
+    // The old cut (200 + the longest spelling, before taking spellings out) split a second copy ~210 chars on; after
+    // the first copy shrank to <url>, the cut piece ("…SECRETKEY12") moved into the kept 200 chars.
+    const LONG = "SECRETKEY1234567890ABCDEF";
+    const url = `https://rpc.example.com/v2/${LONG}`;
+    const echo = `rpc.example.com/v2/${LONG}`;
+    for (const pad of [124, 128, 132, 136, 140, 148]) {
+      const s = stub({}, (r) => (mainFee(r) === 500 ? {error: {code: -32603, message: `internal error at ${echo} ${"x".repeat(pad)} retry ${echo}`}} : undefined));
+      vi.stubGlobal("fetch", s.fetch);
+      const heard: Array<[string, unknown]> = [];
+      await uniswapProvider({rpcUrls: {1: [url]}}).getQuote({...base, onRefusal: (t: string, i: unknown) => { heard.push([t, i]); }} as never);
+      const text = JSON.stringify(heard);
+      expect(heard.length, `pad ${pad}`).toBe(1);
+      for (let k = 6; k <= LONG.length; k++) expect(text, `pad ${pad}`).not.toContain(LONG.slice(0, k));
+    }
+  }, 60_000);
+
+  it("a copy split by the end of the search window is taken out too", async () => {
+    // A 350-char key: 22 whole copies fill 8,140 of the 8,192 searched chars and the window ends 29 chars into the 23rd
+    // ("rpc.example.com/v2/" + "SECRETAAAA"). The 22 copies shrink to "<url> ", so that piece lands inside the kept
+    // 200 chars unless it is taken out as well.
+    const LONG = `SECRET${"A".repeat(344)}`;
+    const url = `https://rpc.example.com/v2/${LONG}`;
+    const echo = `rpc.example.com/v2/${LONG}`;
+    const message = `internal error: ${`${echo} `.repeat(30)}`;
+    expect(("-32603 " + message).slice(0, 8192).endsWith(echo.slice(0, 29))).toBe(true);
+    const s = stub({}, (r) => (mainFee(r) === 500 ? {error: {code: -32603, message}} : undefined));
+    vi.stubGlobal("fetch", s.fetch);
+    const heard: Array<[string, unknown]> = [];
+    await uniswapProvider({rpcUrls: {1: [url]}}).getQuote({...base, onRefusal: (t: string, i: unknown) => { heard.push([t, i]); }} as never);
+    expect(heard.length).toBe(1);
+    expect(JSON.stringify(heard)).not.toContain("SECRET");
+  }, 30_000);
 });
 
 describe("U0-SEC-R3-2: a candidate answer no quoter gives is no answer, never 'no pool'", () => {

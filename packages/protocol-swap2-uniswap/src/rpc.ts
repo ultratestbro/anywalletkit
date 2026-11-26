@@ -112,6 +112,8 @@ function itemError(raw: unknown): RpcItemError {
 
 /** Longest error text kept in a refusal. */
 const TEXT_MAX = 200;
+/** How much of a node's error text is searched for the endpoint's spellings before it is cut to TEXT_MAX. */
+const TEXT_SCAN_MAX = 8192;
 /** Shortest piece of a configured URL taken out of error text on its own (a bare "/rpc" path is no secret). */
 const URL_PART_MIN = 6;
 
@@ -268,9 +270,17 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
   function clean(chainId: number, text: string): string {
     let list = spellings.get(chainId);
     if (!list) spellings.set(chainId, (list = urlSpellings(rpcUrls[chainId] ?? [])));
-    // Cut before taking out (bounded work), but past where a spelling that starts inside the kept text ends.
-    let t = text.slice(0, TEXT_MAX + (list[0]?.length ?? 0));
+    // Take every spelling out of a generous window first and cut to TEXT_MAX only after: a cut before taking out could
+    // split a later copy, and that piece of the key would move into the kept text once an earlier copy shrank.
+    let t = text.slice(0, TEXT_SCAN_MAX);
     for (const u of list) if (t.includes(u)) t = t.split(u).join("<url>");
+    // A copy split by the window's own end (only a text longer than the window has one): drop it from where its
+    // first characters start.
+    if (text.length > TEXT_SCAN_MAX) for (const u of list) {
+      for (let k = Math.min(u.length - 1, t.length); k >= 1; k--) {
+        if (t.endsWith(u.slice(0, k))) { t = `${t.slice(0, t.length - k)}<url>`; break; }
+      }
+    }
     return redactUrls(t).slice(0, TEXT_MAX);
   }
   /** A node's error as refusal text: code and message, cleaned (a keyed endpoint may echo its own URL). */
