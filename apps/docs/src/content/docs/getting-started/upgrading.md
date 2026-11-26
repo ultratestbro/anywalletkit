@@ -28,6 +28,9 @@ Nothing to change in code unless you opt in; read the rollout note if you serve 
   `uniswapPinsWith({v4ExtraPools})` (the server then sets `v4RankedPools: "extra"`).
 - **`maxPriceImpactBps` (opt-in):** refuses a quote that loses that many bps or more to price impact (the larger of the
   1/1000 probe and the spot value loss at one block) as `insufficient_liquidity`; unset, impact stays information.
+- **`rpcCallsPerSecond` (opt-in):** at most that many calls to one endpoint a second, each quote's reads within 5 s of
+  its start (refused `rate_limited` past that). An integer ≥ 13, and ≥ 22 with `v4` on (a lower value throws when the
+  provider is made): a server that limits its calls raises it to 22 or more before it turns v4 on.
 - **Always on:** a swap whose gas need is above the chain's per-transaction cap or block gas limit is refused; per-item
   RPC errors are retried and refused as `rate_limited` / `upstream_unavailable`, never read as "no pool". The provider
   (and `uniswapRemoteProvider`) declares `ownGasEstimate`, so the engine sends each Uniswap call with the account's own
