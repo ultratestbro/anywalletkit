@@ -1,5 +1,7 @@
 // A JSON-RPC stub for one chain: the pinned deployment answers factory()/WETH9(),
-// QuoterV2 answers single-hop quotes from a fee → amountOut table (multi-hop reverts).
+// QuoterV2 answers single-hop quotes from a fee → amountOut table (multi-hop reverts),
+// the factory answers getPool() and each pool its slot0() (a mid price, for maxPriceImpactBps),
+// and the node names its block (eth_blockNumber / eth_getBlockByNumber with a gasLimit).
 import {decodeFunctionData, encodeAbiParameters, parseAbi, type Hex} from "viem";
 import {UNISWAP_V3} from "../src/addresses.js";
 
@@ -42,7 +44,15 @@ export interface StubOptions {
   sqrtAfter?: Record<number, bigint>;
   /** sqrtPriceX96AfterList on two-pool quotes (default both MID_SQRT_PRICE). */
   multiHopSqrtAfter?: readonly bigint[];
+  /** The latest block's gasLimit (default 60M, Ethereum's); null = a block without one. */
+  blockGasLimit?: bigint | null;
+  /** slot0().sqrtPriceX96 of the pool getPool() names for a fee (default MID_SQRT_PRICE: price 1, the stub's own rate). */
+  slot0?: Record<number, bigint>;
 }
+
+/** The pool address getPool() answers for a fee tier: 0x…<fee>, the same for any token pair. */
+export const poolOf = (fee: number): `0x${string}` => `0x${fee.toString(16).padStart(40, "0")}`;
+export const BLOCK = "0x1234";
 
 export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]} {
   const byFee = o.byFee ?? {500: 1_000_000n, 3000: 990_000n};
@@ -54,8 +64,18 @@ export function rpcStub(o: StubOptions = {}): typeof fetch & {urls: string[]} {
     const batch = JSON.parse(String(init?.body)) as {id: number; method: string; params: [{to: string; data: Hex}] | [string]}[];
     const out = batch.map((req) => {
       if (req.method === "eth_getTransactionReceipt") return {id: req.id, result: o.receipt === null || o.receipt === undefined ? null : {status: o.receipt}};
+      if (req.method === "eth_blockNumber") return {id: req.id, result: BLOCK};
+      if (req.method === "eth_getBlockByNumber") {
+        const gasLimit = o.blockGasLimit === undefined ? 60_000_000n : o.blockGasLimit;
+        return {id: req.id, result: {number: BLOCK, ...(gasLimit === null ? {} : {gasLimit: `0x${gasLimit.toString(16)}`})}};
+      }
       const {to, data} = req.params[0] as {to: string; data: Hex};
       const sel = data.slice(0, 10);
+      if (sel === "0x1698ee82" && to === D.factory) return {id: req.id, result: word(poolOf(parseInt(data.slice(-6), 16)))};
+      if (sel === "0x3850c7bd") {
+        const fee = parseInt(to.slice(-6), 16);
+        return {id: req.id, result: encodeAbiParameters([{type: "uint160"}, {type: "int24"}, {type: "uint16"}, {type: "uint16"}, {type: "uint16"}, {type: "uint8"}, {type: "bool"}], [o.slot0?.[fee] ?? MID_SQRT_PRICE, 0, 0, 1, 1, 0, true])};
+      }
       if (sel === "0xc45a0155") return {id: req.id, result: word(o.badFactory && to === D.router ? "0x000000000000000000000000000000000000dead" : D.factory)};
       if (sel === "0x4aa4a4fc") return o.quoterNoWeth && to === D.quoter ? {id: req.id, error: {code: 3, message: "execution reverted"}} : {id: req.id, result: word(D.weth)};
       try {

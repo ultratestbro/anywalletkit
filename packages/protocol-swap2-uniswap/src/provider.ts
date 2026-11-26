@@ -1,11 +1,13 @@
 import {decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, parseAbi, type Hex} from "viem";
 import {describeUniswapActivity} from "./activity.js";
 import {ccAsset} from "@anywalletkit/swap2-assets";
-import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
-import {httpRefusal, refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
+import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
+import {uniswapRpc, type RpcCall} from "./rpc.js";
+import {boundGasLimit, gasCapOf, hopsOf, impactRefusalText, probeImpactBps, spotValueLossBps, validMaxImpactBps} from "./impact.js";
 
 /**
  * Uniswap v3, straight from the contracts — the permissionless swap venue.
@@ -44,12 +46,37 @@ const QUOTER_ABI = parseAbi([
   "function factory() view returns (address)",
   "function WETH9() view returns (address)",
 ]);
+/** The v3 factory's pool lookup and a pool's `slot0()` (its mid price, read for the spot measure of `maxPriceImpactBps`). */
+const POOL_ABI = parseAbi([
+  "function getPool(address tokenA, address tokenB, uint24 fee) view returns (address pool)",
+  "function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
+]);
 
 /** A quoter result's output, the pool price(s) it leaves behind and its gas figure, for either quote shape. */
 function decodeQuote(single: boolean, raw: Hex): {out: bigint; drained: boolean; gas: bigint} {
   const [out, after, , gas] = decodeFunctionResult({abi: QUOTER_ABI, functionName: single ? "quoteExactInputSingle" : "quoteExactInput", data: raw}) as readonly [bigint, bigint | readonly bigint[], unknown, bigint];
   const prices = typeof after === "bigint" ? [after] : after;
   return {out, gas, drained: prices.length === 0 || prices.some((p) => p <= SQRT_PRICE_FLOOR || p >= SQRT_PRICE_CEIL)};
+}
+
+/** An address in a 32-byte ABI word (a getPool answer), or null. */
+function wordAddress(raw: unknown): Hex | null {
+  return typeof raw === "string" && /^0x0{24}[0-9a-fA-F]{40}$/.test(raw) ? getAddress(`0x${raw.slice(26)}`) : null;
+}
+
+/** The first 32-byte word of an answer (slot0's sqrtPriceX96, a uint160), or undefined when it is not one. */
+function firstWord(raw: unknown): bigint | undefined {
+  if (typeof raw !== "string" || !/^0x[0-9a-fA-F]{64,}$/.test(raw)) return undefined;
+  const v = BigInt(raw.slice(0, 66));
+  return v > 0n && v < 1n << 160n ? v : undefined;
+}
+
+/** A block's `gasLimit`, or undefined when the node did not give one. */
+function blockGasLimitOf(block: unknown): bigint | undefined {
+  const g = block && typeof block === "object" ? (block as {gasLimit?: unknown}).gasLimit : undefined;
+  if (typeof g !== "string" || !/^0x[0-9a-fA-F]{1,32}$/.test(g)) return undefined;
+  const v = BigInt(g);
+  return v > 0n ? v : undefined;
 }
 
 export interface UniswapProviderConfig {
@@ -70,6 +97,19 @@ export interface UniswapProviderConfig {
    * turns this on only once the apps it serves verify with ≥ 0.4.2.
    */
   refundNativeInput?: boolean;
+  /**
+   * Refuse a quote that loses this many basis points or more of its value to price impact, as `insufficient_liquidity`
+   * (an integer 1..10000; a web swap page sets e.g. 500). Unset (the default): nothing is refused for impact, which
+   * rides on the quote as information (`providerData.priceImpactBps`) — the wallet warns and the user decides.
+   *
+   * When set: every candidate is ranked as always and only the best route is gated (a lower-output candidate is never
+   * the better offer); every read of the quote is pinned to one block; the measure is the larger of the 1/1000 probe
+   * (`priceImpactBps`, fees excluded, transient RPC errors retried) and the spot value loss against the pools'
+   * `slot0()` mid prices (fees included, `providerData.valueLossBps`). A probe too small to measure falls back to spot;
+   * when neither can be measured the quote is refused — `upstream_unavailable` / `rate_limited` when the RPC did not
+   * answer, never a quote with the check skipped. `preflightDeposit` does not apply it: the signed minimum governs there.
+   */
+  maxPriceImpactBps?: number;
 }
 
 interface Route {
@@ -81,11 +121,6 @@ interface Route {
   path?: Hex;
 }
 
-type RpcCall = {method: string; params: unknown[]};
-
-/** Largest JSON-RPC batch sent to one node (X Layer's public RPCs refuse more than 10). */
-const RPC_BATCH_MAX = 10;
-
 export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvider {
   const deployments = config.deployments ?? UNISWAP_V3;
   const slippageDefault = config.defaultSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
@@ -93,7 +128,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const deadlineS = config.deadlineSeconds ?? DEFAULT_DEADLINE_S;
   const refundNative = config.refundNativeInput === true;
   if (!Number.isInteger(slippageDefault) || slippageDefault <= 0 || slippageDefault >= 5_000) throw new Error("uniswap: defaultSlippageBps must be 1..4999");
+  const maxImpact = config.maxPriceImpactBps;
+  if (maxImpact !== undefined && !validMaxImpactBps(maxImpact)) throw new Error("uniswap: maxPriceImpactBps must be an integer 1..10000");
   const verified = new Map<number, Promise<void>>();
+  /** Each verified chain's block gas limit (undefined: the node did not say), read with the deployment check. */
+  const blockGasLimits = new Map<number, bigint | undefined>();
+  const net = uniswapRpc(config.rpcUrls);
 
   const chainIdOf = (caip2: string): number | null => {
     if (!isEvm(caip2)) return null;
@@ -101,49 +141,14 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     return deployments[id] && config.rpcUrls[id]?.length ? id : null;
   };
 
+  /** JSON-RPC for the getQuote/preflight paths: a revert is null; a call the node did not answer throws, classified. */
+  const rpc = (chainId: number, calls: RpcCall[], policy: "none" | "items" | "all", signal?: AbortSignal) => net.results(chainId, calls, policy, signal);
+  const call = (to: string, data: Hex, block: string = "latest"): RpcCall => ({method: "eth_call", params: [{to, data}, block]});
+
   /**
-   * JSON-RPC batch with endpoint failover; each slot is the result or null (reverted / errored).
-   * Sent in chunks of RPC_BATCH_MAX: some public nodes cap a batch (X Layer's at 10 calls).
+   * The pinned addresses still describe one deployment (router + quoter agree on factory and WETH). The chain's block
+   * gas limit rides in the same batch: a swap whose gas need is above it (or a per-transaction cap) can never be mined.
    */
-  async function rpc(chainId: number, calls: RpcCall[], signal?: AbortSignal): Promise<(unknown | null)[]> {
-    if (calls.length <= RPC_BATCH_MAX) return rpcBatch(chainId, calls, signal);
-    const chunks: RpcCall[][] = [];
-    for (let i = 0; i < calls.length; i += RPC_BATCH_MAX) chunks.push(calls.slice(i, i + RPC_BATCH_MAX));
-    return (await Promise.all(chunks.map((c) => rpcBatch(chainId, c, signal)))).flat();
-  }
-
-  async function rpcBatch(chainId: number, calls: RpcCall[], signal?: AbortSignal): Promise<(unknown | null)[]> {
-    let lastErr: unknown;
-    for (const url of config.rpcUrls[chainId] ?? []) {
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {"content-type": "application/json"},
-          body: JSON.stringify(calls.map((c, id) => ({jsonrpc: "2.0", id, ...c}))),
-          signal: signal ?? timeoutSignal(12_000),
-        });
-        if (!res.ok) {
-          const error = new Error(`HTTP ${res.status}`);
-          const info = httpRefusal(res.status, res.headers?.get?.("retry-after"));
-          throw info ? withReason(error, info) : error;
-        }
-        const body = (await res.json()) as {id: number; result?: unknown; error?: unknown}[] | {error?: {message?: string}};
-        if (!Array.isArray(body)) throw new Error(body.error?.message ?? "batch refused");
-        const out: (unknown | null)[] = calls.map(() => null);
-        for (const r of body) if (typeof r.id === "number" && r.id < out.length && r.error === undefined) out[r.id] = r.result ?? null;
-        return out;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    const error = new Error(`uniswap: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
-    // Every endpoint failed: the last one's own classification (a 429, a rejected key), else unavailable — never the caller's abort.
-    throw signal?.aborted ? error : withReason(error, refusalOf(lastErr) ?? "upstream_unavailable");
-  }
-
-  const call = (to: string, data: Hex): RpcCall => ({method: "eth_call", params: [{to, data}, "latest"]});
-
-  /** The pinned addresses still describe one deployment (router + quoter agree on factory and WETH). */
   function verifyDeployment(chainId: number): Promise<void> {
     let p = verified.get(chainId);
     if (!p) {
@@ -151,11 +156,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       p = (async () => {
         const f = encodeFunctionData({abi: ROUTER_ABI, functionName: "factory"});
         const w = encodeFunctionData({abi: ROUTER_ABI, functionName: "WETH9"});
-        const [rf, rw, qf, qw] = await rpc(chainId, [call(d.router, f), call(d.router, w), call(d.quoter, f), call(d.quoter, w)]);
+        const [rf, rw, qf, qw, block] = await rpc(chainId, [call(d.router, f), call(d.router, w), call(d.quoter, f), call(d.quoter, w), {method: "eth_getBlockByNumber", params: ["latest", false]}], "items");
         const addr = (r: unknown) => (typeof r === "string" && r.length >= 42 ? getAddress(`0x${r.slice(-40)}`) : null);
         const wrapped = d.nativeWrap === false ? getAddress(ZERO) : getAddress(d.weth);
         const ok = [rf, qf].every((r) => addr(r) === getAddress(d.factory)) && addr(rw) === wrapped && addr(qw) === wrapped;
         if (!ok) throw refusal("vault_mismatch", `uniswap: the router/quoter on chain ${chainId} do not match the pinned deployment — refusing`);
+        blockGasLimits.set(chainId, blockGasLimitOf(block));
       })();
       p.catch(() => verified.delete(chainId));
       verified.set(chainId, p);
@@ -181,6 +187,73 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       }
     }
     return out;
+  }
+
+  /** The quoter call for `amount` along a route. */
+  function quoteData(route: Route, tokenIn: Hex, tokenOut: Hex, amount: bigint): Hex {
+    return route.single
+      ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn, tokenOut, amountIn: amount, fee: route.single.fee, sqrtPriceLimitX96: 0n}]})
+      : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [route.path!, amount]});
+  }
+
+  /** The chain's latest block, normalized: every read of a gated quote is pinned to it. */
+  async function pinBlock(chainId: number, signal?: AbortSignal): Promise<Hex> {
+    const [n] = await rpc(chainId, [{method: "eth_blockNumber", params: []}], "all", signal);
+    if (typeof n !== "string" || !/^0x[0-9a-fA-F]{1,16}$/.test(n)) throw refusal("upstream_unavailable", `uniswap: the RPC on chain ${chainId} did not name its latest block`);
+    return `0x${BigInt(n).toString(16)}`;
+  }
+
+  /**
+   * The two measures `maxPriceImpactBps` gates on, for the best route, at `block`: the 1/1000 probe (`probe`, as
+   * `priceImpactBps`) and the spot value loss against the pools' slot0 mid prices, fees included (`spot`). Transient RPC
+   * errors are retried; a measure the RPC could not serve carries its classified error instead (`…Failure`). A probe
+   * too small to run, reverted, empty or zero is simply absent: spot decides.
+   */
+  async function measureImpact(
+    chainId: number, d: UniswapDeployment, route: Route, tokenIn: Hex, tokenOut: Hex, amountIn: bigint, out: bigint, block: Hex, signal?: AbortSignal,
+  ): Promise<{probe?: number; spot?: number; probeFailure?: Error; spotFailure?: Error}> {
+    const m: {probe?: number; spot?: number; probeFailure?: Error; spotFailure?: Error} = {};
+    const hops = hopsOf(tokenIn, tokenOut, route.single, route.path);
+    const probeIn = amountIn / 1000n;
+    const calls = hops.map((h) => call(d.factory, encodeFunctionData({abi: POOL_ABI, functionName: "getPool", args: [h.tokenIn, h.tokenOut, h.fee]}), block));
+    if (probeIn > 0n) calls.push(call(d.quoter, quoteData(route, tokenIn, tokenOut, probeIn), block));
+    const first = await net.slots(chainId, calls, "all", signal);
+    const probe = first[hops.length];
+    if (probe && "failed" in probe) m.probeFailure = probe.failed;
+    else if (probe?.ok && typeof probe.result === "string" && probe.result !== "0x") {
+      try {
+        const [probeOut] = decodeFunctionResult({abi: QUOTER_ABI, functionName: route.single ? "quoteExactInputSingle" : "quoteExactInput", data: probe.result as Hex}) as readonly [bigint];
+        if (probeOut > 0n) m.probe = probeImpactBps(amountIn, out, probeIn, probeOut);
+      } catch (e) {
+        m.probeFailure = withReason(e instanceof Error ? e : new Error(String(e)), "upstream_unavailable"); // the node answered in another shape
+      }
+    }
+    const pools: Hex[] = [];
+    for (let i = 0; i < hops.length; i++) {
+      const s = first[i]!;
+      if ("failed" in s) {
+        m.spotFailure = s.failed;
+        return m;
+      }
+      const pool = s.ok ? wordAddress(s.result) : null;
+      if (!pool || pool === getAddress(ZERO)) return m; // no pool to read a mid price from
+      pools.push(pool);
+    }
+    const slot0 = encodeFunctionData({abi: POOL_ABI, functionName: "slot0"});
+    const second = await net.slots(chainId, pools.map((pool) => call(pool, slot0, block)), "all", signal);
+    const prices: bigint[] = [];
+    for (const s of second) {
+      if ("failed" in s) {
+        m.spotFailure = s.failed;
+        return m;
+      }
+      const price = s.ok ? firstWord(s.result) : undefined;
+      if (price === undefined) return m;
+      prices.push(price);
+    }
+    const spot = spotValueLossBps(hops, prices, amountIn, out);
+    if (spot !== undefined) m.spot = spot;
+    return m;
   }
 
   return {
@@ -224,6 +297,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
       try {
         await verifyDeployment(chainId);
+        // maxPriceImpactBps set: the candidates, the probe and the mid prices are all read at one block, with retries.
+        // Unset: at "latest", as 0.4.11 read them (a call the node did not answer is retried, then refused — never
+        // read as "no pool").
+        const gated = maxImpact !== undefined;
+        const block = gated ? await pinBlock(chainId, signal) : "latest";
         const candidates = routes(chainId, params.sourceChain, tokenIn, tokenOut);
         const results = await rpc(
           chainId,
@@ -233,8 +311,10 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
               r.single
                 ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn, tokenOut, amountIn, fee: r.single.fee, sqrtPriceLimitX96: 0n}]})
                 : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [r.path!, amountIn]}),
+              block,
             ),
           ),
+          gated ? "all" : "items",
           signal,
         );
         let best: {route: Route; out: bigint; gas: bigint} | null = null;
@@ -262,26 +342,46 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // are paid on both sides, so they cancel. Informational — the Oct 16 run swapped
         // 16.78 USDT into 0.0099 USDT0 through an empty pool and nothing said a word.
         let priceImpactBps: number | undefined;
+        let valueLossBps: number | undefined;
         const probeIn = amountIn / 1000n;
-        if (probeIn > 0n) {
-          try {
-            const [raw] = await rpc(
-              chainId,
-              [call(d.quoter, route.single
-                ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn, tokenOut, amountIn: probeIn, fee: route.single.fee, sqrtPriceLimitX96: 0n}]})
-                : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [route.path!, probeIn]}))],
-              signal,
-            );
-            if (typeof raw === "string" && raw !== "0x") {
-              const [probeOut] = decodeFunctionResult({abi: QUOTER_ABI, functionName: route.single ? "quoteExactInputSingle" : "quoteExactInput", data: raw as Hex}) as readonly [bigint];
-              if (probeOut > 0n) {
-                const ratioBps = (out * probeIn * 10_000n) / (probeOut * amountIn); // (out/amountIn) ÷ (probeOut/probeIn), in bps
-                priceImpactBps = Math.max(0, bigintToNumber(10_000n - ratioBps));
+        if (maxImpact === undefined) {
+          if (probeIn > 0n) {
+            try {
+              const [raw] = await rpc(
+                chainId,
+                [call(d.quoter, route.single
+                  ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn, tokenOut, amountIn: probeIn, fee: route.single.fee, sqrtPriceLimitX96: 0n}]})
+                  : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [route.path!, probeIn]}))],
+                "none",
+                signal,
+              );
+              if (typeof raw === "string" && raw !== "0x") {
+                const [probeOut] = decodeFunctionResult({abi: QUOTER_ABI, functionName: route.single ? "quoteExactInputSingle" : "quoteExactInput", data: raw as Hex}) as readonly [bigint];
+                if (probeOut > 0n) {
+                  const ratioBps = (out * probeIn * 10_000n) / (probeOut * amountIn); // (out/amountIn) ÷ (probeOut/probeIn), in bps
+                  priceImpactBps = Math.max(0, bigintToNumber(10_000n - ratioBps));
+                }
               }
+            } catch {
+              /* the quote stands; impact is information, not a gate */
             }
-          } catch {
-            /* the quote stands; impact is information, not a gate */
           }
+        } else {
+          // maxPriceImpactBps (cp0x ask 1b): ranked first, so only the best route is gated — a lower-output candidate
+          // is never the better offer. The measure is the larger of the probe and the spot value loss: the probe alone
+          // can be absent (tiny amounts, a failed read) or blind (a pool parked past an empty range reads 342 bps while
+          // the trade loses 98.7%, UNISWAP-V4-RESEARCH §7.2). Nothing measurable is a refusal, never a pass.
+          const m = await measureImpact(chainId, d, route, tokenIn, tokenOut, amountIn, out, block as Hex, signal);
+          priceImpactBps = m.probe;
+          valueLossBps = m.spot;
+          const loss = m.probe === undefined ? m.spot : m.spot === undefined ? m.probe : Math.max(m.probe, m.spot);
+          if (loss === undefined) {
+            const failure = m.probeFailure ?? m.spotFailure;
+            return failure
+              ? refuse("could not measure the price impact (maxPriceImpactBps is set) — nothing was quoted; try again", refusalOf(failure) ?? "upstream_unavailable")
+              : refuse("the route would not quote a smaller amount; its price impact cannot be measured", "insufficient_liquidity");
+          }
+          if (loss >= maxImpact) return refuse(impactRefusalText(loss, maxImpact, route.label), "insufficient_liquidity");
         }
 
         const bps = params.slippageBps ?? slippageDefault;
@@ -309,8 +409,19 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // swap can cost (0 from a quoter that does not measure gas) is no figure: the limit is then left to the
         // wallet, which estimates the exact call with headroom right before broadcast, as for THORChain and Chainflip.
         // A limit derived from it would be the bare overhead, and the swap would run out of gas on chain.
+        // The limit is bounded by the chain (always on): a bare need (no headroom) above the per-transaction cap or the
+        // block gas limit can never be mined, so it is refused; a padded limit above the cap is clamped to it — never
+        // below the need (Monad charges the whole limit even when the swap reverts).
         const pools = route.single ? 1n : BigInt((route.path!.length - 42) / 46);
-        const gasLimit = gas >= MIN_POOL_GAS * pools ? (gas * 3n) / 2n + 120_000n + (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n) : undefined;
+        const extra = (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n);
+        let gasLimit: bigint | undefined;
+        if (gas >= MIN_POOL_GAS * pools) {
+          const bounded = boundGasLimit(gas + 120_000n + extra, (gas * 3n) / 2n + 120_000n + extra, gasCapOf(chainId, blockGasLimits.get(chainId)));
+          if ("refuse" in bounded) {
+            return refuse(`the swap needs ${bounded.refuse.need} gas, more than chain ${chainId} takes in one transaction (${bounded.refuse.cap}) — its pools are too thin for this amount`, "insufficient_liquidity");
+          }
+          gasLimit = bounded.gasLimit;
+        }
 
         return {
           provider: "uniswap",
@@ -342,6 +453,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             minOut: minOut.toString(),
             ...(route.single ? {fee: String(route.single.fee)} : {path: route.path!}),
             ...(priceImpactBps !== undefined ? {priceImpactBps: String(priceImpactBps)} : {}),
+            ...(valueLossBps !== undefined ? {valueLossBps: String(valueLossBps)} : {}),
           },
         };
       } catch (e) {
@@ -364,7 +476,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const data = pd.fee
         ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn: pd.tokenIn as Hex, tokenOut: pd.tokenOut as Hex, amountIn: BigInt(pd.amountIn), fee: Number(pd.fee), sqrtPriceLimitX96: 0n}]})
         : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [pd.path as Hex, BigInt(pd.amountIn)]});
-      const [raw] = await rpc(chainId, [call(d.quoter, data)]);
+      const [raw] = await rpc(chainId, [call(d.quoter, data)], "items");
       if (typeof raw !== "string" || raw === "0x") throw refusal("no_route", "uniswap: the pool no longer quotes this route — refresh and try again");
       let quoted: ReturnType<typeof decodeQuote>;
       try {
@@ -399,7 +511,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const chainId = Number(ref.intentId.split(":")[1]);
       if (!deployments[chainId] || !config.rpcUrls[chainId]?.length) return {state: "pending"};
       try {
-        const [receipt] = (await rpc(chainId, [{method: "eth_getTransactionReceipt", params: [ref.sourceTxHash]}])) as [{status?: string} | null];
+        const [receipt] = (await rpc(chainId, [{method: "eth_getTransactionReceipt", params: [ref.sourceTxHash]}], "none")) as [{status?: string} | null];
         if (!receipt) return {state: "pending"};
         return receipt.status === "0x1" ? {state: "completed", destTxHash: ref.sourceTxHash} : {state: "failed"};
       } catch {

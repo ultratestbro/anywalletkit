@@ -27,6 +27,48 @@ pools), then `unwrapWETH9` for a native output (or `refundETH` for a native inpu
 source token for the destination token with the quote's minimum, paid to the recipient. `pull`, `sweepToken` and every
 other router call are refused.
 
+## Price impact: information, or a refusal you opt into
+
+Every quote carries `providerData.priceImpactBps`: the best route's full-size rate against a 1/1000
+probe on the same route (pool fees cancel). By default it is information only — nothing is refused
+for impact, so a wallet can warn and let the user decide.
+
+`maxPriceImpactBps` (an integer 1..10000, unset by default) turns it into a refusal, for an app that
+never wants to offer such a route (a web swap page might set 500):
+
+```ts
+uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
+```
+
+- Every candidate is ranked as always; only the best route is gated, and a refused quote never
+  falls back to a lower-output candidate.
+- All reads of the quote are pinned to one block, with transient RPC errors retried.
+- The measure is the larger of the probe and the spot value loss against the pools' `slot0()` mid
+  prices, fees included (`providerData.valueLossBps`). A probe too small to run (under 1,000 raw
+  units), reverted or empty falls back to spot.
+- At or above the limit: `insufficient_liquidity`, "loses 99.8% of the value to price impact — its
+  pools are too thin for this amount (limit 5%; best route via USDC 0.3% → 0.01%)".
+- Nothing measurable: refused (`rate_limited` / `upstream_unavailable` when the RPC did not answer),
+  never a quote with the check skipped.
+- `preflightDeposit` does not apply it: the signed minimum governs there.
+
+Unset, the module sends the same requests and returns the same quotes as 0.4.11
+(`tests/unset-byte-identical.test.ts`).
+
+## Gas limit and RPC errors
+
+- **Gas (always on).** The block gas limit is read with the deployment check, once per chain. A swap
+  whose bare gas need (quoter gas + 120k router overhead + unwrap/refund, no headroom) is above
+  `min(per-transaction cap, block gas limit)` can never be mined and is refused as
+  `insufficient_liquidity`; a padded limit above the cap is clamped to it, never below the need. The
+  per-transaction caps are Ethereum's 16,777,216 (EIP-7825) and Monad's 30M.
+  Monad charges the whole limit, so it is never lowered below the need.
+- **RPC errors.** A per-item JSON-RPC error that is a revert (code 3, revert data, "execution
+  reverted") means no candidate, as before. A rate limit (`-32005`, `-32007`, `429`…), a node error
+  or a call left out of the answer is retried, then refused as `rate_limited` /
+  `upstream_unavailable`. It is never read as "no pool" (before 0.4.12, a rate-limited best pool
+  silently lost to a worse route). Batches carry at most 10 calls, at most 4 in flight.
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes a call into the chain's SwapRouter02
