@@ -63,9 +63,15 @@ A source whose `type` changed in the manifest, and an `evm-proxy` whose first-ev
 
 Each stored value also records its `target` (`chainId`, `address`, `programId`, `url`, `repo`, `path`, `ref` from the manifest, and for `evm-call` its `to`, `data` / `signature` + `args` and `decode`; EVM addresses lowercased). When the manifest points an existing id somewhere else, the old value belongs to the old target: the source takes a new baseline and the digest lists it under **Re-pointed (new baseline, not a change)** instead of reporting a code change. Entries stored before targets existed are compared as before and get their target on the next run.
 
+A source may carry `"severity": "high" | "medium" | "low"`: how much a change of it matters to the module (0x's `settler-in-force-*`, `ownerOf(2)`: a new Settler in force refuses native-coin sales from that day, so `high`). It is copied into the diff entry (`changes[].severity`), the change leads its module in the digest and in Telegram, and the header counts it (`3 changed (1 severity high)`). Any other value fails the run. It is not part of the source's target: adding or changing it is no re-point.
+
 Rules for manifests: addresses and program ids must be the ones the module's source actually calls (copy them from `src/`), one entry per chain the module supports where the address differs; repos must be the protocol's official org; API URLs the ones the provider code requests. `label` is what people read in the digest — name the contract and the chain.
 
 RPC per chain comes from the same env names the matrix uses (`EVM_RPC_URL`, `BASE_RPC_URL`, … `SOLANA_RPC_URL`, `TON_RPC_URL`) with public fallbacks in `watch.mjs`.
+
+## Module canary (`scripts/watch/canary.mjs`)
+
+Each module's own read-only `verify:live`, daily after the watch (the "run canary" step of `watch.yml`); state in `watch/canary/state.json`, the day's rows in `watch/canary/<date>.json`, Telegram on transitions and failures. A job's note (state, day file, Telegram) is cut for length, but a line the job prints as `Reason: …` leads it and is kept whole (canary-status.mjs: the 0x job's `Reason: NEW on 1, 10; unreachable on 143` names every chain that is not ok; before, one NEW line filled the whole note). A `Severity: high | medium | low` line the job prints is kept on the row as `severity` and shown in Telegram; a failing job whose severity changes is a transition. The 0x job gets `RPC_<chainId>` for every `*_RPC_URL` variable that is set (its own public endpoints otherwise), and fails on a chain no RPC answered.
 
 ## Routes canary (`scripts/watch/routes.mjs`)
 

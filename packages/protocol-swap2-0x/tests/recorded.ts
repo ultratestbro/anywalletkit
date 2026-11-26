@@ -20,6 +20,7 @@ const dir = fileURLToPath(new URL("../fixtures/quotes/", import.meta.url));
 interface PinErasJson {
   eras: Record<string, {pinned: string; pins: Record<string, [newestLiveNonce: number, previousLiveNonce: number]>}>;
   unrecorded: string[];
+  unrecordedChains: number[];
 }
 const pinEras = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/pin-eras.json", import.meta.url)), "utf8")) as PinErasJson;
 /** Every pin era, oldest first (as fixtures/pin-eras.json lists them). */
@@ -28,6 +29,8 @@ export const PIN_ERAS: readonly string[] = Object.keys(pinEras.eras);
 export const CURRENT_PIN_ERA: string = PIN_ERAS.at(-1)!;
 /** Eras with no recording yet (owed: re-recording needs ZEROEX_API_KEY). */
 export const UNRECORDED_PIN_ERAS: readonly string[] = pinEras.unrecorded;
+/** Chains of the table with no recording in any era yet (owed: their first recordings need ZEROEX_API_KEY). */
+export const UNRECORDED_CHAINS: readonly number[] = pinEras.unrecordedChains;
 /** An era's pins, chain id → [newestLiveNonce, previousLiveNonce]. */
 export function eraPins(era: string): Readonly<Record<number, readonly [number, number]>> {
   const e = Object.prototype.hasOwnProperty.call(pinEras.eras, era) ? pinEras.eras[era] : undefined;

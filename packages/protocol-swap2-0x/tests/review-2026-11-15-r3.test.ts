@@ -65,7 +65,7 @@ const nativeExpectation = (settlers: readonly string[], chain?: ZeroExChain) => 
 describe("1. a native-coin sale goes only to the current or previous Settler live when the table was pinned", () => {
   it("the table pins both, per chain (2026-11-25, after 0x's 2026-11-24 release, verify:live); token sales keep a margin of two past the newest", () => {
     expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, [c.newestLiveNonce, c.previousLiveNonce]]))).toEqual({
-      1: [22, 21], 10: [22, 21], 56: [24, 23], 137: [21, 20], 8453: [23, 22], 42161: [21, 20], 43114: [21, 20],
+      1: [22, 21], 10: [22, 21], 56: [24, 23], 137: [21, 20], 143: [12, 11], 8453: [23, 22], 42161: [21, 20], 43114: [21, 20],
     });
     expect(ZEROEX_SETTLER_NONCE_MARGIN).toBe(2);
     for (const c of Object.values(ZEROEX_CHAINS)) expect(c).not.toHaveProperty("maxSettlerNonce");

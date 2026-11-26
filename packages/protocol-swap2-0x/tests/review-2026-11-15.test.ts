@@ -46,7 +46,7 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
 
   it("pins the newest deployment live on 2026-11-25 (0x's 2026-11-24 release) plus a small margin on every chain", () => {
     expect(ZEROEX_SETTLER_NONCE_MARGIN).toBe(2);
-    expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, c.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN]))).toEqual({1: 24, 10: 24, 56: 26, 137: 23, 8453: 25, 42161: 23, 43114: 23});
+    expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, c.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN]))).toEqual({1: 24, 10: 24, 56: 26, 137: 23, 143: 14, 8453: 25, 42161: 23, 43114: 23});
   });
 
   // Each recording is held to the pins of the era it was recorded in (fixtures/pin-eras.json), and the newest era is
@@ -303,7 +303,7 @@ describe("6. deriving Settler addresses stops at the chain's pin", () => {
     expect(describeZeroExActivity(moved, {own: fixture.own})).toBeNull();
   });
 
-  it("a miss on all seven chains is cheap (node; Hermes measured 1.7 s per chain before)", () => {
+  it("a miss on every chain of the table is cheap (node; Hermes measured 1.7 s per chain before)", () => {
     const start = performance.now();
     for (const id of Object.keys(ZEROEX_CHAINS)) expect(zeroExSettlerNonce(Number(id), "0x1111111111111111111111111111111111111111")).toBeNull();
     expect(performance.now() - start).toBeLessThan(1_000);

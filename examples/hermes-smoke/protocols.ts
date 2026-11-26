@@ -494,6 +494,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
     // lying RPC can claim holds code); a replaced Settler (21) for no sale at all.
     const reason = (to: string): string | undefined => { try { checkZeroExTransaction({ to, data, value: '1000000000000000', chainId: 8453 }, { ...expected, settlers: [to] }); return 'passed' } catch (e) { return refusalOf(e)?.reason } }
     check('zeroex: a native sale goes to the pinned current or previous Settler only (the margin and a replaced one: vault_mismatch)', reason(zeroExSettlerAddress(8453, 22)) === 'passed' && reason(zeroExSettlerAddress(8453, 24)) === 'vault_mismatch' && reason(zeroExSettlerAddress(8453, 21)) === 'vault_mismatch')
+    // Monad (0.2.0): its pinned Settlers derived under Hermes, MON sold only to 12 or 11 (13, inside the margin, and 10 refused).
+    const monadReason = (nonce: number): string | undefined => { const to = zeroExSettlerAddress(143, nonce); try { checkZeroExTransaction({ to, data, value: '1000000000000000', chainId: 143 }, { ...expected, chainId: 143, settlers: [to] }); return 'passed' } catch (e) { return refusalOf(e)?.reason } }
+    check('zeroex: Monad pinned 12 / 11 (CREATE3 under Hermes); a MON sale only to those two', ZEROEX_CHAINS[143]?.newestLiveNonce === 12 && ZEROEX_CHAINS[143]?.previousLiveNonce === 11 && zeroExSettlerAddress(143, 12) === '0xF16D1df42E368e4dd873b1f92ED0670FF4c987eB' && zeroExSettlerAddress(143, 11) === '0x031D28683fFc9936903a31670bC618b8Bc9b65dD' && monadReason(12) === 'passed' && monadReason(11) === 'passed' && monadReason(13) === 'vault_mismatch' && monadReason(10) === 'vault_mismatch' && zeroexApp.supportsChain!('eip155:143'))
   }
   {
     // 0x on REAL recorded answers (fixtures/quotes, 2026-11-15): the Permit2 reader and rebuild, the signature appended,

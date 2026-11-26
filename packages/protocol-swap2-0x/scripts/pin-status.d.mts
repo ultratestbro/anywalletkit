@@ -16,3 +16,20 @@ export interface PinStatus {
   advice: string;
 }
 export function pinStatus(reading: PinReading): PinStatus;
+/** One chain of a verify:live run: a pinStatus tag, "BAD" (an on-chain check failed) or "unreachable" (no RPC answered). */
+export interface RunChain {
+  id: number | string;
+  tag: PinStatus["tag"] | "unreachable";
+  native?: boolean;
+  token?: boolean;
+}
+/** A live corridor that failed: through the provider ("quote") or through the server handler ("remote"). */
+export interface RunQuote {
+  id: number | string;
+  kind: "quote" | "remote";
+}
+/**
+ * The last lines of a run that did not pass: `Reason:` names every chain that is not ok, by verdict; `Severity: high`
+ * when a sale through the Settler in force is refused today on a chain that answered. Both null on a clean run.
+ */
+export function runSummary(run: {chains: RunChain[]; quotes?: RunQuote[]}): {reason: string | null; severity: string | null};

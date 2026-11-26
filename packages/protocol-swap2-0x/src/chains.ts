@@ -62,13 +62,15 @@ const chain = (name: string, wrappedNative: string, newestLiveNonce: number, pre
 /**
  * The default chain table (EVM chain id → entry). The last two arguments are the taker Settler deployments the
  * registry named as current and previous when pinned (2026-11-25, after 0x's 2026-11-24 Settler release;
- * `pnpm verify:live`: both have code).
+ * `pnpm verify:live`: both have code). Monad (143) joined in 0.2.0 from the same reads: deployment 12, made on
+ * 2026-11-24, and 11; its wrapped native is WMON, the one 0x names as `wnative` there.
  */
 export const ZEROEX_CHAINS: Readonly<Record<number, ZeroExChain>> = Object.freeze({
   1: chain("Ethereum", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", 22, 21),
   10: chain("Optimism", "0x4200000000000000000000000000000000000006", 22, 21),
   56: chain("BNB Smart Chain", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", 24, 23),
   137: chain("Polygon", "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", 21, 20),
+  143: chain("Monad", "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A", 12, 11),
   8453: chain("Base", "0x4200000000000000000000000000000000000006", 23, 22),
   42161: chain("Arbitrum", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", 21, 20),
   43114: chain("Avalanche", "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", 21, 20),

@@ -243,7 +243,7 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
 
   return {
     name: ZEROEX_PROVIDER,
-    describeActivity: describeZeroExActivity,
+    describeActivity: (tx, ctx) => describeZeroExActivity(tx, ctx, chains),
     supportsSameChain: true,
     // The quoted gas limit is the API's word: a native sale (like a Permit2 call) goes out with the account's own estimate.
     ownGasEstimate: true,

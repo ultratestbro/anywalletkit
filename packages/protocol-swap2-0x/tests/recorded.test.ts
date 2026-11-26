@@ -1,5 +1,5 @@
 /**
- * Real 0x answers through every check the device runs (fixtures/quotes, recorded 2026-11-15 on all seven chains):
+ * Real 0x answers through every check the device runs (fixtures/quotes, recorded 2026-11-15 on the first seven chains; Monad is owed):
  * the provider's parser, the Settler check, the Permit2 rebuild against 0x's own hash, the engine's quote validation,
  * the remote-mode verifiers, build and preflight, and a full swap through the engine. A future change in 0x's answer
  * shape, or a check that is too strict for what 0x really sends, fails here instead of in production. Each recording is
@@ -18,7 +18,7 @@ import {zeroExProvider} from "../src/provider.js";
 import {zeroExRemoteProvider, zeroExVerifyBuild, zeroExVerifyQuote} from "../src/remote.js";
 import {SETTLER_NATIVE_CHECK_SELECTOR, SETTLER_PERMIT_ACTIONS, checkZeroExTransaction, createSettlerResolver, decodeSettlerExecute, zeroExSettlerNonce} from "../src/settler.js";
 import {getKey} from "./fixtures.js";
-import {CURRENT_PIN_ERA, PIN_ERAS, RECORDED, UNRECORDED_PIN_ERAS, chainIdOf, chainOf, chainsConfigOf, chainsOf, eraChains, eraPins, loadRecorded, nativeSale, paramsOf, recordedFetch, recordedQuery, rpcOf, type RecordedQuote, type Seen} from "./recorded.js";
+import {CURRENT_PIN_ERA, PIN_ERAS, RECORDED, UNRECORDED_CHAINS, UNRECORDED_PIN_ERAS, chainIdOf, chainOf, chainsConfigOf, chainsOf, eraChains, eraPins, loadRecorded, nativeSale, paramsOf, recordedFetch, recordedQuery, rpcOf, type RecordedQuote, type Seen} from "./recorded.js";
 
 beforeEach(() => { vi.useFakeTimers({toFake: ["Date"]}); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -36,10 +36,15 @@ async function quoted(f: RecordedQuote, over: Partial<QuoteParams> = {}) {
 const ctxOf = (f: RecordedQuote) => ({chains: chainsOf(f), settlers: () => [f.registry.current, ...(f.registry.prev ? [f.registry.prev] : [])], nowMs: f.request.nowMs});
 
 describe("the recordings", () => {
-  it("cover all seven chains, token and native sales, live quotes and indicative prices", () => {
+  it("cover every chain of the table but the ones listed as unrecorded, token and native sales, live quotes and indicative prices", () => {
     const all = RECORDED.map(loadRecorded);
-    expect(new Set(all.map(chainIdOf))).toEqual(new Set(Object.keys(ZEROEX_CHAINS).map(Number)));
-    for (const id of Object.keys(ZEROEX_CHAINS).map(Number)) {
+    const table = Object.keys(ZEROEX_CHAINS).map(Number);
+    // the chains with no recording are exactly fixtures/pin-eras.json unrecordedChains (Monad, owed: ZEROEX_API_KEY)
+    expect(table.filter((id) => !all.some((f) => chainIdOf(f) === id))).toEqual(UNRECORDED_CHAINS);
+    const recorded = table.filter((id) => !UNRECORDED_CHAINS.includes(id));
+    expect(recorded).toEqual([1, 10, 56, 137, 8453, 42161, 43114]);
+    expect(new Set(all.map(chainIdOf))).toEqual(new Set(recorded));
+    for (const id of recorded) {
       const on = all.filter((f) => chainIdOf(f) === id && !f.refusal);
       expect(on.some((f) => !f.request.dry && !nativeSale(f)), `token sale on ${id}`).toBe(true);
       expect(on.some((f) => !f.request.dry && nativeSale(f)), `native sale on ${id}`).toBe(true);
@@ -70,6 +75,15 @@ describe("the recordings", () => {
     // An era is recordable only while 0x still quotes its Settlers and the registry still names its pins. Listing a
     // superseded era as unrecorded would let the shipped table go without a real 0x answer for good.
     for (const era of UNRECORDED_PIN_ERAS) expect(era, `${era} is unrecorded but no longer the era in force: record it (ZEROEX_API_KEY) before raising the pins again`).toBe(CURRENT_PIN_ERA);
+  });
+  it("only a chain that first appears in the era in force may be listed as unrecorded: its first recording is owed before the next pin raise", () => {
+    // Like an unrecorded era: a chain is recordable only while 0x quotes the Settlers its pins name. A chain that was
+    // already in an earlier era and still has no recording would ship without a real 0x answer for good.
+    expect(UNRECORDED_CHAINS).toEqual([143]);
+    for (const id of UNRECORDED_CHAINS) {
+      expect(eraPins(CURRENT_PIN_ERA)[id], `${id} is listed as unrecorded but is not in the era in force`).toBeDefined();
+      for (const era of PIN_ERAS.slice(0, -1)) expect(eraPins(era)[id], `${id} is listed as unrecorded but was already in ${era}: record it (ZEROEX_API_KEY)`).toBeUndefined();
+    }
   });
   it("every era is recorded on each of its chains, except the eras listed as unrecorded (owed: they need ZEROEX_API_KEY)", () => {
     const all = RECORDED.map(loadRecorded);

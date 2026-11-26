@@ -30,3 +30,37 @@ export function pinStatus({id, chain, current, previous, margin}) {
   if (previous !== null && previous !== oldest) return {tag: "PREV", native, token, advice: `the registry names Settler ${previous} as the previous one, not the pinned ${oldest} — check it, then update ${pins} in src/chains.ts`};
   return {tag: "ok", native, token, advice: ""};
 }
+
+// The order the Reason line names its groups in: what refuses the most first.
+const GROUPS = ["PIN", "NEW", "OLD", "PREV", "BAD", "unreachable", "BAD quote", "BAD remote"];
+
+/**
+ * The last lines of a verify:live run that did not pass: one `Reason:` line that names every chain that is not ok, by
+ * verdict (`Reason: NEW on 1, 10; unreachable on 143`), so a reader that keeps only the end of the output — the
+ * canary note, a Telegram line — still has every chain; and a `Severity: high` line when a sale through the Settler in
+ * force is refused today on a chain that answered (a new deployment on a pinned chain refuses native-coin sales from
+ * that day; past the margin, or older than the pinned previous, every sale; a registry with no Settler this module can
+ * tell, everything). Pure.
+ *
+ * @param {{chains: {id: number | string, tag: string, native?: boolean, token?: boolean}[], quotes?: {id: number | string, kind: "quote" | "remote"}[]}} run
+ *   `tag` is a pinStatus tag, "BAD" when an on-chain check failed, or "unreachable" when no RPC answered.
+ * @returns {{reason: string | null, severity: string | null}}
+ */
+export function runSummary({chains, quotes = []}) {
+  const groups = new Map(GROUPS.map((g) => [g, new Set()]));
+  const high = new Set();
+  for (const c of chains) {
+    if (c.tag === "ok") continue;
+    const group = groups.get(c.tag) ?? groups.get("BAD");
+    group.add(String(c.id));
+    // pinStatus's own word on the Settler in force (a flaky owner() read alone is BAD, not a refused sale)
+    if (c.tag !== "unreachable" && (c.native === false || c.token === false)) high.add(String(c.id));
+  }
+  for (const q of quotes) groups.get(q.kind === "remote" ? "BAD remote" : "BAD quote").add(String(q.id));
+  const ids = (set) => [...set].sort((a, b) => Number(a) - Number(b) || a.localeCompare(b)).join(", ");
+  const parts = [...groups].filter(([, set]) => set.size).map(([g, set]) => `${g} on ${ids(set)}`);
+  return {
+    reason: parts.length ? `Reason: ${parts.join("; ")}` : null,
+    severity: high.size ? `Severity: high — sales through the Settler in force are refused today on ${ids(high)} (a new deployment: native-coin sales): check it, then update the pins in src/chains.ts` : null,
+  };
+}

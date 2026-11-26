@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@anywalletkit/protocol-swap2-0x?label=npm)](https://www.npmjs.com/package/@anywalletkit/protocol-swap2-0x)
 
-[0x Swap API v2](https://docs.0x.org/docs/api/swap-permit2) as a same-chain swap2 provider for Any Wallet Kit, through the Permit2 flow. Exact-input swaps on Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche and BNB Smart Chain. Written from the 0x API and the Settler contracts; it uses no 0x package.
+[0x Swap API v2](https://docs.0x.org/docs/api/swap-permit2) as a same-chain swap2 provider for Any Wallet Kit, through the Permit2 flow. Exact-input swaps on eight chains: Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, BNB Smart Chain and Monad (since 0.2.0). Written from the 0x API and the Settler contracts; it uses no 0x package.
 
 ## Install
 
@@ -33,13 +33,15 @@ The SDK reads no environment. By convention apps and backends name the switch an
 
 Selling the native coin needs no approval and no signature: the call carries the amount as value. It too is dry-run from the account right before the broadcast and sent with the account's own gas estimate, never the quoted limit (the provider declares `ownGasEstimate`). A dry run that reverts refuses the swap (`simulation_failed`); one the account's RPC does not answer is asked once more and then refused as `upstream_unavailable`.
 
+**Monad charges the gas limit, not the gas used** (limit × price). That is one more reason every 0x call goes out with the account's own estimate rather than the quoted limit, and no 0x transaction may ask for more than 6,000,000 gas (`ZEROEX_MAX_GAS_LIMIT`). An EIP-7702-delegated account on Monad cannot go below 10 MON (Monad's reserve balance), so selling all of its MON does not go through; how a plain account fares on "sell all MON" has not been verified.
+
 ## What is checked before anything is signed
 
 **The Settler comes from the chain, not from the API.** 0x replaces its Settler contracts regularly. The module reads the Settler in force (`ownerOf(2)`) and the one it replaced (`prev(2)`) from 0x's on-chain registry `0x00000000000004533Fe15556B1E086BB1A72cEae` through your RPC, and accepts a transaction only when its target is one of the two. The answer is held to bounds the RPC cannot move:
 - it must be an address the registry deploys Settlers to — `CREATE3(registry, feature 2, this chain, nonce)`, computed on the device (`zeroExSettlerNonce`) — so an RPC cannot name an arbitrary contract or account;
-- that deployment must sit inside the window the chain table pins: no older than the previous Settler live when the table was pinned (`previousLiveNonce`; an older, replaced Settler is refused) and no newer than the one in force then (`newestLiveNonce`; Base: 23 and 22 since 2026-11-25, after 0x's 2026-11-24 release) plus, for a token sale, a margin of two (`ZEROEX_SETTLER_NONCE_MARGIN`);
+- that deployment must sit inside the window the chain table pins: no older than the previous Settler live when the table was pinned (`previousLiveNonce`; an older, replaced Settler is refused) and no newer than the one in force then (`newestLiveNonce`; Base: 23 and 22 since 2026-11-25, after 0x's 2026-11-24 release; Monad: 12 and 11) plus, for a token sale, a margin of two (`ZEROEX_SETTLER_NONCE_MARGIN`);
 - a **native-coin sale goes only to the pinned current or previous Settler**, never into the margin: its value is sent to the address as it is, and whether a deployment inside the margin exists is only the RPC's word. A token sale may use the margin, since its permit can be spent only with the account itself as the caller;
-- a newer deployment is refused with what to do (update the package, or raise the pins once the deployment is checked) — native sales from the day 0x deploys it, token sales once it is past the margin. The watch job reports every new deployment (`ownerOf(2)` per chain in `watch.json`) and `verify:live` fails as long as the registry names anything but the pinned pair, so the pins are raised promptly;
+- a newer deployment is refused with what to do (update the package, or raise the pins once the deployment is checked) — native sales from the day 0x deploys it, token sales once it is past the margin. The watch job reports every new deployment (`ownerOf(2)` and `prev(2)` per chain in `watch.json`; a new Settler in force is a severity-high change) and `verify:live` fails as long as the registry names anything but the pinned pair, so the pins are raised promptly;
 - there must be a contract at that address (`eth_getCode`, through the same RPC): a deployment that does not exist yet would strand what is sent to it.
 
 A live quote therefore needs `rpcUrls` for its chain. The read is cached for five minutes (`settlerMaxAgeMs`) and repeated right before the broadcast — in remote mode on the device, before the backend's own preflight is asked — so a Settler paused, replaced or removed while the review screen is open is refused with nothing sent. A live quote in remote mode is held to exactly the set its own request read, however long the backend takes, and a native sale's quote stays valid for at most two minutes (`ZEROEX_MAX_NATIVE_QUOTE_SECONDS`; a token sale's is bounded by its permit).
@@ -125,7 +127,7 @@ const zeroex = zeroExRemoteProvider({
 | `apiKey` | none | The 0x key (local mode, servers only — refused under React Native): a getter (preferred) or a string. Without one the provider serves no route. |
 | `baseUrl` | `https://api.0x.org` | API origin (local mode), or your swap2 backend (remote mode). `https` only. |
 | `rpcUrls` | none | `{ chainId: [url…] }` — registry reads and receipts. Required for live quotes. |
-| `chains` | the seven chains above | Chain table: `{ chainId: { name, registry, newestLiveNonce, previousLiveNonce, wrappedNative } }` merged over the defaults; `null` removes a chain. `newestLiveNonce` and `previousLiveNonce` (required) are the Settler deployments the registry names as current and previous when you pin the entry (`pnpm verify:live` prints both): native sales go only to these two, token sales also to the next two deployments once they hold code, nothing older than the previous one. |
+| `chains` | the eight chains above | Chain table: `{ chainId: { name, registry, newestLiveNonce, previousLiveNonce, wrappedNative } }` merged over the defaults; `null` removes a chain. `newestLiveNonce` and `previousLiveNonce` (required) are the Settler deployments the registry names as current and previous when you pin the entry (`pnpm verify:live` prints both): native sales go only to these two, token sales also to the next two deployments once they hold code, nothing older than the previous one. |
 | `defaultSlippageBps` | `50` | Used when the caller passes none. Keep it the same on the backend and in the app. |
 | `quoteTtlMs` | `120000` | How long a quote is offered; never past the Permit2 deadline − 20 s, and a native sale's never past 90 s. A quote that lapses while an approval mines is re-quoted by the engine (the permit is signed once, after the approval). |
 | `timeoutMs` | `10000` | Per API request. |
@@ -165,8 +167,10 @@ Every refusal reads `zeroex: <what was found>` and reaches `onRefusal(text, info
 ```sh
 pnpm test                                   # unit, probes, and every recorded real 0x answer (fixtures/quotes)
 ZEROEX_LIVE=1 ZEROEX_API_KEY=… pnpm test    # also live quotes from api.0x.org (read-only)
-pnpm verify:live                            # registry, Settlers (code, the pinned current / previous pair), Permit2 on all seven chains; with ZEROEX_API_KEY also live corridors
+pnpm verify:live                            # registry, Settlers (code, the pinned current / previous pair), Permit2 on all eight chains; with ZEROEX_API_KEY also live corridors
 ```
+
+`verify:live` reads public RPCs (`RPC_<chainId>=url` overrides one). A chain no RPC answers fails the run: its pins are unchecked. A failed run ends with `FAILED (n)` and a `Reason:` line that names every chain that is not ok, by verdict (`Reason: NEW on 1, 8453; unreachable on 143`), preceded by `Severity: high` when a sale through the Settler in force is refused today (a new deployment on a pinned chain refuses native-coin sales from the day it lands). Without `ZEROEX_API_KEY` the live corridors (including Monad MON → AUSD and USDC → MON) are skipped with a neutral line.
 
 ## License
 

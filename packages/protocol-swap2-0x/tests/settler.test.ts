@@ -45,8 +45,8 @@ describe("selectors and the action table", () => {
 });
 
 describe("chain table", () => {
-  it("serves the seven ticket chains, each with the one registry and a wrapped native", () => {
-    expect(Object.keys(ZEROEX_CHAINS).map(Number).sort((a, b) => a - b)).toEqual([1, 10, 56, 137, 8453, 42161, 43114]);
+  it("serves the seven ticket chains and Monad (0.2.0), each with the one registry and a wrapped native", () => {
+    expect(Object.keys(ZEROEX_CHAINS).map(Number).sort((a, b) => a - b)).toEqual([1, 10, 56, 137, 143, 8453, 42161, 43114]);
     for (const c of Object.values(ZEROEX_CHAINS)) {
       expect(c.registry).toBe(ZEROEX_SETTLER_REGISTRY);
       expect(c.wrappedNative).toMatch(/^0x[0-9a-fA-F]{40}$/);
@@ -88,12 +88,14 @@ describe("which addresses are 0x Settlers (CREATE3 from the registry, offline)",
     expect(zeroExSettlerNonce(chainId, address)).toBe(nonce);
     expect(zeroExSettlerNonce(chainId, address.toLowerCase())).toBe(nonce);
   });
-  // ownerOf(2) / prev(2) after 0x's 2026-11-24 release, read 2026-11-25T20:58Z (verify:live): the pairs the table pins.
+  // ownerOf(2) / prev(2) after 0x's 2026-11-24 release, read 2026-11-25T20:58Z (verify:live): the pairs the table pins
+  // (Monad from the same reads; its deployment 12 is the one 0x made there on 2026-11-24).
   const pinned: [number, string, number][] = [
     [1, "0xD2666EF1f105e504034cf87af517a121C59f46f4", 22], [1, "0xaddC26a3854feaBFd20d6BF658254088D83a425A", 21],
     [10, "0x3E41fB68700E84F66Fb4Ee65367E45736CafC239", 22], [10, "0x11B9a527DFD522888A366C511A7bfd08C7d54Df0", 21],
     [56, "0x3E62E6b1d3F22408F24f052b5451CDaeE061BAdc", 24], [56, "0xd52E8e422A352ac1AfDC2bd6EC533D41B20ACB7b", 23],
     [137, "0x43570b7D5BA5A452EF0FD9c232f5Ad13Ec656404", 21], [137, "0x73Dae2FdF839AF5f6BC62890f65A4357937cCf04", 20],
+    [143, "0xF16D1df42E368e4dd873b1f92ED0670FF4c987eB", 12], [143, "0x031D28683fFc9936903a31670bC618b8Bc9b65dD", 11],
     [8453, "0x7130a552999C7e2cae6B38F9336e90c457ABD47d", 23], [8453, "0x103502909141F7025a94b7b99A276dCD128e21a8", 22],
     [42161, "0x2a5DB34853e857B488E9bAC92F01A42370d685E6", 21], [42161, "0xf41429fc96ff446B8118359Ba16854e07c393591", 20],
     [43114, "0x178055c9f4Fc60BBDbfC7E6BD6D83474A5089187", 21], [43114, "0x584A4e93F11331D318165B04099e53708b1FA915", 20],

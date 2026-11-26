@@ -1,26 +1,32 @@
 #!/usr/bin/env node
 // Read-only. Nothing is signed or sent.
 //
-//  1. Always, keyless, on all seven chains over a public RPC: the chain id; the Settler registry is an ERC-1967 proxy
+//  1. Always, keyless, on every chain of the table (eight) over a public RPC: the chain id; the Settler registry is an ERC-1967 proxy
 //     with an implementation that has code and an owner(); ownerOf(2) (and prev(2) when there is one) name contracts
 //     with code that are CREATE3 deployments of the registry (zeroExSettlerNonce); Permit2 and the wrapped native have code.
 //     The pins: the registry must name exactly the current and previous deployments pinned in src/chains.ts
 //     (newestLiveNonce / previousLiveNonce; verdict in pin-status.mjs). A newer one is 0x deploying: native-coin sales
 //     to it are refused from that day, token sales still use it inside ZEROEX_SETTLER_NONCE_MARGIN, and this run fails
 //     ("NEW") until the pins are raised — past the margin every sale is refused ("PIN"). A rollback ("OLD") or another
-//     previous Settler ("PREV") fails it too.
+//     previous Settler ("PREV") fails it too, and so does a chain no RPC answered on: its pins are unchecked, so it is
+//     a failure, never an ok.
 //  2. Only with ZEROEX_API_KEY: live quotes for the corridors below through the provider — the Settler call and the
 //     Permit2 payload checked on the way — then held to the request by zeroExVerifyQuote, built, checked by
 //     zeroExVerifyBuild and preflighted; and a token and a native sale through the real server handler and
 //     zeroExRemoteProvider (remote mode: quote, build, preflight).
-//     Without the key this part is skipped with a neutral line and the script exits 0 (CI has no key).
+//     Without the key this part is skipped with a neutral line (CI has no key).
+//  3. A run that fails ends with `FAILED (n)` and a `Reason:` line naming every chain that is not ok, by verdict
+//     (`Reason: NEW on 1, 10, 56`): a reader that keeps only the last lines (the canary's note, Telegram) still has
+//     every chain. When a sale through the Settler in force is refused today on a chain that answered, a
+//     `Severity: high` line follows (pin-status.mjs, runSummary). Exit 1; a clean run prints `ok` and exits 0.
 //
 //   node scripts/verify-live.mjs [--no-chain] [--no-quotes] [--only REGEX]
 // ZEROEX_API_KEY is read from the environment only and sent only as the 0x-api-key header; it is never printed.
-// RPC_<chainId>=url overrides a public endpoint.
+// RPC_<chainId>=url[,url] overrides a public endpoint (the first answers the chain checks, the next is the retry); URLs
+// are never printed.
 import {ZEROEX_CHAINS, ZEROEX_PERMIT2, ZEROEX_SETTLER_LOOKAHEAD, ZEROEX_SETTLER_NONCE_MARGIN, createSettlerResolver, zeroExProvider, zeroExRemoteProvider, zeroExSettlerNonce, zeroExVerifyBuild, zeroExVerifyQuote} from "../dist/index.js";
 import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
-import {pinStatus} from "./pin-status.mjs";
+import {pinStatus, runSummary} from "./pin-status.mjs";
 
 const args = process.argv.slice(2);
 const ONLY = args.includes("--only") ? new RegExp(args[args.indexOf("--only") + 1]) : null;
@@ -28,10 +34,10 @@ const KEY = process.env.ZEROEX_API_KEY;
 const PUBLIC_RPC = {
   1: "https://ethereum-rpc.publicnode.com", 10: "https://optimism-rpc.publicnode.com", 56: "https://bsc-rpc.publicnode.com",
   137: "https://polygon-bor-rpc.publicnode.com", 8453: "https://base-rpc.publicnode.com", 42161: "https://arbitrum-one-rpc.publicnode.com",
-  43114: "https://avalanche-c-chain-rpc.publicnode.com",
+  43114: "https://avalanche-c-chain-rpc.publicnode.com", 143: "https://rpc.monad.xyz",
 };
-const rpcFor = (id) => process.env[`RPC_${id}`] || PUBLIC_RPC[id];
-const rpcUrls = Object.fromEntries(Object.keys(ZEROEX_CHAINS).map((id) => [id, [rpcFor(id)]]));
+const rpcsFor = (id) => String(process.env[`RPC_${id}`] || PUBLIC_RPC[id] || "").split(",").map((u) => u.trim()).filter(Boolean);
+const rpcUrls = Object.fromEntries(Object.keys(ZEROEX_CHAINS).map((id) => [id, rpcsFor(id)]));
 const SLOT_IMPL = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 const lc = (s) => String(s ?? "").toLowerCase();
 const word2 = "0000000000000000000000000000000000000000000000000000000000000002";
@@ -44,13 +50,17 @@ const call = (url, method, params) => withTimeout(12_000, async (signal) => {
   return {result: j.result};
 });
 let bad = 0;
-const unreachable = [];
+/** Per chain: its verdict (pinStatus tag, "BAD", or "unreachable") and whether sales through the Settler in force pass. */
+const verdicts = [];
+/** Live corridors that failed, by chain. */
+const failedQuotes = [];
 
 // ── 1. on chain, keyless ─────────────────────────────────────────────────────
 if (!args.includes("--no-chain")) {
   await Promise.all(Object.entries(ZEROEX_CHAINS).map(async ([id, chain]) => {
-    const url = rpcFor(id);
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const urls = rpcsFor(id);
+    for (let attempt = 0; urls.length && attempt < 2; attempt++) {
+      const url = urls[attempt % urls.length];
       try {
         // One call at a time: public endpoints throttle a burst.
         const chainId = await call(url, "eth_chainId", []);
@@ -83,14 +93,18 @@ if (!args.includes("--no-chain")) {
         if (!ok) bad++;
         const onChain = Object.entries(checks).filter(([k]) => k !== "pins").every(([, v]) => v);
         const tag = ok ? "ok " : onChain && status.tag !== "BAD" ? status.tag.padEnd(3) : "BAD";
+        verdicts.push({id, tag: tag.trim(), native: status.native, token: status.token});
         const pin = `pinned ${chain.newestLiveNonce} / previous ${chain.previousLiveNonce}, token sales up to ${chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN}`;
         const advice = status.advice && tag !== "BAD" ? ` — ${status.advice}` : "";
         console.log(`${tag} chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} Settler ${current ?? "—"} (deployment ${nonce ?? "?"}; ${pin})${prev ? `, previous ${prev} (deployment ${prevNonce ?? "?"})` : ""} · registry impl ${impl ?? "—"} owner ${owner ?? "—"}${advice}`, tag === "BAD" ? checks : "");
         return;
       } catch { /* second try */ }
     }
-    unreachable.push(id);
-    console.log(`??? chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} no RPC answered`);
+    // Unchecked is not ok: a new 0x deployment there would go unseen (up to 0.1.6 this printed `ok — no RPC for …`, exit 0).
+    bad++;
+    verdicts.push({id, tag: "unreachable"});
+    const which = process.env[`RPC_${id}`] ? `RPC_${id}` : `the public endpoint; set RPC_${id}`;
+    console.log(`??? chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} ${urls.length ? `no RPC answered (2 tries, ${which})` : `no RPC configured (set RPC_${id})`} — the chain is unchecked, which fails this run`);
   }));
 }
 
@@ -111,6 +125,9 @@ if (!args.includes("--no-quotes")) {
       ["Polygon USDC → POL (Permit2)", 137, "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359", 6, NATIVE, "25000000"],
       ["Avalanche USDC → AVAX (Permit2)", 43114, "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E", 6, NATIVE, "25000000"],
       ["BNB Smart Chain USDT → BNB (Permit2)", 56, "0x55d398326f99059fF775485246999027B3197955", 18, NATIVE, "25000000000000000000"],
+      // Monad: 100 MON → AUSD (Agora, 6 decimals), and USDC → MON
+      ["Monad MON → AUSD (native)", 143, NATIVE, 18, "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a", "100000000000000000000"],
+      ["Monad USDC → MON (Permit2)", 143, "0x754704Bc059F8C67012fEd69BC8A327a5aafb603", 6, NATIVE, "25000000"],
     ].filter(([name]) => !ONLY || ONLY.test(name));
     const resolver = createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls});
     const provider = zeroExProvider({apiKey: () => process.env.ZEROEX_API_KEY, rpcUrls, settlerResolver: resolver});
@@ -138,6 +155,7 @@ if (!args.includes("--no-quotes")) {
         console.log(`ok  quote   ${name.padEnd(38)} out ${q.destAmount} min ${q.minDestAmount} · ${tx.to}${tx.approvalAddress ? " (Permit2 approve + signature)" : " (value)"} · ${q.providerData?.sources ?? "?"}`);
       } catch (e) {
         bad++;
+        failedQuotes.push({id, kind: "quote"});
         console.log(`BAD quote   ${name.padEnd(38)} ${String(e?.message ?? e).replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").slice(0, 260)}`);
       }
       await pause();
@@ -162,6 +180,7 @@ if (!args.includes("--no-quotes")) {
           console.log(`ok  remote  ${corridor[0].padEnd(38)} through createSwap2Handler → zeroExRemoteProvider (quote, build, preflight) · ${tx.to}`);
         } catch (e) {
           bad++;
+          failedQuotes.push({id: corridor[1], kind: "remote"});
           console.log(`BAD remote  ${corridor[0].padEnd(38)} ${String(e?.message ?? e).replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").slice(0, 260)}`);
         }
         await pause();
@@ -169,5 +188,9 @@ if (!args.includes("--no-quotes")) {
     }
   }
 }
-console.log(bad ? `FAILED (${bad})` : `ok${unreachable.length ? ` — no RPC for ${unreachable.join(", ")}` : ""}`);
+const {reason, severity} = runSummary({chains: verdicts, quotes: failedQuotes});
+console.log(bad ? `FAILED (${bad})` : "ok");
+// Last, so whatever keeps only the end of the output still names every chain that is not ok.
+if (bad && severity) console.log(severity);
+if (bad && reason) console.log(reason);
 process.exit(bad ? 1 : 0);

@@ -263,6 +263,12 @@ const F = {
 };
 
 // ── manifests ──────────────────────────────────────────────────────────────
+/**
+ * A source's optional `severity`: how much a change of it matters to the module (the 0x Settler in force: a new
+ * deployment refuses native-coin sales from that day). Carried into the diff entry, the digest and Telegram so triage
+ * does not have to infer it; anything else is a manifest error (a typo must not drop it silently).
+ */
+const SEVERITIES = ["high", "medium", "low"];
 function loadManifests() {
   const out = [];
   for (const d of readdirSync(resolve(ROOT, "packages"))) {
@@ -278,6 +284,7 @@ function loadManifests() {
     for (const s of m.sources ?? []) {
       if (!s.id) throw new Error(`${m.file}: a source has no id`);
       if (seen.has(s.id)) throw new Error(`${m.module}: source id "${s.id}" appears twice (${seen.get(s.id)}, ${m.file})`);
+      if (s.severity !== undefined && !SEVERITIES.includes(s.severity)) throw new Error(`${m.file}: source "${s.id}" has severity ${JSON.stringify(s.severity).slice(0, 40)} (one of ${SEVERITIES.join(", ")}, or none)`);
       seen.set(s.id, m.file);
     }
   }
@@ -410,7 +417,7 @@ for (const m of manifests) {
       // A failed pin / branch check is reported on every run until it is fixed, not only on the day it appears.
       const noun = r.problemNoun ?? "pin check";
       const failed = r.problems?.length ? `${r.problems.length} ${noun}${r.problems.length > 1 ? "s" : ""} failing: ${r.problems.slice(0, 4).join("; ")}${r.problems.length > 4 ? `; …and ${r.problems.length - 4} more` : ""}` : null;
-      if (changed || failed) changes.push({module: m.module, id: s.id, label: s.label ?? s.id, type: s.type, what: [changed ? describe(s, prev, r) : null, failed].filter(Boolean).join("; "), link: linkOf(s, r), before: prev?.meta, after: r.meta});
+      if (changed || failed) changes.push({module: m.module, id: s.id, label: s.label ?? s.id, type: s.type, ...(s.severity ? {severity: s.severity} : {}), what: [changed ? describe(s, prev, r) : null, failed].filter(Boolean).join("; "), link: linkOf(s, r), before: prev?.meta, after: r.meta});
       state.sources[s.id] = {type: s.type, target, value: r.value, meta: r.meta, seenAt: now, changedAt: changed ? now : prev?.changedAt ?? now, ...(prev?.error ? {} : {})};
       if (r.text && s.keepText) state.sources[s.id].text = r.text;
     } catch (e) {
@@ -428,10 +435,14 @@ for (const m of manifests) {
 // live in a Map: a plain object would hand back the inherited Object.prototype value and the digest would throw (scan 2026-10-30 F19).
 const groupBy = (list, key) => { const g = new Map(); for (const x of list) { const k = String(key(x)); const a = g.get(k); if (a) a.push(x); else g.set(k, [x]); } return g; };
 const byModule = (list) => groupBy(list, (c) => c.module);
-const lines = [`# Module watch · ${TODAY}`, "", `${manifests.length} modules, ${total} sources, ${changes.length} changed, ${errors.length} unreachable${repointed.length ? `, ${repointed.length} re-pointed` : ""}.`, ""];
+// Within a module, a change with a higher severity is listed first (a stable sort: the rest keep their order).
+const RANK = {high: 0, medium: 1, low: 2};
+const bySeverity = (cs) => [...cs].sort((a, b) => (RANK[a.severity] ?? 3) - (RANK[b.severity] ?? 3));
+const high = changes.filter((c) => c.severity === "high").length;
+const lines = [`# Module watch · ${TODAY}`, "", `${manifests.length} modules, ${total} sources, ${changes.length} changed${high ? ` (${high} severity high)` : ""}, ${errors.length} unreachable${repointed.length ? `, ${repointed.length} re-pointed` : ""}.`, ""];
 for (const [mod, cs] of byModule(changes)) {
   lines.push(`## ${mod}`);
-  for (const c of cs) lines.push(`- **${c.label}** (${c.type}): ${c.what}${c.link ? ` — ${c.link}` : ""}`);
+  for (const c of bySeverity(cs)) lines.push(`- **${c.label}** (${c.type}${c.severity ? `, severity ${c.severity}` : ""}): ${c.what}${c.link ? ` — ${c.link}` : ""}`);
   lines.push("");
 }
 // Our own manifest edits, not upstream changes: shown so a re-pointed source never looks silently reset.
@@ -471,10 +482,10 @@ if (SEND && !BASELINE) {
   if (!changes.length && !errors.length && !repointed.length) {
     if (flag("--quiet-ok")) await postTelegram(`🟢 <b>Module watch · ${TODAY}</b> — ${manifests.length} modules, ${total} sources, no changes.`);
   } else {
-    const h = [`${changes.length ? "🟠" : "🟡"} <b>Module watch · ${TODAY}</b> — ${changes.length} changed, ${errors.length} unreachable of ${total} sources${repointed.length ? `, ${repointed.length} re-pointed` : ""}`];
+    const h = [`${high ? "🔴" : changes.length ? "🟠" : "🟡"} <b>Module watch · ${TODAY}</b> — ${changes.length} changed${high ? ` (${high} severity high)` : ""}, ${errors.length} unreachable of ${total} sources${repointed.length ? `, ${repointed.length} re-pointed` : ""}`];
     for (const [mod, cs] of byModule(changes)) {
       h.push("", `<b>${esc(slug(mod))}</b>`);
-      for (const c of cs) h.push(`• ${c.link ? `<a href="${esc(c.link)}">${esc(c.label)}</a>` : esc(c.label)}: ${esc(c.what)}`);
+      for (const c of bySeverity(cs)) h.push(`• ${c.severity ? `<b>[severity ${esc(c.severity)}]</b> ` : ""}${c.link ? `<a href="${esc(c.link)}">${esc(c.label)}</a>` : esc(c.label)}: ${esc(c.what)}`);
     }
     if (errors.length) {
       h.push("", "<i>unreachable:</i>");

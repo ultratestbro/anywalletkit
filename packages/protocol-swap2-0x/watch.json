@@ -48,7 +48,20 @@
         2
       ],
       "decode": "address",
+      "severity": "high",
       "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Ethereum \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "settler-previous-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "prev(uint128)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler previous (registry prev(2)) \u00b7 Ethereum \u2014 the instance ownerOf(2) replaced, the oldest a swap may go to: a change outside a new deployment is a rollback or a re-pointed registry (check it with verify:live); with a new deployment, raise previousLiveNonce with newestLiveNonce in src/chains.ts"
     },
     {
       "id": "permit2-ethereum",
@@ -90,7 +103,20 @@
         2
       ],
       "decode": "address",
+      "severity": "high",
       "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Optimism \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "settler-previous-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "prev(uint128)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler previous (registry prev(2)) \u00b7 Optimism \u2014 the instance ownerOf(2) replaced, the oldest a swap may go to: a change outside a new deployment is a rollback or a re-pointed registry (check it with verify:live); with a new deployment, raise previousLiveNonce with newestLiveNonce in src/chains.ts"
     },
     {
       "id": "permit2-optimism",
@@ -132,7 +158,20 @@
         2
       ],
       "decode": "address",
+      "severity": "high",
       "label": "0x Settler in force (registry ownerOf(2)) \u00b7 BNB Smart Chain \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "settler-previous-bsc",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "prev(uint128)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler previous (registry prev(2)) \u00b7 BNB Smart Chain \u2014 the instance ownerOf(2) replaced, the oldest a swap may go to: a change outside a new deployment is a rollback or a re-pointed registry (check it with verify:live); with a new deployment, raise previousLiveNonce with newestLiveNonce in src/chains.ts"
     },
     {
       "id": "permit2-bsc",
@@ -174,7 +213,20 @@
         2
       ],
       "decode": "address",
+      "severity": "high",
       "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Polygon \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "settler-previous-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "prev(uint128)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler previous (registry prev(2)) \u00b7 Polygon \u2014 the instance ownerOf(2) replaced, the oldest a swap may go to: a change outside a new deployment is a rollback or a re-pointed registry (check it with verify:live); with a new deployment, raise previousLiveNonce with newestLiveNonce in src/chains.ts"
     },
     {
       "id": "permit2-polygon",
@@ -189,6 +241,61 @@
       "chainId": 137,
       "address": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
       "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 Polygon"
+    },
+    {
+      "id": "registry-monad",
+      "type": "evm-proxy",
+      "chainId": 143,
+      "address": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "label": "0x Settler registry (ERC-1967 proxy: implementation and code) \u00b7 Monad"
+    },
+    {
+      "id": "registry-owner-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "0x Settler registry owner() \u00b7 Monad (who can deploy, pause and upgrade the registry this module trusts)"
+    },
+    {
+      "id": "settler-in-force-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "ownerOf(uint256)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "severity": "high",
+      "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Monad \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "settler-previous-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "prev(uint128)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler previous (registry prev(2)) \u00b7 Monad \u2014 the instance ownerOf(2) replaced, the oldest a swap may go to: a change outside a new deployment is a rollback or a re-pointed registry (check it with verify:live); with a new deployment, raise previousLiveNonce with newestLiveNonce in src/chains.ts"
+    },
+    {
+      "id": "permit2-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "label": "Permit2 \u00b7 Monad"
+    },
+    {
+      "id": "wrapped-native-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
+      "label": "Wrapped native token (pairs with it are refused, not swapped) \u00b7 Monad"
     },
     {
       "id": "registry-base",
@@ -216,7 +323,20 @@
         2
       ],
       "decode": "address",
+      "severity": "high",
       "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Base \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "settler-previous-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "prev(uint128)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler previous (registry prev(2)) \u00b7 Base \u2014 the instance ownerOf(2) replaced, the oldest a swap may go to: a change outside a new deployment is a rollback or a re-pointed registry (check it with verify:live); with a new deployment, raise previousLiveNonce with newestLiveNonce in src/chains.ts"
     },
     {
       "id": "permit2-base",
@@ -258,7 +378,20 @@
         2
       ],
       "decode": "address",
+      "severity": "high",
       "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Arbitrum \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "settler-previous-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "prev(uint128)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler previous (registry prev(2)) \u00b7 Arbitrum \u2014 the instance ownerOf(2) replaced, the oldest a swap may go to: a change outside a new deployment is a rollback or a re-pointed registry (check it with verify:live); with a new deployment, raise previousLiveNonce with newestLiveNonce in src/chains.ts"
     },
     {
       "id": "permit2-arbitrum",
@@ -300,7 +433,20 @@
         2
       ],
       "decode": "address",
+      "severity": "high",
       "label": "0x Settler in force (registry ownerOf(2)) \u00b7 Avalanche \u2014 a change is a new 0x deployment (native-coin sales to it are refused from that day): check it (verify:live), then raise newestLiveNonce / previousLiveNonce for the chain in src/chains.ts"
+    },
+    {
+      "id": "settler-previous-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x00000000000004533Fe15556B1E086BB1A72cEae",
+      "signature": "prev(uint128)",
+      "args": [
+        2
+      ],
+      "decode": "address",
+      "label": "0x Settler previous (registry prev(2)) \u00b7 Avalanche \u2014 the instance ownerOf(2) replaced, the oldest a swap may go to: a change outside a new deployment is a rollback or a re-pointed registry (check it with verify:live); with a new deployment, raise previousLiveNonce with newestLiveNonce in src/chains.ts"
     },
     {
       "id": "permit2-avalanche",
