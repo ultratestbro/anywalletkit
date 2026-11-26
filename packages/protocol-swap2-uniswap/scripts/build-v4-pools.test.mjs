@@ -6,7 +6,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { encodeAbiParameters, encodeFunctionResult, decodeFunctionData } from 'viem'
 import {
-  CHAINS, FEE_CAP, INITIALIZE_TOPIC, MC3_ABI, Rpc, ZERO, atBound, classifyRpcError, decodeAggregate, decodeInitializeLog, gate, gateVerdict,
+  CHAINS, FEE_CAP, INITIALIZE_TOPIC, MC3_ABI, Rpc, ZERO, atBound, baselineAllowed, classifyRpcError, decodeAggregate, decodeInitializeLog, gate, gateVerdict,
   mergeEntries, pairFilterSet, parseChainFile, poolIdOf, renderChainFile, renderIndex, scanInitialize, sortPools, staticRules, toEntry, topicOf,
 } from './build-v4-pools.mjs'
 
@@ -195,6 +195,19 @@ test('output: deterministic order, checksummed keys, lower-case ids, a header th
   assert.match(renderIndex([8453, 143]), /import \{V4_POOLS_143\} from "\.\/143\.js";\nimport \{V4_POOLS_8453\}/)
 })
 
+/** The lists 0.5.0 ships (the first release with v4 pins, built with --baseline): per chain, [build block, pools]. */
+const BASELINE_050 = Object.freeze({
+  1: [26496488, 160], 10: [160031400, 89], 56: [135770107, 75], 130: [64913238, 54], 137: [97970744, 100], 143: [125461100, 38],
+  196: [76909615, 19], 480: [38171496, 28], 4326: [32864586, 11], 4663: [123519529, 33], 5042: [33211219, 86], 8453: [62356188, 126],
+  42161: [527612650, 152], 42220: [83777893, 13], 43114: [101406277, 27], 57073: [62180240, 17], 59144: [32712881, 13], 99901: [10878220, 11],
+})
+
+test('TOOLING-4: --baseline runs only before 0.5.0 is released (package.json still 0.4.x)', () => {
+  for (const v of ['0.4.11', '0.4.12', '0.0.1']) assert.equal(baselineAllowed(v), true, v)
+  for (const v of ['0.5.0', '0.5.1', '0.6.0', '1.0.0', '0.5.0-next.1', '', 'x']) assert.equal(baselineAllowed(v), false, v)
+  assert.equal(Object.values(BASELINE_050).reduce((n, [, c]) => n + c, 0), 1052)
+})
+
 test('R2-1: every shipped list reads back (parseChainFile), and render → parse is the identity, since included', () => {
   const dir = new URL('../src/v4pools/', import.meta.url)
   const files = readdirSync(dir).filter((f) => /^\d+\.ts$/.test(f))
@@ -204,7 +217,18 @@ test('R2-1: every shipped list reads back (parseChainFile), and render → parse
     const entries = parseChainFile(text)
     const lines = text.split('\n').filter((l) => /^\s*\{currency0: /.test(l))
     assert.equal(entries.length, lines.length, f)
-    assert.ok(entries.every((e) => e.since === undefined), `${f}: the 0.5.0 lists are the baseline (no since)`)
+    // Release-aware (TOOLING-4): the 0.5.0 lists are the baseline, their pools without `since`; a later rebuild keeps
+    // them (lists only grow) and marks every pool it adds with a `since` past the 0.5.0 build. So the pools without
+    // `since` stay exactly the 0.5.0 ones — a rebuild written with --baseline after 0.5.0 adds more and fails here —
+    // and a chain the 0.5.0 release had no list for carries `since` on every pool.
+    const chainId = Number(f.replace('.ts', ''))
+    const base = BASELINE_050[chainId]
+    const bare = entries.filter((e) => e.since === undefined)
+    if (!base) assert.equal(bare.length, 0, `${f}: a chain without a 0.5.0 list marks every pool with since`)
+    else {
+      assert.equal(bare.length, base[1], `${f}: the pools without since are the 0.5.0 list's ${base[1]}`)
+      assert.ok(entries.every((e) => e.since === undefined || e.since > base[0]), `${f}: every pool a rebuild added is marked past the 0.5.0 build (${base[0]})`)
+    }
   }
   const cfg = CHAINS.find((c) => c.chainId === 143)
   const a = toEntry({ currency0: ZERO, currency1: AUSD, fee: 500, tickSpacing: 1, id: poolIdOf({ currency0: ZERO, currency1: AUSD, fee: 500, tickSpacing: 1 }) })

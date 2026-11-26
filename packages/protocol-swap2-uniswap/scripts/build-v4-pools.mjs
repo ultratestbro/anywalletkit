@@ -10,7 +10,8 @@
 //   node scripts/build-v4-pools.mjs --env FILE           load RPC_<chainId>=url[,url] lines (never printed)
 //   node scripts/build-v4-pools.mjs --cache DIR          keep the Initialize index per chain in DIR and resume from it
 //   node scripts/build-v4-pools.mjs --baseline           write no `since` (only for a list in the first release that
-//                                                        ships v4 pins, 0.5.0, before that release: every app has it)
+//                                                        ships v4 pins, 0.5.0, before that release: every app has it;
+//                                                        refused once package.json says 0.5.0 or later)
 //
 // Method (UNISWAP-V4-RESEARCH.md §5.3, decision 5):
 //   1. Index: PoolManager `Initialize` logs over [deployBlock, B], pair-filtered in the RPC
@@ -493,6 +494,19 @@ export function parseChainFile(text) {
  * pool of `fresh` not in it added with `since: block` — or with none when `baseline`, or when it was listed before.
  * Returns {entries (sorted), added, kept} (`kept`: previous pools this build's gate no longer passes).
  */
+/**
+ * Whether `--baseline` may run for a package at `version` (TOOLING-4): only before 0.5.0 is released — package.json
+ * still names a 0.4.x while the release's changesets are pending. A list built after that carries `since` on every pool
+ * it adds, so a server ranks it against v3 only once `v4RankedListBlock` covers it; written without, the new pools would
+ * rank by default and every app on the 0.5.0 pins would refuse the server's v4 winner over one of them.
+ */
+export function baselineAllowed(version) {
+  const m = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(String(version))
+  if (!m) return false
+  const [major, minor] = [Number(m[1]), Number(m[2])]
+  return major === 0 && minor < 5
+}
+
 export function mergeEntries(previous, fresh, { block, baseline = false }) {
   const byId = new Map()
   for (const p of previous ?? []) byId.set(lc(p.id), toEntry(p))
@@ -641,6 +655,10 @@ async function main() {
   const only = opt('--chain') ? new Set(opt('--chain').split(',').map(Number)) : null
   const dry = args.includes('--dry')
   const baseline = args.includes('--baseline')
+  if (baseline) {
+    const version = JSON.parse(readFileSync(join(HERE, '..', 'package.json'), 'utf8')).version
+    if (!baselineAllowed(version)) throw new Error(`--baseline is for the lists of the first release that ships v4 pins (0.5.0), before it is released; this package is ${version}: rebuild without it (every pool added gets \`since\`)`)
+  }
   if (opt('--env')) loadEnvFile(opt('--env'))
   const cacheDir = opt('--cache') ?? null
   if (cacheDir) mkdirSync(cacheDir, { recursive: true })
