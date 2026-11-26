@@ -1,0 +1,445 @@
+{
+  "module": "@anywalletkit/protocol-swap2-kyberswap",
+  "sources": [
+    {
+      "id": "supported-chains",
+      "type": "http-json",
+      "url": "https://common-service.kyberswap.com/api/v1/aggregator/supported-chains",
+      "path": "data.chains",
+      "itemKey": "chainId",
+      "label": "KyberSwap aggregator supported chains (a chain leaving, or a state change, touches KYBER_CHAINS)"
+    },
+    {
+      "id": "docs-contracts",
+      "type": "http-text",
+      "url": "https://docs.kyberswap.com/developer-guide/aggregator-api/contracts.md",
+      "label": "KyberSwap docs \u00b7 aggregator contract addresses (router V2, executor, router V3)"
+    },
+    {
+      "id": "docs-rate-limits",
+      "type": "http-text",
+      "url": "https://docs.kyberswap.com/developer-guide/start-here/rate-limits-and-client-id.md",
+      "label": "KyberSwap docs \u00b7 rate limits, client id and API keys"
+    },
+    {
+      "id": "docs-evm-swaps",
+      "type": "http-text",
+      "url": "https://docs.kyberswap.com/developer-guide/aggregator-api/evm-swaps.md",
+      "label": "KyberSwap docs \u00b7 /routes and /route/build reference"
+    },
+    {
+      "id": "router-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Ethereum"
+    },
+    {
+      "id": "executor-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Ethereum"
+    },
+    {
+      "id": "router-owner-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Ethereum (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Base"
+    },
+    {
+      "id": "executor-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Base"
+    },
+    {
+      "id": "router-owner-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Base (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-bnb-smart-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 BNB Smart Chain"
+    },
+    {
+      "id": "executor-bnb-smart-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 BNB Smart Chain"
+    },
+    {
+      "id": "router-owner-bnb-smart-chain",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 BNB Smart Chain (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Arbitrum"
+    },
+    {
+      "id": "executor-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Arbitrum"
+    },
+    {
+      "id": "router-owner-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Arbitrum (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Optimism"
+    },
+    {
+      "id": "executor-optimism",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Optimism"
+    },
+    {
+      "id": "router-owner-optimism",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Optimism (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Polygon"
+    },
+    {
+      "id": "executor-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Polygon"
+    },
+    {
+      "id": "router-owner-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Polygon (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Avalanche"
+    },
+    {
+      "id": "executor-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Avalanche"
+    },
+    {
+      "id": "router-owner-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Avalanche (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Linea"
+    },
+    {
+      "id": "executor-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Linea"
+    },
+    {
+      "id": "router-owner-linea",
+      "type": "evm-call",
+      "chainId": 59144,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Linea (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-sonic",
+      "type": "evm-code",
+      "chainId": 146,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Sonic"
+    },
+    {
+      "id": "executor-sonic",
+      "type": "evm-code",
+      "chainId": 146,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Sonic"
+    },
+    {
+      "id": "router-owner-sonic",
+      "type": "evm-call",
+      "chainId": 146,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Sonic (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-berachain",
+      "type": "evm-code",
+      "chainId": 80094,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Berachain"
+    },
+    {
+      "id": "executor-berachain",
+      "type": "evm-code",
+      "chainId": 80094,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Berachain"
+    },
+    {
+      "id": "router-owner-berachain",
+      "type": "evm-call",
+      "chainId": 80094,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Berachain (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Unichain"
+    },
+    {
+      "id": "executor-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Unichain"
+    },
+    {
+      "id": "router-owner-unichain",
+      "type": "evm-call",
+      "chainId": 130,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Unichain (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 HyperEVM"
+    },
+    {
+      "id": "executor-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 HyperEVM"
+    },
+    {
+      "id": "router-owner-hyperevm",
+      "type": "evm-call",
+      "chainId": 999,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 HyperEVM (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-plasma",
+      "type": "evm-code",
+      "chainId": 9745,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Plasma"
+    },
+    {
+      "id": "executor-plasma",
+      "type": "evm-code",
+      "chainId": 9745,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Plasma"
+    },
+    {
+      "id": "router-owner-plasma",
+      "type": "evm-call",
+      "chainId": 9745,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Plasma (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Monad"
+    },
+    {
+      "id": "executor-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Monad"
+    },
+    {
+      "id": "router-owner-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Monad (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 MegaETH"
+    },
+    {
+      "id": "executor-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 MegaETH"
+    },
+    {
+      "id": "router-owner-megaeth",
+      "type": "evm-call",
+      "chainId": 4326,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 MegaETH (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Robinhood Chain"
+    },
+    {
+      "id": "executor-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Robinhood Chain"
+    },
+    {
+      "id": "router-owner-robinhood-chain",
+      "type": "evm-call",
+      "chainId": 4663,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Robinhood Chain (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-arc",
+      "type": "evm-code",
+      "chainId": 5042,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Arc"
+    },
+    {
+      "id": "executor-arc",
+      "type": "evm-code",
+      "chainId": 5042,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Arc"
+    },
+    {
+      "id": "router-owner-arc",
+      "type": "evm-call",
+      "chainId": 5042,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Arc (who can change the router's whitelist)"
+    },
+    {
+      "id": "router-elysium",
+      "type": "evm-code",
+      "chainId": 99901,
+      "address": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "label": "KyberSwap MetaAggregationRouterV2 \u00b7 Elysium"
+    },
+    {
+      "id": "executor-elysium",
+      "type": "evm-code",
+      "chainId": 99901,
+      "address": "0x8F10B468b06c6FD214B65F87778827F7D113f996",
+      "label": "KyberSwap AggregationExecutorProxy (the pinned callTarget) \u00b7 Elysium"
+    },
+    {
+      "id": "router-owner-elysium",
+      "type": "evm-call",
+      "chainId": 99901,
+      "to": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "KyberSwap router V2 owner() \u00b7 Elysium (who can change the router's whitelist)"
+    }
+  ]
+}

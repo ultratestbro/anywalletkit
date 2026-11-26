@@ -1,0 +1,879 @@
+{
+ "module": "@anywalletkit/protocol-swap2-kyberswap",
+ "sources": {
+  "executor-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:57.960Z",
+   "changedAt": "2026-11-26T16:52:57.960Z"
+  },
+  "router-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "d724a173bff4ca91",
+   "meta": {
+    "codeHash": "d724a173bff4ca91",
+    "bytes": 18652
+   },
+   "seenAt": "2026-11-26T16:52:57.962Z",
+   "changedAt": "2026-11-26T16:52:57.962Z"
+  },
+  "router-owner-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:57.966Z",
+   "changedAt": "2026-11-26T16:52:57.966Z"
+  },
+  "router-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "55d1e58d8ff08aa8",
+   "meta": {
+    "codeHash": "55d1e58d8ff08aa8",
+    "bytes": 18312
+   },
+   "seenAt": "2026-11-26T16:52:57.972Z",
+   "changedAt": "2026-11-26T16:52:57.972Z"
+  },
+  "executor-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:57.976Z",
+   "changedAt": "2026-11-26T16:52:57.976Z"
+  },
+  "router-owner-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:57.981Z",
+   "changedAt": "2026-11-26T16:52:57.981Z"
+  },
+  "router-bnb-smart-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "cc6767f5395713e1",
+   "meta": {
+    "codeHash": "cc6767f5395713e1",
+    "bytes": 18652
+   },
+   "seenAt": "2026-11-26T16:52:57.987Z",
+   "changedAt": "2026-11-26T16:52:57.987Z"
+  },
+  "router-owner-bnb-smart-chain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 56,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:57.997Z",
+   "changedAt": "2026-11-26T16:52:57.997Z"
+  },
+  "router-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "223a1b85808c305e",
+   "meta": {
+    "codeHash": "223a1b85808c305e",
+    "bytes": 18652
+   },
+   "seenAt": "2026-11-26T16:52:58.011Z",
+   "changedAt": "2026-11-26T16:52:58.011Z"
+  },
+  "executor-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.025Z",
+   "changedAt": "2026-11-26T16:52:58.025Z"
+  },
+  "router-owner-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:58.037Z",
+   "changedAt": "2026-11-26T16:52:58.037Z"
+  },
+  "router-optimism": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "a5e1b42971d51dd2",
+   "meta": {
+    "codeHash": "a5e1b42971d51dd2",
+    "bytes": 18652
+   },
+   "seenAt": "2026-11-26T16:52:58.051Z",
+   "changedAt": "2026-11-26T16:52:58.051Z"
+  },
+  "executor-bnb-smart-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.055Z",
+   "changedAt": "2026-11-26T16:52:58.055Z"
+  },
+  "executor-optimism": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.065Z",
+   "changedAt": "2026-11-26T16:52:58.065Z"
+  },
+  "router-polygon": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "fb967cdc0b1da4df",
+   "meta": {
+    "codeHash": "fb967cdc0b1da4df",
+    "bytes": 18652
+   },
+   "seenAt": "2026-11-26T16:52:58.079Z",
+   "changedAt": "2026-11-26T16:52:58.079Z"
+  },
+  "executor-polygon": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.092Z",
+   "changedAt": "2026-11-26T16:52:58.092Z"
+  },
+  "router-owner-optimism": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 10,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:58.097Z",
+   "changedAt": "2026-11-26T16:52:58.097Z"
+  },
+  "router-owner-polygon": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 137,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:58.104Z",
+   "changedAt": "2026-11-26T16:52:58.104Z"
+  },
+  "docs-rate-limits": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.kyberswap.com/developer-guide/start-here/rate-limits-and-client-id.md"
+   },
+   "value": "7d2ec63f57cce3a1ef4d5a336ef7460da9938599900f7f07c96025fbc16afeb4",
+   "meta": {
+    "hash": "7d2ec63f57cce3a1",
+    "chars": 3391
+   },
+   "seenAt": "2026-11-26T16:52:58.231Z",
+   "changedAt": "2026-11-26T16:52:58.231Z"
+  },
+  "docs-contracts": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.kyberswap.com/developer-guide/aggregator-api/contracts.md"
+   },
+   "value": "f9cd0533aee1733b59314c71b434c727ed5fb68556a97d20f04d6117a4389fff",
+   "meta": {
+    "hash": "f9cd0533aee1733b",
+    "chars": 12412
+   },
+   "seenAt": "2026-11-26T16:52:58.232Z",
+   "changedAt": "2026-11-26T16:52:58.232Z"
+  },
+  "router-avalanche": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "950c4ebc45bcd4a2",
+   "meta": {
+    "codeHash": "950c4ebc45bcd4a2",
+    "bytes": 18652
+   },
+   "seenAt": "2026-11-26T16:52:58.244Z",
+   "changedAt": "2026-11-26T16:52:58.244Z"
+  },
+  "executor-avalanche": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.281Z",
+   "changedAt": "2026-11-26T16:52:58.281Z"
+  },
+  "router-owner-avalanche": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 43114,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:58.342Z",
+   "changedAt": "2026-11-26T16:52:58.342Z"
+  },
+  "router-linea": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "e0e4172d5f3a354e",
+   "meta": {
+    "codeHash": "e0e4172d5f3a354e",
+    "bytes": 18652
+   },
+   "seenAt": "2026-11-26T16:52:58.355Z",
+   "changedAt": "2026-11-26T16:52:58.355Z"
+  },
+  "executor-linea": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.373Z",
+   "changedAt": "2026-11-26T16:52:58.373Z"
+  },
+  "router-owner-linea": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 59144,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x2475039bf2ecdce2ee4c82954e64be9674f43546\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x2475039bf2ecdce2ee4c82954e64be9674f43546"
+   },
+   "seenAt": "2026-11-26T16:52:58.408Z",
+   "changedAt": "2026-11-26T16:52:58.408Z"
+  },
+  "router-sonic": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 146,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "187bad37b64a1702",
+   "meta": {
+    "codeHash": "187bad37b64a1702",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:58.506Z",
+   "changedAt": "2026-11-26T16:52:58.506Z"
+  },
+  "supported-chains": {
+   "type": "http-json",
+   "target": {
+    "url": "https://common-service.kyberswap.com/api/v1/aggregator/supported-chains",
+    "path": "data.chains"
+   },
+   "value": "[\"1\",\"10\",\"130\",\"137\",\"143\",\"146\",\"199\",\"2020\",\"25\",\"250\",\"324\",\"4153\",\"42161\",\"42793\",\"43114\",\"4326\",\"4663\",\"5000\",\"5042\",\"534352\",\"56\",\"59144\",\"80094\",\"81457\",\"8453\",\"9745\",\"999\",\"99901\"]",
+   "meta": {
+    "count": 28,
+    "keys": [
+     "1",
+     "10",
+     "130",
+     "137",
+     "143",
+     "146",
+     "199",
+     "2020",
+     "25",
+     "250",
+     "324",
+     "4153",
+     "42161",
+     "42793",
+     "43114",
+     "4326",
+     "4663",
+     "5000",
+     "5042",
+     "534352",
+     "56",
+     "59144",
+     "80094",
+     "81457",
+     "8453",
+     "9745",
+     "999",
+     "99901"
+    ]
+   },
+   "seenAt": "2026-11-26T16:52:58.598Z",
+   "changedAt": "2026-11-26T16:52:58.598Z"
+  },
+  "router-berachain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 80094,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "5a0e7a8e4ded0a69",
+   "meta": {
+    "codeHash": "5a0e7a8e4ded0a69",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:58.654Z",
+   "changedAt": "2026-11-26T16:52:58.654Z"
+  },
+  "executor-berachain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 80094,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.711Z",
+   "changedAt": "2026-11-26T16:52:58.711Z"
+  },
+  "router-owner-berachain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 80094,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:58.793Z",
+   "changedAt": "2026-11-26T16:52:58.793Z"
+  },
+  "router-unichain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "2ce4983ff00e2dfe",
+   "meta": {
+    "codeHash": "2ce4983ff00e2dfe",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:58.810Z",
+   "changedAt": "2026-11-26T16:52:58.810Z"
+  },
+  "executor-sonic": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 146,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.855Z",
+   "changedAt": "2026-11-26T16:52:58.855Z"
+  },
+  "executor-unichain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:58.894Z",
+   "changedAt": "2026-11-26T16:52:58.894Z"
+  },
+  "docs-evm-swaps": {
+   "type": "http-text",
+   "target": {
+    "url": "https://docs.kyberswap.com/developer-guide/aggregator-api/evm-swaps.md"
+   },
+   "value": "5607f0df3edb968a10607e249193060f6aa1d5c5f5b159197d637dd5ba1b1d6a",
+   "meta": {
+    "hash": "5607f0df3edb968a",
+    "chars": 2365
+   },
+   "seenAt": "2026-11-26T16:52:58.898Z",
+   "changedAt": "2026-11-26T16:52:58.898Z"
+  },
+  "router-owner-sonic": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 146,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090"
+   },
+   "seenAt": "2026-11-26T16:52:58.904Z",
+   "changedAt": "2026-11-26T16:52:58.904Z"
+  },
+  "router-owner-unichain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 130,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:58.914Z",
+   "changedAt": "2026-11-26T16:52:58.914Z"
+  },
+  "router-plasma": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 9745,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "ee4c9ff068fcb67f",
+   "meta": {
+    "codeHash": "ee4c9ff068fcb67f",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:58.961Z",
+   "changedAt": "2026-11-26T16:52:58.961Z"
+  },
+  "router-owner-hyperevm": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 999,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090"
+   },
+   "seenAt": "2026-11-26T16:52:59.022Z",
+   "changedAt": "2026-11-26T16:52:59.022Z"
+  },
+  "router-hyperevm": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 999,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "49c49c4ed704c058",
+   "meta": {
+    "codeHash": "49c49c4ed704c058",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:59.041Z",
+   "changedAt": "2026-11-26T16:52:59.041Z"
+  },
+  "executor-plasma": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 9745,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:59.073Z",
+   "changedAt": "2026-11-26T16:52:59.073Z"
+  },
+  "router-monad": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "9beab122fde56d87",
+   "meta": {
+    "codeHash": "9beab122fde56d87",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:59.074Z",
+   "changedAt": "2026-11-26T16:52:59.074Z"
+  },
+  "router-owner-plasma": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 9745,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090"
+   },
+   "seenAt": "2026-11-26T16:52:59.089Z",
+   "changedAt": "2026-11-26T16:52:59.089Z"
+  },
+  "executor-hyperevm": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 999,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:59.103Z",
+   "changedAt": "2026-11-26T16:52:59.103Z"
+  },
+  "executor-monad": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:59.144Z",
+   "changedAt": "2026-11-26T16:52:59.144Z"
+  },
+  "router-megaeth": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4326,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "b199d7cfec7508a6",
+   "meta": {
+    "codeHash": "b199d7cfec7508a6",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:59.168Z",
+   "changedAt": "2026-11-26T16:52:59.168Z"
+  },
+  "executor-megaeth": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4326,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "80559ccced6d0bcf",
+   "meta": {
+    "codeHash": "80559ccced6d0bcf",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:59.169Z",
+   "changedAt": "2026-11-26T16:52:59.169Z"
+  },
+  "router-owner-monad": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 143,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090"
+   },
+   "seenAt": "2026-11-26T16:52:59.175Z",
+   "changedAt": "2026-11-26T16:52:59.175Z"
+  },
+  "router-owner-megaeth": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4326,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090"
+   },
+   "seenAt": "2026-11-26T16:52:59.176Z",
+   "changedAt": "2026-11-26T16:52:59.176Z"
+  },
+  "router-owner-arc": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 5042,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x1874028262f1f4b2dd1f2700a72ee8b9b7c69090"
+   },
+   "seenAt": "2026-11-26T16:52:59.247Z",
+   "changedAt": "2026-11-26T16:52:59.247Z"
+  },
+  "router-arc": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5042,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "75dabe46ce09c1f0",
+   "meta": {
+    "codeHash": "75dabe46ce09c1f0",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:59.249Z",
+   "changedAt": "2026-11-26T16:52:59.249Z"
+  },
+  "executor-arc": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5042,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "eaaf3008b150896b",
+   "meta": {
+    "codeHash": "eaaf3008b150896b",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:59.249Z",
+   "changedAt": "2026-11-26T16:52:59.249Z"
+  },
+  "router-owner-robinhood-chain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4663,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:59.274Z",
+   "changedAt": "2026-11-26T16:52:59.274Z"
+  },
+  "router-owner-elysium": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 99901,
+    "to": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbe2f0354d970265bfc36d383af77f72736b81b54\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbe2f0354d970265bfc36d383af77f72736b81b54"
+   },
+   "seenAt": "2026-11-26T16:52:59.591Z",
+   "changedAt": "2026-11-26T16:52:59.591Z"
+  },
+  "executor-robinhood-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "c92db371a41fcdcd",
+   "meta": {
+    "codeHash": "c92db371a41fcdcd",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:59.737Z",
+   "changedAt": "2026-11-26T16:52:59.737Z"
+  },
+  "executor-elysium": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 99901,
+    "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996"
+   },
+   "value": "4d8b16d283341d06",
+   "meta": {
+    "codeHash": "4d8b16d283341d06",
+    "bytes": 13529
+   },
+   "seenAt": "2026-11-26T16:52:59.772Z",
+   "changedAt": "2026-11-26T16:52:59.772Z"
+  },
+  "router-elysium": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 99901,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "b4aeffeb9179060c",
+   "meta": {
+    "codeHash": "b4aeffeb9179060c",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:59.781Z",
+   "changedAt": "2026-11-26T16:52:59.781Z"
+  },
+  "router-robinhood-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+   },
+   "value": "caa94cf05c60a941",
+   "meta": {
+    "codeHash": "caa94cf05c60a941",
+    "bytes": 13724
+   },
+   "seenAt": "2026-11-26T16:52:59.805Z",
+   "changedAt": "2026-11-26T16:52:59.805Z"
+  }
+ }
+}

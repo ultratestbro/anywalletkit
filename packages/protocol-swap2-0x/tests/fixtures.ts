@@ -15,17 +15,17 @@ export const WETH = "0x4200000000000000000000000000000000000006";
 export const ME = "0x4444444444444444444444444444444444444444";
 export const OTHER = "0x9999999999999999999999999999999999999999";
 /**
- * What the registry answers on Base: deployment 22 (in force on 2026-11-15) and 21 (the one it replaced) — the pair the
- * chain table pins (`newestLiveNonce`, `previousLiveNonce`); 20 is the one before, a real deployment with code that is
- * older than the pinned previous and so refused. A rotation in these tests is the one that really happened: from
- * {21, 20} to {22, 21}. Real Settlers rotate, but every one accepted is an address the registry deploys to, inside the
- * chain's pinned window, with code.
+ * What the registry answers on Base: deployment 23 (in force since 0x's 2026-11-24 release) and 22 (the one it
+ * replaced) — the pair the chain table pins (`newestLiveNonce`, `previousLiveNonce`); 21 is the one before, a real
+ * deployment with code that is older than the pinned previous and so refused. A rotation in these tests is the one that
+ * really happened: from {22, 21} to {23, 22}. Real Settlers rotate, but every one accepted is an address the registry
+ * deploys to, inside the chain's pinned window, with code.
  */
-export const SETTLER = zeroExSettlerAddress(8453, 22);
-export const PREV_SETTLER = zeroExSettlerAddress(8453, 21);
-export const OLDER_SETTLER = zeroExSettlerAddress(8453, 20);
-/** Every taker Settler deployed on Base on 2026-11-15 (deployments 1–22): the stub chain has code at these and nowhere else. */
-export const DEPLOYED_ON_BASE: readonly string[] = Array.from({length: 22}, (_, i) => zeroExSettlerAddress(8453, i + 1));
+export const SETTLER = zeroExSettlerAddress(8453, 23);
+export const PREV_SETTLER = zeroExSettlerAddress(8453, 22);
+export const OLDER_SETTLER = zeroExSettlerAddress(8453, 21);
+/** Every taker Settler deployed on Base on 2026-11-25 (deployments 1–23): the stub chain has code at these and nowhere else. */
+export const DEPLOYED_ON_BASE: readonly string[] = Array.from({length: 23}, (_, i) => zeroExSettlerAddress(8453, i + 1));
 /** Contract code, as far as the checks care: any non-empty bytes. */
 export const SOME_CODE = "0x6080604052";
 export const RPC = {8453: ["https://rpc.test"]};

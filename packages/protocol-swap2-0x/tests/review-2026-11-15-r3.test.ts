@@ -7,12 +7,12 @@
  *     would strand it or hand it to whatever 0x deploys there later. Native sales go only to `newestLiveNonce` or
  *     `previousLiveNonce`; token sales keep the margin (a Permit2 signature is spent only with the account as
  *     msg.sender). Reviewer's reproduction: scratch-tests/rev-r3-security.test.ts, part A (the engine sent the input to
- *     Base 23 and 24).
+ *     Base 23 and 24, the two deployments past the pinned 22; with Base pinned at 23 since 2026-11-25 they are 24 and 25).
  *  2. MEDIUM — call a Settler the registry dropped while the user was on the review sheet, in remote mode:
  *     zeroExRemoteProvider re-reads the registry on the device right before broadcast (part C), and a native-sale quote
  *     may stay valid for at most ZEROEX_MAX_NATIVE_QUOTE_SECONDS.
  *  3. LOW — name a replaced Settler: the oldest accepted is the previous one live at pin time (part B: Base 5 and 12,
- *     whose code predates what the checks rely on). The table is validated.
+ *     whose code predates what the checks rely on; 21, the one before the pinned previous). The table is validated.
  *  4. verify:live tells a stale pin apart (scripts/pin-status.mjs).
  */
 import {afterEach, describe, expect, it, vi} from "vitest";
@@ -63,15 +63,15 @@ const nativeExpectation = (settlers: readonly string[], chain?: ZeroExChain) => 
 // ── 1. native value goes only to a Settler live at pin time ─────────────────
 
 describe("1. a native-coin sale goes only to the current or previous Settler live when the table was pinned", () => {
-  it("the table pins both, per chain (2026-11-15, verify:live); token sales keep a margin of two past the newest", () => {
+  it("the table pins both, per chain (2026-11-25, after 0x's 2026-11-24 release, verify:live); token sales keep a margin of two past the newest", () => {
     expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, [c.newestLiveNonce, c.previousLiveNonce]]))).toEqual({
-      1: [21, 20], 10: [21, 20], 56: [23, 22], 137: [20, 19], 8453: [22, 21], 42161: [20, 19], 43114: [20, 19],
+      1: [22, 21], 10: [22, 21], 56: [24, 23], 137: [21, 20], 8453: [23, 22], 42161: [21, 20], 43114: [21, 20],
     });
     expect(ZEROEX_SETTLER_NONCE_MARGIN).toBe(2);
     for (const c of Object.values(ZEROEX_CHAINS)) expect(c).not.toHaveProperty("maxSettlerNonce");
   });
 
-  for (const nonce of [23, 24]) {
+  for (const nonce of [24, 25]) {
     describe(`the reviewer's attack: Base ${nonce} (inside the margin, not deployed) named by the RPC and the API, the RPC claiming code there`, () => {
       const EMPTY = OLD(nonce);
       const hostile = () => stub({settler: EMPTY, registry: {current: EMPTY, prev: SETTLER}, code: () => true, out: 2_500_000n});
@@ -121,11 +121,11 @@ describe("1. a native-coin sale goes only to the current or previous Settler liv
       try { checkZeroExTransaction(tx, e); } catch (err) { return [(err as Error).message, refusalOf(err)?.reason]; }
       return ["passed", undefined];
     };
-    expect(refused(nativeTx(OLD(23)), nativeExpectation([OLD(23)], BASE))).toEqual([nativeText(23, OLD(23)), "vault_mismatch"]);
-    // an integrator's table that pins 23 takes it
-    expect(() => checkZeroExTransaction(nativeTx(OLD(23)), nativeExpectation([OLD(23)], {...BASE, newestLiveNonce: 23, previousLiveNonce: 22}))).not.toThrow();
+    expect(refused(nativeTx(OLD(24)), nativeExpectation([OLD(24)], BASE))).toEqual([nativeText(24, OLD(24)), "vault_mismatch"]);
+    // an integrator's table that pins 24 takes it
+    expect(() => checkZeroExTransaction(nativeTx(OLD(24)), nativeExpectation([OLD(24)], {...BASE, newestLiveNonce: 24, previousLiveNonce: 23}))).not.toThrow();
     // older than the pinned previous, past the margin, or no Settler at all: not a deployment this module accepts
-    for (const to of [OLD(20), OLD(BASE.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN + 1), "0x1035029091415555555555555555555555550001"]) {
+    for (const to of [OLD(21), OLD(BASE.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN + 1), "0x7130a55299915555555555555555555555550001"]) {
       expect(refused(nativeTx(to), nativeExpectation([to], BASE))).toEqual([`zeroex: the transaction target ${to} is not a 0x Settler deployment this module accepts on chain 8453`, "vault_mismatch"]);
     }
     // a chain outside the table pins nothing
@@ -151,7 +151,7 @@ describe("2. zeroExRemoteProvider re-reads the registry on the device before bro
   }
   const REMOVED = "zeroex: the quoted 0x Settler is no longer in the on-chain registry. Nothing was sent; refresh the quote.";
 
-  /** 0x removes the Settler in force while the user is on the review sheet (the registry rolls back to 21). */
+  /** 0x removes the Settler in force while the user is on the review sheet (the registry rolls back to 22). */
   const run = async (mode: "local" | "remote") => {
     let removed = false;
     vi.stubGlobal("fetch", stub({out: 2_500_000n, onRegistryRead: () => (removed ? {current: PREV_SETTLER, prev: null} : {current: SETTLER, prev: PREV_SETTLER})}));
@@ -258,11 +258,11 @@ describe("2. zeroExRemoteProvider re-reads the registry on the device before bro
 // ── 3. replaced Settlers are refused; the table is validated ────────────────
 
 describe("3. the oldest Settler accepted is the previous one live at pin time", () => {
-  for (const nonce of [5, 12, 20]) {
+  for (const nonce of [5, 12, 21]) {
     it(`Base deployment ${nonce} named as the Settler in force is refused (vault_mismatch); nothing is signed or sent`, async () => {
       vi.stubGlobal("fetch", stub({settler: OLD(nonce), registry: {current: OLD(nonce), prev: null}}));
       const err = await caught(createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: RPC}).resolve(8453));
-      expect((err as Error).message).toBe(`zeroex: the RPC on chain 8453 names ${OLD(nonce)} (Settler deployment ${nonce}) as the 0x Settler, older than the oldest this module accepts there (21) — a replaced Settler is not called`);
+      expect((err as Error).message).toBe(`zeroex: the RPC on chain 8453 names ${OLD(nonce)} (Settler deployment ${nonce}) as the 0x Settler, older than the oldest this module accepts there (22) — a replaced Settler is not called`);
       expect(refusalOf(err)?.reason).toBe("vault_mismatch");
       const sent: Sent[] = [];
       const signed: {message: {spender: string}}[] = [];
@@ -273,9 +273,9 @@ describe("3. the oldest Settler accepted is the previous one live at pin time", 
   }
 
   it("a previous Settler older than the pin is dropped from the set; a registry rolled back to the pinned previous still works", async () => {
-    vi.stubGlobal("fetch", stub({registry: {current: SETTLER, prev: OLD(20)}}));
+    vi.stubGlobal("fetch", stub({registry: {current: SETTLER, prev: OLD(21)}}));
     expect(await createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: RPC}).resolve(8453)).toEqual([SETTLER]);
-    vi.stubGlobal("fetch", stub({settler: PREV_SETTLER, registry: {current: PREV_SETTLER, prev: OLD(20)}, out: 2_500_000n}));
+    vi.stubGlobal("fetch", stub({settler: PREV_SETTLER, registry: {current: PREV_SETTLER, prev: OLD(21)}, out: 2_500_000n}));
     expect(await createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: RPC}).resolve(8453)).toEqual([PREV_SETTLER]);
     const sent: Sent[] = [];
     await new ZeroExSwap2Protocol(account(sent) as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: RPC}).swap2(nativeSale as never);
@@ -315,16 +315,16 @@ describe("3. the oldest Settler accepted is the previous one live at pin time", 
 describe("4. verify:live fails on any registry state the pin does not describe, and says what to do", () => {
   it("in step: ok; a new deployment: NEW (native sales refused) or PIN (past the margin); a rollback or another previous: OLD / PREV", () => {
     const at = (current: number | null, previous: number | null) => pinStatus({id: 8453, chain: BASE, current, previous, margin: ZEROEX_SETTLER_NONCE_MARGIN});
-    expect(at(22, 21)).toMatchObject({tag: "ok", native: true, token: true});
-    expect(at(22, null)).toMatchObject({tag: "ok"});
-    expect(at(23, 22)).toMatchObject({tag: "NEW", native: false, token: true});
-    expect(at(23, 22).advice).toMatch(/0x deployed Settler 23: native-coin sales to it are refused until newestLiveNonce \/ previousLiveNonce for chain 8453 are raised in src\/chains\.ts/);
+    expect(at(23, 22)).toMatchObject({tag: "ok", native: true, token: true});
+    expect(at(23, null)).toMatchObject({tag: "ok"});
     expect(at(24, 23)).toMatchObject({tag: "NEW", native: false, token: true});
-    expect(at(25, 24)).toMatchObject({tag: "PIN", native: false, token: false});
-    expect(at(21, 20)).toMatchObject({tag: "OLD", native: true, token: true});
-    expect(at(20, 19)).toMatchObject({tag: "OLD", native: false, token: false});
-    expect(at(22, 20)).toMatchObject({tag: "PREV", native: true, token: true});
+    expect(at(24, 23).advice).toMatch(/0x deployed Settler 24: native-coin sales to it are refused until newestLiveNonce \/ previousLiveNonce for chain 8453 are raised in src\/chains\.ts/);
+    expect(at(25, 24)).toMatchObject({tag: "NEW", native: false, token: true});
+    expect(at(26, 25)).toMatchObject({tag: "PIN", native: false, token: false});
+    expect(at(22, 21)).toMatchObject({tag: "OLD", native: true, token: true});
+    expect(at(21, 20)).toMatchObject({tag: "OLD", native: false, token: false});
+    expect(at(23, 21)).toMatchObject({tag: "PREV", native: true, token: true});
     expect(at(null, null)).toMatchObject({tag: "BAD", native: false, token: false});
-    for (const s of [at(23, 22), at(25, 24), at(21, 20), at(20, 19), at(22, 20)]) expect(s.advice).toMatch(/src\/chains\.ts/);
+    for (const s of [at(24, 23), at(26, 25), at(22, 21), at(21, 20), at(23, 21)]) expect(s.advice).toMatch(/src\/chains\.ts/);
   });
 });

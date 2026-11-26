@@ -1,0 +1,470 @@
+{
+ "date": "2026-11-26",
+ "counts": {
+  "ok": 44,
+  "warn": 13,
+  "fail": 3
+ },
+ "transitions": [
+  {
+   "id": "curve:100",
+   "module": "curve",
+   "from": "ok",
+   "to": "fail",
+   "note": "FAIL 100 Gnosis: router 1.1.0 ng5 code 0x38dc1cc4… weth ok | preflight pool check 2/2 | pools 2 | ok Curve.fi wxDAI/USDC/USDT [Curve.fi wxDAI/USDC/USDT] in 1000000000000000000 → out 999873, min 989874, simulated 999874, impact 0 bps | FAIL simulate USDCe/EURe: execution reverted: !balance"
+  },
+  {
+   "id": "zeroex",
+   "module": "zeroex",
+   "from": "fail",
+   "to": "ok",
+   "note": ""
+  },
+  {
+   "id": "relay",
+   "module": "relay",
+   "from": "fail",
+   "to": "ok",
+   "note": ""
+  }
+ ],
+ "failing": [
+  {
+   "id": "curve:100",
+   "status": "fail",
+   "note": "FAIL 100 Gnosis: router 1.1.0 ng5 code 0x38dc1cc4… weth ok | preflight pool check 2/2 | pools 2 | ok Curve.fi wxDAI/USDC/USDT [Curve.fi wxDAI/USDC/USDT] in 1000000000000000000 → out 999873, min 989874, simulated 999874, impact 0 bps | FAIL simulate USDCe/EURe: execution reverted: !balance"
+  },
+  {
+   "id": "cow:1",
+   "status": "fail",
+   "note": "ok 1 native buy: USDC → native coin dry quote — 25000000 → 14793768049036459 (min 14719799208791277), verified=true | FAIL 1 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | ok 1 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — uid 0xcb571"
+  },
+  {
+   "id": "cow:8453",
+   "status": "fail",
+   "note": "ok 8453 native buy: USDC → native coin dry quote — 25000000 → 14807070246197485 (min 14733034894966498), verified=true | FAIL 8453 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | ok 8453 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — ui"
+  }
+ ],
+ "results": [
+  {
+   "id": "ssv",
+   "module": "ssv",
+   "status": "ok",
+   "ms": 892,
+   "note": ""
+  },
+  {
+   "id": "jito",
+   "module": "spl-stake-pool",
+   "status": "ok",
+   "ms": 1183,
+   "note": ""
+  },
+  {
+   "id": "native-stake",
+   "module": "native-stake",
+   "status": "ok",
+   "ms": 1520,
+   "note": ""
+  },
+  {
+   "id": "lido",
+   "module": "lido",
+   "status": "ok",
+   "ms": 2534,
+   "note": ""
+  },
+  {
+   "id": "tonstakers",
+   "module": "tonstakers",
+   "status": "ok",
+   "ms": 4243,
+   "note": ""
+  },
+  {
+   "id": "mellow:lido-earn-eth",
+   "module": "mellow",
+   "status": "ok",
+   "ms": 2671,
+   "note": ""
+  },
+  {
+   "id": "mellow:lido-earn-usd",
+   "module": "mellow",
+   "status": "ok",
+   "ms": 660,
+   "note": ""
+  },
+  {
+   "id": "aave:1:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 2073,
+   "note": ""
+  },
+  {
+   "id": "aave:1:lido",
+   "module": "aave",
+   "status": "ok",
+   "ms": 413,
+   "note": ""
+  },
+  {
+   "id": "aave:1:etherfi",
+   "module": "aave",
+   "status": "warn",
+   "ms": 390,
+   "note": "quoteSupply → AaveError weETH: supply cap reached (0 base units left)."
+  },
+  {
+   "id": "aave:10:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 493,
+   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:56:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 488,
+   "note": "quoteSupply → AaveError Cake: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:100:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 3062,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:137:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 550,
+   "note": ""
+  },
+  {
+   "id": "aave:146:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 933,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:324:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1325,
+   "note": "quoteSupply → AaveError USDC: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:1088:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1277,
+   "note": "quoteSupply → AaveError m.DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:1868:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 992,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:5000:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1266,
+   "note": ""
+  },
+  {
+   "id": "aave:8453:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 556,
+   "note": ""
+  },
+  {
+   "id": "aave:9745:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1818,
+   "note": ""
+  },
+  {
+   "id": "aave:42161:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 524,
+   "note": "quoteSupply → AaveError DAI: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "aave:42220:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1432,
+   "note": ""
+  },
+  {
+   "id": "aave:43114:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1767,
+   "note": "quoteSupply → AaveError DAI.e: supply cap reached (0 base units left)."
+  },
+  {
+   "id": "aave:57073:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1297,
+   "note": ""
+  },
+  {
+   "id": "aave:59144:core",
+   "module": "aave",
+   "status": "ok",
+   "ms": 1171,
+   "note": ""
+  },
+  {
+   "id": "aave:534352:core",
+   "module": "aave",
+   "status": "warn",
+   "ms": 1192,
+   "note": "quoteSupply → AaveError WETH: the reserve is frozen (withdraw and repay only)."
+  },
+  {
+   "id": "native-monad",
+   "module": "native-monad",
+   "status": "ok",
+   "ms": 30012,
+   "note": ""
+  },
+  {
+   "id": "morpho:8453",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 1832,
+   "note": ""
+  },
+  {
+   "id": "morpho:1",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 2486,
+   "note": ""
+  },
+  {
+   "id": "morpho:10",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3150,
+   "note": ""
+  },
+  {
+   "id": "morpho:42161",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3416,
+   "note": ""
+  },
+  {
+   "id": "morpho:137",
+   "module": "morpho",
+   "status": "warn",
+   "ms": 2090,
+   "note": " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached or the receiver is gated)."
+  },
+  {
+   "id": "morpho:130",
+   "module": "morpho",
+   "status": "warn",
+   "ms": 3224,
+   "note": " quoteSupply → MorphoError Gauntlet WETH: deposits are closed right now (caps reached or the receiver is gated)."
+  },
+  {
+   "id": "morpho:999",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 4058,
+   "note": ""
+  },
+  {
+   "id": "morpho:747474",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 4290,
+   "note": ""
+  },
+  {
+   "id": "morpho:143",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 3759,
+   "note": ""
+  },
+  {
+   "id": "approvals:1",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 1213,
+   "note": ""
+  },
+  {
+   "id": "approvals:8453",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 709,
+   "note": ""
+  },
+  {
+   "id": "approvals:42161",
+   "module": "approvals",
+   "status": "ok",
+   "ms": 605,
+   "note": ""
+  },
+  {
+   "id": "morpho:4663",
+   "module": "morpho",
+   "status": "ok",
+   "ms": 5236,
+   "note": ""
+  },
+  {
+   "id": "kamino",
+   "module": "kamino",
+   "status": "ok",
+   "ms": 4680,
+   "note": ""
+  },
+  {
+   "id": "curve:10",
+   "module": "curve",
+   "status": "ok",
+   "ms": 1132,
+   "note": ""
+  },
+  {
+   "id": "curve:1",
+   "module": "curve",
+   "status": "ok",
+   "ms": 7795,
+   "note": ""
+  },
+  {
+   "id": "curve:143",
+   "module": "curve",
+   "status": "ok",
+   "ms": 5163,
+   "note": ""
+  },
+  {
+   "id": "curve:196",
+   "module": "curve",
+   "status": "ok",
+   "ms": 3546,
+   "note": ""
+  },
+  {
+   "id": "curve:8453",
+   "module": "curve",
+   "status": "ok",
+   "ms": 5974,
+   "note": ""
+  },
+  {
+   "id": "curve:9745",
+   "module": "curve",
+   "status": "ok",
+   "ms": 3426,
+   "note": ""
+  },
+  {
+   "id": "curve:100",
+   "module": "curve",
+   "status": "fail",
+   "ms": 2631,
+   "note": "FAIL 100 Gnosis: router 1.1.0 ng5 code 0x38dc1cc4… weth ok | preflight pool check 2/2 | pools 2 | ok Curve.fi wxDAI/USDC/USDT [Curve.fi wxDAI/USDC/USDT] in 1000000000000000000 → out 999873, min 989874, simulated 999874, impact 0 bps | FAIL simulate USDCe/EURe: execution reverted: !balance"
+  },
+  {
+   "id": "scrvusd",
+   "module": "scrvusd",
+   "status": "ok",
+   "ms": 1934,
+   "note": ""
+  },
+  {
+   "id": "liquid-near",
+   "module": "liquid-near",
+   "status": "ok",
+   "ms": 83044,
+   "note": ""
+  },
+  {
+   "id": "zeroex",
+   "module": "zeroex",
+   "status": "ok",
+   "ms": 5173,
+   "note": ""
+  },
+  {
+   "id": "relay",
+   "module": "relay",
+   "status": "ok",
+   "ms": 9508,
+   "note": ""
+  },
+  {
+   "id": "curve:42161",
+   "module": "curve",
+   "status": "ok",
+   "ms": 24206,
+   "note": ""
+  },
+  {
+   "id": "across",
+   "module": "across",
+   "status": "ok",
+   "ms": 15510,
+   "note": ""
+  },
+  {
+   "id": "cow:42161",
+   "module": "cow",
+   "status": "ok",
+   "ms": 18901,
+   "note": ""
+  },
+  {
+   "id": "cow:1",
+   "module": "cow",
+   "status": "fail",
+   "ms": 8577,
+   "note": "ok 1 native buy: USDC → native coin dry quote — 25000000 → 14793768049036459 (min 14719799208791277), verified=true | FAIL 1 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | ok 1 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — uid 0xcb571"
+  },
+  {
+   "id": "cow:8453",
+   "module": "cow",
+   "status": "fail",
+   "ms": 6011,
+   "note": "ok 8453 native buy: USDC → native coin dry quote — 25000000 → 14807070246197485 (min 14733034894966498), verified=true | FAIL 8453 eth-flow: native → USDC quote — cow: rate limited (HTTP 429) | ok 8453 status: a real fulfilled order reads as completed with its settlement hash; nothing to cancel — ui"
+  },
+  {
+   "id": "native-near",
+   "module": "native-near",
+   "status": "ok",
+   "ms": 62623,
+   "note": ""
+  },
+  {
+   "id": "kyberswap",
+   "module": "kyberswap",
+   "status": "ok",
+   "ms": 65699,
+   "note": ""
+  }
+ ]
+}

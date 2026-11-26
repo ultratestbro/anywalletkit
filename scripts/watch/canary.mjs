@@ -99,6 +99,9 @@ if (existsSync(pkg("protocol-swap2-across"))) jobs.push({id: "across", module: "
 // the provider (an order and a permit signed by a throwaway key and verified locally; nothing is placed).
 for (const chainId of [1, 8453, 42161]) jobs.push({id: `cow:${chainId}`, module: "cow", script: pkg("protocol-swap2-cow"), args: [String(chainId)], env: {[`COW_RPC_${chainId}`]: rpcFor(chainId)}});
 
+// KyberSwap: router and executor code and build on all 18 chains, then an execution quote each way per chain (routes +
+// build, the calldata checked, a native input simulated). Keyless; KYBERSWAP_API_KEY is passed through when set.
+if (existsSync(pkg("protocol-swap2-kyberswap"))) jobs.push({id: "kyberswap", module: "kyberswap", script: pkg("protocol-swap2-kyberswap"), args: [], timeoutS: 300});
 const selected = jobs.filter((j) => !ONLY || ONLY.has(j.module) || ONLY.has(j.id));
 function run(job) {
   return new Promise((done) => {

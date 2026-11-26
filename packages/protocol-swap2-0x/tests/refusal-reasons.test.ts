@@ -1,17 +1,17 @@
 // CS-13: every refusal this module raises carries a stable `reason` next to its text, and the text is unchanged.
-// Everything below runs the module's real code paths on real recorded 0x answers; only `fetch` is replaced.
+// Everything below runs the module's real code paths on real recorded 0x answers; only `fetch` is replaced. Each
+// recording is replayed with the chain table of its pin era (tests/recorded.ts).
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {getAddress} from "viem";
 import {SWAP2_REFUSAL_REASONS, Swap2QuoteError, refusalOf, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
 import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
-import {ZEROEX_CHAINS} from "../src/chains.js";
 import {ZeroExSwap2Protocol} from "../src/protocol.js";
 import {zeroExProvider, type ZeroExProviderConfig} from "../src/provider.js";
 import {zeroExPins, zeroExVerifyBuild, zeroExVerifyQuote} from "../src/remote.js";
 import {ZeroExTransactionError, checkZeroExTransaction, createSettlerResolver} from "../src/settler.js";
 import {getKey} from "./fixtures.js";
-import {bodyOf, loadRecorded, paramsOf, recordedFetch, rpcOf, type RecordedQuote} from "./recorded.js";
+import {bodyOf, chainOf, chainsConfigOf, chainsOf, loadRecorded, paramsOf, recordedFetch, rpcOf, type RecordedQuote} from "./recorded.js";
 
 const OTHER = "0x1111111111111111111111111111111111111111";
 const TOKEN = "base-usdc-eth"; // Base USDC → ETH, a Permit2 token sale
@@ -53,7 +53,7 @@ async function quote(name: string, o: {over?: Partial<QuoteParams>; body?: unkno
   const f = loadRecorded(name);
   vi.setSystemTime(f.request.nowMs);
   vi.stubGlobal("fetch", o.fetchImpl ?? recordedFetch(f, {...(o.body !== undefined ? {body: o.body} : {}), ...(o.status ? {status: o.status} : {}), ...(o.headers ? {headers: o.headers} : {}), ...(o.registry ? {registry: o.registry} : {})}));
-  const provider = zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), ...o.config});
+  const provider = zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f), ...o.config});
   const params = heardParams(f, o.over);
   const q = await provider.getQuote(params);
   return {f, provider, params, quote: q};
@@ -117,7 +117,7 @@ describe("getQuote: 0x's HTTP answer", () => {
     const ctrl = new AbortController();
     vi.stubGlobal("fetch", (async (_u: string, init: RequestInit) => { ctrl.abort(); throw init.signal?.reason ?? new DOMException("aborted", "AbortError"); }) as unknown as typeof fetch);
     const params = heardParams(f);
-    expect(await zeroExProvider({apiKey: getKey}).getQuote(params, ctrl.signal)).toBeNull();
+    expect(await zeroExProvider({apiKey: getKey, chains: chainsConfigOf(f)}).getQuote(params, ctrl.signal)).toBeNull();
     expect(params.heard).toHaveLength(1);
     expect(params.heard[0]!.text).toMatch(/^zeroex: API unreachable \(/);
     expect(params.heard[0]!.info).toBeUndefined();
@@ -209,7 +209,7 @@ describe("getQuote: what the API answers", () => {
 
 describe("checkZeroExTransaction and the resolver throw classified ZeroExTransactionErrors", () => {
   const f = loadRecorded(TOKEN);
-  const expectation = {chainId: 8453, settlers: [f.registry.current], sellToken: f.request.sourceToken, buyToken: f.request.destToken, sellAmount: BigInt(f.request.amountIn), recipient: f.request.destAddress, minBuyAmount: BigInt(f.response.minBuyAmount), nowMs: f.request.nowMs};
+  const expectation = {chainId: 8453, chain: chainOf(f), settlers: [f.registry.current], sellToken: f.request.sourceToken, buyToken: f.request.destToken, sellAmount: BigInt(f.request.amountIn), recipient: f.request.destAddress, minBuyAmount: BigInt(f.response.minBuyAmount), nowMs: f.request.nowMs};
   const tx = () => ({to: f.response.transaction.to, data: f.response.transaction.data, value: "0", chainId: 8453, approvalAddress: "0x000000000022D473030F116dDEE9F6B43aC78BA3", permit2Transfer: JSON.stringify(f.response.permit2.eip712)});
   it("keeps its class, name and text next to the reason", async () => {
     const err = await caught(() => checkZeroExTransaction({...tx(), chainId: 1}, expectation));
@@ -229,7 +229,7 @@ describe("checkZeroExTransaction and the resolver throw classified ZeroExTransac
   });
   it("the resolver: an unknown chain is unsupported_pair", async () => {
     vi.stubGlobal("fetch", recordedFetch(f));
-    expectThrown(await caught(createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: {100: ["https://rpc.test"]}}).resolve(100)), "zeroex: chain 100 is not in the 0x chain table", "unsupported_pair");
+    expectThrown(await caught(createSettlerResolver({chains: chainsOf(f), rpcUrls: {100: ["https://rpc.test"]}}).resolve(100)), "zeroex: chain 100 is not in the 0x chain table", "unsupported_pair");
   });
 });
 
@@ -254,7 +254,7 @@ describe("build and preflight", () => {
 describe("zeroExPins: every text the verifiers return is classified through reasonOf", () => {
   async function live(name = TOKEN) {
     const {quote: q, params, provider, f} = await quote(name);
-    return {q: q!, params, provider, f, ctx: {chains: ZEROEX_CHAINS, settlers: () => [f.registry.current, ...(f.registry.prev ? [f.registry.prev] : [])], nowMs: f.request.nowMs}};
+    return {q: q!, params, provider, f, ctx: {chains: chainsOf(f), settlers: () => [f.registry.current, ...(f.registry.prev ? [f.registry.prev] : [])], nowMs: f.request.nowMs}};
   }
   const pins = zeroExPins();
   const classified = (text: string | null, want: string, reason: Swap2RefusalReason | undefined) => {
@@ -288,7 +288,7 @@ describe("zeroExPins: every text the verifiers return is classified through reas
   it("verifyBuild", async () => {
     const {q, params, provider, f, ctx} = await live();
     const tx = await provider.buildDeposit(q);
-    const resolver = createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: rpcOf(f)});
+    const resolver = createSettlerResolver({chains: chainsOf(f), rpcUrls: rpcOf(f)});
     classified(await zeroExVerifyBuild(q, tx, undefined, {...ctx, resolver}), "the request this quote answered is not known to the app", "policy_refused");
     classified(await zeroExVerifyBuild(q, {...tx, gasLimit: "1"}, params, {...ctx, resolver}), "the built transaction is not the quoted swap", "policy_refused");
     classified(await zeroExVerifyBuild(withoutTx(q), tx, params, {...ctx, resolver}), "the quote carries no transaction", "policy_refused");
@@ -299,9 +299,9 @@ describe("zeroExPins: every text the verifiers return is classified through reas
     const {q, params, f} = await live();
     const lying = {...q, txRequest: {...q.txRequest!, to: OTHER}};
     const backend = (async () => new Response(JSON.stringify(lying))) as unknown as typeof fetch;
-    const resolver = createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: rpcOf(f)});
+    const resolver = createSettlerResolver({chains: chainsOf(f), rpcUrls: rpcOf(f)});
     await resolver.resolve(8453);
-    const local = zeroExPins({settlerResolver: resolver});
+    const local = zeroExPins({settlerResolver: resolver, chains: chainsConfigOf(f)});
     const stub = remoteProvider({name: "zeroex", baseUrl: "https://backend.example/api/swap2", fetchImpl: backend, ...local});
     expectThrown(await caught(stub.getQuote(params)), `zeroex: the quote fails this app's own check — the transaction target ${OTHER} is not a 0x Settler from the on-chain registry`, "vault_mismatch");
   });
@@ -312,7 +312,7 @@ describe("through the engine", () => {
     const f = loadRecorded(PRICE);
     vi.setSystemTime(f.request.nowMs);
     vi.stubGlobal("fetch", recordedFetch(f, {status: 429, body: "slow down", headers: {"retry-after": "5"}}));
-    const protocol = new ZeroExSwap2Protocol(undefined, {fromChain: "eip155:8453", apiKey: getKey});
+    const protocol = new ZeroExSwap2Protocol(undefined, {fromChain: "eip155:8453", apiKey: getKey, chains: chainsConfigOf(f)});
     const err = await caught(protocol.quoteSwap2({fromToken: "USDC", toToken: f.request.destToken, toChain: 8453, recipient: f.request.destAddress, fromTokenAmount: BigInt(f.request.amountIn)}));
     expect(err).toBeInstanceOf(Swap2QuoteError);
     expect((err as Error).message).toBe("swap2: no route available for the requested pair :: zeroex: rate limited (HTTP 429)");

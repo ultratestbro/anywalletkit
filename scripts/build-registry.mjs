@@ -26,6 +26,9 @@ const modules = []
 for (const dir of readdirSync(join(root, 'packages'))) {
   const p = join(root, 'packages', dir, 'module.json')
   if (!existsSync(p)) continue
+  // An unreleased package (private, listed in check-pack's UNRELEASED) is not on npm yet, so not in the registry.
+  const pkgJson = join(root, 'packages', dir, 'package.json')
+  if (existsSync(pkgJson) && JSON.parse(readFileSync(pkgJson, 'utf8')).private === true) continue
   const m = JSON.parse(readFileSync(p, 'utf8'))
   validate(m, `packages/${dir}/module.json`)
   modules.push(m)

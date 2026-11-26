@@ -1,5 +1,6 @@
 {
  "note": "Real 0x Swap API v2 answer (/swap/permit2/quote), BNB Smart Chain USDT->USDC, recorded 2026-11-15 from api.0x.org with a throwaway taker that holds nothing. Response body as 0x sent it; request rebuilt from the recorded query (no headers, no key). registry = what ownerOf(2) / prev(2) answered on that chain.",
+ "pinEra": "2026-11-15",
  "request": {
   "endpoint": "/swap/permit2/quote",
   "sourceChain": "eip155:56",

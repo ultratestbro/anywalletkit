@@ -1,0 +1,90 @@
+{
+  "name": "@anywalletkit/protocol-swap2-kyberswap",
+  "version": "0.1.0",
+  "description": "KyberSwap Aggregator same-chain swaps for Any Wallet Kit: exact-input routes on 18 EVM chains, settled through MetaAggregationRouterV2, with the encoded transaction decoded strictly and checked against the request before signing.",
+  "license": "Apache-2.0",
+  "homepage": "https://docs.anywallet.tech",
+  "bugs": {
+    "url": "https://github.com/ultratestbro/anywalletkit/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ultratestbro/anywalletkit.git",
+    "directory": "packages/protocol-swap2-kyberswap"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./provider": {
+      "types": "./dist/provider.d.ts",
+      "import": "./dist/provider.js",
+      "require": "./dist/provider.cjs"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "import": "./dist/router.js",
+      "require": "./dist/router.cjs"
+    },
+    "./activity": {
+      "types": "./dist/activity.d.ts",
+      "import": "./dist/activity.js",
+      "require": "./dist/activity.cjs"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js",
+      "require": "./dist/protocol.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "module.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@anywalletkit/protocol-swap2-core": "workspace:*",
+    "@anywalletkit/swap2-assets": "workspace:*",
+    "viem": "^2.57.2",
+    "@anywalletkit/protocol-swap2-wrap": "workspace:*"
+  },
+  "peerDependencies": {
+    "@anywalletkit/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^5.1.0",
+    "@anywalletkit/conformance": "workspace:*",
+    "@anywalletkit/core": "workspace:*"
+  },
+  "keywords": [
+    "swap2",
+    "swap",
+    "dex-aggregator",
+    "kyberswap",
+    "kyber",
+    "evm",
+    "anywalletkit"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

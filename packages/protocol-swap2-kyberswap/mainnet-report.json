@@ -1,0 +1,92 @@
+{
+  "kind": "public-mainnet-funded",
+  "limitations": [
+    "Small capped swaps from one test wallet on Base"
+  ],
+  "cases": [
+    {
+      "case": "native",
+      "at": "2026-11-24T15:38:00.912Z",
+      "chain": "eip155:8453",
+      "account": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "from": "ETH",
+      "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "amountIn": "79015435870492",
+      "before": {
+        "eth": "316061743481968",
+        "usdc": "13984118",
+        "allowance": "0"
+      },
+      "result": {
+        "id": "awk1.kyberswap.kyberswap%3A8453.0x989779e9fa56ffb7bcf2b0fa731c55e1f17b9c2773b762a93e42211c86148fe7",
+        "fees": [],
+        "fromTokenAmount": "79015435870492",
+        "toTokenAmount": "133161",
+        "toTokenAmountMin": "132494",
+        "hash": "0x989779e9fa56ffb7bcf2b0fa731c55e1f17b9c2773b762a93e42211c86148fe7",
+        "transactions": [
+          {
+            "hash": "0x989779e9fa56ffb7bcf2b0fa731c55e1f17b9c2773b762a93e42211c86148fe7",
+            "type": "source"
+          }
+        ]
+      },
+      "status": {
+        "status": "completed",
+        "transactions": [
+          {
+            "hash": "0x989779e9fa56ffb7bcf2b0fa731c55e1f17b9c2773b762a93e42211c86148fe7",
+            "type": "destination"
+          }
+        ]
+      },
+      "after": {
+        "eth": "235550336652452",
+        "usdc": "14117278",
+        "allowance": "0"
+      }
+    },
+    {
+      "case": "token",
+      "at": "2026-11-24T15:38:23.968Z",
+      "chain": "eip155:8453",
+      "account": "0x8AbE813577E47415A3CD0Bbc68c7ABCa2c4c55bA",
+      "from": "USDC",
+      "to": "0x0000000000000000000000000000000000000000",
+      "amountIn": "1000000",
+      "before": {
+        "eth": "235550336652452",
+        "usdc": "14117278",
+        "allowance": "0"
+      },
+      "result": {
+        "id": "awk1.kyberswap.kyberswap%3A8453.0xda5f2326fbd2ed9305cab4d309e541c244e0fa04488e636b9a48b9e335ba6dac",
+        "fees": [],
+        "fromTokenAmount": "1000000",
+        "toTokenAmount": "595564401793823",
+        "toTokenAmountMin": "592586579784852",
+        "hash": "0xda5f2326fbd2ed9305cab4d309e541c244e0fa04488e636b9a48b9e335ba6dac",
+        "transactions": [
+          {
+            "hash": "0xda5f2326fbd2ed9305cab4d309e541c244e0fa04488e636b9a48b9e335ba6dac",
+            "type": "source"
+          }
+        ]
+      },
+      "status": {
+        "status": "completed",
+        "transactions": [
+          {
+            "hash": "0xda5f2326fbd2ed9305cab4d309e541c244e0fa04488e636b9a48b9e335ba6dac",
+            "type": "destination"
+          }
+        ]
+      },
+      "after": {
+        "eth": "828858369366179",
+        "usdc": "13117278",
+        "allowance": "0"
+      }
+    }
+  ]
+}

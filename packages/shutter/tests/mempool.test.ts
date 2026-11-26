@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { decodeFunctionData, encodeFunctionData, keccak256, parseAbi, parseTransaction, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import {
@@ -99,6 +99,10 @@ describe('mempool encoding', () => {
 })
 
 describe('sendEncryptedTransaction', () => {
+  // The Gnosis preset is refused from its sunset (2026-11-24): these sends run on a clock before it; only Date is faked.
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-01T00:00:00Z')) })
+  afterEach(() => { vi.useRealTimers() })
+
   it('signs nonce n+1 inside the ciphertext, submits it with nonce n, and pays the encrypted gas', async () => {
     const rpc = fakeRpc()
     const acc = account()
@@ -158,8 +162,16 @@ describe('sendEncryptedTransaction', () => {
     expect(rpc.sent).toHaveLength(0)
   })
 
-  it('the Gnosis preset is refused from 2026-11-24 (decommissioned 11-25)', () => {
+  it('the Gnosis preset is refused from 2026-11-24 (decommissioned 11-25)', async () => {
     expect(new Date(SHUTTER_GNOSIS_MEMPOOL.sunsetAt! * 1000).toISOString()).toBe('2026-11-24T00:00:00.000Z')
+    for (const at of ['2026-11-24T00:00:00Z', '2027-01-01T00:00:00Z']) {
+      vi.setSystemTime(new Date(at))
+      const rpc = fakeRpc()
+      const acct = account()
+      await expect(sendEncryptedTransaction({ rpc, account: acct, tx: { to: TO } })).rejects.toThrow(/shut down/)
+      expect(acct.signed).toHaveLength(0)
+      expect(rpc.sent).toHaveLength(0)
+    }
   })
 })
 
