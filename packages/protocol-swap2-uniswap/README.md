@@ -42,8 +42,8 @@ never wants to offer such a route (a web swap page might set 500):
 uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
 ```
 
-- Every candidate is ranked as always; only the best route is gated, and a refused quote never
-  falls back to a lower-output candidate.
+- Every candidate is ranked as always (a route over the chain's gas cap ranked out first, see below);
+  only the best route is gated, and a refused quote never falls back to a lower-output candidate.
 - All reads of the quote are pinned to one block, with transient RPC errors retried.
 - The measure is the larger of the probe and the spot value loss against the pools' `slot0()` mid
   prices, fees included (`providerData.valueLossBps`), rounded down to a whole bp; the pools' floor
@@ -74,9 +74,11 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
 
 - **Gas (always on).** The swap's need is its bare need (quoter gas + 120k router overhead +
   unwrap/refund) plus 5%: EIP-150 forwards 63/64 of the gas into each call, and the pool's swap runs
-  two calls deep (live, swaps ran in 2.1% to 3.5% over the bare need). A need above the chain's cap
-  can never complete and is refused as `insufficient_liquidity`; a padded limit above the cap is
-  clamped to it, never below the need. Monad charges the whole limit, so it is never lowered below
+  two calls deep (live, swaps ran in 2.1% to 3.5% over the bare need). A route whose need is above
+  the chain's cap can never complete: it is ranked out before the best route is picked, so a
+  lower-output route the chain can carry is quoted instead, and only when no candidate fits is the
+  best by output refused as `insufficient_liquidity`; a padded limit above the cap is clamped to it,
+  never below the need. Monad charges the whole limit, so it is never lowered below
   the need. The cap is `min(per-transaction cap, block gas limit − the block's own reserve)`:
 
   | Chains | Per-transaction cap |

@@ -7,7 +7,7 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
 import {MIN_CALLS_PER_SECOND, QUOTE_WAIT_MAX_MS, uniswapRpc, type RpcCall, type SlotOptions} from "./rpc.js";
-import {boundGasLimit, gasBoundsOf, hopsOf, impactRefusalText, probeImpactBps, spotImpactNetOfFeesBps, spotValueLossBps, validMaxImpactBps} from "./impact.js";
+import {boundGasLimit, gasBoundsOf, hopsOf, impactRefusalText, probeImpactBps, spotImpactNetOfFeesBps, spotValueLossBps, validMaxImpactBps, type GasBounds} from "./impact.js";
 
 /**
  * Uniswap v3, straight from the contracts — the permissionless swap venue.
@@ -118,8 +118,9 @@ export interface UniswapProviderConfig {
    * refused for impact, which rides on the quote as information (`providerData.priceImpactBps`, when the probe could be
    * measured) — the wallet warns and the user decides.
    *
-   * When set: every candidate is ranked as always and only the best route is gated (a lower-output candidate is never
-   * the better offer); every read of the quote is pinned to one block; the measure is the larger of the 1/1000 probe
+   * When set: every candidate is ranked as always (a route one transaction on the chain cannot carry ranked out first)
+   * and only the best route is gated (a lower-output candidate is never the better offer); every read of the quote is
+   * pinned to one block; the measure is the larger of the 1/1000 probe
    * (`priceImpactBps`, fees excluded, transient RPC errors retried) and the spot value loss against the pools'
    * `slot0()` mid prices (fees included, `providerData.valueLossBps`). The fees count: a limit at or under the route's
    * pool fee (100 on a 1% pool, 60 on two 0.3% pools) refuses that route however deep its pools are — the text then
@@ -169,6 +170,23 @@ interface Route {
   single?: {fee: number};
   path?: Hex;
 }
+
+/** A full fill the quoter priced: its route, output and gas figure, and its place in the candidate list (`at`). */
+interface V3Candidate {
+  route: Route;
+  out: bigint;
+  gas: bigint;
+  at: number;
+}
+
+/** Better first: more output, then the candidate list's own order (the first listed wins a tie, as it always has). */
+const byOutput = (a: V3Candidate, b: V3Candidate): number => (a.out > b.out ? -1 : a.out < b.out ? 1 : a.at - b.at);
+
+/** The pools a route crosses: one for `exactInputSingle`, one per `fee, token` step (23 bytes) of an `exactInput` path. */
+const poolsOf = (route: Route): bigint => (route.single ? 1n : BigInt((route.path!.length - 42) / 46));
+
+/** The quoter's figure measures the swap (MIN_POOL_GAS a pool or more): a gas limit is derived from it, and bounded. */
+const measuresGas = (c: {route: Route; gas: bigint}): boolean => c.gas >= MIN_POOL_GAS * poolsOf(c.route);
 
 export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvider {
   const deployments = config.deployments ?? UNISWAP_V3;
@@ -442,7 +460,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           signal,
           {...turns, accept},
         );
-        let best: {route: Route; out: bigint; gas: bigint} | null = null;
+        const ranked: V3Candidate[] = [];
         let partial = false;
         results.forEach((raw, i) => {
           const q = typeof raw === "string" && raw !== "0x" ? decoded.get(i) : undefined; // a revert (null) or unset's "0x": no candidate
@@ -451,10 +469,34 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             partial = true;
             return;
           }
-          if (!best || q.out > best.out) best = {route: candidates[i]!, out: q.out, gas: q.gas};
+          ranked.push({route: candidates[i]!, out: q.out, gas: q.gas, at: i});
         });
-        if (!best) return refuse(partial ? PARTIAL_FILL : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
-        const {route, out, gas} = best as {route: Route; out: bigint; gas: bigint};
+        if (!ranked.length) return refuse(partial ? PARTIAL_FILL : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
+        ranked.sort(byOutput);
+
+        // The gas bound (below) for a candidate: the quoter's figure, the router's overhead, and this request's unwrap and
+        // refund legs. LIVE-VR-3: a route whose need is above what one transaction on the chain may carry can never be
+        // mined, so it is ranked out before the best is picked — it never displaces a route that can (as Uniswap v4's
+        // candidates are ranked). The chain's bounds are waited for only when the best candidate measures gas; one that
+        // does not stays a candidate, as before. When none the chain can carry is left, the best by output goes on and
+        // is refused below exactly as before.
+        const refund = nativeIn && refundNative;
+        const extra = (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n);
+        const gasBound = (g: bigint, bounds: GasBounds) => boundGasLimit(g + 120_000n + extra, (g * 3n) / 2n + 120_000n + extra, bounds);
+        let pick = ranked[0]!;
+        let rankBounds: GasBounds | undefined;
+        for (const c of ranked) {
+          if (!measuresGas(c)) {
+            pick = c;
+            break;
+          }
+          if (rankBounds === undefined) rankBounds = gasBoundsOf(chainId, await blockGasLimit(gasRead, signal));
+          if (!("refuse" in gasBound(c.gas, rankBounds))) {
+            pick = c;
+            break;
+          }
+        }
+        const {route, out, gas} = pick;
 
         // Price impact (SDK-127): a probe 1/1000 the size on the same route gives the pool's
         // marginal rate; the full-size rate's shortfall against it is the impact. Pool fees
@@ -487,8 +529,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             }
           }
         } else {
-          // maxPriceImpactBps (cp0x ask 1b): ranked first, so only the best route is gated — a lower-output candidate
-          // is never the better offer. The measure is the larger of the probe and the spot value loss: the probe alone
+          // maxPriceImpactBps (cp0x ask 1b): ranked first, so only the best route the chain can carry is gated — a
+          // lower-output candidate is never the better offer. The measure is the larger of the probe and the spot value
+          // loss: the probe alone
           // can be absent (tiny amounts, a failed read) or blind (a pool parked past an empty range reads 342 bps while
           // the trade loses 98.7%, UNISWAP-V4-RESEARCH §7.2). So spot must be measured: when its reads fail the quote is
           // refused (fail closed) — at the limit already on the probe alone, else as the RPC's failure; an unmeasured
@@ -526,7 +569,6 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // sweep. refundETH() pays it back to the sender in the same transaction (nothing to send on a full fill). Opt-in
         // (`refundNativeInput`) until every pinned client accepts the leg; the preflight partial-fill check and the
         // minimum already make an unspent remainder revert rather than stay behind.
-        const refund = nativeIn && refundNative;
         if (refund) legs.push(encodeFunctionData({abi: ROUTER_ABI, functionName: "refundETH"}));
         const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineS);
         const data = encodeFunctionData({abi: ROUTER_ABI, functionName: "multicall", args: [deadline, legs]});
@@ -538,12 +580,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // above the per-transaction cap, the block gas limit (less what the block spends first: OP-stack's 1M-gas
         // L1-info deposit) or Nitro's execution cap can never complete, so it is
         // refused; a padded limit above the gasLimit cap is clamped to it — never below the need (Monad charges the
-        // whole limit even when the swap reverts).
-        const pools = route.single ? 1n : BigInt((route.path!.length - 42) / 46);
-        const extra = (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n);
+        // whole limit even when the swap reverts). A route that could be mined was ranked ahead of one that cannot
+        // (LIVE-VR-3, above), so a route refused here is the best by output with none the chain can carry among the
+        // candidates. The bounds are taken again here, as before: a block read that landed meanwhile counts.
         let gasLimit: bigint | undefined;
-        if (gas >= MIN_POOL_GAS * pools) {
-          const bounded = boundGasLimit(gas + 120_000n + extra, (gas * 3n) / 2n + 120_000n + extra, gasBoundsOf(chainId, await blockGasLimit(gasRead, signal)));
+        if (measuresGas(pick)) {
+          const bounded = gasBound(gas, gasBoundsOf(chainId, await blockGasLimit(gasRead, signal)));
           if ("refuse" in bounded) {
             return refuse(`the swap needs ${bounded.refuse.need} gas, more than chain ${chainId} takes in one transaction (${bounded.refuse.cap}) — its pools are too thin for this amount`, "insufficient_liquidity");
           }
