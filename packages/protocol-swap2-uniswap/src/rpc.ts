@@ -66,8 +66,8 @@ export const QUOTE_WAIT_MAX_MS = 5_000;
  */
 export const MIN_CALLS_PER_SECOND = 13;
 /**
- * The lowest `rpcCallsPerSecond` with Uniswap v4 on (`v4: "native-in"` or `"all"`): the least with which the largest v4
- * quote fits QUOTE_WAIT_MAX_MS on an idle endpoint that answers within 250 ms. A v4 quote's reads go under the same
+ * The lowest `rpcCallsPerSecond` with Uniswap v4 on (`v4: "native-in"` or `"all"`): a rate with which the largest v4
+ * quote fits QUOTE_WAIT_MAX_MS on an idle endpoint that answers within 250 ms, with a margin. A v4 quote's reads go under the same
  * per-quote bound as its v3 reads (U0-LIVE-1), and the largest — a token input with the sender known, gated, on a chain
  * whose RPC serves no `eth_simulateV1`, an output token the shipped list does not know, `venueRoutes: "both"`, with up
  * to four candidates that need more gas than the chain's per-transaction cap (LIVE-1; the recorded Monad 2,000 AUSD →
@@ -76,13 +76,15 @@ export const MIN_CALLS_PER_SECOND = 13;
  * aggregates (104 routes); each aggregate holding such a candidate halved down to the call (10 → 5 → 3 → 2 → 1: four
  * passes of two aggregates per candidate), then those candidates read again at the cap; v3's pool lookups + probe and
  * slot0() reads (3 + 2) beside v4's probe, balance + allowance, `eth_simulateV1`, the access list, 16 allowance-slot
- * read-backs and the swap's `eth_call`. At 33 it is refused as `rate_limited` with nothing else in the queue on an
- * endpoint answering in 201–249 ms with four such candidates (34 carries 0–4 at every answer time up to 250 ms) (tests/v4-release-review-merge.test.ts; U0V4-4: 22, counted without the halving and the re-read,
- * refused it from 150 ms). Not carried: candidates past the cap in more aggregates (all eleven: 53 at 250 ms), and a
- * quote whose best v4 build is refused for its own route and that builds the next one (V4_MAX_BUILDS, three passes more
- * each: with such candidates 47 for a second build, and no rate carries a third at 250 ms). Sixteen passes take the
- * bound's 5 s on their own on an endpoint slower than ~310 ms: there no rate carries that quote, and such an endpoint
- * needs more than this one does at 250 ms (47 at 300 ms).
+ * read-backs and the swap's `eth_call`. 34 carries it with 0–4 such candidates at every answer time up to 250 ms
+ * (tests/v4-release-review-merge.test.ts). It was set when the scheduler over-booked batches sent in the same
+ * millisecond (33 then refused four such candidates at 201–249 ms); booked by the window it really holds (review RPC-1),
+ * 31 is the least that carries every such timing and 30 refuses from 231 ms, so 34 keeps a margin of three (U0V4-4: 22,
+ * counted without the halving and the re-read, refused it from 150 ms). Not carried, measured before RPC-1: candidates
+ * past the cap in more aggregates (all eleven: 53 at 250 ms), and a quote whose best v4 build is refused for its own
+ * route and that builds the next one (V4_MAX_BUILDS, three passes more each: with such candidates 47 for a second build,
+ * and no rate carries a third at 250 ms). Sixteen passes take the bound's 5 s on their own on an endpoint slower than
+ * ~310 ms: there no rate carries that quote, and such an endpoint needs more than this one does at 250 ms (47 at 300 ms).
  */
 export const MIN_CALLS_PER_SECOND_V4 = 34;
 /**
@@ -360,18 +362,19 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
   const describe = (chainId: number, e: RpcItemError) => clean(chainId, e.code !== undefined ? `${e.code} ${e.message}` : e.message);
 
   /**
-   * The earliest moment from `from` at which `n` more calls fit the window, given what went (`sent`, in order): no window
-   * of RATE_WINDOW_MS then holds more than `rate` calls, counted at the moment each batch went.
+   * The earliest moment from `from` at which `n` more calls fit the window, given what went (`sent`, in order, none
+   * after `from`): no window of RATE_WINDOW_MS then holds more than `rate` calls, counted at the moment each batch went.
+   * Moving the window past the oldest batch it holds drops every batch that went at or before that moment — those that
+   * went in the same millisecond too (review RPC-1: they stayed counted, and a turn was booked up to a window late).
    */
   function roomAt(sent: readonly Sent[], n: number, from: number): number {
+    const live = sent.filter((x) => x.at > from - RATE_WINDOW_MS);
     let inWindow = n;
-    for (const x of sent) if (x.at > from - RATE_WINDOW_MS) inWindow += x.n;
-    for (const x of sent) {
-      if (inWindow <= rate!) break;
-      if (x.at > from - RATE_WINDOW_MS) {
-        inWindow -= x.n;
-        from = x.at + RATE_WINDOW_MS;
-      }
+    for (const x of live) inWindow += x.n;
+    let i = 0;
+    while (inWindow > rate! && i < live.length) {
+      from = live[i]!.at + RATE_WINDOW_MS;
+      while (i < live.length && live[i]!.at <= from - RATE_WINDOW_MS) inWindow -= live[i++]!.n;
     }
     return from;
   }

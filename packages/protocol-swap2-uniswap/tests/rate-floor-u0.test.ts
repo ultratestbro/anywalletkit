@@ -184,3 +184,51 @@ describe("U0-LIVE-3: a window is counted at the moment each batch went, not when
     for (const [t] of sent) expect(sent.filter(([u]) => u > t - RATE_WINDOW_MS && u <= t).reduce((a, [, n]) => a + n, 0)).toBeLessThanOrEqual(10);
   });
 });
+
+describe("RPC-1: batches that went in the same millisecond leave the window together", () => {
+  // callsPerSecond 34, one endpoint. 4 calls, then 20 (two batches of 10) in the same ms at t0, 10 more at t0 + 500.
+  // At t0 + 600 a batch of 10 asks: the window ending at t0 + 1000 holds only the 10 from t0 + 500 (+ 10 = 20 ≤ 34),
+  // so its turn is t0 + 1000. Before, the window was moved past the 4-call batch alone and its two same-ms siblings
+  // stayed counted: the turn was booked at t0 + 1500, and with waitUntil t0 + 1300 the batch was refused rate_limited.
+  const run = async (gapMs: number, waitUntil?: number) => {
+    const t0 = fake();
+    const sent: Array<[number, number]> = [];
+    vi.stubGlobal("fetch", (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as Req[];
+      sent.push([Date.now() - t0, batch.length]);
+      return new Response(JSON.stringify(batch.map((x) => ({jsonrpc: "2.0", id: x.id, result: "0x1"}))));
+    }) as typeof fetch);
+    const net = uniswapRpc({1: ["https://a.test"]}, {callsPerSecond: 34});
+    const many = (n: number) => Array.from({length: n}, () => ({method: "eth_blockNumber", params: []}));
+    const first = net.results(1, many(4), "none");
+    if (gapMs) await vi.advanceTimersByTimeAsync(gapMs);
+    const second = net.results(1, many(20), "none");
+    await vi.advanceTimersByTimeAsync(500 - gapMs);
+    const third = net.results(1, many(10), "none");
+    await vi.advanceTimersByTimeAsync(100);
+    const last = net.results(1, many(10), "none", undefined, waitUntil === undefined ? {} : {waitUntil: t0 + waitUntil});
+    const settled = last.then((r) => r.length, (e: Error) => e.message);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await Promise.all([first, second, third]);
+    return {sent, last: await settled};
+  };
+
+  it("same ms: the waiting batch goes at t0 + 1000, not t0 + 1500", async () => {
+    const {sent, last} = await run(0);
+    expect(last).toBe(10);
+    expect(sent).toEqual([[0, 4], [0, 10], [0, 10], [500, 10], [1000, 10]]);
+    for (const [t] of sent) expect(sent.filter(([u]) => u > t - RATE_WINDOW_MS && u <= t).reduce((a, [, n]) => a + n, 0)).toBeLessThanOrEqual(34);
+  });
+
+  it("same ms with waitUntil t0 + 1300: the batch goes (before: refused, booked past 5 s into the quote)", async () => {
+    const {sent, last} = await run(0, 1_300);
+    expect(last).toBe(10);
+    expect(sent.at(-1)).toEqual([1000, 10]);
+  });
+
+  it("the same sequence with the first two asks 1 ms apart books as it always did", async () => {
+    const {sent, last} = await run(1, 1_300);
+    expect(last).toBe(10);
+    expect(sent).toEqual([[0, 4], [1, 10], [1, 10], [500, 10], [1001, 10]]);
+  });
+});

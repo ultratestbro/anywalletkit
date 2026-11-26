@@ -189,7 +189,7 @@ describe("U0-LIVE-1 / U0C-1 on the v4 path: a quote's v4 reads go by its turns, 
     }
   });
 
-  it(`the largest v4 quote (up to 127 calls in sixteen passes) fits ${QUOTE_WAIT_MAX_MS / 1000} s at ${MIN_CALLS_PER_SECOND_V4} on an idle endpoint answering within 250 ms; at ${MIN_CALLS_PER_SECOND_V4 - 1}, refused`, async () => {
+  it(`the largest v4 quote (up to 127 calls in sixteen passes) fits ${QUOTE_WAIT_MAX_MS / 1000} s at ${MIN_CALLS_PER_SECOND_V4} on an idle endpoint answering within 250 ms; at 30, refused`, async () => {
     // The passes of a gated token-input quote with the sender known, venueRoutes "both", on an RPC without
     // eth_simulateV1, for an output token the shipped list does not know, through the provider's own uniswapRpc — and,
     // `pastCap` > 0, with that many V4Quoter candidates past the chain's per-transaction cap, each in its own aggregate
@@ -258,7 +258,12 @@ describe("U0-LIVE-1 / U0C-1 on the v4 path: a quote's v4 reads go by its turns, 
         expect(m.lastSend).toBeLessThanOrEqual(QUOTE_WAIT_MAX_MS);
       }
     }
-    const under = await largest(MIN_CALLS_PER_SECOND_V4 - 1, 230, 4);
+    // RPC-1 re-measure: 33 refused it (201–249 ms, four such candidates) only because the scheduler kept batches sent in
+    // the same millisecond in the window. Booked by the window it really holds, 31 is the least that carries every
+    // timing above (every ms 0–250, 0–4 candidates past the cap) and 30 refuses from 231 ms; the floor stays at 34.
+    expect((await largest(MIN_CALLS_PER_SECOND_V4 - 1, 230, 4)).refused).toEqual([]);
+    for (const rtt of [190, 210, 230, 240, 250]) expect([rtt, (await largest(31, rtt, 4)).refused]).toEqual([rtt, []]);
+    const under = await largest(30, 235, 1);
     expect(under.refused[0]).toMatch(/calls a second are booked past 5 s into the quote/);
     // U0V4-4: 22, the floor counted without the halving and the re-read, refused a quote with one candidate past the cap
     // from 150 ms (it carried the quote without one).
