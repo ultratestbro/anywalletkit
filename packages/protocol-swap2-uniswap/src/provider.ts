@@ -1208,6 +1208,30 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       };
     };
     type PassBounds = ReturnType<typeof passBounds>;
+    /**
+     * One walk's view of its pass's bounds (review V4RANK-1b): the pass's one set — `taken`, `take`, `sure` and
+     * `inHand` are the pass's own — and whether this walk went by them (`went`): it took them (to tell whether a route
+     * stands, or at a build's gas step) or ranked a route out by them once taken (`wentBy`). A "both" pass walks its v3
+     * row and its v4 row on the same bounds, side by side; a row whose walk never went by them counts its quote by the
+     * caps alone, whether or not the other row's walk took them first. `take` hands back the pass's own promise.
+     */
+    const walkBounds = (pb: PassBounds) => {
+      let went = false;
+      return {
+        taken: pb.taken,
+        take: (): Promise<GasBounds> => {
+          went = true;
+          return pb.take();
+        },
+        sure: pb.sure,
+        inHand: pb.inHand,
+        wentBy: (): void => {
+          went = true;
+        },
+        went: (): boolean => went,
+      };
+    };
+    type WalkBounds = ReturnType<typeof walkBounds>;
 
     /**
      * One v4 candidate as a quote: the impact measures (and the gate, when set), the minimum, the router call (directly
@@ -1564,15 +1588,16 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
     /**
      * The v4 candidates (every one the V4Quoter priced, whatever its pools) ranked out because one transaction on the
-     * chain cannot carry them, and the cap that did it (with none, the chain's LIVE-1 bound): counted by the pass's
-     * bounds once taken — never by a block read the pass did not go by. Before they are taken, `of` says what is
-     * counted. A quote's `providerData.v4Unexecutable` ("quote"): by the caps alone (gasCapsOf) — the walk ranked
-     * nothing out for gas (it would have taken the bounds), and a route with no gas figure never takes them, so the
-     * count of a quote never turns on whether the block read has landed by the time it is built (review V4RANK-1). A
-     * pass's refusal ("refusal"): by `sure`, the bounds the walk ranked every route out by.
+     * chain cannot carry them, and the cap that did it (with none, the chain's LIVE-1 bound), counted by the bounds `b`
+     * — never by a block read the walk did not go by:
+     * - a quote's `providerData.v4Unexecutable` ({@link quoteCountBounds}): by the pass's bounds when the quote's own
+     *   walk went by them (it took them, or ranked a route out by them once taken), else by the caps alone (gasCapsOf).
+     *   A walk that never went by them ranked nothing out for gas, and a route with no gas figure never takes them, so
+     *   the count never turns on when the block read lands (review V4RANK-1) — nor, in a "both" pass, on whether the
+     *   other row's walk took the bounds first (V4RANK-1b);
+     * - a pass's refusal: by the bounds taken, else `sure` — the bounds the walk ranked every route out by.
      */
-    const v4GasOut = (v4: V4Read, pb: PassBounds, of: "quote" | "refusal"): {count: number; cap: bigint | undefined} => {
-      const b = pb.taken() ?? (of === "quote" ? gasCapsOf(chainId) : pb.sure());
+    const v4GasOut = (v4: V4Read, b: GasBounds): {count: number; cap: bigint | undefined} => {
       let count = 0;
       let cap: bigint | undefined = v4ReadBoundOf(chainId);
       for (const c of rankedV4Candidates(v4.candidates)) {
@@ -1585,6 +1610,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       }
       return {count, cap};
     };
+    /** The bounds a quote's `v4Unexecutable` counts by: the pass's once its own walk went by them, else the caps alone. */
+    const quoteCountBounds = (own: WalkBounds): GasBounds => (own.went() ? own.taken() : undefined) ?? gasCapsOf(chainId);
 
     /** A candidate of a pass's ranking: a v3 route or a v4 one. */
     type Entry = {venue: "v3"; c: V3Candidate} | {venue: "v4"; c: V4Ranked};
@@ -1636,11 +1663,13 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
      * - With no answer by the end, v3's best by output goes on (unless it did) and its refusal is the pass's: with no v3
      *   candidate the chain can carry, the best is refused as it always was.
      * `go.v3Final` hears the first v4 build set aside (if any) right before a v3 answer is certain to be the pass's: before
-     * that v3 build when it is certain already, else once it stands.
+     * that v3 build when it is certain already, else once it stands. `pb` is this walk's own view of the pass's bounds
+     * ({@link walkBounds}): a route ranked out by the bounds once taken marks the walk as having gone by them, as taking
+     * them does.
      */
     const walk = async (
       list: readonly Entry[],
-      pb: PassBounds,
+      pb: WalkBounds,
       go: {v3?: (c: V3Candidate) => Promise<VenueAnswer>; v4?: (c: V4Ranked) => Promise<V4Build>; v3Final?: (setAside: V4Refused | undefined) => void},
     ): Promise<Walked> => {
       const w: Walked = {};
@@ -1661,7 +1690,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const stands = (e: Entry, i: number): boolean | "take" => {
         if (!measuresOf(e)) return true;
         const b = pb.taken();
-        if (b) return fitsOf(e, b);
+        if (b) {
+          if (fitsOf(e, b)) return true;
+          pb.wentBy(); // ranked out by the bounds the pass took
+          return false;
+        }
         return !instead(i) || fitsOf(e, pb.inHand()) ? true : "take";
       };
       for (let i = 0; i < list.length; i++) {
@@ -1669,7 +1702,10 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         if (e.venue === "v4" && !v4Open) continue;
         const b = pb.taken();
         if (b) {
-          if (!fitsOf(e, b)) continue;
+          if (!fitsOf(e, b)) {
+            pb.wentBy(); // ranked out by the bounds the pass took (in a "both" pass, maybe by the other row's walk)
+            continue;
+          }
         } else if (measuresOf(e) && !fitsOf(e, pb.sure())) {
           if (instead(i)) {
             await pb.take();
@@ -1712,7 +1748,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
     /** The v3 candidate of a venue-routes pass: as a "best" pass with v4 off quotes it — v3's best route the chain can carry. */
     const v3Row = async (ranked: readonly V3Candidate[], block: string, pb: PassBounds): Promise<VenueAnswer> => {
-      const w = await walk(ranked.map((c): Entry => ({venue: "v3", c})), pb, {v3: (c) => buildV3(c, block, pb, () => 0)});
+      const own = walkBounds(pb);
+      const w = await walk(ranked.map((c): Entry => ({venue: "v3", c})), own, {v3: (c) => buildV3(c, block, own, () => 0)});
       return w.answer!.a; // `ranked` is never empty here: the walk always answers
     };
 
@@ -1729,9 +1766,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
      */
     const v4Candidate = async (v4: V4Read, v3Route: boolean, gated: boolean, pb: PassBounds, v3Unread: VenueRefusal | undefined): Promise<VenueAnswer> => {
       const restrict = v3Route && v4Ranked !== "all";
-      const unexecutable = (): number => v4.unexecutable + v4GasOut(v4, pb, "quote").count;
-      const w = await walk(rankedV4(v4, restrict).map((c): Entry => ({venue: "v4", c})), pb, {
-        v4: (c) => finishV4(chainId, v4In!, v4, c, currencyIn4, currencyOut4, amountIn, gated, pb, unexecutable, signal),
+      // The v4 row's own view of the bounds: the v3 row's walk may take them first, and the row's count goes by what
+      // this walk went by (review V4RANK-1b).
+      const own = walkBounds(pb);
+      const unexecutable = (): number => v4.unexecutable + v4GasOut(v4, quoteCountBounds(own)).count;
+      const w = await walk(rankedV4(v4, restrict).map((c): Entry => ({venue: "v4", c})), own, {
+        v4: (c) => finishV4(chainId, v4In!, v4, c, currencyIn4, currencyOut4, amountIn, gated, own, unexecutable, signal),
       });
       if (w.answer) {
         if ("quote" in w.answer.a && w.setAside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${w.setAside.refused}) — quoted another v4 route`, reasonOfInfo(w.setAside.info));
@@ -1745,7 +1785,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // outside them can be mined: where the bounds are not taken and one could be, they are taken to tell.
       const all = rankedV4Candidates(v4.candidates);
       if (restrict && pb.taken() === undefined && all.some((c) => measures4(c) && !("refuse" in gasBound4(c.gasEstimate, pb.sure())))) await pb.take();
-      const gas = v4GasOut(v4, pb, "refusal");
+      const gas = v4GasOut(v4, pb.taken() ?? pb.sure());
       // Routes the chain can mine, all through pools outside the ranked set: not offered next to v3's.
       const outside = restrict && all.length > gas.count;
       if (outside && v3Unread) {
@@ -1909,11 +1949,13 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // v4 route no transaction can carry never displaces one that can; with v4 off, the v3 walk alone.
       const r3 = v3Read.ranked;
       const r4 = v4 ? rankedV4(v4, !(r3.length === 0 || v4Ranked === "all")) : [];
-      /** The v4 candidates ranked out for gas (with LIVE-1's), carried as information on the quote. */
-      const unexecutable = (): number => (v4 !== undefined ? v4.unexecutable + v4GasOut(v4, pb, "quote").count : 0);
-      const w = await walk(merged(r3, r4), pb, {
-        v3: (c) => buildV3(c, block, pb, unexecutable),
-        v4: (c) => finishV4(chainId, v4In!, v4!, c, currencyIn4, currencyOut4, amountIn, gated, pb, unexecutable, signal),
+      /** The v4 candidates ranked out for gas (with LIVE-1's), carried as information on the quote. One walk goes by
+       *  the pass's bounds here, so it went by them exactly when they were taken. */
+      const own = walkBounds(pb);
+      const unexecutable = (): number => (v4 !== undefined ? v4.unexecutable + v4GasOut(v4, quoteCountBounds(own)).count : 0);
+      const w = await walk(merged(r3, r4), own, {
+        v3: (c) => buildV3(c, block, own, unexecutable),
+        v4: (c) => finishV4(chainId, v4In!, v4!, c, currencyIn4, currencyOut4, amountIn, gated, own, unexecutable, signal),
         v3Final: (aside) => {
           if (aside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${aside.refused}) — quoted v3`, reasonOfInfo(aside.info));
         },
@@ -1927,7 +1969,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // No v3 candidate (the walk answers whenever there is one) and no v4 one that stood.
       if (w.setAside) return refuse(w.setAside.refused, w.setAside.info);
       if (v4) partial = partial || v4.partial;
-      const gas4 = v4 !== undefined ? v4GasOut(v4, pb, "refusal") : undefined;
+      const gas4 = v4 !== undefined ? v4GasOut(v4, pb.taken() ?? pb.sure()) : undefined;
       if (!partial && v4 !== undefined && v4.unexecutable + gas4!.count > 0) {
         return refuse(`every Uniswap ${d3 ? "v3 and v4 route" : "v4 route"} for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${chainId} may have (${String(gas4!.cap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
       }

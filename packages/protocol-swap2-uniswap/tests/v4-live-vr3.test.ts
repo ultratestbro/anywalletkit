@@ -346,3 +346,39 @@ describe("V4RANK-1: v4Unexecutable on a quote that never took the bounds goes by
     }
   });
 });
+
+describe('V4RANK-1b: in a "both" pass the v4 row\'s count goes by what its own walk went by, never by the v3 row taking the bounds first', () => {
+  // The v3 row has a gas figure (1M), so its gas step takes the pass's bounds; the v4 row runs beside it on the same
+  // bounds. Before, the v4 row counted by the bounds as soon as they were taken — by anyone — so with its best route
+  // without a gas figure it said v4Unexecutable "1" when the v3 row's gas step happened to land first (the read in hand,
+  // or landing by the time both probes answer) and nothing when it landed later.
+  const v3 = {3000: {out: USD(2_800), gas: 1_000_000n}};
+  /** When the read lands (fake ms after the quote begins; "in hand": a read a minute old), for a probe answering at `probeMs`. */
+  const at = (probeMs: number, ms: number[]) => [
+    {when: `probe ${probeMs}, in hand`, reads: [{limit: 15_000_000n, ms: 0}] as Read[], at: [0, MIN], probeMs},
+    ...ms.map((m) => ({when: `probe ${probeMs}, read at ${m} ms`, reads: [{limit: 15_000_000n, ms: m}] as Read[], at: [0], probeMs})),
+  ];
+  const timings = [...at(200, [0, 100, 200, 201, 300]), ...at(0, [0, 24, 25, 26, 100, 300])];
+  const rows = async (pools: Record<string, PricedPool>, t: (typeof timings)[number]) => {
+    const r = (await quotes(node(v3, pools, t.reads, t.probeMs), t.at, {venueRoutes: "both"}, "quotes")).at(-1)!;
+    expect([t.when, r.heard]).toEqual([t.when, []]);
+    return [t.when, r.qs!.map((q) => [q.routeId, q.destAmount, q.txRequest!.gasLimit, q.providerData!.v4Unexecutable])];
+  };
+
+  it("the v4 row's best route has no gas figure: no count at any timing, the v3 row bounded as before", async () => {
+    // v4 0.05%/10 pays 3,000 USDC at quoter gas 0; v4 0.3%/60 pays 2,900 and needs 16,957,500, over the 15M block.
+    const pools = {[P500]: {out: USD(3_000), gas: 0n}, [P3000]: {out: USD(2_900), gas: 16_000_000n}};
+    for (const t of timings) {
+      expect(await rows(pools, t)).toEqual([t.when, [["v3", USD(2_800).toString(), "1620000", undefined], ["v4", USD(3_000).toString(), undefined, undefined]]]);
+    }
+  });
+
+  it("the v4 row ranks its best route out for gas: counted at every timing, whichever row's walk took the bounds", async () => {
+    // v4 0.05%/10 pays 3,000 but needs 16,957,500; 0.3%/60 pays 2,900 at quoter gas 0. The v4 row's own walk goes by
+    // the bounds: it takes them itself, or ranks the route out by the ones the v3 row's gas step took.
+    const pools = {[P500]: {out: USD(3_000), gas: 16_000_000n}, [P3000]: {out: USD(2_900), gas: 0n}};
+    for (const t of timings) {
+      expect(await rows(pools, t)).toEqual([t.when, [["v3", USD(2_800).toString(), "1620000", undefined], ["v4", USD(2_900).toString(), undefined, "1"]]]);
+    }
+  });
+});

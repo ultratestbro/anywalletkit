@@ -158,9 +158,12 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
 - **`providerData`** of a v4 quote: `venue: "v4"`, `route` (e.g. "v4 via USDC 0.05%/10 → 0.005%/1"), `poolFee`, `router`,
   `currencyIn` (`address(0)` for the native coin), `currencyOut`, `amountIn`, `minOut`, `poolKeys` (JSON), `path`,
   `priceImpactBps` (`valueLossBps` when gated), `sender`, for a token input `simulated`, and `v4Unexecutable` (the count
-  of candidates ranked out for gas, when any — on a v3 quote too, with v4 on — against the quote's block read once the
-  quote took it, else against the caps alone: a quote whose route has no gas figure never takes the read, and its count
-  never turns on whether that read has landed by the time it is built). A v3 quote has no `venue`, as before.
+  of candidates ranked out for gas, when any — on a v3 quote too, with v4 on). It is counted against the quote's block
+  read when the quote's own ranking went by that read — it took the read (at a gas step, or to tell whether a route
+  stands) or ranked a route out by it — and else against the caps alone. A quote whose route has no gas figure and
+  that ranked nothing out never goes by the read, so its count never turns on whether the read has landed by the time
+  it is built, nor, with `venueRoutes: "both"`, on whether the v3 row's gas step took the read first. A v3 quote has no
+  `venue`, as before.
 - **Rollout.** A 0.4.x app's `uniswapPins` names SwapRouter02 only: it drops a Universal Router or SwapProxy quote, and
   since a stub gets one quote per pair, that app loses Uniswap on the pair. So: release; apps bump to ≥ 0.5.0 pins
   (`uniswapRemoteProvider`); only then does the server set `v4: "native-in"`, later `"all"`. With `v4: "off"` the server
