@@ -290,6 +290,14 @@
    "amount": "100"
   },
   {
+   "id": "uni4:monad-mon>monad-ausd",
+   "provider": "uniswap_v4",
+   "src": "eip155:143:MON",
+   "dst": "eip155:143:AUSD",
+   "amount": "100",
+   "note": "Uniswap v4 native input (v4 \"native-in\", maxPriceImpactBps 500): v3 alone loses ~20% here (UNISWAP-V4-RESEARCH §7.3); the hookless v4 route must keep quoting"
+  },
+  {
    "id": "wrap:base-eth>base-weth",
    "provider": "wrap",
    "src": "eip155:8453:ETH",

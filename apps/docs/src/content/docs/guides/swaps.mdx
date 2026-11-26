@@ -45,7 +45,7 @@ app, and each provider also works on its own without the router.
 | `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage. Two routes: `fast` (Circle's fee, about 1 bps; seconds to minutes) and `standard` (free; waits for the source's finality: 15–19 min from Ethereum and its L2s, hours from Linea) |
 | `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 16 EVM chains in one transaction; the direct USDT path into HyperEVM; USDT from Ethereum / Arbitrum / Celo into TON through the Legacy Mesh (destinations only); Tron opt-in (`meshDestinations`): its LayerZero fee is above the engine's native-fee ceiling today |
 | `stargate` | Stargate V2 Taxi (LayerZero) | USDC, USDT and ETH between 15 EVM chains from the pools, no API key; delivery and paid recovery checked against the chain. Opt-in `compose` route swaps into another ERC-20 on Ethereum. Off until `enabled: true` ([below](#stargate)) |
-| `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key |
+| `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key. Uniswap v4 (pinned hookless pools, ranked with v3; native input, and token input through Uniswap's SwapProxy) is opt-in ([below](#uniswap-v4)) |
 | `curve` | On-chain DEX (Curve Router NG) | Same-chain stablecoin, ETH ↔ LST and crvUSD swaps from the contracts over a pinned pool allowlist; no API, no key, no fee ([below](#curve)) |
 | `cow` | Intents (CoW Protocol orders) | Same-chain swaps on Ethereum, Base and Arbitrum that solvers fill: no gas coin needed for a token swap (EIP-712 order, EIP-2612 permit where the token has one), native coin through eth-flow; orders can be cancelled; no key, off by default ([below](#cow-protocol)) |
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
@@ -55,6 +55,68 @@ app, and each provider also works on its own without the router.
 | `zeroex` | EVM aggregator (0x Swap API v2) | Same-chain swaps on Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche and BNB Smart Chain through Permit2 and the 0x Settler; needs a 0x API key on your backend, and an RPC for the chain ([below](#0x)) |
 | `kyberswap` | EVM aggregator (KyberSwap) | Same-chain swaps on 18 EVM chains through MetaAggregationRouterV2, no integrator fee; keyless or an API key on your backend; the calldata is checked on the device and simulated before any approval ([below](#kyberswap)) |
 | `across` | Intents (Across SpokePool) | EVM → EVM bridging of the same asset (USDC, USDT / USDT0, ETH, WBTC) between 17 chains, filled by Across relayers in seconds; a plain deposit built and verified on the device; API key on your server ([below](#across)) |
+
+### Uniswap v4
+
+`@anywalletkit/protocol-swap2-uniswap` quotes Uniswap v3 by default. `v4: "native-in"` adds Uniswap v4 for a native-coin
+input: the chain's pinned hookless v4 pools (a generated list shipped with the package, plus your own `v4ExtraPools`)
+are quoted on the V4Quoter beside v3 (at one pinned block when `maxPriceImpactBps` is set, else each read at
+`latest`), and the larger output wins; the swap runs through the pinned
+Universal Router 2.1.2 with the coin as `value`, no approval. `v4: "all"` adds token input (into a token or the native
+coin) the same way, through Uniswap's SwapProxy: the token is approved to the chain's pinned SwapProxy for exactly the
+input, and the provider simulates that approval and the exact swap from the sender before it returns the quote
+(`eth_simulateV1`, or on Monad an `eth_call` with the allowance set by a state override) — nothing is approved for a
+swap that would revert. A read of that check the RPC did not answer refuses the quote (`rate_limited` /
+`upstream_unavailable`); it never returns the v3 quote in its place.
+
+```ts
+uniswapProvider({rpcUrls, v4: "all", maxPriceImpactBps: 500}) // or "native-in"; the gate is optional and applies to the winner
+```
+
+- Hookless pools only (no hook allowlist), LP fee ≤ 10% (`v4MaxFeePips`). A failed pool or quote read refuses the
+  quote (`rate_limited` / `upstream_unavailable`) instead of quoting from fewer pools. A candidate that needs more gas
+  than one transaction on the chain may have (read again at that cap, straight to the quoter) is ranked out and counted
+  (`providerData.v4Unexecutable`) where the module knows the chain's per-transaction or execution cap (Ethereum, OP,
+  BNB, Unichain, World Chain, Base, Ink, Linea, Arc, Polygon, Monad, Arbitrum, Robinhood Chain); elsewhere (Avalanche,
+  Celo, X Layer, MegaETH, Elysium) such a call still refuses the quote.
+- With `"native-in"`, token input and native output stay on v3.
+- With v4 on, a recipient the chain's v4 pins name as a sink (a router sentinel, the zero address, a pinned Uniswap v4
+  contract) is refused as `recipient_mismatch` for every venue: output paid there would be stranded.
+- Behind a backend: use `uniswapRemoteProvider({baseUrl})` in the app — the stub with the shipped pins that also
+  declares `ownGasEstimate` (a bare `remoteProvider({...uniswapPins})` broadcasts the backend's quoted gas limit). Turn
+  v4 on in the server only after every app it serves ships the pins from 0.5.0 or later: older pins name SwapRouter02
+  only, drop the Universal Router or SwapProxy quote, and lose Uniswap on that pair.
+- Pool provenance: an app's pins accept only pools from the shipped list (or the `v4ExtraPools` it pins itself with
+  `uniswapPinsWith({v4ExtraPools})`). By default (`v4RankedPools: "listed"`) the server never lets a route through an
+  unlisted-token grid pool or an extra pool displace the v3 route; `"extra"` ranks extra pools the apps share, `"all"`
+  is for a provider running in the app itself.
+- A v4 deadline is at most 600 s ahead whatever `deadlineSeconds` says (the bound the pins hold it to, with 60 s of
+  clock skew; `uniswapPinsWith({clockSkewSeconds})` allows more).
+- The local provider declares `ownGasEstimate`: the engine sends each Uniswap call with the account's own estimate
+  (Monad charges the gas limit, not the gas used).
+
+On Monad, 62,000 MON → AUSD pays about 1 AUSD on v3 and about 670 AUSD on v4 (the hookless MON → USDC → AUSD route).
+
+**Uniswap v3 and v4 as two rows.** By default the provider returns one Uniswap quote, the better venue. To show both,
+set `venueRoutes: "both"` (with v4 on): `getQuotes` then returns the best v3 route (`routeId: "v3"`) and the best v4
+route (`routeId: "v4"`) from one ranking pass — the same reads as one quote, plus the losing venue's own probe and checks
+(with `maxPriceImpactBps`, also its spot reads for the gate: 5 calls more on the recorded Monad 62,000 MON pass) — each
+built and checked as it would be had it won (impact gate, gas bound, the strict v4 check, the token-input simulation).
+One venue refusing never drops the other; a venue left out because its reads failed (rate-limited, unanswered), or
+because its deployment does not match its pins (v3's too), is named to the operator through `onV4Warning`. The
+router ranks each as its own row; label it from `routeId` and execute the pick with `using("uniswap", routeId)` — a
+live request without a `routeId` is the one-quote ranking, which need not match the row shown. A picked route is
+quoted on that venue or refused, never swapped for the other, and the pins bind `routeId` to the calldata (a `"v3"`
+quote calling the Universal Router is refused).
+
+```ts
+uniswapProvider({rpcUrls, v4: "all", venueRoutes: "both"})          // in the app, or on the server
+uniswapRemoteProvider({baseUrl: "/api/v2/swap2", multiQuotes: true}) // the app's stub, once the server runs "both"
+```
+
+Behind a backend, set `venueRoutes: "both"` on the server first: `/quote` keeps answering with the winner (now naming
+its route), so apps without `multiQuotes` keep one Uniswap row; apps then turn on `multiQuotes` for the two rows. A
+`multiQuotes` app against a server without `"both"` gets no Uniswap quote at all (no row, and no executable quote).
 
 ### Curve
 

@@ -696,12 +696,15 @@
         "eip155:42161",
         "eip155:42220",
         "eip155:43114",
+        "eip155:4326",
         "eip155:4663",
         "eip155:480",
+        "eip155:5042",
         "eip155:56",
         "eip155:57073",
         "eip155:59144",
-        "eip155:8453"
+        "eip155:8453",
+        "eip155:99901"
       ],
       "tier": "core",
       "maintainers": [
@@ -710,7 +713,7 @@
       "conformance": "0.x",
       "repo": "https://github.com/ultratestbro/anywalletkit",
       "path": "packages/protocol-swap2-uniswap",
-      "description": "Uniswap v3 same-chain swaps from the contracts only (QuoterV2 + SwapRouter02): no API key, no frontend, addresses verified on-chain.",
+      "description": "Uniswap v3 + v4 same-chain swaps from the contracts only (QuoterV2 + SwapRouter02; v4, opt-in, on pinned hookless pools through Universal Router 2.1.2 — native input directly, token input through Uniswap's SwapProxy): no API key, no frontend, addresses verified on-chain.",
       "addedAt": "2026-10-12"
     },
     {

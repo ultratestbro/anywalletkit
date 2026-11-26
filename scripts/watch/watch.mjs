@@ -64,8 +64,21 @@ async function fetchJson(url, init = {}, timeoutMs = 20_000) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
+/** HTTP statuses some nodes answer a JSON-RPC error with (a refused eth_getLogs range: World Chain / X Layer 400, Ink 413):
+ *  the body's error is the node's answer, so it is read as one — the range halving needs its text (LIVE2-1). Any other
+ *  status (429, auth, 5xx) stays a transport failure. */
+const RPC_ERROR_STATUS = new Set([400, 413]);
 async function rpc(url, method, params) {
-  const j = await fetchJson(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params})});
+  const r = await fetch(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params}), signal: AbortSignal.timeout(20_000)});
+  if (!r.ok) {
+    let body = null;
+    if (RPC_ERROR_STATUS.has(r.status)) { try { body = await r.json(); } catch {} }
+    const e = body && typeof body === "object" && body.error && typeof body.error === "object" ? body.error : null;
+    if (e && (typeof e.message === "string" || typeof e.code === "number")) throw Object.assign(new Error(String(e.message ?? JSON.stringify(e)).slice(0, 300)), {rpcError: true, httpStatus: r.status});
+    // The status rides along (same text as before): a source that paces its calls waits out a 429 (evm-initialize `intervalMs`).
+    throw Object.assign(new Error(`HTTP ${r.status}`), {httpStatus: r.status});
+  }
+  const j = await r.json();
   if (j.error) throw Object.assign(new Error(j.error.message || JSON.stringify(j.error)), {rpcError: true});
   return j.result;
 }
@@ -88,6 +101,8 @@ function ownFile(m, rel) {
 const SLOT_IMPL = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 const SLOT_ADMIN = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 const SLOT_BEACON = "0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50";
+/** evm-initialize.mjs, loaded on first use (the watch sandbox tests copy only the files a source type needs). */
+let initializeMod = null;
 const addrOfSlot = (w) => (w && /^0x0*[0-9a-f]{1,40}$/i.test(w) && BigInt(w) !== 0n ? "0x" + w.slice(-40).toLowerCase() : null);
 const F = {
   async "evm-proxy"(s) {
@@ -225,6 +240,22 @@ const F = {
     const served = Object.values(map).filter(Boolean);
     return {value: sha(canonical(map)), meta: {selectors: served.length, of: Object.keys(map).length, facets: new Set(served).size, map, names}};
   },
+  async "evm-initialize"(s, m, prev) {
+    // A Uniswap v4 PoolManager's Initialize log since the last run (stateful: the stored meta carries lastBlock + the
+    // pools already seen) and the liveness of the module's pinned pool list. See evm-initialize.mjs.
+    initializeMod ??= await import("./evm-initialize.mjs");
+    const url = rpcFor(s.chainId); if (!url) throw new Error(`no RPC for chain ${s.chainId}`);
+    if (s.logsRpc !== undefined && !(typeof s.logsRpc === "string" && /^https:\/\/[^\s"']+$/.test(s.logsRpc))) throw new Error("evm-initialize: logsRpc must be an https URL");
+    for (const k of ["poolManager", "stateView"]) if (typeof s[k] !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(s[k])) throw new Error(`evm-initialize: \`${k}\` is not an address`);
+    const mod = await import(pathToFileURL(ownFile(m, s.pools?.from)).href);
+    const all = mod[s.pools?.export];
+    if (!all || typeof all !== "object") throw new Error(`${s.pools?.from} exports no ${s.pools?.export}`);
+    const list = Object.prototype.hasOwnProperty.call(all, s.chainId) ? all[s.chainId] : undefined;
+    const call = (method, params) => rpc(url, method, params);
+    const logsCall = s.logsRpc ? (method, params) => rpc(s.logsRpc, method, params) : call;
+    const r = await initializeMod.runInitializeSource(s, {call, logsCall, prev: prev?.meta, list});
+    return {...r, problemNoun: "index check"};
+  },
   async "zcash-branch"(s, m) {
     // The branch id a freshly mined v5 / v6 transaction carries vs the module's table at that height (`from`: the built
     // entry). NU7 changed it on 2026-11-06 and every send was refused until the table learned it; a new upgrade's id
@@ -342,6 +373,7 @@ function describe(s, before, after) {
       if (dropped.length) parts.push(`no longer watched: ${dropped.slice(0, 4).map(name).join(", ")}${dropped.length > 4 ? ` +${dropped.length - 4}` : ""}`);
       return parts.join("; ") || "selectors changed";
     }
+    case "evm-initialize": return initializeMod ? initializeMod.describeInitialize(b, a) : "pool set changed";
     case "zcash-branch": return `branch id ${b.branchId ?? "—"} (${b.upgrade ?? "—"}) → ${a.branchId} (${a.upgrade}) at block ${a.height}; the module signs under ${a.expected} (${a.expectedUpgrade})`;
     case "rss": { const B = new Set(b.titles ?? []); const n = (a.titles ?? []).filter((t) => !B.has(t)); return n.length ? `new: ${n.map((t) => `“${t}”`).join(", ")}` : "items changed"; }
     default: return "changed";
@@ -369,7 +401,7 @@ function rebaseline(s, prev, r) {
  * An `evm-call` reading belongs to its call as well (`to`, `data` / `signature` + `args`, `decode`): another call under the
  * same id is a new baseline too. EVM addresses compare case-insensitively (checksummed vs lowercase is the same contract).
  */
-const TARGET_KEYS = ["chainId", "address", "to", "data", "signature", "args", "decode", "programId", "url", "repo", "path", "ref"];
+const TARGET_KEYS = ["chainId", "address", "to", "data", "signature", "args", "decode", "programId", "url", "repo", "path", "ref", "poolManager", "stateView"];
 function targetOf(s) {
   const t = {};
   for (const k of TARGET_KEYS) if (s[k] != null) t[k] = typeof s[k] === "string" && /^0x[0-9a-f]{40}$/i.test(s[k]) ? s[k].toLowerCase() : s[k];
@@ -394,9 +426,11 @@ for (const m of manifests) {
     total++;
     try {
       if (!F[s.type]) throw new Error(`unknown source type ${s.type}`);
-      const r = await F[s.type](s, m);
-      let prev = state.sources[s.id];
       const target = targetOf(s);
+      // A stateful source (evm-initialize) continues from its last stored reading of the same type and target.
+      const stored = state.sources[s.id];
+      const r = await F[s.type](s, m, stored && stored.type === s.type && (!stored.target || canonical(stored.target) === canonical(target)) ? stored : undefined);
+      let prev = state.sources[s.id];
       // A stored entry written before targets were recorded has none: it is compared as before and gets one now.
       if (prev?.target && canonical(prev.target) !== canonical(target)) {
         repointed.push({module: m.module, id: s.id, label: s.label ?? s.id, from: prev.target, to: target});
@@ -405,6 +439,9 @@ for (const m of manifests) {
       }
       const why = prev && prev.value !== r.value ? rebaseline(s, prev, r) : null;
       if (why) { console.error(`baseline ${slug(m.module)} · ${s.id}: ${why}`); prev = undefined; }
+      // A stateful source without a reading to continue from names the one it started at (evm-initialize: the empty set at
+      // the block its pinned list was built at), so what it found on the way is reported, never swallowed by the baseline.
+      if (!prev && r.baseline) prev = {type: s.type, target, value: r.baseline.value, meta: r.baseline.meta};
       const now = new Date().toISOString();
       const changed = !!prev && prev.value !== r.value;
       // A failed pin / branch check is reported on every run until it is fixed, not only on the day it appears.

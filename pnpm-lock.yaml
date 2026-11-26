@@ -323,6 +323,9 @@ importers:
       '@anywalletkit/protocol-swap2-thorchain':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-thorchain
+      '@anywalletkit/protocol-swap2-uniswap':
+        specifier: workspace:*
+        version: link:../../packages/protocol-swap2-uniswap
       '@anywalletkit/protocol-swap2-usdt0':
         specifier: workspace:*
         version: link:../../packages/protocol-swap2-usdt0
@@ -1836,6 +1839,9 @@ importers:
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
+      '@anywalletkit/protocol-swap2-router':
+        specifier: workspace:*
+        version: link:../protocol-swap2-router
       '@types/node':
         specifier: ^22
         version: 22.20.5

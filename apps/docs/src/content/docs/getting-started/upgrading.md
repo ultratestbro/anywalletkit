@@ -10,6 +10,39 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## Uniswap 0.5.0: Uniswap v4 (opt-in), the price-impact gate (opt-in)
+
+Nothing to change in code unless you opt in; read the rollout note if you serve Uniswap through `remoteProvider`.
+
+- **protocol-swap2-uniswap (minor):** `v4: "native-in"` quotes a native-coin input on the chain's pinned hookless v4
+  pools as well and executes the better of v3 and v4; `v4: "all"` does the same for a token input, through Uniswap's
+  SwapProxy (simulated with its approval before the quote); the default `"off"` keeps every quote as before.
+  `uniswapPins` now lists the Universal Router 2.1.2 as a call target and the SwapProxy as a call target and a spender,
+  and `uniswapVerifyQuote` checks their calls (`uniswapV4VerifyQuote`); the v3 check alone is `uniswapV3VerifyQuote`.
+  See [Swaps → Uniswap v4](/guides/swaps/#uniswap-v4).
+- **Rollout:** bump the app's pins first, then set `v4: "native-in"` (later `"all"`) on the server. An app on 0.4.x pins
+  drops a Universal Router or SwapProxy quote and loses Uniswap on that pair while the server has v4 on.
+- **Behind a backend, use `uniswapRemoteProvider({baseUrl})`** instead of `remoteProvider({name: "uniswap", baseUrl,
+  ...uniswapPins})`: the same pins, plus `ownGasEstimate`, so the engine sends the account's own gas estimate rather
+  than the backend's quoted limit. An app that shares `v4ExtraPools` with its server pins them with
+  `uniswapPinsWith({v4ExtraPools})` (the server then sets `v4RankedPools: "extra"`).
+- **`maxPriceImpactBps` (opt-in):** refuses a quote that loses that many bps or more to price impact (the larger of the
+  1/1000 probe and the spot value loss at one block) as `insufficient_liquidity`; unset, impact stays information.
+- **`rpcCallsPerSecond` (opt-in):** at most that many calls to one endpoint a second, each quote's reads sent within 5 s
+  of its start (refused `rate_limited` past that). An integer ≥ 13, and ≥ 34 with `v4` on (a lower value throws when the
+  provider is made): a server that limits its calls raises it to 34 or more before it turns v4 on.
+- **`venueRoutes: "both"` (opt-in, needs v4 on):** the v3 and the v4 route as two Uniswap rows (`routeId` `"v3"` /
+  `"v4"`). Behind a backend, set it on the server first, then `uniswapRemoteProvider({baseUrl, multiQuotes: true})` in
+  the apps: a `multiQuotes` app against a server without `"both"` gets no Uniswap quote at all.
+- **Always on (with v4 off too):** a route whose gas need is above the chain's per-transaction cap, block gas limit or
+  (Arbitrum, Robinhood Chain) Nitro's 32M execution cap is ranked out and the next route the chain can carry is quoted
+  — a different route and amount from what 0.4.11 may have quoted — and the quote is refused only when no route fits;
+  a padded gasLimit above the cap is clamped to it. Per-item RPC errors are retried and refused as `rate_limited` /
+  `upstream_unavailable`, never read as "no pool". The provider (and `uniswapRemoteProvider`) declares
+  `ownGasEstimate`, so the engine sends each Uniswap call with the account's own gas estimate of that exact call,
+  dry-run right before broadcast (a dry run that reverts refuses the swap), never the quoted limit. Activity recognizes
+  Uniswap v4 swaps.
+
 ## 2026-11-26: KyberSwap
 
 Nothing to change in code unless you opt in.

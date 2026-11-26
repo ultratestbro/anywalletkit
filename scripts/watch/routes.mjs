@@ -70,6 +70,8 @@ if (want("omniston")) providers.omniston = (await dist("protocol-swap2-omniston"
 });
 if (want("cctp")) providers.cctp = (await dist("protocol-swap2-cctp", "provider.js")).cctpProvider({enabled: true, rpcUrls: ownRpc});
 if (want("uniswap")) providers.uniswap = (await dist("protocol-swap2-uniswap", "provider.js")).uniswapProvider({enabled: true, rpcUrls: venueRpc});
+// Uniswap v4 as a server that turned it on would run it (native input through the Universal Router 2.1.2, cp0x's 500-bps gate).
+if (want("uniswap_v4")) providers.uniswap_v4 = (await dist("protocol-swap2-uniswap", "provider.js")).uniswapProvider({enabled: true, rpcUrls: venueRpc, v4: "native-in", maxPriceImpactBps: 500});
 if (want("wrap")) providers.wrap = (await dist("protocol-swap2-wrap", "provider.js")).wrapProvider({enabled: true, rpcUrls: venueRpc});
 if (want("balancer")) providers.balancer = (await dist("protocol-swap2-balancer", "provider.js")).balancerProvider({enabled: true, rpcUrls: venueRpc});
 if (want("curve")) providers.curve = (await dist("protocol-swap2-curve", "provider.js")).curveProvider({enabled: true, rpcUrls: venueRpc, onWarning: () => {}});

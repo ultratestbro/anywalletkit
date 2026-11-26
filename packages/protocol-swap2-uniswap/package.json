@@ -1,7 +1,7 @@
 {
   "name": "@anywalletkit/protocol-swap2-uniswap",
   "version": "0.4.11",
-  "description": "Uniswap v3 same-chain swaps straight from the contracts: on-chain QuoterV2 quotes, SwapRouter02 execution, no API, no frontend.",
+  "description": "Uniswap v3 and v4 same-chain swaps straight from the contracts: on-chain QuoterV2 / V4Quoter quotes, SwapRouter02 / Universal Router 2.1.2 execution, no API, no frontend.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
   "bugs": { "url": "https://github.com/ultratestbro/anywalletkit/issues" },
@@ -28,6 +28,16 @@
       "import": "./dist/protocol.js",
       "require": "./dist/protocol.cjs"
     },
+    "./v4": {
+      "types": "./dist/v4.d.ts",
+      "import": "./dist/v4.js",
+      "require": "./dist/v4.cjs"
+    },
+    "./v4pools": {
+      "types": "./dist/v4pools.d.ts",
+      "import": "./dist/v4pools.js",
+      "require": "./dist/v4pools.cjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -38,8 +48,10 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "lint": "eslint src"
+    "test": "vitest run && node --test scripts/build-v4-pools.test.mjs",
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs",
+    "build:v4-pools": "node scripts/build-v4-pools.mjs"
   },
   "dependencies": {
     "@anywalletkit/protocol-swap2-core": "workspace:*",
@@ -53,10 +65,12 @@
     "@types/node": "^22",
     "vitest": "^5.1.0",
     "@anywalletkit/conformance": "workspace:*",
-    "@anywalletkit/core": "workspace:*"
+    "@anywalletkit/core": "workspace:*",
+    "@anywalletkit/protocol-swap2-router": "workspace:*"
   },
   "keywords": [
     "uniswap",
+    "uniswap-v4",
     "swap",
     "permissionless",
     "anywalletkit"
