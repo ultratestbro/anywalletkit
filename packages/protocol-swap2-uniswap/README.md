@@ -42,8 +42,9 @@ never wants to offer such a route (a web swap page might set 500):
 uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
 ```
 
-- Every candidate is ranked as always (a route over the chain's gas cap ranked out first, see below);
-  only the best route is gated, and a refused quote never falls back to a lower-output candidate.
+- Every candidate is ranked as always (a route over the chain's gas cap never displaces one under
+  it, see below); only the best route the chain can carry is gated, and a refused quote never falls
+  back to a lower-output candidate.
 - All reads of the quote are pinned to one block, with transient RPC errors retried.
 - The measure is the larger of the probe and the spot value loss against the pools' `slot0()` mid
   prices, fees included (`providerData.valueLossBps`), rounded down to a whole bp; the pools' floor
@@ -108,6 +109,17 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   alone, and the read fills the cache when it lands. Once a read is in, a quote never waits for the
   next: while a re-read is pending or has failed, the last answer stands, for up to an hour after it
   was read.
+  One block read goes for the whole quote: the route picked and the route bounded are judged by the
+  same one. A best route by output that the caps above refuse whatever the node answers (or the
+  block read already in) is ranked out before it is measured, and the first route under it that
+  fits goes on. Any other best route goes on as before — the same requests at the same moments, its
+  block read taken at its gas step with the wait above — and when that step refuses it, the next
+  route the same read lets through is measured and quoted instead (more requests only where the
+  quote was refused before). A refusal before the gas step (the impact gate, the minimum, the
+  floor) stands at once when the best route fits the block gas limit in hand; when it does not, the
+  quote takes its block read first (waiting only while a chain's first read is out). A quote that
+  ranks out its best route while a chain's first read is out waits for it, at most 1.5 s, before it
+  measures the next.
 - **RPC errors.** A per-item JSON-RPC error that is a revert (code 3; "execution reverted" and other
   EVM errors, out of gas included; revert data whose message names no rate limit or node fault)
   means no candidate, as before. A rate limit (`-32005`, `-32007`, `429`, or its text), a node error
