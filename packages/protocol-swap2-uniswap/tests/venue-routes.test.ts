@@ -292,6 +292,69 @@ describe("one venue failing or refusing keeps the other", () => {
     expect(seen.some((s) => s.to === MULTICALL3.toLowerCase())).toBe(false);
   });
 
+  it("review R2-C1: a v3 deployment that does not match its pins — the v4 candidate, and the operator alerted (vault_mismatch), as for v4; a \"best\" quote still refuses through onRefusal alone", async () => {
+    // SwapRouter02.factory() answers another factory: the v3 linkage drifted.
+    const drift: Odd = (s) => (s.method === "eth_call" && s.to === D3.router.toLowerCase() && s.data === "0xc45a0155" ? {result: `0x${"00".repeat(12)}${"de".repeat(20)}`} : undefined);
+    const mismatch = [expect.stringMatching(/^uniswap: Uniswap v3 is off on chain 143: the deployment does not match its pins \(the router or quoter does not answer the pinned factory and wrapped native\)$/), {chainId: 143, reason: "vault_mismatch"}];
+    const {qs, heard, warned} = await candidates(MON(62_000n), {}, drift);
+    expect(heard).toEqual([]);
+    expect(qs.map((q) => [q.routeId, q.destAmount])).toEqual([["v4", "676608109"]]);
+    expect(uniswapVerifyQuote(params(MON(62_000n)), qs[0]!)).toBeNull();
+    expect(warned).toEqual([mismatch]); // once: not again as "its reads failed"
+    // A picked venue: "v3" refused with the mismatch (onRefusal) and alerted; "v4" quoted over shipped-list pools, alerted.
+    const pick = async (routeId: string) => {
+      vi.stubGlobal("fetch", replay(drift).fetch);
+      const h: Heard = [];
+      const w: Array<[string, unknown]> = [];
+      const q = await both({onV4Warning: (t, i) => { w.push([t, i]); }}).getQuote({...params(MON(62_000n), {routeId}), onRefusal: (t: string, i?: Swap2RefusalInfo) => { h.push([t, i]); }});
+      return {q, h, w};
+    };
+    const v3 = await pick("v3");
+    expect(v3.q).toBeNull();
+    expect(v3.h).toEqual([["uniswap: the router/quoter on chain 143 do not match the pinned deployment — refusing", {reason: "vault_mismatch"}]]);
+    expect(v3.w).toEqual([mismatch]);
+    const v4 = await pick("v4");
+    expect([v4.q?.routeId, v4.q?.destAmount]).toEqual(["v4", "676608109"]);
+    expect(v4.w).toEqual([mismatch]);
+    // "best" (the default) is untouched: the request refused vault_mismatch, heard by onRefusal, no alert.
+    vi.stubGlobal("fetch", replay(drift).fetch);
+    const h: Heard = [];
+    const w: unknown[] = [];
+    const q = await uniswapProvider({rpcUrls: RPC, v4: "native-in", onV4Warning: (t, i) => { w.push([t, i]); }}).getQuote({...params(MON(62_000n)), onRefusal: (t: string, i?: Swap2RefusalInfo) => { h.push([t, i]); }});
+    expect(q).toBeNull();
+    expect(h).toEqual([["uniswap: the router/quoter on chain 143 do not match the pinned deployment — refusing", {reason: "vault_mismatch"}]]);
+    expect(w).toEqual([]);
+  });
+
+  it("review R2-C3: the caller aborts while v4 is read, after v3 answered — the cancelled pass alerts nobody", async () => {
+    const ctl = new AbortController();
+    const r = replay();
+    let v3Answered!: () => void;
+    const v3Done = new Promise<void>((resolve) => { v3Answered = resolve; });
+    const held = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as {method: string; params: unknown[]}[];
+      const to = (req: {method: string; params: unknown[]}) => (req.method === "eth_call" ? (req.params[0] as {to: string}).to.toLowerCase() : undefined);
+      if (batch.some((req) => to(req) === MULTICALL3.toLowerCase())) {
+        // The v4 discovery: held until v3's quotes are in, then the router's auction times out.
+        await v3Done;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        ctl.abort(new Error("auction timeout"));
+        throw new DOMException("This operation was aborted", "AbortError");
+      }
+      const res = await r.fetch(url, init);
+      if (batch.some((req) => to(req) === D3.quoter.toLowerCase() && !DEPLOYMENT_CHECK.test((req.params[0] as {data: string}).data.slice(0, 10)))) v3Answered();
+      return res;
+    }) as typeof fetch;
+    vi.stubGlobal("fetch", held);
+    const heard: Heard = [];
+    const warned: unknown[] = [];
+    const qs = await both({onV4Warning: (t, i) => { warned.push([t, i]); }}).getQuotes!({...params(MON(62_000n)), onRefusal: (t: string, i?: Swap2RefusalInfo) => { heard.push([t, i]); }}, ctl.signal);
+    expect(ctl.signal.aborted).toBe(true);
+    expect(qs.map((q) => q.routeId)).toEqual(["v3"]); // what the pass came to — the caller throws it away
+    expect(warned).toEqual([]); // the v4 read failed for the abort, not the node
+    expect(heard).toEqual([]);
+  });
+
   it("a chain with Uniswap v4 but no v3 (review F2): no v3 venue to answer — a pair without a v4 route is no_route, as a \"best\" quote says; a picked \"v3\" is unsupported_pair", async () => {
     const p = (extra: Partial<QuoteParams> = {}): QuoteParams => ({sourceChain: "eip155:143", destChain: "eip155:143", sourceToken: "MON", destToken: FAKE_AUSD, amountIn: (10n ** 18n).toString(), destAddress: FAKE_ME, refundAddress: FAKE_ME, ...extra});
     const make = (c: Partial<UniswapProviderConfig> = {}) => uniswapProvider({rpcUrls: FAKE_RPC, v4Deployments: FAKE_V4, v4: "native-in", deployments: {}, ...c});

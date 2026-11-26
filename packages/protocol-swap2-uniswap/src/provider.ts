@@ -315,10 +315,10 @@ export interface UniswapProviderConfig {
    * checked exactly as it would be had it won: the impact gate (`maxPriceImpactBps`), the gas bound, the module's own
    * strict v4 check and the token-input simulation apply to each one. One venue refusing never drops the other; with
    * both refused the list is empty and `onRefusal` hears why (on a chain without Uniswap v3, v4's reason alone). A
-   * venue left out because its reads failed while the other's candidate goes out is named through `onV4Warning`. The
-   * v4 candidate keeps the `v4RankedPools` provenance rule: a route over pools outside the ranked set (grid, extra,
-   * newer-list pools) only where v3 has no route — where v3 could not be read, such a route is refused with that
-   * read's reason.
+   * venue left out because its reads failed while the other's candidate goes out, or because its deployment does not
+   * match its pins (v3's too), is named through `onV4Warning`. The v4 candidate keeps the `v4RankedPools` provenance
+   * rule: a route over pools outside the ranked set (grid, extra, newer-list pools) only where v3 has no route — where
+   * v3 could not be read, such a route is refused with that read's reason.
    * `getQuote` without a `routeId` returns the `"best"` winner, now naming its route (`"v3"` or `"v4"`); with
    * `routeId: "v3"` it quotes v3 alone, with `"v4"` v4 alone (v3 is read only for that provenance rule) — never the
    * other venue in its place; any other `routeId` is refused (`policy_refused`). A router shows each candidate as its
@@ -361,7 +361,10 @@ export interface UniswapProviderConfig {
    * too). With `venueRoutes: "both"`, also when one venue's candidate is left out because its reads failed (the node's
    * reason: `rate_limited`, `upstream_unavailable`, `stale_node`, `key_rejected`, or unclassified as
    * `upstream_unavailable`) while the other venue's candidate goes out — v3's too: the row then shown alone is the only
-   * Uniswap offer, and a retry may bring the other back. It is the operator's alert, not the caller's refusal:
+   * Uniswap offer, and a retry may bring the other back; never for a request the caller aborted. And on every
+   * venue-routes pass that finds the chain's v3 router or quoter not matching its pins (`reason: "vault_mismatch"`: v3
+   * is off on that chain for the pass, v4 untouched; a `"best"` quote refuses the request through `onRefusal`
+   * instead). It is the operator's alert, not the caller's refusal:
    * `onRefusal` is first-wins and dropped by the handlers when a quote stands, so a note there would hide the real reason
    * or go nowhere. A throw (or a rejected promise) is ignored.
    */
@@ -1474,6 +1477,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         let v3Unread: VenueRefusal | undefined;
         if (c3 && "error" in c3) {
           v3Unread = venueFailed(c3.error);
+          if (v3Unread.info !== undefined && reasonOfInfo(v3Unread.info) === "vault_mismatch") {
+            // §6.5 row 15 for v3 as for v4: refuse + alert. v3 is off on this chain for the pass while the v4 candidate
+            // may go out, so onRefusal may never hear it (review R2-C1); a "best" pass refuses the whole quote instead.
+            warn(`Uniswap v3 is off on chain ${chainId}: the deployment does not match its pins (the router or quoter does not answer the pinned factory and wrapped native)`, "vault_mismatch");
+            v3Unread = {...v3Unread, alerted: true};
+          }
           if (wantV3) out.v3 = v3Unread;
           v3Known = false;
         }
@@ -1539,11 +1548,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
      * has no route; v3 unread or unanswered counts as having one). On a chain without Uniswap v3, "both" asks v4 alone:
      * there is no v3 venue to refuse (a picked "v3" is refused `unsupported_pair`; review F2). A venue left out because
      * its reads failed while the other venue's candidate goes out is named to the operator (`onV4Warning`, review
-     * LIVE-VR-1): `onRefusal` is not called while a candidate stands.
+     * LIVE-VR-1): `onRefusal` is not called while a candidate stands. A pass the caller aborted alerts nobody: its reads
+     * failed for the abort, not the node, and its result is thrown away (review R2-C3).
      */
     const venuePass = async (pick: VenuePick): Promise<VenueQuotes> => {
       const out = await venueReads(pick);
-      if (pick === "both") {
+      if (pick === "both" && !signal?.aborted) {
         for (const [id, other] of [["v3", "v4"], ["v4", "v3"]] as const) {
           const a = out[id];
           const b = out[other];
