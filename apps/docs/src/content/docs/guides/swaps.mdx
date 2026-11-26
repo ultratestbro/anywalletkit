@@ -97,9 +97,11 @@ On Monad, 62,000 MON → AUSD pays about 1 AUSD on v3 and about 670 AUSD on v4 (
 set `venueRoutes: "both"` (with v4 on): `getQuotes` then returns the best v3 route (`routeId: "v3"`) and the best v4
 route (`routeId: "v4"`) from one ranking pass — the same reads as one quote, plus the losing venue's own probe — each
 built and checked as it would be had it won (impact gate, gas bound, the strict v4 check, the token-input simulation).
-One venue refusing never drops the other. The router ranks each as its own row; label it from `routeId` and execute
-the pick with `using("uniswap", routeId)`. A picked route is quoted on that venue or refused, never swapped for the
-other, and the pins bind `routeId` to the calldata (a `"v3"` quote calling the Universal Router is refused).
+One venue refusing never drops the other; a venue left out because its reads failed (rate-limited, unanswered) is
+named to the operator through `onV4Warning`. The router ranks each as its own row; label it from `routeId` and execute
+the pick with `using("uniswap", routeId)` — a live request without a `routeId` is the one-quote ranking, which need
+not match the row shown. A picked route is quoted on that venue or refused, never swapped for the other, and the pins
+bind `routeId` to the calldata (a `"v3"` quote calling the Universal Router is refused).
 
 ```ts
 uniswapProvider({rpcUrls, v4: "all", venueRoutes: "both"})          // in the app, or on the server

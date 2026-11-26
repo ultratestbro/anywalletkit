@@ -264,20 +264,24 @@ describe("one venue failing or refusing keeps the other", () => {
   const isDiscovery = (s: Req) => s.to === MULTICALL3.toLowerCase() && decodeFunctionData({abi: MC3, data: s.data as Hex}).args[0].every((c) => getAddress(c.target) === getAddress(D4.stateView));
   const isV3Quote = (s: Req) => s.to === D3.quoter.toLowerCase() && !DEPLOYMENT_CHECK.test(s.data!.slice(0, 10));
 
-  it("the v4 discovery rate-limited on every attempt: the v3 candidate alone (a \"best\" quote is refused rate_limited)", async () => {
-    const {qs, heard} = await candidates(MON(62_000n), {}, (s) => (isDiscovery(s) ? limited : undefined));
+  it("the v4 discovery rate-limited on every attempt: the v3 candidate alone (a \"best\" quote is refused rate_limited), and the operator alerted", async () => {
+    const {qs, heard, warned} = await candidates(MON(62_000n), {}, (s) => (isDiscovery(s) ? limited : undefined));
     expect(heard).toEqual([]);
     expect(qs.map((q) => [q.routeId, q.destAmount])).toEqual([["v3", "1130999"]]);
+    // Review LIVE-VR-1: the row that is missing for a failed read is named to the operator (the app's onRefusal is not
+    // called while a candidate stands), with the node's reason — a retry may bring it back.
+    expect(warned).toEqual([[expect.stringMatching(/^uniswap: Uniswap v4 is left out on chain 143: its reads failed \(no RPC answered on chain 143 \(-32007 .*\)\) — only the v3 route is offered; a retry may bring the v4 one back$/), {chainId: 143, reason: "rate_limited"}]]);
     const best = await single(MON(62_000n), {v4: "native-in"}, {}, (s) => (isDiscovery(s) ? limited : undefined));
     expect(best.q).toBeNull();
     expect(best.heard[0]![1]).toEqual({reason: "rate_limited"});
   }, 30_000);
 
-  it("v3's quoter reads unanswered: the v4 candidate alone, over shipped-list pools only (v3 may have a route)", async () => {
-    const {qs, heard} = await candidates(MON(62_000n), {}, (s) => (isV3Quote(s) ? limited : undefined));
+  it("v3's quoter reads unanswered: the v4 candidate alone, over shipped-list pools only (v3 may have a route), and the operator alerted", async () => {
+    const {qs, heard, warned} = await candidates(MON(62_000n), {}, (s) => (isV3Quote(s) ? limited : undefined));
     expect(heard).toEqual([]);
     expect(qs.map((q) => [q.routeId, q.destAmount])).toEqual([["v4", "676608109"]]);
     expect(uniswapVerifyQuote(params(MON(62_000n)), qs[0]!)).toBeNull();
+    expect(warned).toEqual([[expect.stringMatching(/^uniswap: Uniswap v3 is left out on chain 143: its reads failed \(no RPC answered .*\) — only the v4 route is offered/), {chainId: 143, reason: "rate_limited"}]]);
   }, 30_000);
 
   it("a v4 deployment that does not match its pins: the v3 candidate, and the operator alerted", async () => {
@@ -286,6 +290,27 @@ describe("one venue failing or refusing keeps the other", () => {
     expect(qs.map((q) => q.routeId)).toEqual(["v3"]);
     expect(warned).toEqual([[expect.stringMatching(/Uniswap v4 is off on chain 143: the deployment does not match its pins/), {chainId: 143, reason: "vault_mismatch"}]]);
     expect(seen.some((s) => s.to === MULTICALL3.toLowerCase())).toBe(false);
+  });
+
+  it("a chain with Uniswap v4 but no v3 (review F2): no v3 venue to answer — a pair without a v4 route is no_route, as a \"best\" quote says; a picked \"v3\" is unsupported_pair", async () => {
+    const p = (extra: Partial<QuoteParams> = {}): QuoteParams => ({sourceChain: "eip155:143", destChain: "eip155:143", sourceToken: "MON", destToken: FAKE_AUSD, amountIn: (10n ** 18n).toString(), destAddress: FAKE_ME, refundAddress: FAKE_ME, ...extra});
+    const make = (c: Partial<UniswapProviderConfig> = {}) => uniswapProvider({rpcUrls: FAKE_RPC, v4Deployments: FAKE_V4, v4: "native-in", deployments: {}, ...c});
+    const ask = async (f: (heard: Heard) => Promise<unknown>) => {
+      vi.stubGlobal("fetch", fakeNode({amount: 10n ** 18n, v4: new Map()}).fetch);
+      const heard: Heard = [];
+      return {out: await f(heard), heard};
+    };
+    const best = await ask((heard) => make().getQuote({...p(), onRefusal: (t, i) => { heard.push([t, i]); }}));
+    expect(best.out).toBeNull();
+    expect(best.heard).toEqual([["uniswap: no Uniswap v4 pool route for this pair and amount", {reason: "no_route"}]]);
+    const listed = await ask((heard) => make({venueRoutes: "both"}).getQuotes!({...p(), onRefusal: (t, i) => { heard.push([t, i]); }}));
+    expect(listed.out).toEqual([]);
+    expect(listed.heard).toEqual([["uniswap: v4: no Uniswap v4 pool route for this pair and amount", {reason: "no_route"}]]);
+    const v4 = await ask((heard) => make({venueRoutes: "both"}).getQuote({...p({routeId: "v4"}), onRefusal: (t, i) => { heard.push([t, i]); }}));
+    expect(v4.heard).toEqual([["uniswap: no Uniswap v4 pool route for this pair and amount", {reason: "no_route"}]]);
+    const v3 = await ask((heard) => make({venueRoutes: "both"}).getQuote({...p({routeId: "v3"}), onRefusal: (t, i) => { heard.push([t, i]); }}));
+    expect(v3.out).toBeNull();
+    expect(v3.heard).toEqual([["uniswap: no Uniswap v3 deployment on chain 143", {reason: "unsupported_pair"}]]);
   });
 });
 
@@ -344,11 +369,42 @@ describe("token input (v4 \"all\", the fake Monad node): each candidate built an
     expect(heard[0]).toEqual([expect.stringMatching(/the wallet holds 699999999 of the input/), {reason: "simulation_failed"}]);
   });
 
-  it("the caller's floor applies to each candidate: above v3's minimum only v4 is offered", async () => {
+  it("the caller's floor applies to each candidate: above v3's minimum only v4 is offered (a trade verdict: no alert)", async () => {
     vi.stubGlobal("fetch", node().fetch);
-    const qs = await provider([]).getQuotes!(usdcToAusd({minAmountOut: "696000000"}));
+    const warned: Array<[string, unknown]> = [];
+    const qs = await provider(warned).getQuotes!(usdcToAusd({minAmountOut: "696000000"}));
     expect(qs.map((q) => q.routeId)).toEqual(["v4"]);
+    expect(warned).toEqual([]);
   });
+
+  it("review LIVE-VR-1: the allowance read rate-limited on every attempt — the v4 row is left out with the operator alerted (rate_limited); a \"best\" quote refuses, a picked \"v4\" refuses with the node's reason", async () => {
+    const limitedAllowance = (inner: typeof fetch): typeof fetch => (async (u: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {id: number; method: string; params: unknown[]} | {id: number; method: string; params: unknown[]}[];
+      const batch = Array.isArray(body) ? body : [body];
+      const res = (await (await inner(u, init)).json()) as {id: number} | {id: number}[];
+      const answers = (Array.isArray(res) ? res : [res]).map((r, i) => {
+        const req = batch[i]!;
+        const c = req.params[0] as {data?: string} | undefined;
+        return req.method === "eth_call" && req.params[2] === undefined && c?.data?.startsWith("0xdd62ed3e") ? {jsonrpc: "2.0", id: r.id, error: {code: -32007, message: "50/second request limit reached"}} : r;
+      });
+      return new Response(JSON.stringify(Array.isArray(body) ? answers : answers[0]));
+    }) as typeof fetch;
+    vi.stubGlobal("fetch", limitedAllowance(node().fetch));
+    const warned: Array<[string, unknown]> = [];
+    const heard: Heard = [];
+    const qs = await provider(warned).getQuotes!({...usdcToAusd(), onRefusal: (t, i) => { heard.push([t, i]); }});
+    expect(qs.map((q) => [q.routeId, q.destAmount])).toEqual([["v3", "699000000"]]);
+    expect(heard).toEqual([]);
+    expect(warned).toEqual([[expect.stringMatching(/^uniswap: Uniswap v4 is left out on chain 143: its reads failed \(no RPC answered on chain 143 \(-32007 .*\)\) — only the v3 route is offered/), {chainId: 143, reason: "rate_limited"}]]);
+    vi.stubGlobal("fetch", limitedAllowance(node().fetch));
+    const picked: Heard = [];
+    expect(await provider([]).getQuote({...usdcToAusd({routeId: "v4"}), onRefusal: (t, i) => { picked.push([t, i]); }})).toBeNull();
+    expect(picked).toEqual([[expect.stringMatching(/no RPC answered on chain 143/), {reason: "rate_limited"}]]);
+    vi.stubGlobal("fetch", limitedAllowance(node().fetch));
+    const ranked: Heard = [];
+    expect(await uniswapProvider({rpcUrls: FAKE_RPC, v4Deployments: FAKE_V4, v4: "all"}).getQuote({...usdcToAusd(), onRefusal: (t, i) => { ranked.push([t, i]); }})).toBeNull();
+    expect(ranked[0]![1]).toEqual({reason: "rate_limited"});
+  }, 60_000);
 
   it('with v4 "native-in", a token input has no v4 candidate: v3 alone; a picked "v4" is refused unsupported_pair', async () => {
     vi.stubGlobal("fetch", node().fetch);
@@ -437,7 +493,44 @@ describe("v4 candidate provenance (v4RankedPools): a grid route only where v3 ha
     expect(qs.map((q) => [q.routeId, q.destAmount])).toEqual([["v4", "1200000"]]);
     expect(JSON.parse(qs[0]!.providerData!.poolKeys!).map(poolIdOf)).toEqual([GRID_ID]);
     expect((await server().getQuote(monToX({routeId: "v4"})))?.destAmount).toBe("1200000");
+    // An app on the shipped pins drops this candidate (its pool is not pinned), exactly as it drops the same route as a
+    // "best" quote: nothing it had is lost, and nothing is executed (review SEC-VR-1, the release note's wording).
+    vi.stubGlobal("fetch", gridNode(false));
+    const ranked = await uniswapProvider({rpcUrls: RPC, v4: "native-in", v4Deployments: V4}).getQuote(monToX());
+    expect(ranked?.destAmount).toBe("1200000");
+    for (const q of [qs[0]!, ranked!]) expect(uniswapVerifyQuote(monToX(), q)).toMatch(/is not in the pinned pool list/);
   });
+
+  it("review F1: a picked \"v4\" whose provenance read went unanswered (v3's quotes, or v3's deployment check) is refused with that read's reason, never no_route", async () => {
+    const V3_CHECK = /^0x(c45a0155|4aa4a4fc)/;
+    /** The grid node with the v3 calls `match` picks rate-limited on every attempt. */
+    const limitedV3 = (inner: typeof fetch, match: (data: string) => boolean): typeof fetch => (async (u: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as {id: number; method: string; params: unknown[]}[];
+      const res = (await (await inner(u, init)).json()) as {id: number}[];
+      return new Response(JSON.stringify(res.map((r, i) => {
+        const req = batch[i]!;
+        const c = req.params[0] as {to?: string; data?: string} | undefined;
+        const v3 = req.method === "eth_call" && c?.to !== undefined && [D3.router, D3.quoter].some((a) => getAddress(a) === getAddress(c.to!));
+        return v3 && match(c!.data!) ? {jsonrpc: "2.0", id: r.id, error: {code: -32007, message: "50/second request limit reached"}} : r;
+      })));
+    }) as typeof fetch;
+    for (const [what, match] of [["v3's quotes", (d: string) => !V3_CHECK.test(d)], ["v3's deployment check", (d: string) => V3_CHECK.test(d)]] as const) {
+      vi.stubGlobal("fetch", limitedV3(gridNode(false), match));
+      const heard: Heard = [];
+      expect(await server().getQuote({...monToX({routeId: "v4"}), onRefusal: (t, i) => { heard.push([t, i]); }}), what).toBeNull();
+      expect(heard, what).toEqual([[expect.stringMatching(/^uniswap: the only Uniswap v4 routes for this pair go through pools outside the ranked pool lists \(v4RankedPools\), which stand only where Uniswap v3 has no route — and v3 could not be read: no RPC answered on chain 143 \(-32007 /), {reason: "rate_limited"}]]);
+      // getQuotes in the same state: both venues refused, classified by the read that failed.
+      vi.stubGlobal("fetch", limitedV3(gridNode(false), match));
+      const listed: Heard = [];
+      expect(await server().getQuotes!({...monToX(), onRefusal: (t, i) => { listed.push([t, i]); }}), what).toEqual([]);
+      expect(listed, what).toEqual([[expect.stringMatching(/^uniswap: v3: no RPC answered on chain 143 .*; v4: the only Uniswap v4 routes .* v3 could not be read/), {reason: "rate_limited"}]]);
+      // A "best" quote in the same state is refused for the same read.
+      vi.stubGlobal("fetch", limitedV3(gridNode(false), match));
+      const ranked: Heard = [];
+      expect(await uniswapProvider({rpcUrls: RPC, v4: "native-in", v4Deployments: V4}).getQuote({...monToX(), onRefusal: (t, i) => { ranked.push([t, i]); }}), what).toBeNull();
+      expect(ranked[0]![1], what).toEqual({reason: "rate_limited"});
+    }
+  }, 60_000);
 
   it('v4RankedPools "all" (a provider in the app): both, the grid route next to v3', async () => {
     vi.stubGlobal("fetch", gridNode(true));

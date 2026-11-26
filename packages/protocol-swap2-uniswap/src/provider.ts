@@ -314,12 +314,16 @@ export interface UniswapProviderConfig {
    * `routeId: "v4"`, the best v4 route — each built and
    * checked exactly as it would be had it won: the impact gate (`maxPriceImpactBps`), the gas bound, the module's own
    * strict v4 check and the token-input simulation apply to each one. One venue refusing never drops the other; with
-   * both refused the list is empty and `onRefusal` hears why. The v4 candidate keeps the `v4RankedPools` provenance
-   * rule: a route over pools outside the ranked set (grid, extra, newer-list pools) only where v3 has no route.
+   * both refused the list is empty and `onRefusal` hears why (on a chain without Uniswap v3, v4's reason alone). A
+   * venue left out because its reads failed while the other's candidate goes out is named through `onV4Warning`. The
+   * v4 candidate keeps the `v4RankedPools` provenance rule: a route over pools outside the ranked set (grid, extra,
+   * newer-list pools) only where v3 has no route — where v3 could not be read, such a route is refused with that
+   * read's reason.
    * `getQuote` without a `routeId` returns the `"best"` winner, now naming its route (`"v3"` or `"v4"`); with
    * `routeId: "v3"` it quotes v3 alone, with `"v4"` v4 alone (v3 is read only for that provenance rule) — never the
    * other venue in its place; any other `routeId` is refused (`policy_refused`). A router shows each candidate as its
-   * own row; the app labels rows from `routeId` and executes a pick with `using("uniswap", routeId)`.
+   * own row; the app labels rows from `routeId` and executes a pick with `using("uniswap", routeId)` — a live request
+   * without a `routeId` is the `"best"` pass, which can refuse where a row was shown (see the README).
    */
   venueRoutes?: "best" | "both";
   /**
@@ -354,8 +358,12 @@ export interface UniswapProviderConfig {
    * "vault_mismatch"`; v4, or its token input, is off on that chain for the quote, v3 untouched), or the best v4 route's
    * build was refused for a reason of the build and the quote fell back to another route (the build's reason). Also
    * called on a deployment mismatch that leaves the chain without a route (the quote's `onRefusal` hears that refusal
-   * too). It is the operator's alert, not the caller's refusal: `onRefusal` is first-wins and dropped by the handlers when
-   * a quote stands, so a note there would hide the real reason or go nowhere. A throw (or a rejected promise) is ignored.
+   * too). With `venueRoutes: "both"`, also when one venue's candidate is left out because its reads failed (the node's
+   * reason: `rate_limited`, `upstream_unavailable`, `stale_node`, `key_rejected`, or unclassified as
+   * `upstream_unavailable`) while the other venue's candidate goes out — v3's too: the row then shown alone is the only
+   * Uniswap offer, and a retry may bring the other back. It is the operator's alert, not the caller's refusal:
+   * `onRefusal` is first-wins and dropped by the handlers when a quote stands, so a note there would hide the real reason
+   * or go nowhere. A throw (or a rejected promise) is ignored.
    */
   onV4Warning?: (text: string, info: {chainId: number; reason: Swap2RefusalReason}) => void;
 }
@@ -385,8 +393,11 @@ type V4Build =
 /** The route selectors of `venueRoutes: "both"` (`Quote.routeId` / `QuoteParams.routeId`): the venue a quote runs on. */
 export type UniswapRouteId = "v3" | "v4";
 const ROUTE_IDS: readonly UniswapRouteId[] = ["v3", "v4"];
-/** A venue's answer in a venue-routes pass: its quote, or why it has none (the text without "uniswap: "). */
-type VenueAnswer = {quote: Quote} | {refused: string; info?: Swap2RefusalReason | Swap2RefusalInfo};
+/**
+ * A venue's answer in a venue-routes pass: its quote, or why it has none (the text without "uniswap: "; `alerted`: the
+ * operator already heard it through `onV4Warning`).
+ */
+type VenueAnswer = {quote: Quote} | {refused: string; info?: Swap2RefusalReason | Swap2RefusalInfo; alerted?: true};
 type VenueRefusal = Extract<VenueAnswer, {refused: string}>;
 /** What a venue-routes pass quotes: one venue, or both. */
 type VenuePick = UniswapRouteId | "both";
@@ -394,6 +405,11 @@ type VenuePick = UniswapRouteId | "both";
 type VenueQuotes = Partial<Record<UniswapRouteId, VenueAnswer>>;
 /** Reasons that say only that a venue has nothing here: with both venues refused, another venue's reason is the one reported. */
 const SOFT_REASONS: ReadonlySet<Swap2RefusalReason> = new Set<Swap2RefusalReason>(["no_route", "unsupported_pair"]);
+/**
+ * Reasons that say a venue's reads failed — the node, not the trade: a venue left out for one while the other venue's
+ * candidate goes out is named to the operator (review LIVE-VR-1); a retry may bring it back.
+ */
+const READ_FAILURES: ReadonlySet<Swap2RefusalReason> = new Set<Swap2RefusalReason>(["rate_limited", "upstream_unavailable", "stale_node", "key_rejected"]);
 
 interface Route {
   /** Human description for the review / logs. */
@@ -1404,9 +1420,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     /**
      * The v4 candidate of a venue-routes pass: the best route the chain can mine and the provenance rule lets stand
      * (`v3Route`: v3 has a route for the pair, or may have — then only the ranked pools compete, as in a "best" pass),
-     * built exactly as a winning one is — or why there is none.
+     * built exactly as a winning one is — or why there is none. `v3Unread`: why v3 may have a route — its reads failed
+     * (the deployment check or the quotes); routes only over pools outside the ranked set are then refused with that
+     * failure, which a retry can clear, never as "no route" (review F1).
      */
-    const v4Candidate = async (v4: V4Read, v3Route: boolean, gated: boolean, gasRead: BlockGasRead): Promise<VenueAnswer> => {
+    const v4Candidate = async (v4: V4Read, v3Route: boolean, gated: boolean, gasRead: BlockGasRead, v3Unread: VenueRefusal | undefined): Promise<VenueAnswer> => {
       const restrict = v3Route && v4Ranked !== "all";
       let gasOut = 0;
       let gasCap: bigint | undefined = v4ReadBoundOf(chainId);
@@ -1420,28 +1438,26 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         if ("trade" in built) return venueNo(built.trade.refused, built.trade.info);
         if (built.setAside) {
           warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${built.setAside.refused}) — no v4 route is offered`, reasonOfInfo(built.setAside.info));
-          return venueNo(built.setAside.refused, built.setAside.info);
+          return {...venueNo(built.setAside.refused, built.setAside.info), alerted: true};
         }
         // Routes the chain can mine, all through pools outside the ranked set: not offered next to v3's.
         outside = restrict && r.ranked.length === 0 && rankedV4Candidates(v4.candidates).length > gasOut;
+      }
+      if (outside && v3Unread) {
+        // Whether v3 has a route is unknown, so whether these routes may stand is too: refused for the read that failed.
+        return venueNo(`the only Uniswap v4 routes for this pair go through pools outside the ranked pool lists (v4RankedPools), which stand only where Uniswap v3 has no route — and v3 could not be read: ${v3Unread.refused}`, v3Unread.info);
       }
       if (outside) return venueNo("the only Uniswap v4 routes for this pair go through pools outside the ranked pool lists (v4RankedPools) — not offered next to the v3 route", "no_route");
       if (!v4.partial && v4.unexecutable + gasOut > 0) return venueNo(`every Uniswap v4 route for this pair and amount needs more gas than one transaction on chain ${chainId} may have (${String(gasCap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
       return v4.partial ? venueNo(PARTIAL_FILL, "insufficient_liquidity") : venueNo("no Uniswap v4 pool route for this pair and amount", "no_route");
     };
 
-    /**
-     * A venue-routes pass (`venueRoutes: "both"`): the reads of a "best" pass — the deployment checks, v3 and v4 at one
-     * block (pinned when `maxPriceImpactBps` is set, else "latest"), one batch set — and each venue asked for built on
-     * its own, exactly as it would be had it won. A venue that refuses or fails never drops the other. v3 is read for its
-     * own quote, and for the v4 candidate's provenance (a v4 route over pools outside the ranked set stands only where v3
-     * has no route; v3 unread or unanswered counts as having one).
-     */
-    const venuePass = async (pick: VenuePick): Promise<VenueQuotes> => {
+    /** The reads and builds of a venue-routes pass (`venuePass`, below): each venue asked for, answered. */
+    const venueReads = async (pick: VenuePick): Promise<VenueQuotes> => {
       const out: VenueQuotes = {};
-      const wantV3 = pick !== "v4";
+      const wantV3 = pick === "v3" || (pick === "both" && d3 !== undefined);
       const wantV4 = pick !== "v3";
-      if (wantV3 && !d3) out.v3 = venueNo(`no Uniswap v3 deployment on chain ${chainId}`, "unsupported_pair");
+      if (pick === "v3" && !d3) out.v3 = venueNo(`no Uniswap v3 deployment on chain ${chainId}`, "unsupported_pair");
       if (wantV4 && !v4In) {
         out.v4 = venueNo(!d4 ? `Uniswap v4 is not quoted on chain ${chainId}`
           : !v4ServesFlow(d4, v4Mode, nativeIn, nativeOut) ? (!nativeIn && v4Mode === "native-in" ? 'Uniswap v4 takes a native-coin input only here (v4: "native-in")' : "this chain's native coin is an ERC-20 on Uniswap v4 — swap that instead")
@@ -1454,8 +1470,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const settled = <T,>(p: Promise<T>): Promise<{ok: T} | {error: unknown}> => p.then((ok) => ({ok}), (error: unknown) => ({error}));
         const [c3, c4] = await Promise.all([readsV3 ? settled(verifyDeployment(chainId)) : undefined, v4Asked ? settled(verifyV4Deployment(chainId, v4In!)) : undefined]);
         let v3Known = readsV3;
+        /** Why v3 could not be read (its deployment check or its quotes failed), asked for or not: the v4 provenance rule's unknown. */
+        let v3Unread: VenueRefusal | undefined;
         if (c3 && "error" in c3) {
-          if (wantV3) out.v3 = venueFailed(c3.error);
+          v3Unread = venueFailed(c3.error);
+          if (wantV3) out.v3 = v3Unread;
           v3Known = false;
         }
         let v4Ready = false;
@@ -1466,7 +1485,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           if (!v4Ready) {
             // §6.5 row 15: refuse + alert. v4 (or its token input) is off on this chain for this quote; v3 is not touched.
             warn(`Uniswap v4 ${nativeIn || !ok.native ? "" : "token input "}is off on chain ${chainId}: the deployment does not match its pins (${ok.problem ?? "the check got no answer"})`, "vault_mismatch");
-            out.v4 = venueNo(`the Uniswap v4 deployment on chain ${chainId} does not match its pins — refusing`, "vault_mismatch");
+            out.v4 = {...venueNo(`the Uniswap v4 deployment on chain ${chainId} does not match its pins — refusing`, "vault_mismatch"), alerted: true};
           }
         }
         const needV3 = v3Known && (wantV3 || v4Ready);
@@ -1481,7 +1500,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           try {
             v3 = await readV3(block, "all");
           } catch (e) {
-            if (wantV3) out.v3 = venueFailed(e);
+            v3Unread = venueFailed(e);
+            if (wantV3) out.v3 = v3Unread;
           }
         }
         let v4: V4Read | undefined;
@@ -1499,7 +1519,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
               ? buildV3(v3.best, block, gasRead, 0).catch(venueFailed)
               : Promise.resolve(v3.partial ? venueNo(PARTIAL_FILL, "insufficient_liquidity") : venueNo("no Uniswap v3 pool route for this pair and amount", "no_route"))
             : undefined,
-          wantV4 && !out.v4 && v4 ? v4Candidate(v4, v3Route, gated, gasRead).catch(venueFailed) : undefined,
+          wantV4 && !out.v4 && v4 ? v4Candidate(v4, v3Route, gated, gasRead, v3Unread).catch(venueFailed) : undefined,
         ]);
         if (a3) out.v3 = a3;
         if (a4) out.v4 = a4;
@@ -1507,6 +1527,31 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const r = venueFailed(e);
         if (wantV3) out.v3 ??= r;
         if (wantV4) out.v4 ??= r;
+      }
+      return out;
+    };
+
+    /**
+     * A venue-routes pass (`venueRoutes: "both"`): the reads of a "best" pass — the deployment checks, v3 and v4 at one
+     * block (pinned when `maxPriceImpactBps` is set, else "latest"), one batch set — and each venue asked for built on
+     * its own, exactly as it would be had it won. A venue that refuses or fails never drops the other. v3 is read for its
+     * own quote, and for the v4 candidate's provenance (a v4 route over pools outside the ranked set stands only where v3
+     * has no route; v3 unread or unanswered counts as having one). On a chain without Uniswap v3, "both" asks v4 alone:
+     * there is no v3 venue to refuse (a picked "v3" is refused `unsupported_pair`; review F2). A venue left out because
+     * its reads failed while the other venue's candidate goes out is named to the operator (`onV4Warning`, review
+     * LIVE-VR-1): `onRefusal` is not called while a candidate stands.
+     */
+    const venuePass = async (pick: VenuePick): Promise<VenueQuotes> => {
+      const out = await venueReads(pick);
+      if (pick === "both") {
+        for (const [id, other] of [["v3", "v4"], ["v4", "v3"]] as const) {
+          const a = out[id];
+          const b = out[other];
+          if (a === undefined || "quote" in a || a.alerted || b === undefined || !("quote" in b)) continue;
+          const reason = a.info === undefined ? undefined : reasonOfInfo(a.info);
+          if (reason !== undefined && !READ_FAILURES.has(reason)) continue; // a verdict on the trade there, not a failed read
+          warn(`Uniswap ${id} is left out on chain ${chainId}: its reads failed (${a.refused}) — only the ${other} route is offered; a retry may bring the ${id} one back`, reason ?? "upstream_unavailable");
+        }
       }
       return out;
     };
@@ -1607,7 +1652,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
   /**
    * `getQuotes` with `venueRoutes: "both"`: the v3 and v4 candidates of one pass. With both refused, an empty list and
-   * one refusal naming both venues' reasons (classified as the first one that says more than "no route here").
+   * one refusal naming both venues' reasons (classified as the first one that says more than "no route here"); on a
+   * chain without Uniswap v3, v4's alone.
    */
   async function venueCandidates(params: QuoteParams, signal?: AbortSignal): Promise<Quote[]> {
     if (params.routeId !== undefined) {

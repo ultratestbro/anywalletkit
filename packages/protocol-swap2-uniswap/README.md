@@ -211,21 +211,32 @@ uniswapRemoteProvider({ baseUrl: "/api/v2/swap2", multiQuotes: true })
 - **Two candidates, one pass.** `getQuotes(params)` returns up to two quotes: `routeId: "v3"`, the best v3 route, and
   `routeId: "v4"`, the best v4 route. Both come from the reads one `"best"` quote makes — the deployment checks, v3 and
   v4 at the same block (pinned with `maxPriceImpactBps`, else `latest`), one batch set — plus the 1/1000 probe of the
-  venue that would have lost (and, for a token input, its approve + swap simulation). Live on 2026-11-26 (read-only,
-  each comparison at one pinned block): 18–38 JSON-RPC calls for both candidates against 17–49 for one `"best"` quote,
-  a ratio of 0.78–1.14.
+  venue that would have lost (and, for a token input, its approve + swap simulation). So `"both"` never costs less
+  than one `"best"` quote: it makes every read that quote makes, plus that venue's probe and checks. Live on 2026-11-26
+  (read-only, each comparison at one pinned block): 18–38 JSON-RPC calls for both candidates against 17–37 for one
+  `"best"` quote, 1–4 calls more, a ratio of 1.03–1.14.
 - **Each one as if it had won.** A candidate is built and checked exactly as a winning quote is: the impact gate of
   `maxPriceImpactBps` on each venue's own best route, the minimum and the caller's floor, the gas bound, the module's
   own strict v4 check, the token-input simulation before any approval, the fallback to the next v4 route when the best
-  one's build is refused (at most 3). Each equals what that venue alone returns at the same block (v4 off for v3, no v3
-  deployment for v4) — checked live on Monad, Robinhood Chain, Base and Unichain.
+  one's build is refused (at most 3). Within the `v4RankedPools` provenance rule (below), each equals what that venue
+  alone returns at the same block (v4 off for v3, no v3 deployment for v4) — checked live on Monad, Robinhood Chain,
+  Base and Unichain. Where v3 has a route, the v4 candidate is the best route over ranked pools, so it can differ from
+  a v4-alone quote through a grid, extra or newer-list pool, or be missing where that is v4's only route.
 - **One venue refusing never drops the other.** A v4 read rate-limited, a v4 deployment that does not match its pins,
   every v4 simulation reverting, a wallet short of the input for the v4 simulation, the gate refusing v3's thin pool:
   the other candidate still stands. With both refused, `getQuotes` returns `[]` and `onRefusal` hears one refusal that
-  names both reasons (`"v3: …; v4: …"`), classified by the first one that says more than "no route here".
+  names both reasons (`"v3: …; v4: …"`), classified by the first one that says more than "no route here"; on a chain
+  with Uniswap v4 but no v3 (MegaETH, Arc, Elysium) there is no v3 venue, and v4's reason is the one heard. A venue
+  left out because its reads failed (`rate_limited`, `upstream_unavailable`, …) while the other venue's candidate goes
+  out is named to the operator through `onV4Warning`, with the node's reason: `onRefusal` is not called while a
+  candidate stands, and a `"best"` quote would have refused the whole request for that read. A retry may bring the row
+  back; an app that wants to say so wires `onV4Warning` (on the provider in the app, or on its server).
 - **Pool provenance as before.** The v4 candidate keeps the `v4RankedPools` rule: where v3 has a route (or may: v3's
-  reads unanswered), only the ranked pools compete — so an app on the shipped pins never receives a v4 candidate it
-  would refuse; a route through a grid, extra or newer-list pool is the v4 candidate only where v3 has no route.
+  reads unanswered), only the ranked pools compete — so there an app on the shipped pins never receives a v4 candidate
+  it would refuse. A route through a grid, extra or newer-list pool is the v4 candidate only where v3 has no route; the
+  shipped pins drop that candidate (its pool is not pinned), exactly as they drop the same route as a `"best"` quote,
+  and nothing is executed. Where v3's reads failed and the only v4 routes go through such pools, the v4 candidate (a
+  picked `"v4"` too) is refused with that read's reason, never as "no route".
 - **`getQuote` and `routeId`.** Without a `routeId`, `getQuote` returns the `"best"` winner, now naming its route
   (`"v3"` or `"v4"`), as the swap2 contract asks of a provider with `getQuotes`. With `routeId: "v3"` it quotes v3 alone
   (no v4 read at all); with `"v4"` v4 alone (v3 is read only for the provenance rule) — a picked venue is quoted or
@@ -242,6 +253,11 @@ uniswapRemoteProvider({ baseUrl: "/api/v2/swap2", multiQuotes: true })
   v4 quote, absent on a v3 one). The router ranks each candidate as its own row with the other venues (`best` /
   `fastest` tags included) and executes the one picked with `using("uniswap", routeId)`; a quote refreshed after a long
   approval keeps its route.
+- **Execute the row that was picked.** A live request without a `routeId` (`swap2(options)` with no `using`) is the
+  `"best"` pass: one quote, ranked by output as without the option. It need not be the row the router tagged `best`,
+  and it can refuse where a row was shown — for example where v3's highest-output route needs more gas than the chain
+  allows: that pass refuses on v3's gas bound while the v4 row stands. An app in `"both"` mode executes the row the
+  user (or its own policy) picked with `using("uniswap", routeId)`.
 - **Rollout.** A server sets `venueRoutes: "both"` first (once v4 is on for its apps): `/quote` answers as before, the
   winner now naming its route, so apps without `multiQuotes` keep one Uniswap row. Then apps opt in with
   `uniswapRemoteProvider({ baseUrl, multiQuotes: true })`. A `multiQuotes` app against a server without `"both"` has its
