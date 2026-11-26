@@ -2,7 +2,8 @@
  * Real 0x answers through every check the device runs (fixtures/quotes, recorded 2026-11-15 on all seven chains):
  * the provider's parser, the Settler check, the Permit2 rebuild against 0x's own hash, the engine's quote validation,
  * the remote-mode verifiers, build and preflight, and a full swap through the engine. A future change in 0x's answer
- * shape, or a check that is too strict for what 0x really sends, fails here instead of in production.
+ * shape, or a check that is too strict for what 0x really sends, fails here instead of in production. Each recording is
+ * replayed with the chain table of the pin era it was recorded in (tests/recorded.ts, fixtures/pin-eras.json).
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {getAddress} from "viem";
@@ -17,7 +18,7 @@ import {zeroExProvider} from "../src/provider.js";
 import {zeroExRemoteProvider, zeroExVerifyBuild, zeroExVerifyQuote} from "../src/remote.js";
 import {SETTLER_NATIVE_CHECK_SELECTOR, SETTLER_PERMIT_ACTIONS, checkZeroExTransaction, createSettlerResolver, decodeSettlerExecute, zeroExSettlerNonce} from "../src/settler.js";
 import {getKey} from "./fixtures.js";
-import {RECORDED, chainIdOf, loadRecorded, nativeSale, paramsOf, recordedFetch, recordedQuery, rpcOf, type RecordedQuote, type Seen} from "./recorded.js";
+import {CURRENT_PIN_ERA, PIN_ERAS, RECORDED, UNRECORDED_PIN_ERAS, chainIdOf, chainOf, chainsConfigOf, chainsOf, eraChains, eraPins, loadRecorded, nativeSale, paramsOf, recordedFetch, recordedQuery, rpcOf, type RecordedQuote, type Seen} from "./recorded.js";
 
 beforeEach(() => { vi.useFakeTimers({toFake: ["Date"]}); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -27,12 +28,12 @@ async function quoted(f: RecordedQuote, over: Partial<QuoteParams> = {}) {
   const seen: Seen[] = [];
   vi.stubGlobal("fetch", recordedFetch(f, {seen}));
   const refusals: {text: string; reason: string | undefined}[] = [];
-  const provider = zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), ...(f.request.excludedSources ? {excludedSources: f.request.excludedSources} : {})});
+  const provider = zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f), ...(f.request.excludedSources ? {excludedSources: f.request.excludedSources} : {})});
   const params = paramsOf(f, {onRefusal: (text, info) => refusals.push({text, reason: info?.reason}), ...over});
   const quote = await provider.getQuote(params);
   return {provider, params, quote, refusals, seen};
 }
-const ctxOf = (f: RecordedQuote) => ({chains: ZEROEX_CHAINS, settlers: () => [f.registry.current, ...(f.registry.prev ? [f.registry.prev] : [])], nowMs: f.request.nowMs});
+const ctxOf = (f: RecordedQuote) => ({chains: chainsOf(f), settlers: () => [f.registry.current, ...(f.registry.prev ? [f.registry.prev] : [])], nowMs: f.request.nowMs});
 
 describe("the recordings", () => {
   it("cover all seven chains, token and native sales, live quotes and indicative prices", () => {
@@ -49,6 +50,32 @@ describe("the recordings", () => {
     for (const f of RECORDED.map(loadRecorded)) {
       expect(zeroExSettlerNonce(chainIdOf(f), f.registry.current), f.name).not.toBeNull();
       if (f.registry.prev) expect(zeroExSettlerNonce(chainIdOf(f), f.registry.prev), f.name).not.toBeNull();
+    }
+  });
+  it("each names a pin era; the newest era is the chain table in force, and pins only move forward from era to era", () => {
+    for (const f of RECORDED.map(loadRecorded)) expect(PIN_ERAS, f.name).toContain(f.pinEra);
+    expect(eraChains(CURRENT_PIN_ERA)).toEqual(ZEROEX_CHAINS);
+    expect([...PIN_ERAS].sort()).toEqual(PIN_ERAS);
+    for (let i = 1; i < PIN_ERAS.length; i++) {
+      const [before, after] = [eraPins(PIN_ERAS[i - 1]!), eraPins(PIN_ERAS[i]!)];
+      for (const [id, [newest, previous]] of Object.entries(before)) {
+        const next = after[Number(id)];
+        if (!next) continue;
+        expect(next[0], `${PIN_ERAS[i]} chain ${id} newest`).toBeGreaterThanOrEqual(newest);
+        expect(next[1], `${PIN_ERAS[i]} chain ${id} previous`).toBeGreaterThanOrEqual(previous);
+      }
+    }
+  });
+  it("only the era in force may be listed as unrecorded: its recording is owed before the next pin raise", () => {
+    // An era is recordable only while 0x still quotes its Settlers and the registry still names its pins. Listing a
+    // superseded era as unrecorded would let the shipped table go without a real 0x answer for good.
+    for (const era of UNRECORDED_PIN_ERAS) expect(era, `${era} is unrecorded but no longer the era in force: record it (ZEROEX_API_KEY) before raising the pins again`).toBe(CURRENT_PIN_ERA);
+  });
+  it("every era is recorded on each of its chains, except the eras listed as unrecorded (owed: they need ZEROEX_API_KEY)", () => {
+    const all = RECORDED.map(loadRecorded);
+    expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era))).toEqual(UNRECORDED_PIN_ERAS);
+    for (const era of PIN_ERAS.filter((e) => !UNRECORDED_PIN_ERAS.includes(e))) {
+      for (const id of Object.keys(eraPins(era)).map(Number)) expect(all.some((f) => f.pinEra === era && chainIdOf(f) === id), `${era} chain ${id}`).toBe(true);
     }
   });
 });
@@ -124,10 +151,10 @@ describe.each(RECORDED)("%s", (name) => {
     expect(zeroExVerifyQuote(params, {...q, intentId: `${q.intentId}~${"a".repeat(32)}`}, ctxOf(f))).toBeNull();
     if (!live) return;
     const tx = await provider.buildDeposit(q);
-    const resolver = createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: rpcOf(f)});
+    const resolver = createSettlerResolver({chains: chainsOf(f), rpcUrls: rpcOf(f)});
     expect(await zeroExVerifyBuild(q, tx, params, {...ctxOf(f), resolver})).toBeNull();
     await expect(provider.preflightDeposit!(q, tx)).resolves.toBeUndefined();
-    checkZeroExTransaction(tx, {chainId: chainIdOf(f), settlers: ctxOf(f).settlers(), sellToken: f.request.sourceToken, buyToken: f.request.destToken, sellAmount: BigInt(f.request.amountIn), recipient: f.request.destAddress, minBuyAmount: BigInt(f.response.minBuyAmount), nowMs: f.request.nowMs});
+    checkZeroExTransaction(tx, {chainId: chainIdOf(f), chain: chainOf(f), settlers: ctxOf(f).settlers(), sellToken: f.request.sourceToken, buyToken: f.request.destToken, sellAmount: BigInt(f.request.amountIn), recipient: f.request.destAddress, minBuyAmount: BigInt(f.response.minBuyAmount), nowMs: f.request.nowMs});
   });
 
   if (live) {
@@ -160,7 +187,7 @@ describe("through the engine and the server, on real answers", () => {
     vi.stubGlobal("fetch", recordedFetch(f));
     const log = {sent: [] as {to?: string; data?: string; value?: bigint; gasLimit?: bigint}[], signed: [] as unknown[]};
     let plan: Swap2ExecutionPlan | undefined;
-    const protocol = new ZeroExSwap2Protocol(account(log) as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: rpcOf(f), reviewExecution: (p) => { plan = p; }});
+    const protocol = new ZeroExSwap2Protocol(account(log) as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f), reviewExecution: (p) => { plan = p; }});
     await protocol.swap2({fromToken: "USDC", toToken: f.request.destToken, toChain: 8453, recipient: TAKER, fromTokenAmount: BigInt(f.request.amountIn), minAmountOut: BigInt(f.response.minBuyAmount), slippageBps: 50} as never);
     expect(plan!.approvals).toEqual([expect.objectContaining({spender: getAddress(ZEROEX_PERMIT2), amount: BigInt(f.request.amountIn)})]);
     expect(log.signed).toHaveLength(1);
@@ -175,7 +202,7 @@ describe("through the engine and the server, on real answers", () => {
     vi.setSystemTime(f.request.nowMs);
     vi.stubGlobal("fetch", recordedFetch(f));
     const log = {sent: [] as {to?: string; data?: string; value?: bigint}[], signed: [] as unknown[]};
-    const protocol = new ZeroExSwap2Protocol(account(log) as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: rpcOf(f)});
+    const protocol = new ZeroExSwap2Protocol(account(log) as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)});
     await protocol.swap2({fromToken: "ETH", toToken: f.request.destToken, toChain: 8453, recipient: TAKER, fromTokenAmount: BigInt(f.request.amountIn), minAmountOut: BigInt(f.response.minBuyAmount), slippageBps: 50} as never);
     expect(log.signed).toEqual([]);
     expect(log.sent).toEqual([expect.objectContaining({to: getAddress(f.response.transaction.to), data: f.response.transaction.data, value: BigInt(f.request.amountIn)})]);
@@ -186,12 +213,12 @@ describe("through the engine and the server, on real answers", () => {
     vi.setSystemTime(f.request.nowMs);
     const upstream = recordedFetch(f);
     vi.stubGlobal("fetch", upstream);
-    const handle = createSwap2Handler<string>({providers: [zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f)})], sealSecret: "recorded-test-seal-secret-at-least-32-bytes", guard: () => {}, subject: () => "alice"});
+    const handle = createSwap2Handler<string>({providers: [zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)})], sealSecret: "recorded-test-seal-secret-at-least-32-bytes", guard: () => {}, subject: () => "alice"});
     const backend = (async (url: string, init: RequestInit) => {
       const res = await handle(String(url).split("/").pop()!, JSON.parse(String(init.body)), "user");
       return new Response(JSON.stringify(res.body), {status: res.status, headers: {"content-type": "application/json"}});
     }) as unknown as typeof fetch;
-    const app = zeroExRemoteProvider({baseUrl: "https://backend.example/api/swap2", fetchImpl: backend, rpcUrls: rpcOf(f)});
+    const app = zeroExRemoteProvider({baseUrl: "https://backend.example/api/swap2", fetchImpl: backend, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)});
     const params = paramsOf(f);
     const q = await app.getQuote(params);
     expect(q).not.toBeNull();

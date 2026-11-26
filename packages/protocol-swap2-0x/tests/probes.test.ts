@@ -1,27 +1,26 @@
 /**
  * The attacks of the independent reviews of 2026-11-15 (live acceptance with the real key, the adversarial review of
  * this module and of the core Permit2 path), each built on a REAL 0x answer from fixtures/quotes and turned into a
- * regression test. Threat model: the 0x API, the remote backend and the RPC are hostile; the device must not sign
+ * regression test (replayed with the chain table of its pin era, tests/recorded.ts). Threat model: the 0x API, the remote backend and the RPC are hostile; the device must not sign
  * anything that moves more than the input of the input token to anyone but the swap, or delivers the output elsewhere.
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 import {refusalOf} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ChainTx} from "@anywalletkit/core";
-import {ZEROEX_CHAINS} from "../src/chains.js";
 import {describeZeroExActivity} from "../src/activity.js";
 import {ZeroExSwap2Protocol} from "../src/protocol.js";
 import {zeroExProvider} from "../src/provider.js";
 import {zeroExRemoteProvider, zeroExVerifyQuote} from "../src/remote.js";
 import {checkZeroExTransaction, createSettlerResolver, decodeSettlerExecute, zeroExSettlerAddress, zeroExSettlerNonce} from "../src/settler.js";
 import {executeData, getKey, transferFromAction, uniswapV3VipAction, word, type Permit} from "./fixtures.js";
-import {bodyOf, chainIdOf, loadRecorded, paramsOf, recordedFetch, rpcOf, type RecordedQuote} from "./recorded.js";
+import {bodyOf, chainIdOf, chainOf, chainsConfigOf, chainsOf, loadRecorded, paramsOf, recordedFetch, rpcOf, type RecordedQuote} from "./recorded.js";
 
 beforeEach(() => { vi.useFakeTimers({toFake: ["Date"]}); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 const ATTACKER = "0x5555555555555555555555555555555555555555";
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const ctxOf = (f: RecordedQuote) => ({chains: ZEROEX_CHAINS, settlers: () => [f.registry.current, ...(f.registry.prev ? [f.registry.prev] : [])], nowMs: f.request.nowMs});
+const ctxOf = (f: RecordedQuote) => ({chains: chainsOf(f), settlers: () => [f.registry.current, ...(f.registry.prev ? [f.registry.prev] : [])], nowMs: f.request.nowMs});
 
 /** The raw bytes (hex, no 0x) of each action of a Settler call, in order. */
 function actionsOf(data: string): string[] {
@@ -54,7 +53,7 @@ describe("probe 1: a native-coin sale spends an earlier, unspent Permit2 signatu
       const data = withFirstAction(f, first, 0xffff);
       // remote mode: the backend's quote, held to the request on the device
       vi.stubGlobal("fetch", recordedFetch(f));
-      const honest = await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f)}).getQuote(paramsOf(f));
+      const honest = await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)}).getQuote(paramsOf(f));
       const forged = {...honest!, txRequest: {...honest!.txRequest!, data}};
       expect(zeroExVerifyQuote(paramsOf(f), forged, ctxOf(f))).toMatch(/^the swap's first action 0x[0-9a-f]{8} is not the native-value check a native-coin sale opens with$/);
       // local mode: the API's answer
@@ -62,13 +61,13 @@ describe("probe 1: a native-coin sale spends an earlier, unspent Permit2 signatu
       body.transaction.data = data;
       vi.stubGlobal("fetch", recordedFetch(f, {body}));
       const heard: {text: string; reason?: string}[] = [];
-      expect(await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f)}).getQuote(paramsOf(f, {onRefusal: (text, info) => heard.push({text, ...(info ? {reason: info.reason} : {})})}))).toBeNull();
+      expect(await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)}).getQuote(paramsOf(f, {onRefusal: (text, info) => heard.push({text, ...(info ? {reason: info.reason} : {})})}))).toBeNull();
       expect(heard).toEqual([{text: expect.stringMatching(/is not the native-value check a native-coin sale opens with$/), reason: "policy_refused"}]);
     });
   }
   it("the honest recorded native sale (NATIVE_CHECK first) passes", () => {
     const e = decodeSettlerExecute(f.response.transaction.data);
-    expect(() => checkZeroExTransaction({to: f.response.transaction.to, data: f.response.transaction.data, value: f.response.transaction.value, chainId: 8453}, {chainId: 8453, settlers: ctxOf(f).settlers(), sellToken: "0x0000000000000000000000000000000000000000", buyToken: USDC, sellAmount: BigInt(f.request.amountIn), recipient: e.recipient, minBuyAmount: e.minAmountOut, nowMs: f.request.nowMs})).not.toThrow();
+    expect(() => checkZeroExTransaction({to: f.response.transaction.to, data: f.response.transaction.data, value: f.response.transaction.value, chainId: 8453}, {chainId: 8453, chain: chainOf(f), settlers: ctxOf(f).settlers(), sellToken: "0x0000000000000000000000000000000000000000", buyToken: USDC, sellAmount: BigInt(f.request.amountIn), recipient: e.recipient, minBuyAmount: e.minAmountOut, nowMs: f.request.nowMs})).not.toThrow();
   });
 });
 
@@ -86,7 +85,7 @@ describe("probe 2: a quoted gas limit far below what the signed call needs (an o
       quoteSendTransaction: async () => ({fee: 1n}), waitForTransaction: async () => {}, signTypedData: async () => `0x${"ab".repeat(65)}`,
       sendTransaction: async (t: {to?: string; gasLimit?: bigint}) => { sent.push(t); return {hash: `0x${"1".repeat(64)}`}; },
     };
-    await new ZeroExSwap2Protocol(account as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: rpcOf(f)})
+    await new ZeroExSwap2Protocol(account as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)})
       .swap2({fromToken: "USDC", toToken: f.request.destToken, toChain: 8453, recipient: TAKER, fromTokenAmount: BigInt(f.request.amountIn), minAmountOut: BigInt(f.response.minBuyAmount), slippageBps: 50} as never);
     expect(sent.at(-1)!.to!.toLowerCase()).toBe(f.response.transaction.to.toLowerCase());
     expect(sent.at(-1)!.gasLimit).toBeUndefined();
@@ -110,7 +109,7 @@ describe("probe 3: an RPC (in the backend's trust domain) names the attacker as 
     const seen: {url: string; method: string}[] = [];
     vi.stubGlobal("fetch", recordedFetch(f, {body: forge(), registry: {current: ATTACKER, prev: null}, seen}));
     const heard: {text: string; reason?: string}[] = [];
-    expect(await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f)}).getQuote(paramsOf(f, {onRefusal: (text, info) => heard.push({text, ...(info ? {reason: info.reason} : {})})}))).toBeNull();
+    expect(await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)}).getQuote(paramsOf(f, {onRefusal: (text, info) => heard.push({text, ...(info ? {reason: info.reason} : {})})}))).toBeNull();
     expect(heard).toEqual([{text: `zeroex: the RPC on chain 8453 names ${ATTACKER} as the 0x Settler, which is not an address the 0x registry deploys Settlers to`, reason: "vault_mismatch"}]);
     expect(seen.filter((s) => s.method === "GET")).toEqual([]);
   });
@@ -118,7 +117,7 @@ describe("probe 3: an RPC (in the backend's trust domain) names the attacker as 
     vi.setSystemTime(f.request.nowMs);
     vi.stubGlobal("fetch", recordedFetch(f, {registry: {current: ATTACKER, prev: null}}));
     const backend = vi.fn(async () => new Response("{}")) as unknown as typeof fetch;
-    const app = zeroExRemoteProvider({baseUrl: "https://backend.example/api/swap2", fetchImpl: backend, rpcUrls: rpcOf(f)});
+    const app = zeroExRemoteProvider({baseUrl: "https://backend.example/api/swap2", fetchImpl: backend, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)});
     const err = await app.getQuote(paramsOf(f)).catch((e: unknown) => e);
     expect((err as Error).message).toMatch(/is not an address the 0x registry deploys Settlers to/);
     expect(refusalOf(err)?.reason).toBe("vault_mismatch");
@@ -126,7 +125,7 @@ describe("probe 3: an RPC (in the backend's trust domain) names the attacker as 
   });
   it("a previous Settler that is not a 0x deployment is dropped; the current one alone stands", async () => {
     vi.stubGlobal("fetch", recordedFetch(f, {registry: {current: f.registry.current, prev: ATTACKER}}));
-    expect(await createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: rpcOf(f)}).resolve(8453)).toEqual([f.registry.current]);
+    expect(await createSettlerResolver({chains: chainsOf(f), rpcUrls: rpcOf(f)}).resolve(8453)).toEqual([f.registry.current]);
   });
   it("every real Settler of the recordings is a registry deployment; an EOA or another contract never is", () => {
     expect(zeroExSettlerAddress(8453, 22)).toBe(f.registry.current);
@@ -141,7 +140,7 @@ describe("probe 4: a permit valid for longer than 0x ever asks (inside the core 
     const f = loadRecorded("base-usdc-eth");
     vi.setSystemTime(f.request.nowMs);
     vi.stubGlobal("fetch", recordedFetch(f));
-    const honest = await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f)}).getQuote(paramsOf(f));
+    const honest = await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)}).getQuote(paramsOf(f));
     const permit = JSON.parse(honest!.txRequest!.permit2Transfer!);
     permit.message.deadline = String(Math.floor(f.request.nowMs / 1000) + 3000);
     expect(zeroExVerifyQuote(paramsOf(f), {...honest!, txRequest: {...honest!.txRequest!, permit2Transfer: JSON.stringify(permit)}}, ctxOf(f))).toBe("the Permit2 deadline is more than 600 s away");
@@ -155,7 +154,7 @@ describe("probe 5: the API key and redirects", () => {
     const inits: RequestInit[] = [];
     const inner = recordedFetch(f);
     vi.stubGlobal("fetch", vi.fn(async (u: string, init: RequestInit) => { inits.push(init); return (inner as (u: string, i: RequestInit) => Promise<Response>)(u, init); }));
-    expect(await zeroExProvider({apiKey: getKey}).getQuote(paramsOf(f))).not.toBeNull();
+    expect(await zeroExProvider({apiKey: getKey, chains: chainsConfigOf(f)}).getQuote(paramsOf(f))).not.toBeNull();
     expect(inits[0]!.redirect).toBe("error");
   });
 });
