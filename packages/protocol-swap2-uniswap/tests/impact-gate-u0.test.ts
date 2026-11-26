@@ -98,7 +98,7 @@ describe("maxPriceImpactBps set: refused at or above the limit, the best route o
     expect(at.q).toBeNull();
     expect(at.heard).toEqual([[LOSES("5.0", "5"), {reason: "insufficient_liquidity"}]]);
     const under = await quote(stub({impactBps: 499}), {maxPriceImpactBps: 500});
-    expect(under.q).toMatchObject({destAmount: "950100", providerData: {priceImpactBps: "499", valueLossBps: "498"}});
+    expect(under.q).toMatchObject({destAmount: "950100", providerData: {priceImpactBps: "499", valueLossBps: "499"}});
     const top = await quote(stub({impactBps: 9999}), {maxPriceImpactBps: 10_000});
     expect(top.q).toMatchObject({providerData: {priceImpactBps: "9999"}});
     const quarter = await quote(stub({impactBps: 260}), {maxPriceImpactBps: 250});
@@ -107,7 +107,7 @@ describe("maxPriceImpactBps set: refused at or above the limit, the best route o
 
   it("a passing quote keeps priceImpactBps (the probe, fees excluded) and adds valueLossBps (spot, fees included)", async () => {
     const {q} = await quote(stub({impactBps: 4300}), {maxPriceImpactBps: 5000});
-    expect(q).toMatchObject({destAmount: "570000", providerData: {priceImpactBps: "4300", valueLossBps: "4299"}});
+    expect(q).toMatchObject({destAmount: "570000", providerData: {priceImpactBps: "4300", valueLossBps: "4300"}});
   });
 
   it("G is the larger measure: spot catches a loss the probe does not see (a pool parked past an empty range)", async () => {
@@ -132,12 +132,24 @@ describe("maxPriceImpactBps set: refused at or above the limit, the best route o
     const s = stub({byFee: {}, multiHop: 1_000_000n, slot0: {100: MID_4}});
     const {q, heard} = await quote(s, {maxPriceImpactBps: 500});
     expect(q).toBeNull();
-    // Both hops' mids are 4: the path's mid rate is 16, so 1:1 loses 93.75% (rounded down to 9374 bps).
-    expect(heard[0]![0]).toBe(LOSES("93.7", "5", "via WETH 0.01% → 0.01%"));
+    // Both hops' mids are 4: the path's mid rate is 16, so 1:1 loses 93.75% (9375 bps).
+    expect(heard[0]![0]).toBe(LOSES("93.8", "5", "via WETH 0.01% → 0.01%"));
     const pools = s.calls().filter(isGetPool).map((c) => (c.params[0] as {data: string}).data);
     expect(pools).toHaveLength(2);
     const flat = await quote(stub({byFee: {}, multiHop: 1_000_000n}), {maxPriceImpactBps: 500});
     expect(flat.q).toMatchObject({providerData: {priceImpactBps: "0", valueLossBps: "0"}});
+  });
+
+  it("U0-R2-SEC-5: a dust trade too small to probe is gated on what the recipient gets (3 raw units in, 2 out)", async () => {
+    // amountIn 3 has no probe (3 / 1000 = 0), so spot alone decides; reading the output as `out + hops` passed it at 0.
+    const dust = {byFee: {500: 666_667n}}; // pays 2 for 3 at a mid of 1
+    const {q, heard} = await quote(stub(dust), {maxPriceImpactBps: 500}, {amountIn: "3"});
+    expect(q).toBeNull();
+    expect(heard).toEqual([[LOSES("33.3", "5"), {reason: "insufficient_liquidity"}]]);
+    // Unset, the same trade is quoted as 0.4.11 quoted it (no probe, no figure).
+    const unset = await quote(stub(dust), {}, {amountIn: "3"});
+    expect(unset.q).toMatchObject({destAmount: "2", minDestAmount: "1"});
+    expect(unset.q!.providerData!.priceImpactBps).toBeUndefined();
   });
 
   it("every read of the quote is at one block (eth_blockNumber once); the deployment check stays at latest", async () => {
@@ -290,7 +302,7 @@ describe("maxPriceImpactBps set: nothing measurable is a refusal (fail closed)",
     expect(refused.heard).toEqual([[LOSES("7.0", "5"), {reason: "insufficient_liquidity"}]]);
     // A transient error on the mid prices is asked again and measured.
     const again = await quote(stub({impactBps: 100}, (r, seen) => (isSlot0(r) && seen === 0 ? limited : undefined)), {maxPriceImpactBps: 500});
-    expect(again.q).toMatchObject({providerData: {priceImpactBps: "100", valueLossBps: "99"}});
+    expect(again.q).toMatchObject({providerData: {priceImpactBps: "100", valueLossBps: "100"}});
   });
 
   it("hostile spot answers on a pool parked past an empty range (U0-SEC-1): never a pass on the probe alone", async () => {

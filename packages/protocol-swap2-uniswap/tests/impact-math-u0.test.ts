@@ -16,16 +16,28 @@ describe("spot value loss (fees included)", () => {
   it("prices token1 per token0 and inverts for a hop that sells token1", () => {
     // mid 4 token1 per token0: 1 LO (token0) is worth 4 HI; 1 HI is worth 0.25 LO.
     const p = 2n * Q96;
-    expect(spotValueLossBps([{tokenIn: LO, tokenOut: HI, fee: 500}], [p], 1_000_000n, 3_000_000n)).toBe(2499); // 25% lost
-    expect(spotValueLossBps([{tokenIn: HI, tokenOut: LO, fee: 500}], [p], 1_000_000n, 200_000n)).toBe(1999); // 20% lost
+    expect(spotValueLossBps([{tokenIn: LO, tokenOut: HI, fee: 500}], [p], 1_000_000n, 3_000_000n)).toBe(2500); // 25% lost
+    expect(spotValueLossBps([{tokenIn: HI, tokenOut: LO, fee: 500}], [p], 1_000_000n, 200_000n)).toBe(2000); // 20% lost
     expect(spotValueLossBps([{tokenIn: HI, tokenOut: LO, fee: 500}], [p], 1_000_000n, 250_000n)).toBe(0); // at the mid
   });
 
-  it("chains two hops as a product, and counts out + hops so rounding never adds a loss", () => {
+  it("chains two hops as a product; the exact shortfall, rounded down to a whole bp", () => {
     const hops = [{tokenIn: LO, tokenOut: MID, fee: 100}, {tokenIn: MID, tokenOut: HI, fee: 100}];
-    expect(spotValueLossBps(hops, [2n * Q96, 2n * Q96], 1_000_000n, 1_000_000n)).toBe(9374); // mid 16: 93.75%, rounded down
-    expect(spotValueLossBps(hops, [Q96, Q96], 1_000_000n, 999_998n)).toBe(0); // 2 units short of the mid: rounding, not loss
-    expect(spotValueLossBps(hops, [Q96, Q96], 1_000_000n, 999_000n)).toBe(9);
+    expect(spotValueLossBps(hops, [2n * Q96, 2n * Q96], 1_000_000n, 1_000_000n)).toBe(9375); // mid 16: 93.75%
+    expect(spotValueLossBps(hops, [Q96, Q96], 1_000_000n, 999_998n)).toBe(0); // 0.0002% short of the mid: under 1 bp
+    expect(spotValueLossBps(hops, [Q96, Q96], 1_000_000n, 999_000n)).toBe(10); // 0.1%
+    expect(spotValueLossBps(hops, [Q96, Q96], 1_000_000n, 999_899n)).toBe(1); // 1.01 bp
+  });
+
+  it("U0-R2-SEC-5: floor rounding counts as loss — a dust output is not read as a fair trade", () => {
+    // 3 raw units in, 2 out at a mid of 1: the recipient gets a third less. With `out + hops` taken as the output this
+    // read 0, and a 0–2-decimal token's dust trade passed any limit with no probe to catch it.
+    const h = [{tokenIn: LO, tokenOut: HI, fee: 500}];
+    expect(spotValueLossBps(h, [Q96], 3n, 2n)).toBe(3333);
+    expect(spotValueLossBps(h, [Q96], 3n, 3n)).toBe(0);
+    expect(spotValueLossBps(h, [Q96], 999n, 998n)).toBe(10);
+    // Two hops: the intermediate hop's rounding is in the output the recipient gets, so it counts too.
+    expect(spotValueLossBps([{tokenIn: LO, tokenOut: MID, fee: 100}, {tokenIn: MID, tokenOut: HI, fee: 100}], [Q96, Q96], 5n, 3n)).toBe(4000);
   });
 
   it("is undefined for a price outside (0, 2^160) or mismatched lengths; above the mid is 0", () => {

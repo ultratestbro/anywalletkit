@@ -44,9 +44,10 @@ const SQRT_PRICE_MAX = 1n << 160n;
 /**
  * Spot value loss, fees included ("gross"): how much less than the pools' mid prices the route pays, in bps, 0..10000.
  * `sqrtPrices[i]` is hop i's `slot0().sqrtPriceX96` (token1 per token0, Q64.96). The mid output is
- * `amountIn × Π rate_i`, with rate = sqrtP² / 2¹⁹² when the hop sells token0, its inverse otherwise. The output is taken
- * as `out + hops` so that floor rounding in the pools can never add to the loss; the ratio is rounded up for the same
- * reason. Undefined when a price is outside (0, 2¹⁶⁰) or the counts do not match.
+ * `amountIn × Π rate_i`, with rate = sqrtP² / 2¹⁹² when the hop sells token0, its inverse otherwise. The loss is the
+ * output's exact shortfall against it, rounded down to a whole bp (so `loss ≥ limit` holds exactly when the true loss
+ * reaches the limit). Floor rounding in the pools counts: it is value the recipient does not get, and on a dust output
+ * (3 raw units in, 2 out) it is most of the loss. Undefined when a price is outside (0, 2¹⁶⁰) or the counts do not match.
  */
 export function spotValueLossBps(hops: readonly Hop[], sqrtPrices: readonly bigint[], amountIn: bigint, out: bigint): number | undefined {
   if (hops.length === 0 || hops.length !== sqrtPrices.length || amountIn <= 0n || out < 0n) return undefined;
@@ -65,9 +66,9 @@ export function spotValueLossBps(hops: readonly Hop[], sqrtPrices: readonly bigi
       den *= sq;
     }
   }
-  const paid = (out + BigInt(hops.length)) * den * 10_000n;
+  const paid = out * den * 10_000n;
   const mid = amountIn * num;
-  const ratio = (paid + mid - 1n) / mid; // ⌈(out + hops) / (amountIn × rate)⌉, in bps
+  const ratio = (paid + mid - 1n) / mid; // ⌈out / (amountIn × rate)⌉, in bps
   return ratio >= 10_000n ? 0 : bigintToNumber(10_000n - ratio);
 }
 
@@ -87,11 +88,46 @@ export function impactRefusalText(lossBps: number, limitBps: number, routeLabel:
 }
 
 /**
- * Per-transaction gas-limit caps that are lower than a block: Ethereum's EIP-7825 (2²⁴, since Fusaka) and Monad's 30M
- * ("Transaction gas limit 30M gas", docs.monad.xyz). A transaction's gasLimit above them is invalid, so a padded limit
- * is clamped to them. Elsewhere the block gas limit, read on chain, is the cap.
+ * Per-transaction gas-limit caps that are lower than a block: a transaction's gasLimit above them is invalid (the node
+ * refuses it), so a padded limit is clamped to them and a need above them refused.
+ * - 2²⁴ = 16,777,216 (EIP-7825): Ethereum since Fusaka; OP Mainnet, BNB Chain, Unichain, World Chain, Base, Ink and
+ *   Linea also enforce it.
+ * - 2²⁵ = 33,554,432: Polygon PoS.
+ * - 30M: Monad ("Transaction gas limit 30M gas", docs.monad.xyz).
+ * The 2²⁴ and 2²⁵ caps were read live, read-only, on 2026-11-26 (scripts/verify-live.mjs): `eth_estimateGas` of an
+ * endless loop (a code override) reports the allowance a transaction can have — "gas required exceeds allowance
+ * (16777216)" — against block gas limits of 40M–2B, while the same nodes' `eth_call` runs 100M (so not an RPC gas cap).
+ * Elsewhere the block gas limit, read on chain, is the cap (less KNOWN_BLOCK_GAS_RESERVE).
  */
-export const KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = Object.freeze({1: 16_777_216n, 143: 30_000_000n});
+export const KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = Object.freeze({
+  1: 16_777_216n,
+  10: 16_777_216n,
+  56: 16_777_216n,
+  130: 16_777_216n,
+  480: 16_777_216n,
+  8453: 16_777_216n,
+  57073: 16_777_216n,
+  59144: 16_777_216n,
+  137: 33_554_432n,
+  143: 30_000_000n,
+});
+
+/**
+ * Gas every block spends before any user transaction, kept below the block gas limit when that limit is the cap: on
+ * OP-stack chains each block opens with the L1-info deposit (type 0x7e, gasLimit 1,000,000, about 46k used), so a
+ * transaction whose gasLimit is the whole block never fits what is left and is never included — it waits in the pool
+ * and holds the account's later nonces. Read live on 2026-11-26 on every chain listed (the latest block's first
+ * transaction); it binds where no per-transaction cap is lower: Celo (30M block) and X Layer.
+ */
+export const KNOWN_BLOCK_GAS_RESERVE: Readonly<Record<number, bigint>> = Object.freeze({
+  10: 1_000_000n,
+  130: 1_000_000n,
+  196: 1_000_000n,
+  480: 1_000_000n,
+  8453: 1_000_000n,
+  42220: 1_000_000n,
+  57073: 1_000_000n,
+});
 
 /**
  * Arbitrum Nitro chains: the most gas one transaction can spend on execution. Their block header carries a 2⁵⁰
@@ -105,7 +141,7 @@ export const KNOWN_EXECUTION_GAS_CAP: Readonly<Record<number, bigint>> = Object.
 
 /** What bounds one transaction's gas on a chain: its gasLimit (`limit`, clamped to) and the gas execution may use (refused above). */
 export interface GasBounds {
-  /** min(the chain's per-transaction gas-limit cap, its block gas limit). */
+  /** min(the chain's per-transaction gas-limit cap, its block gas limit less the block's own reserve). */
   limit?: bigint;
   /** The most gas one transaction's execution may use, when that is not its gasLimit (Arbitrum Nitro). */
   execution?: bigint;
@@ -116,7 +152,9 @@ const own = (table: Readonly<Record<number, bigint>>, chainId: number) => (Objec
 /** The chain's gas bounds from the known caps and its block gas limit (undefined: the node did not say). */
 export function gasBoundsOf(chainId: number, blockGasLimit: bigint | undefined): GasBounds {
   const known = own(KNOWN_TX_GAS_CAP, chainId);
-  const limit = known === undefined ? blockGasLimit : blockGasLimit === undefined || known < blockGasLimit ? known : blockGasLimit;
+  const reserve = own(KNOWN_BLOCK_GAS_RESERVE, chainId) ?? 0n;
+  const block = blockGasLimit === undefined ? undefined : blockGasLimit > reserve ? blockGasLimit - reserve : 0n;
+  const limit = known === undefined ? block : block === undefined || known < block ? known : block;
   const execution = own(KNOWN_EXECUTION_GAS_CAP, chainId);
   return {...(limit !== undefined ? {limit} : {}), ...(execution !== undefined ? {execution} : {})};
 }

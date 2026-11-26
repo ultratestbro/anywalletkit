@@ -8,10 +8,16 @@
 // quoter gas 16,359,404 (bare need 16,479,404) was clamped to 16,777,216 and the built transaction needed 16,825,998
 // — mined, out of gas, paid for. The block gas limit is read on its own, optional, and re-read after 10 minutes
 // (U0-R1-2, U0-SEC-3, U0-LIVE-3): a node that does not serve it no longer fails every quote on the chain.
+//
+// Round 2: eight more chains cap one transaction below their block (U0-R2-LIVE-1): 2^24 on OP Mainnet, BNB Chain,
+// Unichain, World Chain, Base, Ink and Linea, 2^25 on Polygon — read live (scripts/verify-live.mjs), and 0.4.12 still
+// emitted Base 17.0M / Linea 17.5M limits those nodes refuse. OP-stack blocks open with a 1M-gas L1-info deposit, so a
+// limit of the whole block is never included (U0-R2-LIVE-2: Celo clamped to exactly 30,000,000). And a block read that
+// hangs no longer holds the quote (U0-R2-2).
 import {afterEach, describe, expect, it, vi} from "vitest";
 import type {Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import {uniswapProvider} from "../src/provider.js";
-import {GAS_NEED_PCT, KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, gasNeedOf} from "../src/impact.js";
+import {GAS_NEED_PCT, KNOWN_BLOCK_GAS_RESERVE, KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, gasNeedOf} from "../src/impact.js";
 import {D, ME, USDC, USDT, rpcStub, type StubOptions} from "./fixtures.js";
 
 afterEach(() => {
@@ -49,15 +55,28 @@ function blockRead(o: StubOptions, answer: object | {http: number} | undefined, 
 }
 
 describe("gas validity (always on)", () => {
-  it("the bounds: Ethereum 2^24 (EIP-7825), Monad 30M, the block's own limit; Nitro's 32M execution cap is never clamped to", () => {
-    expect(KNOWN_TX_GAS_CAP).toEqual({1: 16_777_216n, 143: 30_000_000n});
+  it("the bounds: 2^24 (EIP-7825) on eight chains, Polygon 2^25, Monad 30M, the block's own limit less its reserve; Nitro's 32M execution cap is never clamped to", () => {
+    const P24 = 16_777_216n;
+    expect(KNOWN_TX_GAS_CAP).toEqual({1: P24, 10: P24, 56: P24, 130: P24, 480: P24, 8453: P24, 57073: P24, 59144: P24, 137: 33_554_432n, 143: 30_000_000n});
+    expect(KNOWN_BLOCK_GAS_RESERVE).toEqual({10: 1_000_000n, 130: 1_000_000n, 196: 1_000_000n, 480: 1_000_000n, 8453: 1_000_000n, 42220: 1_000_000n, 57073: 1_000_000n});
     expect(KNOWN_EXECUTION_GAS_CAP).toEqual({42161: 32_000_000n, 4663: 32_000_000n});
-    expect(gasBoundsOf(1, 60_000_000n)).toEqual({limit: 16_777_216n});
+    expect(gasBoundsOf(1, 60_000_000n)).toEqual({limit: P24});
     expect(gasBoundsOf(1, 10_000_000n)).toEqual({limit: 10_000_000n});
     expect(gasBoundsOf(143, 150_000_000n)).toEqual({limit: 30_000_000n});
-    expect(gasBoundsOf(42220, 30_000_000n)).toEqual({limit: 30_000_000n});
-    expect(gasBoundsOf(8453, undefined)).toEqual({});
-    expect(gasBoundsOf(1, undefined)).toEqual({limit: 16_777_216n});
+    // OP-stack: the block less its 1M L1-info deposit where no lower cap binds (Celo, X Layer); the cap where it does.
+    expect(gasBoundsOf(42220, 30_000_000n)).toEqual({limit: 29_000_000n});
+    expect(gasBoundsOf(196, 210_000_000n)).toEqual({limit: 209_000_000n});
+    expect(gasBoundsOf(57073, 30_000_000n)).toEqual({limit: P24});
+    expect(gasBoundsOf(57073, 10_000_000n)).toEqual({limit: 9_000_000n});
+    expect(gasBoundsOf(42220, 500_000n)).toEqual({limit: 0n}); // a block that holds less than its own deposit: nothing fits
+    expect(gasBoundsOf(42220, undefined)).toEqual({});
+    for (const id of [10, 56, 130, 480, 8453, 57073, 59144]) expect([id, gasBoundsOf(id, undefined)]).toEqual([id, {limit: P24}]);
+    expect(gasBoundsOf(8453, 40_000_000n)).toEqual({limit: P24});
+    expect(gasBoundsOf(59144, 2_000_000_000n)).toEqual({limit: P24});
+    expect(gasBoundsOf(137, 160_000_000n)).toEqual({limit: 33_554_432n});
+    expect(gasBoundsOf(43114, undefined)).toEqual({}); // Avalanche: no known cap (its nodes' 50M allowance is an RPC gas cap)
+    expect(gasBoundsOf(43114, 80_000_000n)).toEqual({limit: 80_000_000n});
+    expect(gasBoundsOf(1, undefined)).toEqual({limit: P24});
     expect(gasBoundsOf(42161, 1n << 50n)).toEqual({limit: 1n << 50n, execution: 32_000_000n});
     expect(gasBoundsOf(4663, undefined)).toEqual({execution: 32_000_000n});
     expect(gasBoundsOf(324, 1n << 50n)).toEqual({limit: 1n << 50n}); // zkSync: its per-transaction limit is an open question
@@ -77,7 +96,7 @@ describe("gas validity (always on)", () => {
     for (const config of [{}, {maxPriceImpactBps: 500}, {maxPriceImpactBps: 10_000}]) {
       const {q, heard} = await quote(42220, {quoterGas: 39_400_000n, blockGasLimit: 30_000_000n}, {}, config);
       expect(q).toBeNull();
-      expect(heard).toEqual([[NEEDS(41_496_000n, 42220, 30_000_000n), {reason: "insufficient_liquidity"}]]); // 39.52M + 5%
+      expect(heard).toEqual([[NEEDS(41_496_000n, 42220, 29_000_000n), {reason: "insufficient_liquidity"}]]); // 39.52M + 5%
     }
   });
 
@@ -85,7 +104,59 @@ describe("gas validity (always on)", () => {
     // 12,450 USDC → CELO was clamped to 30,000,000 and needed 30,396,880.
     const {q, heard} = await quote(42220, {quoterGas: 28_900_000n, blockGasLimit: 30_000_000n});
     expect(q).toBeNull();
-    expect(heard).toEqual([[NEEDS(30_471_000n, 42220, 30_000_000n), {reason: "insufficient_liquidity"}]]);
+    expect(heard).toEqual([[NEEDS(30_471_000n, 42220, 29_000_000n), {reason: "insufficient_liquidity"}]]);
+  });
+
+  it("Celo (live, U0-R2-LIVE-2): clamped below the block, never to all of it — every block opens with a 1M-gas deposit", async () => {
+    // 12,300 USDC → CELO: 0.4.11 sent 35,681,454; round 1 clamped to exactly 30,000,000 (need 25.02M), which never fits
+    // what the block's L1-info deposit leaves (29,953,830 in block 83,766,668): pending forever, the later nonces held.
+    const thin = await quote(42220, {quoterGas: 23_708_000n, blockGasLimit: 30_000_000n}); // need 25,019,400; padded 35.68M
+    expect(thin.heard).toEqual([]);
+    expect(thin.q!.txRequest!.gasLimit).toBe("29000000");
+    expect(BigInt(thin.q!.txRequest!.gasLimit!)).toBeLessThan(30_000_000n - 46_170n);
+    // 12,400 USDC: need 28.71M, under the 29M bound: clamped to it, never below the need.
+    const tight = await quote(42220, {quoterGas: 27_224_000n, blockGasLimit: 30_000_000n}); // need 28,711,800
+    expect(tight.q!.txRequest!.gasLimit).toBe("29000000");
+    // A need between the block less its deposit and the block is refused: it fits no block.
+    for (const gas of [27_500_000n, 28_000_000n, 28_450_000n]) {
+      const {q, heard} = await quote(42220, {quoterGas: gas, blockGasLimit: 30_000_000n});
+      expect(q).toBeNull();
+      expect(heard).toEqual([[NEEDS(((gas + 120_000n) * 105n + 99n) / 100n, 42220, 29_000_000n), {reason: "insufficient_liquidity"}]]);
+    }
+    // X Layer (OP-stack, 210M block): the same reserve.
+    const xlayer = await quote(196, {quoterGas: 200_000_000n, blockGasLimit: 210_000_000n});
+    expect(xlayer.heard[0]![0]).toBe(NEEDS(210_126_000n, 196, 209_000_000n));
+  });
+
+  it("Base and Linea (live, U0-R2-LIVE-1): limits over 2^24 are clamped to it — 0.4.12 round 1 emitted ones the nodes refuse", async () => {
+    // Base USDC → crvUSD 50,019.96 USDC: 16,988,323; Linea USDC → USDT 50,000 USDC: 17,519,959 (needs 11.9M–12.2M; the
+    // built transactions ran at the bare need + 5%). Each block holds far more (40M, 2B): only the 2^24 cap refuses them.
+    const cases: Array<[number, bigint, bigint, string]> = [
+      [8453, 11_245_549n, 40_000_000n, "16988323"],
+      [59144, 11_599_973n, 2_000_000_000n, "17519959"],
+    ];
+    for (const [chainId, gas, block, before] of cases) {
+      expect(((gas * 3n) / 2n + 120_000n).toString()).toBe(before); // what was emitted
+      const {q, heard} = await quote(chainId, {quoterGas: gas, blockGasLimit: block});
+      expect(heard).toEqual([]);
+      expect(q!.txRequest!.gasLimit).toBe("16777216");
+      const over = await quote(chainId, {quoterGas: 16_700_000n, blockGasLimit: block});
+      expect(over.heard).toEqual([[NEEDS(17_661_000n, chainId, 16_777_216n), {reason: "insufficient_liquidity"}]]);
+    }
+    // OP Mainnet, BNB Chain, Unichain, World Chain, Ink: the same cap.
+    for (const chainId of [10, 56, 130, 480, 57073]) {
+      const {q} = await quote(chainId, {quoterGas: 11_245_549n, blockGasLimit: 280_000_000n});
+      expect([chainId, q!.txRequest!.gasLimit]).toEqual([chainId, "16777216"]);
+    }
+  });
+
+  it("Polygon (live, U0-R2-LIVE-1): 2^25 per transaction against a 160M block", async () => {
+    const under = await quote(137, {quoterGas: 22_000_000n, blockGasLimit: 160_000_000n}); // padded 33.12M
+    expect(under.q!.txRequest!.gasLimit).toBe("33120000");
+    const clamp = await quote(137, {quoterGas: 22_500_000n, blockGasLimit: 160_000_000n}); // padded 33.87M
+    expect(clamp.q!.txRequest!.gasLimit).toBe("33554432");
+    const over = await quote(137, {quoterGas: 32_000_000n, blockGasLimit: 160_000_000n});
+    expect(over.heard).toEqual([[NEEDS(33_726_000n, 137, 33_554_432n), {reason: "insufficient_liquidity"}]]);
   });
 
   it("Ethereum: a need under 2^24 whose padded limit is over it is clamped to 16,777,216 (also in the built tx)", async () => {
@@ -165,7 +236,7 @@ describe("gas validity (always on)", () => {
   it("a block below the known cap caps lower; a block without a gasLimit leaves only the known cap", async () => {
     const low = await quote(1, {quoterGas: 9_000_000n, blockGasLimit: 10_000_000n});
     expect(low.q!.txRequest!.gasLimit).toBe("10000000");
-    const none = await quote(8453, {quoterGas: 50_000_000n, blockGasLimit: null}); // no known cap, no block limit: as 0.4.11
+    const none = await quote(43114, {quoterGas: 50_000_000n, blockGasLimit: null}); // no known cap, no block limit: as 0.4.11
     expect(none.q!.txRequest!.gasLimit).toBe("75120000");
     const known = await quote(1, {quoterGas: 12_000_000n, blockGasLimit: null});
     expect(known.q!.txRequest!.gasLimit).toBe("16777216");
@@ -199,10 +270,49 @@ describe("gas validity (always on)", () => {
         const big = await quote(1, blockRead({quoterGas: 12_000_000n}, answer), {}, config);
         expect(big.q!.txRequest!.gasLimit).toBe("16777216");
         // ...and a chain with no known cap quotes as 0.4.11 did.
-        const base = await quote(8453, blockRead({quoterGas: 50_000_000n}, answer), {}, config);
-        expect(base.q!.txRequest!.gasLimit).toBe("75120000");
+        const avalanche = await quote(43114, blockRead({quoterGas: 50_000_000n}, answer), {}, config);
+        expect(avalanche.q!.txRequest!.gasLimit).toBe("75120000");
       }
     }
+  });
+
+  it("U0-R2-2: a block read that hangs holds no quote — 1.5 s after it began at most, never past the caller's abort; the known caps meanwhile, the cache filled when it lands", async () => {
+    let land!: (gasLimit: bigint) => void;
+    const landed = new Promise<bigint>((r) => (land = r));
+    const inner = rpcStub({quoterGas: 6_500_000n}); // padded 9,870,000: under 2^24, over a 9M block
+    const methods: string[] = [];
+    vi.stubGlobal("fetch", (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as Req[];
+      methods.push(...batch.map((r) => r.method));
+      if (batch.some((r) => r.method === "eth_getBlockByNumber")) {
+        const gasLimit = await landed; // a gateway that stalls on this method alone
+        return new Response(JSON.stringify([{jsonrpc: "2.0", id: 0, result: {number: "0x1", gasLimit: `0x${gasLimit.toString(16)}`}}]));
+      }
+      return inner(url, init);
+    }) as typeof fetch);
+    const p = uniswapProvider({rpcUrls: {1: ["https://rpc.test"]}});
+    const t0 = Date.now();
+    // The caller gives up at 300 ms: the quote stops waiting then (round 1 held it 12 s per endpoint, the abort ignored).
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 300);
+    const first = await p.getQuote(on(1), ctrl.signal);
+    expect(Date.now() - t0).toBeLessThan(1_200);
+    expect(first!.txRequest!.gasLimit).toBe("9870000"); // Ethereum's known cap alone
+    // No signal (the server path): it waits until 1.5 s after the read began, then goes by the known caps.
+    const second = await p.getQuote(on(1));
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1_400);
+    expect(Date.now() - t0).toBeLessThan(3_000);
+    expect(second!.txRequest!.gasLimit).toBe("9870000");
+    // Past that, a quote does not wait at all while the read is still out; nothing is sent again.
+    const t1 = Date.now();
+    expect((await p.getQuote(on(1)))!.txRequest!.gasLimit).toBe("9870000");
+    expect(Date.now() - t1).toBeLessThan(500);
+    expect(methods.filter((m) => m === "eth_getBlockByNumber")).toHaveLength(1);
+    // The read lands: it fills the cache, and the next quote goes by the block.
+    land(9_000_000n);
+    await new Promise((r) => setTimeout(r, 0));
+    expect((await p.getQuote(on(1)))!.txRequest!.gasLimit).toBe("9000000");
+    expect(methods.filter((m) => m === "eth_getBlockByNumber")).toHaveLength(1);
   });
 
   it("the deployment check is 0.4.11's four calls; the block read goes on its own, after it", async () => {

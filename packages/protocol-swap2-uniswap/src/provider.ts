@@ -42,6 +42,12 @@ const PARTIAL_FILL = "pool liquidity runs out before the full amount (partial fi
 /** How long a chain's block gas limit is trusted before it is read again (ms); a read that failed, for less. */
 const BLOCK_GAS_TTL_MS = 10 * 60_000;
 const BLOCK_GAS_RETRY_MS = 60_000;
+/**
+ * How long after a block read starts a quote waits for it (ms). The read goes out alongside the quote's own reads, so a
+ * healthy node has answered long before; past this, a quote uses the known caps alone (the "node did not say" path)
+ * and the read goes on in the background to fill the cache — a node that stalls on the method never holds quotes.
+ */
+const BLOCK_GAS_WAIT_MS = 1_500;
 
 const QUOTER_ABI = parseAbi([
   "function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
@@ -115,6 +121,24 @@ export interface UniswapProviderConfig {
    * limit), never a quote with the check skipped. `preflightDeposit` does not apply it: the signed minimum governs there.
    */
   maxPriceImpactBps?: number;
+  /**
+   * Most JSON-RPC calls sent to one endpoint in any one second, across every quote, check and read of this provider (an
+   * integer ≥ 1; a server sets the good-item rate its keyed endpoint serves — QuickNode answered 50 calls a second on
+   * Monad and `-32007` the rest, UNISWAP-V4-RESEARCH §5.3). Batches then carry at most this many calls and wait for
+   * their turn on their endpoint, first come first served; one that would wait more than 4 s is sent to the next
+   * endpoint instead, and with none left refused as `rate_limited` (a queue never outlives its callers). Unset (the
+   * default): no limit, every batch goes at once as in 0.4.11 — what the node rate-limits is retried, then refused.
+   */
+  rpcCallsPerSecond?: number;
+}
+
+/** A chain's block gas read: kept until `until`; a quote waits for it until `waitUntil`; `limit` once `done` (if any). */
+interface BlockGasRead {
+  until: number;
+  readonly waitUntil: number;
+  done: boolean;
+  limit?: bigint;
+  read: Promise<void>;
 }
 
 interface Route {
@@ -135,10 +159,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   if (!Number.isInteger(slippageDefault) || slippageDefault <= 0 || slippageDefault >= 5_000) throw new Error("uniswap: defaultSlippageBps must be 1..4999");
   const maxImpact = config.maxPriceImpactBps;
   if (maxImpact !== undefined && !validMaxImpactBps(maxImpact)) throw new Error("uniswap: maxPriceImpactBps must be an integer 1..10000");
+  const perSecond = config.rpcCallsPerSecond;
+  if (perSecond !== undefined && !(typeof perSecond === "number" && Number.isInteger(perSecond) && perSecond >= 1)) throw new Error("uniswap: rpcCallsPerSecond must be an integer ≥ 1");
   const verified = new Map<number, Promise<void>>();
-  /** Each chain's block gas limit (undefined: the node did not say, or the read failed), and until when it holds. */
-  const blockGas = new Map<number, {until: number; read: Promise<bigint | undefined>}>();
-  const net = uniswapRpc(config.rpcUrls);
+  /** Each chain's block gas read: until when it holds, until when a quote waits for it, and its answer once in. */
+  const blockGas = new Map<number, BlockGasRead>();
+  const net = uniswapRpc(config.rpcUrls, perSecond === undefined ? {} : {callsPerSecond: perSecond});
 
   const chainIdOf = (caip2: string): number | null => {
     if (!isEvm(caip2)) return null;
@@ -171,26 +197,50 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   }
 
   /**
-   * The chain's block gas limit, for the gas bound: a transaction whose gasLimit is above it is invalid. Read on its
-   * own (`eth_getBlockByNumber("latest", false)`, one pass over the endpoints, never the caller's abort) and kept for
-   * BLOCK_GAS_TTL_MS, so a wrong or stale answer does not stay. Optional: a node that does not serve it, errs, or
-   * answers without a gasLimit leaves undefined — only the known caps then apply — and never fails a quote; a failed
-   * read is tried again after BLOCK_GAS_RETRY_MS.
+   * The chain's block gas read, for the gas bound: a transaction whose gasLimit is above the block's is invalid. Read on
+   * its own (`eth_getBlockByNumber("latest", false)`, one pass over the endpoints, never the caller's abort) and kept for
+   * BLOCK_GAS_TTL_MS, so a wrong or stale answer does not stay. Optional: a node that does not serve it, errs, or answers
+   * without a gasLimit leaves undefined — only the known caps then apply — and never fails a quote; a failed read is
+   * tried again after BLOCK_GAS_RETRY_MS.
    */
-  function blockGasLimit(chainId: number): Promise<bigint | undefined> {
+  function blockGasRead(chainId: number): BlockGasRead {
     const now = Date.now();
     const hit = blockGas.get(chainId);
-    if (hit && now < hit.until) return hit.read;
-    const entry = {until: now + BLOCK_GAS_TTL_MS, read: Promise.resolve<bigint | undefined>(undefined)};
+    if (hit && now < hit.until) return hit;
+    const entry: BlockGasRead = {until: now + BLOCK_GAS_TTL_MS, waitUntil: now + BLOCK_GAS_WAIT_MS, done: false, read: Promise.resolve()};
     entry.read = net.slots(chainId, [{method: "eth_getBlockByNumber", params: ["latest", false]}], "none").then(
       ([s]) => (s && s.ok ? blockGasLimitOf(s.result) : undefined),
       () => undefined,
     ).then((limit) => {
+      entry.done = true;
       if (limit === undefined) entry.until = Math.min(entry.until, now + BLOCK_GAS_RETRY_MS);
-      return limit;
+      else entry.limit = limit;
     });
     blockGas.set(chainId, entry);
-    return entry.read;
+    return entry;
+  }
+
+  /**
+   * The block gas limit one quote goes by: the read's answer when it is in; else it waits at most until the read's
+   * `waitUntil`, and never past the caller's abort — then undefined (the known caps alone), the read going on.
+   */
+  function blockGasLimit(entry: BlockGasRead, signal?: AbortSignal): Promise<bigint | undefined> {
+    if (entry.done) return Promise.resolve(entry.limit);
+    const left = entry.waitUntil - Date.now();
+    if (left <= 0 || signal?.aborted) return Promise.resolve(undefined);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener?.("abort", finish);
+        resolve(entry.done ? entry.limit : undefined);
+      };
+      const timer = setTimeout(finish, left);
+      signal?.addEventListener?.("abort", finish, {once: true});
+      void entry.read.then(finish);
+    });
   }
 
   /** Every candidate route for tokenIn → tokenOut on this chain. */
@@ -317,7 +367,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
       try {
         await verifyDeployment(chainId);
-        const gasCap = blockGasLimit(chainId); // alongside the quotes; optional (it never fails the quote)
+        const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
         // maxPriceImpactBps set: the candidates, the probe and the mid prices are all read at one block, with retries.
         // Unset: at "latest", as 0.4.11 read them (a call the node did not answer is retried, then refused — never
         // read as "no pool").
@@ -431,14 +481,15 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // wallet, which estimates the exact call with headroom right before broadcast, as for THORChain and Chainflip.
         // A limit derived from it would be the bare overhead, and the swap would run out of gas on chain.
         // The limit is bounded by the chain (always on): a need (the bare need + 5% for EIP-150's 63/64 forwarding)
-        // above the per-transaction cap, the block gas limit or Nitro's execution cap can never complete, so it is
+        // above the per-transaction cap, the block gas limit (less what the block spends first: OP-stack's 1M-gas
+        // L1-info deposit) or Nitro's execution cap can never complete, so it is
         // refused; a padded limit above the gasLimit cap is clamped to it — never below the need (Monad charges the
         // whole limit even when the swap reverts).
         const pools = route.single ? 1n : BigInt((route.path!.length - 42) / 46);
         const extra = (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n);
         let gasLimit: bigint | undefined;
         if (gas >= MIN_POOL_GAS * pools) {
-          const bounded = boundGasLimit(gas + 120_000n + extra, (gas * 3n) / 2n + 120_000n + extra, gasBoundsOf(chainId, await gasCap));
+          const bounded = boundGasLimit(gas + 120_000n + extra, (gas * 3n) / 2n + 120_000n + extra, gasBoundsOf(chainId, await blockGasLimit(gasRead, signal)));
           if ("refuse" in bounded) {
             return refuse(`the swap needs ${bounded.refuse.need} gas, more than chain ${chainId} takes in one transaction (${bounded.refuse.cap}) — its pools are too thin for this amount`, "insufficient_liquidity");
           }

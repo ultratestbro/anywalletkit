@@ -41,12 +41,13 @@ const RPC_TIMEOUT_MS = 12_000;
 /** Largest JSON-RPC batch sent to one node (X Layer's public RPCs refuse more than 10). */
 export const RPC_BATCH_MAX = 10;
 /**
- * Batches in flight at once on one chain, shared by every request of the provider (concurrent quotes, the deployment
- * check, the block read): 40 calls, under the per-second good-item rate a keyed endpoint was measured to serve
- * (QuickNode on Monad answered 50 calls a second and `-32007` the rest, UNISWAP-V4-RESEARCH §5.3). A v3 quote is at
- * most 40 calls, so one quote still goes out in one wave; a second one waits for a free slot instead of piling on.
+ * `callsPerSecond` (opt-in): the window it counts calls in, per endpoint, and the longest a batch waits for its turn.
+ * A batch that would wait longer is not queued: that endpoint is rate-limited for it, the next one is asked, and with
+ * none left the chunk fails as `rate_limited` — so a queue never outgrows what a caller (the router allows a quote 8 s)
+ * would still wait for, with or without a signal.
  */
-export const RPC_MAX_IN_FLIGHT = 4;
+export const RATE_WINDOW_MS = 1_000;
+export const RATE_WAIT_MAX_MS = 4_000;
 /**
  * Waits before each retry (ms, from..to): long enough for a per-second window to pass, spread at random so that
  * concurrent quotes refused in the same window do not all come back in the next one together.
@@ -57,7 +58,7 @@ export const RETRY_DELAYS_MS: readonly (readonly [number, number])[] = [[300, 60
 const RATE_LIMIT_CODES: ReadonlySet<number> = new Set([429, -32005, -32007, -32011, -32029, -32090]);
 const RATE_LIMIT_TEXT = /rate.?limit|too many|request limit|limit (?:reached|exceeded)|exceeds? (?:the )?limit|throttl|capacity|quota/i;
 /** The call ran and the EVM stopped it: a revert, or the gas the node lets one call use ran out (an answer either way). */
-const REVERT_TEXT = /revert|out of gas|gas required exceeds|gas limit reached|invalid opcode|invalid jump|stack (?:underflow|overflow)|vm execution error/i;
+const REVERT_TEXT = /revert|out of gas|gas required exceeds|gas limit reached|invalid opcode|invalid jump|stack (?:underflow|overflow|limit reached)|max call depth exceeded|write protection|return data out of bounds|vm execution error/i;
 /** The node failed to run the call: hex `data` next to these is not revert bytes. */
 const NODE_FAULT_TEXT = /timeout|timed out|unavailable|internal error|overload|busy|try again|header not found|missing trie node/i;
 
@@ -65,7 +66,8 @@ const NODE_FAULT_TEXT = /timeout|timed out|unavailable|internal error|overload|b
  * A per-item JSON-RPC error read as a revert (the call ran: an answer) or as the reason the node did not answer:
  * - code 3 (geth, reth, Monad) is a revert, whatever its text;
  * - a rate-limit code (`-32005`, `-32007`, `429`…) is `rate_limited`;
- * - a revert or gas-exhaustion text (`-32000 "execution reverted"`, Besu, Erigon, an empty revert) is a revert;
+ * - a revert or other EVM-error text (`-32000 "execution reverted"`, Besu, Erigon, an empty revert, out of gas, geth's
+ *   `stack limit reached 1024 (1023)` — read before the rate-limit text, which "limit reached" would also match) is a revert;
  * - a rate-limit text is `rate_limited`, before `data` is looked at (`{-32000, "rate limit exceeded", data: "0x…"}`);
  * - revert bytes in `data` are a revert, unless the text names a node fault (`-32603 "internal error"`, a timeout);
  * - anything else (`header not found`, `missing trie node`, an internal error) is `upstream_unavailable` — never "no pool".
@@ -131,57 +133,90 @@ function abortError(chainId: number, signal?: AbortSignal): Error {
   return new Error(`uniswap: no RPC answered on chain ${chainId} (${typeof reason?.message === "string" ? reason.message : "This operation was aborted"})`);
 }
 
-export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>): UniswapRpc {
-  /** Per chain: the batches in flight and the ones waiting for a slot, first come first served (RPC_MAX_IN_FLIGHT). */
-  const lanes = new Map<number, {busy: number; waiting: Array<() => void>}>();
+export interface UniswapRpcOptions {
+  /**
+   * Most JSON-RPC calls sent to one endpoint in any RATE_WINDOW_MS, across every request of this instance (opt-in, an
+   * integer ≥ 1). Unset: no limit, every chunk goes at once as 0.4.11 sent them. Set: batches carry at most this many
+   * calls, each waits for its turn on its endpoint (first come, first served), and one that would wait more than
+   * RATE_WAIT_MAX_MS goes to the next endpoint instead.
+   */
+  callsPerSecond?: number;
+}
 
-  /** A slot on the chain's lane: true once held; false when the caller aborted first (nothing is held then). */
-  function acquire(chainId: number, signal?: AbortSignal): Promise<boolean> {
-    let lane = lanes.get(chainId);
-    if (!lane) lanes.set(chainId, (lane = {busy: 0, waiting: []}));
-    if (signal?.aborted) return Promise.resolve(false);
-    if (lane.busy < RPC_MAX_IN_FLIGHT) {
-      lane.busy++;
-      return Promise.resolve(true);
+/** One batch booked on an endpoint: when it goes and how many calls it carries. */
+type Booking = {readonly at: number; readonly n: number};
+
+export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>, options: UniswapRpcOptions = {}): UniswapRpc {
+  const rate = options.callsPerSecond;
+  if (rate !== undefined && !(Number.isInteger(rate) && rate >= 1)) throw new Error("uniswap: rpcCallsPerSecond must be an integer ≥ 1");
+  const batchMax = rate === undefined ? RPC_BATCH_MAX : Math.min(RPC_BATCH_MAX, rate);
+  /** Per endpoint (`callsPerSecond` only): the batches sent in the last window and booked after it, in send order. */
+  const booked = new Map<string, Booking[]>();
+
+  /**
+   * Books `n` calls (n ≤ rate) on `url` at the earliest moment, no sooner than the batches booked before it, at which no
+   * window of RATE_WINDOW_MS holds more than `rate` calls; undefined (nothing booked) when that is over RATE_WAIT_MAX_MS
+   * away. Every window that ends at or after the new booking lies inside the one checked, so the bound holds for all.
+   */
+  function book(url: string, n: number, limit: number): Booking | undefined {
+    const now = Date.now();
+    let log = booked.get(url);
+    if (!log) booked.set(url, (log = []));
+    while (log.length > 0 && log[0]!.at <= now - RATE_WINDOW_MS) log.shift();
+    let at = log.length > 0 ? Math.max(now, log[log.length - 1]!.at) : now;
+    let inWindow = 0;
+    for (const b of log) inWindow += b.n;
+    let i = 0;
+    const leave = () => {
+      while (i < log!.length && log![i]!.at <= at - RATE_WINDOW_MS) inWindow -= log![i++]!.n;
+    };
+    leave();
+    while (inWindow + n > limit && i < log.length) {
+      at = log[i]!.at + RATE_WINDOW_MS;
+      leave();
     }
-    const l = lane;
-    return new Promise((resolve) => {
-      const grant = () => {
-        signal?.removeEventListener?.("abort", cancel);
-        resolve(true);
-      };
-      const cancel = () => {
-        const at = l.waiting.indexOf(grant);
-        if (at >= 0) l.waiting.splice(at, 1);
-        resolve(false);
-      };
-      l.waiting.push(grant);
-      signal?.addEventListener?.("abort", cancel, {once: true});
-    });
+    if (at - now > RATE_WAIT_MAX_MS) return undefined;
+    const b: Booking = {at, n};
+    log.push(b);
+    return b;
   }
 
-  /** Frees a slot: it passes straight to the next batch waiting, if any. */
-  function release(chainId: number): void {
-    const lane = lanes.get(chainId)!;
-    const next = lane.waiting.shift();
-    if (next) next();
-    else lane.busy--;
+  function unbook(url: string, b: Booking): void {
+    const log = booked.get(url);
+    const at = log ? log.indexOf(b) : -1;
+    if (at >= 0) log!.splice(at, 1);
   }
 
-  /** One chunk over the endpoints (starting at `start`), each slot its answer — or a ChunkFailure when none answered. */
-  async function chunk(chainId: number, calls: readonly RpcCall[], start: number, signal?: AbortSignal): Promise<RpcSlot[]> {
+  /**
+   * One chunk over the endpoints (starting at `start`), each slot its answer — or a ChunkFailure when none answered.
+   * Under `callsPerSecond`, a chunk the pass has given up on (`abandoned`) while it waited for its turn is not sent.
+   */
+  async function chunk(chainId: number, calls: readonly RpcCall[], start: number, signal: AbortSignal | undefined, abandoned: () => boolean): Promise<RpcSlot[]> {
     const urls = rpcUrls[chainId] ?? [];
     let lastErr: unknown;
     let jsonRpc = false;
     for (let k = 0; k < urls.length; k++) {
       const url = urls[(start + k) % urls.length]!;
+      if (rate !== undefined) {
+        const b = book(url, calls.length, rate);
+        if (!b) {
+          lastErr = refusal("rate_limited", `the endpoint's ${rate} calls a second are booked more than ${RATE_WAIT_MAX_MS / 1000} s ahead`);
+          jsonRpc = false;
+          continue;
+        }
+        if (b.at > Date.now()) await pause(b.at - Date.now(), signal);
+        if (signal?.aborted || abandoned()) {
+          unbook(url, b);
+          throw abortError(chainId, signal); // the caller's abort; or a pass that has already failed (nobody reads it)
+        }
+      }
       let batchRefused = false;
       try {
         const res = await fetch(url, {
           method: "POST",
           headers: {"content-type": "application/json"},
           body: JSON.stringify(calls.map((c, id) => ({jsonrpc: "2.0", id, ...c}))),
-          // Bounded even under the caller's signal: a request that hangs would hold one of the chain's shared slots.
+          // Bounded even under the caller's signal: a hung endpoint is left for the next one after RPC_TIMEOUT_MS.
           signal: signal ? anySignal([signal, timeoutSignal(RPC_TIMEOUT_MS)]) : timeoutSignal(RPC_TIMEOUT_MS),
         });
         if (!res.ok) {
@@ -189,7 +224,7 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>)
           const info = httpRefusal(res.status, res.headers?.get?.("retry-after"));
           throw info ? withReason(error, info) : error;
         }
-        const body = (await res.json()) as {id: number; result?: unknown; error?: unknown}[] | {error?: {message?: string}};
+        const body = (await res.json()) as {id: unknown; result?: unknown; error?: unknown}[] | {error?: {message?: string}};
         if (!Array.isArray(body)) {
           // The whole batch refused with a JSON-RPC error (a rate limit, a batch-size cap): no call was answered.
           const e = itemError(body.error);
@@ -198,62 +233,67 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>)
           throw withReason(new Error(body.error?.message !== undefined ? describe({message: String(body.error.message)}) : "batch refused"), kind === "revert" ? "upstream_unavailable" : kind);
         }
         const out: (RpcSlot | undefined)[] = calls.map(() => undefined);
+        /** An error the node sent without a usable id (a batch-level rate limit as an array entry): the unanswered calls' reason. */
+        let idless: RpcItemError | undefined;
         for (const r of body) {
-          if (!r || typeof r !== "object" || typeof r.id !== "number" || !Number.isInteger(r.id) || r.id < 0 || r.id >= out.length) continue;
+          if (!r || typeof r !== "object") continue;
+          if (typeof r.id !== "number" || !Number.isInteger(r.id) || r.id < 0 || r.id >= out.length) {
+            if (idless === undefined && (r.id === null || r.id === undefined) && r.error !== undefined && r.error !== null) idless = itemError(r.error);
+            continue;
+          }
           if (r.error === undefined) {
-            out[r.id] = {ok: true, result: r.result ?? null};
+            // An answer must carry its result: an item with neither, or eth_call's `null`, is no answer (it was read as
+            // a revert before, so the best pool dropped out silently). `null` stays an answer where it means one (a
+            // receipt not mined yet).
+            out[r.id] = !Object.prototype.hasOwnProperty.call(r, "result") || (r.result === null && calls[r.id]!.method === "eth_call")
+              ? {ok: false, failed: refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node answered a call with no result)`)}
+              : {ok: true, result: r.result};
             continue;
           }
           const e = itemError(r.error);
           const kind = rpcErrorKind(e);
           out[r.id] = kind === "revert" ? {ok: false, revert: e} : {ok: false, failed: refusal(kind, `uniswap: no RPC answered on chain ${chainId} (${describe(e)})`)};
         }
-        return out.map((s) => s ?? {ok: false, failed: refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node left a call unanswered)`)});
+        const unanswered = (): RpcSlot => {
+          if (idless === undefined) return {ok: false, failed: refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node left a call unanswered)`)};
+          const kind = rpcErrorKind(idless);
+          return {ok: false, failed: refusal(kind === "revert" ? "upstream_unavailable" : kind, `uniswap: no RPC answered on chain ${chainId} (${describe(idless)})`)};
+        };
+        return out.map((s) => s ?? unanswered());
       } catch (e) {
         lastErr = e;
         jsonRpc = batchRefused;
       }
     }
-    const error = new Error(`uniswap: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
+    // A transport error may carry the endpoint itself (Node's fetch names a URL with credentials): taken out.
+    const error = new Error(`uniswap: no RPC answered on chain ${chainId} (${redactUrls(lastErr instanceof Error ? lastErr.message : String(lastErr))})`);
     // Every endpoint failed: the last one's own classification (a 429, a rejected key), else unavailable — never the caller's abort.
     if (signal?.aborted) throw error;
     throw new ChunkFailure(withReason(error, refusalOf(lastErr) ?? "upstream_unavailable"), jsonRpc);
   }
 
   /**
-   * The calls in chunks of RPC_BATCH_MAX, in order, each sent once it holds a slot on the chain's lane (at most
-   * RPC_MAX_IN_FLIGHT in flight across every request of this provider). Once one chunk has failed the pass, the
-   * chunks not yet sent are not sent.
+   * The calls in chunks (RPC_BATCH_MAX, or `callsPerSecond` when lower), all sent at once as 0.4.11 sent them (under
+   * `callsPerSecond`, each when its endpoint has room). A chunk failure the policy does not retry fails the pass; it
+   * stays failed, and under `callsPerSecond` the chunks still waiting for their turn are then not sent.
    */
   async function pass(chainId: number, calls: readonly RpcCall[], start: number, policy: RetryPolicy, signal?: AbortSignal): Promise<RpcSlot[]> {
     const chunks: RpcCall[][] = [];
-    for (let i = 0; i < calls.length; i += RPC_BATCH_MAX) chunks.push(calls.slice(i, i + RPC_BATCH_MAX));
-    const out: RpcSlot[][] = new Array(chunks.length);
-    let next = 0;
+    for (let i = 0; i < calls.length; i += batchMax) chunks.push(calls.slice(i, i + batchMax));
     let failed = false;
-    const worker = async () => {
-      while (next < chunks.length && !failed) {
-        const i = next++;
-        if (!(await acquire(chainId, signal))) {
-          failed = true;
-          throw abortError(chainId, signal);
-        }
-        try {
-          if (failed) return;
-          out[i] = await chunk(chainId, chunks[i]!, start, signal);
-        } catch (e) {
-          failed = !isChunkFailure(e) || !(policy === "all" || (policy === "items" && e.jsonRpc));
-          if (!isChunkFailure(e)) throw e; // the caller's abort
-          // Under `all` (and `items` for a JSON-RPC-level refusal) the chunk's calls are retried like any unanswered call.
-          if (!failed) out[i] = chunks[i]!.map(() => ({ok: false, failed: e.error}));
-          else throw e.error;
-        } finally {
-          release(chainId);
-        }
+    const one = async (c: RpcCall[]): Promise<RpcSlot[]> => {
+      try {
+        return await chunk(chainId, c, start, signal, () => failed);
+      } catch (e) {
+        // Under `all` (and `items` for a JSON-RPC-level refusal) the chunk's calls are retried like any unanswered call.
+        const retryable = isChunkFailure(e) && (policy === "all" || (policy === "items" && e.jsonRpc));
+        if (!retryable) failed = true;
+        if (!isChunkFailure(e)) throw e; // the caller's abort
+        if (!retryable) throw e.error;
+        return c.map(() => ({ok: false, failed: e.error}));
       }
     };
-    await Promise.all(Array.from({length: Math.min(RPC_MAX_IN_FLIGHT, chunks.length)}, worker));
-    return out.flat();
+    return (await Promise.all(chunks.map(one))).flat();
   }
 
   async function slots(chainId: number, calls: readonly RpcCall[], policy: RetryPolicy, signal?: AbortSignal): Promise<RpcSlot[]> {
