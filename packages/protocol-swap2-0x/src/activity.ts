@@ -11,14 +11,18 @@
  */
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {callSelector, chainLabel, describeSwapLike} from "@anywalletkit/protocol-swap2-core/activity";
-import {ZEROEX_CHAINS, ZEROEX_SETTLER_NONCE_MARGIN, zeroExChain, zeroExChainId} from "./chains.js";
+import {ZEROEX_CHAINS, ZEROEX_SETTLER_NONCE_MARGIN, zeroExChain, zeroExChainId, type ZeroExChain} from "./chains.js";
 import {SETTLER_EXECUTE_SELECTOR, decodeSettlerExecute, zeroExSettlerNonce} from "./settler.js";
 
 export const ZEROEX_MODULE = "@anywalletkit/protocol-swap2-0x";
 
-export function describeZeroExActivity(tx: ChainTx, ctx: DescribeActivityContext): ActivityItem | null {
+/**
+ * The activity item for a 0x swap, or `null`. `chains` is the chain table to read (default: the module's own); the
+ * providers pass the table they were built with, so a chain added or re-pinned through `chains` is labelled too.
+ */
+export function describeZeroExActivity(tx: ChainTx, ctx: DescribeActivityContext, chains: Readonly<Record<number, ZeroExChain>> = ZEROEX_CHAINS): ActivityItem | null {
   const chainId = zeroExChainId(tx.chain);
-  const chain = zeroExChain(ZEROEX_CHAINS, chainId);
+  const chain = zeroExChain(chains, chainId);
   if (!chain) return null;
   if (callSelector(tx) !== SETTLER_EXECUTE_SELECTOR) return null;
   const target = tx.call?.to ?? tx.to;

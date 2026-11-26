@@ -4,14 +4,15 @@
 // report only what changed since the last run (ok → fail, warn → ok, …) plus
 // anything still failing. Nothing is signed or sent on-chain.
 //
-//   node scripts/watch/canary.mjs [--only aave,morpho] [--timeout 240] [--send] [--dry] [--env FILE]
-// --timeout is per job (seconds); a job with its own `timeoutS` gets the longer of the two.
+//   node scripts/watch/canary.mjs [--only aave,morpho] [--timeout 240] [--send] [--dry] [--env FILE] [--retry-wait S]
+// --timeout is per job (seconds); a job with its own `timeoutS` gets the longer of the two. --retry-wait sets the wait
+// before a failed job's one retry (seconds; by default 20, or 60 after a rate limit: retry-wait.mjs) — for tests.
 // State: watch/canary/state.json; today's rows: watch/canary/<date>.json.
 import {spawn} from "node:child_process";
 import {readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync} from "node:fs";
 import {resolve, dirname} from "node:path";
 import {fileURLToPath} from "node:url";
-import {runStatus} from "./canary-status.mjs";
+import {noteOf, retryKept, retryTextOf, rpcOverrides, runStatus, shortNote} from "./canary-status.mjs";
 import {fitLines} from "./html-text.mjs";
 import {retryWaitMs} from "./retry-wait.mjs";
 
@@ -23,6 +24,8 @@ const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] :
 const ONLY = opt("--only") ? new Set(opt("--only").split(",")) : null;
 const TIMEOUT_MS = Number(opt("--timeout", "240")) * 1000;
 const SEND = flag("--send"), DRY = flag("--dry");
+const RETRY_WAIT = opt("--retry-wait") === undefined ? null : Number(opt("--retry-wait")) * 1000;
+if (RETRY_WAIT !== null && !(RETRY_WAIT >= 0)) throw new Error("--retry-wait takes a number of seconds");
 const TODAY = new Date().toISOString().slice(0, 10);
 if (opt("--env")) for (const l of readFileSync(resolve(opt("--env")), "utf8").split("\n")) { const i = l.indexOf("="); if (i > 0 && !l.startsWith("#") && !(l.slice(0, i).trim() in process.env)) process.env[l.slice(0, i).trim()] = l.slice(i + 1).trim(); }
 const env = process.env;
@@ -88,9 +91,14 @@ jobs.push({id: "scrvusd", module: "scrvusd", script: pkg("protocol-lending-curve
 // built and preflighted through the provider and the router. Keyless; RELAY_API_KEY is passed through when set.
 if (existsSync(pkg("protocol-swap2-relay"))) jobs.push({id: "relay", module: "relay", script: pkg("protocol-swap2-relay"), args: [], timeoutS: 300});
 // 0x: the registry (ERC-1967 proxy, owner, the Settlers it names are CREATE3 deployments with code), Permit2 and the wrapped
-// natives on all seven chains — keyless, always. Live quotes (local and through createSwap2Handler) only with
-// ZEROEX_API_KEY; without it the script says so in a neutral line and exits 0.
-if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], timeoutS: 300});
+// natives on every chain of its table — keyless, always; a chain no RPC answered on fails it. Our RPCs go in as the
+// script's RPC_<chainId> overrides where they are set (it reads no *_RPC_URL names; before, CI always ran it on its
+// public fallbacks), each followed by the chain's public endpoint as the retry, so our RPC running dry or rate-limited
+// does not fail the job on its own. It ends a failed run with `Reason:` (every chain that is not ok) and, when a sale
+// through the Settler in force is refused today (what is refused and why, per chain), `Severity: high`. Live quotes
+// (local and through createSwap2Handler) only with ZEROEX_API_KEY; without it the script says so in a neutral line.
+// `summaryLines`: its Reason / Severity lines are its own (canary-status.mjs); no other job's are read as such.
+if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], env: rpcOverrides(env, RPC_ENV, PUBLIC_RPC), timeoutS: 300, summaryLines: true});
 // Across: every pin on chain (SpokePool proxy, chainId, admin = HubPool, wrapped native, buffers, not paused, token
 // decimals, the HubPool's registry) and /suggested-fees on nine corridors on the pinned SpokePools — keyless, always.
 // Live quotes (local and through createSwap2Handler) only with ACROSS_API_KEY; without it a neutral line, exit 0.
@@ -112,13 +120,15 @@ function run(job) {
     const timer = setTimeout(() => child.kill("SIGKILL"), Math.max(TIMEOUT_MS, (job.timeoutS ?? 0) * 1000)); // a job's own timeoutS can only extend --timeout
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      const {status, lines, soft} = runStatus({code, signal, out});
-      // A failure note names the cause (viem's Details / Status lines, the error line) rather than the stack tail. URLs are cut:
-      // an RPC URL carries its API key and the note goes to Telegram and the committed state file.
-      const cause = [...new Set(lines.map((l) => l.trim()).filter((l) => /^(\w*Error: |(Details|Status|Reason|function): )/.test(l)))].slice(0, 4);
-      const note = (status === "fail" ? (cause.length ? cause : lines.slice(-4)).join(" | ") : soft.slice(0, 3).join(" | "))
-        .replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").slice(0, 300);
-      done({...job, status, ms: Date.now() - t0, note});
+      const st = runStatus({code, signal, out, summaryLines: job.summaryLines === true});
+      // A failure note names the cause (viem's Details / Status lines, the error line) rather than the stack tail; a job
+      // with `summaryLines` leads it with its own `Reason:` line, whole (every chain that is not ok). URLs are cut
+      // (canary-status.mjs).
+      const note = noteOf(st);
+      // What the retry wait is chosen from (not stored): the note, plus every failing line of a job that prints Reason.
+      const retryText = retryTextOf(st);
+      // `run` (the parsed output) is for the retry below only; like the retry text it is not stored.
+      done({...job, status: st.status, ms: Date.now() - t0, note, retryText, run: st, ...(st.severity ? {severity: st.severity} : {})});
     });
   });
 }
@@ -127,16 +137,24 @@ const queue = [...selected];
 // One retry after 20 s for a fail / timeout: a single rate-limited or lagging RPC answer is not a module break (aave:1:lido and
 // mellow:lido-earn-* alternated ok/fail across 2026-10-20..23 and passed 8/8 locally). The first failure stays in the note.
 // A 429 / Too Many Requests note waits 60 s instead: 20 s after it the same burst was still on (native-monad, 2026-11-04).
+// A retry that fails too keeps the higher severity of the two runs and, for a job with summaryLines, the first run's
+// Reason lines it does not repeat (canary-status.mjs, retryKept): a retry on a rate-limited RPC no longer replaces a
+// first run's `NEW on 8453` / `Severity: high` with `unreachable on 8453` and no severity.
 async function runWithRetry(job) {
   const first = await run(job);
   if (first.status !== "fail" && first.status !== "timeout") return first;
-  await new Promise((r) => setTimeout(r, retryWaitMs(first.note)));
+  await new Promise((r) => setTimeout(r, RETRY_WAIT ?? retryWaitMs(first.retryText ?? first.note)));
   const second = await run(job);
-  if (second.status === "fail" || second.status === "timeout") return second;
-  console.error(`retry   ${job.id} passed on the second try — first: ${first.note.slice(0, 160)}`);
+  if (second.status === "fail" || second.status === "timeout") {
+    if (!first.run || !second.run) return second;
+    const {note, severity} = retryKept(first.run, second.run);
+    const {severity: _own, ...rest} = second;
+    return {...rest, note, ...(severity ? {severity} : {})};
+  }
+  console.error(`retry   ${job.id} passed on the second try — first: ${shortNote(first.note, 160, job.summaryLines)}`);
   return second;
 }
-await Promise.all(Array.from({length: 4}, async () => { for (;;) { const j = queue.shift(); if (!j) return; const r = await runWithRetry(j); results.push(r); console.error(`${r.status.padEnd(7)} ${(r.ms / 1000).toFixed(1).padStart(6)}s  ${r.id}${r.note ? "  — " + r.note.slice(0, 140) : ""}`); } }));
+await Promise.all(Array.from({length: 4}, async () => { for (;;) { const j = queue.shift(); if (!j) return; const r = await runWithRetry(j); results.push(r); console.error(`${r.status.padEnd(7)} ${(r.ms / 1000).toFixed(1).padStart(6)}s  ${r.id}${r.severity ? ` [severity ${r.severity}]` : ""}${r.note ? "  — " + shortNote(r.note, 140, r.summaryLines) : ""}`); } }));
 
 // ── compare with the last run ──────────────────────────────────────────────
 const dir = resolve(ROOT, "watch/canary"); mkdirSync(dir, {recursive: true});
@@ -145,19 +163,21 @@ const prev = existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, "utf8"))
 // A warn note that only differs in numbers (caps, rates) is the same warning.
 const norm = (n) => (n || "").replace(/\d[\d.,]*/g, "#");
 const transitions = [], failing = [];
+// A failing job whose own severity changed (an unreachable chain, then a new 0x deployment) is a transition too.
+const sev = (x) => (x?.severity ? {severity: x.severity} : {});
 for (const r of results) {
   const p = prev[r.id];
-  if (p && (p.status !== r.status || (r.status === "warn" && norm(p.note) !== norm(r.note)))) transitions.push({id: r.id, module: r.module, from: p.status, to: r.status, note: r.note});
-  if (!p && r.status !== "ok") transitions.push({id: r.id, module: r.module, from: "new", to: r.status, note: r.note});
+  if (p && (p.status !== r.status || (r.status === "warn" && norm(p.note) !== norm(r.note)) || (r.status === "fail" && (p.severity ?? null) !== (r.severity ?? null)))) transitions.push({id: r.id, module: r.module, from: p.status, to: r.status, note: r.note, ...sev(r)});
+  if (!p && r.status !== "ok") transitions.push({id: r.id, module: r.module, from: "new", to: r.status, note: r.note, ...sev(r)});
   if (r.status === "fail" || r.status === "timeout" || r.status === "missing") failing.push(r);
 }
-const next = {...prev}; for (const r of results) next[r.id] = {status: r.status, note: r.note, at: new Date().toISOString()};
+const next = {...prev}; for (const r of results) next[r.id] = {status: r.status, note: r.note, ...sev(r), at: new Date().toISOString()};
 const counts = results.reduce((c, r) => ((c[r.status] = (c[r.status] ?? 0) + 1), c), {});
 const summary = Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(", ");
 console.error(`\n${results.length} jobs: ${summary}; ${transitions.length} transitions`);
 if (!DRY) {
   writeFileSync(stateFile, JSON.stringify(next, null, 1) + "\n");
-  writeFileSync(resolve(dir, `${TODAY}.json`), JSON.stringify({date: TODAY, counts, transitions, failing: failing.map((f) => ({id: f.id, status: f.status, note: f.note})), results: results.map((r) => ({id: r.id, module: r.module, status: r.status, ms: r.ms, note: r.note}))}, null, 1) + "\n");
+  writeFileSync(resolve(dir, `${TODAY}.json`), JSON.stringify({date: TODAY, counts, transitions, failing: failing.map((f) => ({id: f.id, status: f.status, note: f.note, ...sev(f)})), results: results.map((r) => ({id: r.id, module: r.module, status: r.status, ms: r.ms, note: r.note, ...sev(r)}))}, null, 1) + "\n");
 }
 
 // ── telegram ───────────────────────────────────────────────────────────────
@@ -168,8 +188,10 @@ if (SEND && (transitions.length || failing.length || flag("--quiet-ok"))) {
   if (!token || !chat) console.error("telegram: not configured, skipping");
   else {
     const h = [`${failing.length ? "🔴" : transitions.length ? "🟡" : "🟢"} <b>Canary · ${TODAY}</b> — ${results.length} checks: ${esc(summary)}`];
-    if (transitions.length) { h.push("", "<i>changed since last run:</i>"); for (const t of transitions.slice(0, 20)) h.push(`• ${ICON[t.from] ?? ""}→${ICON[t.to]} <b>${esc(t.id)}</b>${t.note ? `: ${esc(t.note.slice(0, 160))}` : ""}`); if (transitions.length > 20) h.push(`• …and ${transitions.length - 20} more`); }
-    if (failing.length) { h.push("", "<i>still failing:</i>"); for (const f of failing.slice(0, 12)) h.push(`• ${esc(f.id)}: ${esc((f.note || f.status).slice(0, 160))}`); }
+    const severity = (x) => (x.severity ? ` · <b>severity ${esc(x.severity)}</b>` : "");
+    const summaryJob = new Set(results.filter((r) => r.summaryLines === true).map((r) => r.id));
+    if (transitions.length) { h.push("", "<i>changed since last run:</i>"); for (const t of transitions.slice(0, 20)) h.push(`• ${ICON[t.from] ?? ""}→${ICON[t.to]} <b>${esc(t.id)}</b>${severity(t)}${t.note ? `: ${esc(shortNote(t.note, 160, summaryJob.has(t.id)))}` : ""}`); if (transitions.length > 20) h.push(`• …and ${transitions.length - 20} more`); }
+    if (failing.length) { h.push("", "<i>still failing:</i>"); for (const f of failing.slice(0, 12)) h.push(`• ${esc(f.id)}${severity(f)}: ${esc(shortNote(f.note || f.status, 160, f.summaryLines))}`); }
     const body = {chat_id: chat, text: fitLines(h), parse_mode: "HTML", disable_web_page_preview: true};
     if (env.TELEGRAM_WATCH_TOPIC) body.message_thread_id = Number(env.TELEGRAM_WATCH_TOPIC);
     const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000)});

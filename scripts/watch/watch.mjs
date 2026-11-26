@@ -8,8 +8,9 @@ import {fileURLToPath, pathToFileURL} from "node:url";
 import {createHash} from "node:crypto";
 import {esc, firstBlocks, fitLines, readCapped, safeLink, visibleText} from "./html-text.mjs";
 import {RECORD_FORMATS, checkPins, decodeFacets, pinsFromModule, selectorsFromSource} from "./pins.mjs";
-import {callData, decodeResult} from "./evm-call.mjs";
+import {callData, decodeResult, isRevert} from "./evm-call.mjs";
 import {checkBranch} from "./zcash-branch.mjs";
+import {severityError} from "./manifest.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -74,12 +75,12 @@ async function rpc(url, method, params) {
     let body = null;
     if (RPC_ERROR_STATUS.has(r.status)) { try { body = await r.json(); } catch {} }
     const e = body && typeof body === "object" && body.error && typeof body.error === "object" ? body.error : null;
-    if (e && (typeof e.message === "string" || typeof e.code === "number")) throw Object.assign(new Error(String(e.message ?? JSON.stringify(e)).slice(0, 300)), {rpcError: true, httpStatus: r.status});
+    if (e && (typeof e.message === "string" || typeof e.code === "number")) throw Object.assign(new Error(String(e.message ?? JSON.stringify(e)).slice(0, 300)), {rpcError: true, httpStatus: r.status, code: e.code});
     // The status rides along (same text as before): a source that paces its calls waits out a 429 (evm-initialize `intervalMs`).
     throw Object.assign(new Error(`HTTP ${r.status}`), {httpStatus: r.status});
   }
   const j = await r.json();
-  if (j.error) throw Object.assign(new Error(j.error.message || JSON.stringify(j.error)), {rpcError: true});
+  if (j.error) throw Object.assign(new Error(j.error.message || JSON.stringify(j.error)), {rpcError: true, code: j.error.code});
   return j.result;
 }
 const ghHeaders = () => ({accept: "application/vnd.github+json", "user-agent": "anywalletkit-watch", ...(env.GITHUB_TOKEN ? {authorization: `Bearer ${env.GITHUB_TOKEN}`} : {})});
@@ -113,7 +114,13 @@ const F = {
     ]);
     if (!code || code === "0x") throw new Error("no code at address");
     const meta = {codeHash: sha(code).slice(0, 16), impl: addrOfSlot(impl), admin: addrOfSlot(admin), beacon: addrOfSlot(beacon)};
-    if (meta.beacon) { try { const r = await rpc(url, "eth_call", [{to: meta.beacon, data: "0x5c60da1b"}, "latest"]); meta.beaconImpl = addrOfSlot(r); } catch {} }
+    // The beacon's implementation(): only a revert means "none". Any other failure fails the source (previous value kept):
+    // swallowed, it stored a value without beaconImpl, and the next good read was reported as a change (review
+    // 2026-11-26 round 3, the same as implCodeHash below).
+    if (meta.beacon) {
+      try { meta.beaconImpl = addrOfSlot(await rpc(url, "eth_call", [{to: meta.beacon, data: "0x5c60da1b"}, "latest"])); }
+      catch (e) { if (!(e.rpcError && isRevert(e))) throw new Error(`beacon implementation(): ${e.message}`); }
+    }
     // No EIP-1967 slot: an AragonProxy (stETH) or a FiatTokenProxy (USDC) names its implementation through
     // implementation() instead, and its own code never changes on an upgrade (triage 2026-11-04). Only a revert means
     // "none": any other failure fails the source (previous value kept), so a flaky RPC never reads as a lost implementation.
@@ -123,11 +130,20 @@ const F = {
     if (!meta.impl && !meta.beacon) {
       let r = null;
       try { r = addrOfSlot(await rpc(url, "eth_call", [{to: s.address, data: "0x5c60da1b"}, "latest"])); }
-      catch (e) { if (!(e.rpcError && /revert/i.test(e.message))) throw new Error(`implementation(): ${e.message}`); }
+      catch (e) { if (!(e.rpcError && isRevert(e))) throw new Error(`implementation(): ${e.message}`); }
       meta.implProbe = true;
       if (r) { meta.impl = r; meta.implVia = "implementation()"; }
     }
-    if (meta.impl) { try { const ic = await rpc(url, "eth_getCode", [meta.impl, "latest"]); meta.implCodeHash = sha(ic).slice(0, 16); } catch {} }
+    // The implementation's code: a read that fails fails the source (previous value kept). Swallowed, a rate-limited
+    // eth_getCode stored the value without implCodeHash, and the next good read was reported as "implementation code
+    // changed (— → …)" on a proxy nothing had touched — an RPC fault posted as an upstream change (review 2026-11-26
+    // round 3: the 0x registry on BSC, HTTP 429).
+    if (meta.impl) {
+      let ic;
+      try { ic = await rpc(url, "eth_getCode", [meta.impl, "latest"]); } catch (e) { throw new Error(`implementation code: ${e.message}`); }
+      if (typeof ic !== "string") throw new Error("implementation code: no result");
+      meta.implCodeHash = sha(ic).slice(0, 16);
+    }
     const {implProbe: _probe, ...compared} = meta;
     return {value: canonical(compared), meta};
   },
@@ -149,7 +165,7 @@ const F = {
     let hex;
     try { hex = await rpc(url, "eth_call", [{to: s.to, data}, "latest"]); }
     catch (e) {
-      if (!(e.rpcError && /revert/i.test(e.message))) throw e;
+      if (!(e.rpcError && isRevert(e))) throw e;
       return {value: "reverted", meta: {call, reverted: e.message.slice(0, 120)}};
     }
     const result = decodeResult(hex, s.decode ?? "raw");
@@ -294,6 +310,8 @@ const F = {
 };
 
 // ── manifests ──────────────────────────────────────────────────────────────
+// A source's optional `severity` (manifest.mjs): anything but high / medium / low is a manifest error (a typo must not
+// drop it silently); CI holds every real manifest to the same rule.
 function loadManifests() {
   const out = [];
   for (const d of readdirSync(resolve(ROOT, "packages"))) {
@@ -309,6 +327,7 @@ function loadManifests() {
     for (const s of m.sources ?? []) {
       if (!s.id) throw new Error(`${m.file}: a source has no id`);
       if (seen.has(s.id)) throw new Error(`${m.module}: source id "${s.id}" appears twice (${seen.get(s.id)}, ${m.file})`);
+      const badSeverity = severityError(m.file, s); if (badSeverity) throw new Error(badSeverity);
       seen.set(s.id, m.file);
     }
   }
@@ -447,7 +466,7 @@ for (const m of manifests) {
       // A failed pin / branch check is reported on every run until it is fixed, not only on the day it appears.
       const noun = r.problemNoun ?? "pin check";
       const failed = r.problems?.length ? `${r.problems.length} ${noun}${r.problems.length > 1 ? "s" : ""} failing: ${r.problems.slice(0, 4).join("; ")}${r.problems.length > 4 ? `; …and ${r.problems.length - 4} more` : ""}` : null;
-      if (changed || failed) changes.push({module: m.module, id: s.id, label: s.label ?? s.id, type: s.type, what: [changed ? describe(s, prev, r) : null, failed].filter(Boolean).join("; "), link: linkOf(s, r), before: prev?.meta, after: r.meta});
+      if (changed || failed) changes.push({module: m.module, id: s.id, label: s.label ?? s.id, type: s.type, ...(s.severity ? {severity: s.severity} : {}), what: [changed ? describe(s, prev, r) : null, failed].filter(Boolean).join("; "), link: linkOf(s, r), before: prev?.meta, after: r.meta});
       state.sources[s.id] = {type: s.type, target, value: r.value, meta: r.meta, seenAt: now, changedAt: changed ? now : prev?.changedAt ?? now, ...(prev?.error ? {} : {})};
       if (r.text && s.keepText) state.sources[s.id].text = r.text;
     } catch (e) {
@@ -465,10 +484,14 @@ for (const m of manifests) {
 // live in a Map: a plain object would hand back the inherited Object.prototype value and the digest would throw (scan 2026-10-30 F19).
 const groupBy = (list, key) => { const g = new Map(); for (const x of list) { const k = String(key(x)); const a = g.get(k); if (a) a.push(x); else g.set(k, [x]); } return g; };
 const byModule = (list) => groupBy(list, (c) => c.module);
-const lines = [`# Module watch · ${TODAY}`, "", `${manifests.length} modules, ${total} sources, ${changes.length} changed, ${errors.length} unreachable${repointed.length ? `, ${repointed.length} re-pointed` : ""}.`, ""];
+// Within a module, a change with a higher severity is listed first (a stable sort: the rest keep their order).
+const RANK = {high: 0, medium: 1, low: 2};
+const bySeverity = (cs) => [...cs].sort((a, b) => (RANK[a.severity] ?? 3) - (RANK[b.severity] ?? 3));
+const high = changes.filter((c) => c.severity === "high").length;
+const lines = [`# Module watch · ${TODAY}`, "", `${manifests.length} modules, ${total} sources, ${changes.length} changed${high ? ` (${high} severity high)` : ""}, ${errors.length} unreachable${repointed.length ? `, ${repointed.length} re-pointed` : ""}.`, ""];
 for (const [mod, cs] of byModule(changes)) {
   lines.push(`## ${mod}`);
-  for (const c of cs) lines.push(`- **${c.label}** (${c.type}): ${c.what}${c.link ? ` — ${c.link}` : ""}`);
+  for (const c of bySeverity(cs)) lines.push(`- **${c.label}** (${c.type}${c.severity ? `, severity ${c.severity}` : ""}): ${c.what}${c.link ? ` — ${c.link}` : ""}`);
   lines.push("");
 }
 // Our own manifest edits, not upstream changes: shown so a re-pointed source never looks silently reset.
@@ -508,10 +531,10 @@ if (SEND && !BASELINE) {
   if (!changes.length && !errors.length && !repointed.length) {
     if (flag("--quiet-ok")) await postTelegram(`🟢 <b>Module watch · ${TODAY}</b> — ${manifests.length} modules, ${total} sources, no changes.`);
   } else {
-    const h = [`${changes.length ? "🟠" : "🟡"} <b>Module watch · ${TODAY}</b> — ${changes.length} changed, ${errors.length} unreachable of ${total} sources${repointed.length ? `, ${repointed.length} re-pointed` : ""}`];
+    const h = [`${high ? "🔴" : changes.length ? "🟠" : "🟡"} <b>Module watch · ${TODAY}</b> — ${changes.length} changed${high ? ` (${high} severity high)` : ""}, ${errors.length} unreachable of ${total} sources${repointed.length ? `, ${repointed.length} re-pointed` : ""}`];
     for (const [mod, cs] of byModule(changes)) {
       h.push("", `<b>${esc(slug(mod))}</b>`);
-      for (const c of cs) h.push(`• ${c.link ? `<a href="${esc(c.link)}">${esc(c.label)}</a>` : esc(c.label)}: ${esc(c.what)}`);
+      for (const c of bySeverity(cs)) h.push(`• ${c.severity ? `<b>[severity ${esc(c.severity)}]</b> ` : ""}${c.link ? `<a href="${esc(c.link)}">${esc(c.label)}</a>` : esc(c.label)}: ${esc(c.what)}`);
     }
     if (errors.length) {
       h.push("", "<i>unreachable:</i>");

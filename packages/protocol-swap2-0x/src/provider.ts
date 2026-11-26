@@ -7,7 +7,7 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
 import {describeZeroExActivity} from "./activity.js";
 import {ZEROEX_NATIVE, ZEROEX_PERMIT2, zeroExChain, zeroExChainId, zeroExChains, type ZeroExChain} from "./chains.js";
 import {rpcRequest, rpcUrlsFor, type RpcUrls} from "./rpc.js";
-import {ZEROEX_MAX_NATIVE_QUOTE_SECONDS, ZEROEX_NATIVE_QUOTE_SKEW_SECONDS, checkZeroExTransaction, createSettlerResolver, isZeroExNative, type SettlerResolver, type ZeroExExpectation} from "./settler.js";
+import {ZEROEX_MAX_NATIVE_QUOTE_SECONDS, ZEROEX_NATIVE_QUOTE_SKEW_SECONDS, checkZeroExGasLimit, checkZeroExTransaction, createSettlerResolver, isZeroExNative, type SettlerResolver, type ZeroExExpectation} from "./settler.js";
 
 /**
  * 0x Swap API v2 (docs.0x.org) as a same-chain swap2 provider, Permit2 flow: `/swap/permit2/price` for
@@ -243,7 +243,7 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
 
   return {
     name: ZEROEX_PROVIDER,
-    describeActivity: describeZeroExActivity,
+    describeActivity: (tx, ctx) => describeZeroExActivity(tx, ctx, chains),
     supportsSameChain: true,
     // The quoted gas limit is the API's word: a native sale (like a Permit2 call) goes out with the account's own estimate.
     ownGasEstimate: true,
@@ -590,10 +590,10 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
 
 /**
  * The device's last check before the engine signs a 0x swap, run by the `preflightDeposit` of both providers (in remote
- * mode before the backend's own preflight is asked): the transaction must be the quoted one, and its target must still
- * be a Settler the registry names now — a fresh read through `resolver` (the device's own RPC), so a Settler paused,
- * replaced or removed since the quote (on the review screen, during an approval) is refused here, with nothing signed
- * or sent.
+ * mode before the backend's own preflight is asked): the transaction must be the quoted one, its gas limit (when it
+ * carries one) within the chain's cap, and its target must still be a Settler the registry names now — a fresh read
+ * through `resolver` (the device's own RPC), so a Settler paused, replaced or removed since the quote (on the review
+ * screen, during an approval) is refused here, with nothing signed or sent.
  */
 export async function zeroExPreflightDeposit(quote: Quote, tx: UnsignedTx, ctx: {chains: Readonly<Record<number, ZeroExChain>>; resolver: SettlerResolver}): Promise<void> {
   const quoted = quote.txRequest;
@@ -605,7 +605,9 @@ export async function zeroExPreflightDeposit(quote: Quote, tx: UnsignedTx, ctx: 
     throw refusal("policy_refused", "zeroex: the transaction is not the quoted swap. Nothing was sent; refresh the quote.");
   }
   const chainId = typeof quote.intentId === "string" ? Number(quote.intentId.split(":")[1]) : NaN;
-  if (!zeroExChain(ctx.chains, chainId)) throw refusal("policy_refused", "zeroex: the quote names no chain this provider serves. Nothing was sent.");
+  const chain = zeroExChain(ctx.chains, chainId);
+  if (!chain) throw refusal("policy_refused", "zeroex: the quote names no chain this provider serves. Nothing was sent.");
+  checkZeroExGasLimit(tx.gasLimit, chain, chainId);
   const settlers = await ctx.resolver.resolve(chainId, {fresh: true});
   if (!settlers.some((s) => same(s, quoted.to!))) {
     throw refusal("vault_mismatch", "zeroex: the quoted 0x Settler is no longer in the on-chain registry. Nothing was sent; refresh the quote.");

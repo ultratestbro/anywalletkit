@@ -31,7 +31,7 @@
 import {getAddress, getContractAddress, numberToHex, pad} from "viem";
 import {refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {readPermit2Transfer, type Permit2Transfer} from "@anywalletkit/protocol-swap2-core/util";
-import {ZEROEX_CHAINS, ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_MAX_NONCE, ZEROEX_SETTLER_NONCE_MARGIN, ZEROEX_SETTLER_REGISTRY, ZEROEX_TAKER_FEATURE, zeroExChain, type ZeroExChain} from "./chains.js";
+import {ZEROEX_CHAINS, ZEROEX_GAS_CAP_CEILING, ZEROEX_NATIVE, ZEROEX_PERMIT2, ZEROEX_SETTLER_MAX_NONCE, ZEROEX_SETTLER_NONCE_MARGIN, ZEROEX_SETTLER_REGISTRY, ZEROEX_TAKER_FEATURE, isZeroExGasCap, zeroExChain, type ZeroExChain} from "./chains.js";
 import {isRevert, rpcRequest, rpcUrlsFor, type RpcUrls} from "./rpc.js";
 
 /** `execute((address recipient, address buyToken, uint256 minAmountOut), bytes[] actions, bytes32 zidAndAffiliate)`. */
@@ -397,10 +397,39 @@ export interface ZeroExTransaction {
 }
 
 /**
- * The most gas a 0x swap may be given. Unused gas is refunded, but a reverting route burns up to the limit, so a
- * quote that asks for a block's worth is refused. Real Settler swaps sit well under 2 million.
+ * The most gas a 0x swap may be given on a chain whose table entry sets no cap of its own: the padded limit (0x's gas ×
+ * 1.2 + 20,000). Unused gas is refunded, but a reverting route burns up to the limit, so a quote that asks for a block's
+ * worth is refused. Settler swaps on the first seven chains sit well under 2 million, and they keep this cap. Monad sets
+ * its own ({@link ZeroExChain.maxGasLimit}: 15,000,000): its gas grows with the size of the sale, to millions on large
+ * MON sales, and under this cap 0x sales of MON from about $10,000 were refused on 2026-11-26 (see the README). The
+ * engine never sends the quoted limit (`ownGasEstimate`: the account's own estimate after a dry run), so a cap only
+ * decides which quotes are refused.
  */
 export const ZEROEX_MAX_GAS_LIMIT = 6_000_000n;
+
+/**
+ * The gas cap of a chain table entry: its own `maxGasLimit`, else {@link ZEROEX_MAX_GAS_LIMIT}. An entry whose cap is
+ * not a bigint from 1 to `ZEROEX_GAS_CAP_CEILING` (one built by hand rather than through `zeroExChains`) throws: a
+ * chain table cannot remove the bound.
+ */
+export function zeroExMaxGasLimit(chain: ZeroExChain, chainId?: number): bigint {
+  const cap: unknown = chain.maxGasLimit;
+  if (cap === undefined) return ZEROEX_MAX_GAS_LIMIT;
+  if (!isZeroExGasCap(cap)) throw refuse(`the chain table's gas cap${chainId !== undefined ? ` for chain ${chainId}` : ""} is not a bigint from 1 to ${ZEROEX_GAS_CAP_CEILING}`);
+  return cap;
+}
+
+/**
+ * Hold a transaction's gas limit, when it carries one, to the chain's cap ({@link zeroExMaxGasLimit}): decimal, above
+ * zero, at most the cap. Throws {@link ZeroExTransactionError} (`policy_refused`) naming the chain and its cap.
+ */
+export function checkZeroExGasLimit(gasLimit: unknown, chain: ZeroExChain, chainId: number): void {
+  const cap = zeroExMaxGasLimit(chain, chainId);
+  if (gasLimit === undefined) return;
+  if (typeof gasLimit !== "string" || !/^[0-9]{1,12}$/.test(gasLimit) || BigInt(gasLimit) === 0n || BigInt(gasLimit) > cap) {
+    throw refuse(`the transaction asks for more gas than any 0x swap needs (its gas limit must be 1 to ${cap} on chain ${chainId})`, "policy_refused");
+  }
+}
 
 export interface ZeroExCheckedTransaction {
   execute: SettlerExecute;
@@ -418,7 +447,8 @@ export interface ZeroExCheckedTransaction {
  *     swap's chain.
  *  2. `value` is the input for a native-coin sale and zero for a token sale; a sale that sends value goes only to the
  *     chain's `newestLiveNonce` or `previousLiveNonce` deployment — Settlers that were live when the table was pinned —
- *     never into the margin; a gas limit, when given, is at most {@link ZEROEX_MAX_GAS_LIMIT}.
+ *     never into the margin; a gas limit, when given, is at most the chain's cap ({@link zeroExMaxGasLimit}: its own
+ *     `maxGasLimit`, else {@link ZEROEX_MAX_GAS_LIMIT}).
  *  3. The method is `execute`, and its slippage tuple names the expected recipient, the requested buy token and
  *     exactly the expected minimum (never zero).
  *  4. Token sale: the allowance target is canonical Permit2; the Permit2 payload passes the core reader (Permit2
@@ -463,9 +493,7 @@ export function checkZeroExTransaction(tx: ZeroExTransaction, expected: ZeroExEx
       ? `the swap sends native coin to Settler deployment ${deployment} (${to}) on chain ${expected.chainId}, newer than the newest one live when this module's chain table was pinned (${pin.newestLiveNonce}) — a native-coin sale goes only to a pinned Settler: update @anywalletkit/protocol-swap2-0x`
       : `the swap sends native coin to Settler deployment ${deployment} (${to}) on chain ${expected.chainId}, which was not live when this module's chain table was pinned (${pin.newestLiveNonce} and ${pin.previousLiveNonce} were) — a native-coin sale goes only to a pinned Settler`, "vault_mismatch");
   }
-  if (tx.gasLimit !== undefined && (typeof tx.gasLimit !== "string" || !/^[0-9]{1,12}$/.test(tx.gasLimit) || BigInt(tx.gasLimit) === 0n || BigInt(tx.gasLimit) > ZEROEX_MAX_GAS_LIMIT)) {
-    throw refuse("the transaction asks for more gas than any 0x swap needs", "policy_refused");
-  }
+  checkZeroExGasLimit(tx.gasLimit, pin, expected.chainId);
   if (typeof tx.data !== "string") throw refuse("the transaction has no data", "policy_refused");
 
   const execute = decodeSettlerExecute(tx.data);

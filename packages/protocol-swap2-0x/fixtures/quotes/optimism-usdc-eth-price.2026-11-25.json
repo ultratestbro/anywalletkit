@@ -1,0 +1,135 @@
+{
+ "note": "Real 0x Swap API v2 answer (/swap/permit2/price), Optimism USDC->ETH, recorded 2026-11-26 from api.0x.org with a throwaway taker that holds nothing, keyed (the key is not part of the recording). Response body as 0x sent it; request rebuilt from the recorded query (no headers, no key). registry = what ownerOf(2) / prev(2) answered on that chain at record time (block 160046413), exactly pin era 2026-11-25's pins.",
+ "pinEra": "2026-11-25",
+ "request": {
+  "endpoint": "/swap/permit2/price",
+  "sourceChain": "eip155:10",
+  "sourceToken": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+  "sourceDecimals": 6,
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amountIn": "25000000",
+  "slippageBps": 50,
+  "destAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "refundAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "dry": true,
+  "nowMs": 1795691607000
+ },
+ "registry": {
+  "current": "0x3E41fB68700E84F66Fb4Ee65367E45736CafC239",
+  "prev": "0x11B9a527DFD522888A366C511A7bfd08C7d54Df0"
+ },
+ "response": {
+  "allowanceTarget": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  "blockNumber": "160046415",
+  "buyAmount": "14730708499105016",
+  "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "fees": {
+   "integratorFee": null,
+   "integratorFees": null,
+   "zeroExFee": {
+    "amount": "37500",
+    "token": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+    "type": "volume"
+   },
+   "gasFee": null
+  },
+  "issues": {
+   "allowance": {
+    "actual": "0",
+    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
+   "balance": {
+    "token": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+    "actual": "0",
+    "expected": "25000000"
+   },
+   "simulationIncomplete": false,
+   "invalidSourcesPassed": []
+  },
+  "liquidityAvailable": true,
+  "minBuyAmount": "14657054956609491",
+  "mode": "exact-in",
+  "route": {
+   "fills": [
+    {
+     "from": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+     "to": "0x1f32b1c2345538c0c6f582fcb022739c4a194ebb",
+     "source": "Aero_Slipstream",
+     "proportionBps": "1786"
+    },
+    {
+     "from": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+     "to": "0x4200000000000000000000000000000000000006",
+     "source": "Aero_Slipstream",
+     "proportionBps": "2734"
+    },
+    {
+     "from": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+     "to": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+     "source": "Velodrome_V3",
+     "proportionBps": "1908"
+    },
+    {
+     "from": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+     "to": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+     "source": "Aero_Slipstream",
+     "proportionBps": "1786"
+    },
+    {
+     "from": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+     "to": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+     "source": "Solidly_V3",
+     "proportionBps": "1786"
+    },
+    {
+     "from": "0x1f32b1c2345538c0c6f582fcb022739c4a194ebb",
+     "to": "0x4200000000000000000000000000000000000006",
+     "source": "Balancer_V2",
+     "proportionBps": "1786"
+    },
+    {
+     "from": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+     "to": "0x4200000000000000000000000000000000000006",
+     "source": "Aero_Slipstream",
+     "proportionBps": "5480"
+    }
+   ],
+   "tokens": [
+    {
+     "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+     "symbol": "USDC"
+    },
+    {
+     "address": "0x1f32b1c2345538c0c6f582fcb022739c4a194ebb",
+     "symbol": "wstETH"
+    },
+    {
+     "address": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+     "symbol": "USDT"
+    },
+    {
+     "address": "0x4200000000000000000000000000000000000006",
+     "symbol": "WETH"
+    }
+   ]
+  },
+  "sellAmount": "25000000",
+  "sellToken": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+  "tokenMetadata": {
+   "buyToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   },
+   "sellToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   }
+  },
+  "totalNetworkFee": "102480999380",
+  "zid": "0x3ef1c6fcb1d2a868328861fe",
+  "gas": "1565655",
+  "gasPrice": "62010"
+ }
+}

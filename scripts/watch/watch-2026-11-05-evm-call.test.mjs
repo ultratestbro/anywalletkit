@@ -13,7 +13,7 @@ import {tmpdir} from "node:os";
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {spawn} from "node:child_process";
-import {callData, decodeResult, keccak256, parseSignature, selectorOf} from "./evm-call.mjs";
+import {callData, decodeResult, isRevert, keccak256, parseSignature, selectorOf} from "./evm-call.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const word = (n) => BigInt.asUintN(256, BigInt(n)).toString(16).padStart(64, "0");
@@ -96,11 +96,16 @@ test("decodeResult refuses malformed answers and unknown decode types instead of
   }
 });
 
+test("isRevert: code 3, or a message that starts with \"execution reverted\" (code -32000); nothing else is a revert", () => {
+  for (const e of [{code: 3, message: "execution reverted"}, {code: 3, message: "execution reverted: 0x"}, {code: 3, message: ""}, {code: -32000, message: "execution reverted"}, {code: -32000, message: " Execution reverted: custom error 0x1234"}]) assert.equal(isRevert(e), true, JSON.stringify(e));
+  for (const e of [{code: -32000, message: "header not found; request reverted by gateway"}, {code: -32005, message: "rate limit: revert later"}, {code: -32000, message: "the call was reverted"}, {code: "3", message: "x"}, {message: "reverted"}, null, undefined, "execution reverted"]) assert.equal(isRevert(e), false, JSON.stringify(e));
+});
+
 // ── end to end ─────────────────────────────────────────────────────────────
 function sandbox(manifests) {
   const root = mkdtempSync(join(tmpdir(), "watch-1105-"));
   mkdirSync(join(root, "scripts/watch"), {recursive: true});
-  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs", "manifest.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
   for (const [dir, m] of Object.entries(manifests)) { mkdirSync(join(root, "packages", dir), {recursive: true}); writeFileSync(join(root, "packages", dir, "watch.json"), JSON.stringify(m)); }
   return root;
 }
@@ -190,6 +195,11 @@ test("evm-call end to end: decoded value compared, revert is a reading, other fa
     chain.versionError = "header not found";
     r = await run(root, srv.url);
     assert.match(r.out, /Router NG v1\.2 version · Ethereum: header not found \(previous value kept\)/);
+    assert.equal(readState(root, "curve")["router-version"].value, '"1.2.0"');
+    // Nor a gateway's error that only mentions the word (it matched /revert/i and read as "reverted" before 2026-11-26).
+    chain.versionError = "header not found; request reverted by gateway";
+    r = await run(root, srv.url);
+    assert.match(r.out, /Router NG v1\.2 version · Ethereum: header not found; request reverted by gateway \(previous value kept\)/);
     assert.equal(readState(root, "curve")["router-version"].value, '"1.2.0"');
     chain.versionError = null;
 

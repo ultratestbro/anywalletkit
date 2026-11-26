@@ -250,7 +250,7 @@ test("SEC-U4-R3-1: the canary is required, a pool of the pinned list, at or befo
 function sandbox(rpcUrl, list = LIST_BARE) {
   const root = mkdtempSync(join(tmpdir(), "watch-1126-"));
   mkdirSync(join(root, "scripts/watch"), {recursive: true});
-  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs", "evm-initialize.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs", "evm-initialize.mjs", "manifest.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
   const pkg = join(root, "packages/protocol-swap2-uniswap");
   mkdirSync(join(pkg, "dist"), {recursive: true});
   writeFileSync(join(pkg, "dist/v4pools.js"), `export const UNISWAP_V4_POOLS = ${JSON.stringify({1: list})};\n`);

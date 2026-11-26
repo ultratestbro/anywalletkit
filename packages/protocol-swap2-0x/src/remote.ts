@@ -237,7 +237,7 @@ export function zeroExRemoteProvider(options: ZeroExRemoteOptions): ZeroExRemote
   });
   return {
     ...inner,
-    describeActivity: describeZeroExActivity,
+    describeActivity: (tx, ctx) => describeZeroExActivity(tx, ctx, pins.chains),
     // The quoted gas limit is the backend's word: every call goes out with the account's own estimate.
     ownGasEstimate: true,
     settlerResolver: pins.resolver,

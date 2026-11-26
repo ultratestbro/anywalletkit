@@ -28,7 +28,7 @@ import {zeroExProvider} from "../src/provider.js";
 import {zeroExKnownSpenders, zeroExRemoteProvider, zeroExVerifyQuote} from "../src/remote.js";
 import {createSettlerResolver, decodeSettlerExecute, zeroExSettlerAddress, zeroExSettlerNonce} from "../src/settler.js";
 import {ME, PREV_SETTLER, RPC, SETTLER, USDC, getKey, permit2Typed, stub} from "./fixtures.js";
-import {CURRENT_PIN_ERA, PIN_ERAS, RECORDED, UNRECORDED_PIN_ERAS, bodyOf, chainIdOf, chainsConfigOf, chainsOf, eraChains, loadRecorded, paramsOf, recordedFetch, rpcOf} from "./recorded.js";
+import {CURRENT_PIN_ERA, PIN_ERAS, RECORDED, UNRECORDED_PIN_ERAS, bodyOf, chainIdOf, chainsConfigOf, chainsOf, eraChains, loadRecorded, paramsOf, recordedFetch, registryMismatch, rpcOf} from "./recorded.js";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
@@ -46,26 +46,47 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
 
   it("pins the newest deployment live on 2026-11-25 (0x's 2026-11-24 release) plus a small margin on every chain", () => {
     expect(ZEROEX_SETTLER_NONCE_MARGIN).toBe(2);
-    expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, c.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN]))).toEqual({1: 24, 10: 24, 56: 26, 137: 23, 8453: 25, 42161: 23, 43114: 23});
+    expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, c.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN]))).toEqual({1: 24, 10: 24, 56: 26, 137: 23, 143: 14, 8453: 25, 42161: 23, 43114: 23});
   });
 
   // Each recording is held to the pins of the era it was recorded in (fixtures/pin-eras.json), and the newest era is
-  // the table in force. Raising a pin in src/chains.ts without adding its era fails here. So does an era that has no
-  // recording but is not listed as unrecorded, and an era listed as unrecorded that has recordings.
-  it("every recorded registry answer is covered by the pins of its era, margin untouched — a newer live deployment fails this and verify:live", () => {
+  // the table in force. Raising a pin in src/chains.ts without adding its era fails here, and so does an era without
+  // recordings: every era is recorded (none may be listed as unrecorded, tests/recorded.test.ts).
+  it("every recorded registry answer is exactly the pins of its era, current and previous, margin untouched — a newer live deployment fails this and verify:live", () => {
     expect(eraChains(CURRENT_PIN_ERA)).toEqual(ZEROEX_CHAINS);
     const all = RECORDED.map(loadRecorded);
-    expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era)), "eras with no recording = fixtures/pin-eras.json unrecorded").toEqual(UNRECORDED_PIN_ERAS);
-    for (const name of RECORDED) {
-      const f = loadRecorded(name);
+    expect(UNRECORDED_PIN_ERAS).toEqual([]);
+    expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era)), "every era has recordings").toEqual([]);
+    for (const f of all) {
+      expect(registryMismatch(f), f.name).toBeNull();
       const c = chainsOf(f)[chainIdOf(f)]!;
-      for (const a of [f.registry.current, f.registry.prev]) {
-        if (!a) continue;
-        const n = zeroExSettlerNonce(chainIdOf(f), a, c.registry, c.newestLiveNonce);
-        expect(n, `${name} ${a}`).not.toBeNull();
-        expect(n!, `${name} ${a}`).toBe(a === f.registry.current ? c.newestLiveNonce : c.previousLiveNonce);
-      }
+      expect(zeroExSettlerNonce(chainIdOf(f), f.registry.current, c.registry, c.newestLiveNonce), f.name).toBe(c.newestLiveNonce);
+      // an era that pins a previous deployment (every era so far, on every chain) has it named: prev is never null there
+      if (c.previousLiveNonce < c.newestLiveNonce) expect(zeroExSettlerNonce(chainIdOf(f), f.registry.prev!, c.registry, c.newestLiveNonce), f.name).toBe(c.previousLiveNonce);
+      else expect(f.registry.prev, f.name).toBeNull();
     }
+  });
+
+  // Review 2026-11-26 (C2): a registry answer with no previous Settler was skipped, so a recording (or a recorder bug)
+  // with `prev: null` passed in an era that pins one. Held exactly now, for live answers and /price alike.
+  it.each(["monad-usdc-mon-price.2026-11-25", "monad-mon-ausd.2026-11-25", "base-eth-usdc", "base-eth-usdc-price"])("%s: a registry answer that is not exactly its era's pins is caught — a null prev included", (name) => {
+    const f = loadRecorded(name);
+    expect(registryMismatch(f)).toBeNull();
+    const c = chainsOf(f)[chainIdOf(f)]!;
+    const id = chainIdOf(f);
+    const off = (registry: {current: string; prev: string | null}) => registryMismatch({...f, registry});
+    expect(off({...f.registry, prev: null})).toBe(`registry.prev null is not deployment ${c.previousLiveNonce} (${f.registry.prev}) of era ${f.pinEra} on chain ${id}`);
+    expect(off({current: f.registry.current, prev: f.registry.current})).not.toBeNull();
+    expect(off({current: f.registry.prev!, prev: f.registry.prev})).not.toBeNull();
+    expect(off({...f.registry, prev: zeroExSettlerAddress(id, c.previousLiveNonce - 1)})).not.toBeNull();
+    expect(off({...f.registry, current: zeroExSettlerAddress(id, c.newestLiveNonce + 1)})).not.toBeNull();
+    expect(off({...f.registry, prev: f.registry.prev!.toLowerCase()})).not.toBeNull();
+    // the same answer under another era's pins is no longer exact either
+    const other = PIN_ERAS.find((e) => e !== f.pinEra)!;
+    expect(registryMismatch({...f, pinEra: other})).not.toBeNull();
+    // a chain whose era pins a single deployment (previous = newest) has no previous Settler: null is exact there, a prev is not
+    expect(registryMismatch({...f, pinEra: "single", registry: {current: zeroExSettlerAddress(id, 5), prev: null}}, {single: {[id]: [5, 5]}})).toBeNull();
+    expect(registryMismatch({...f, pinEra: "single", registry: {current: zeroExSettlerAddress(id, 5), prev: zeroExSettlerAddress(id, 4)}}, {single: {[id]: [5, 5]}})).not.toBeNull();
   });
 
   it("refuses a deployment inside the margin that holds no contract (Base 24 on 2026-11-25)", async () => {
@@ -303,7 +324,7 @@ describe("6. deriving Settler addresses stops at the chain's pin", () => {
     expect(describeZeroExActivity(moved, {own: fixture.own})).toBeNull();
   });
 
-  it("a miss on all seven chains is cheap (node; Hermes measured 1.7 s per chain before)", () => {
+  it("a miss on every chain of the table is cheap (node; Hermes measured 1.7 s per chain before)", () => {
     const start = performance.now();
     for (const id of Object.keys(ZEROEX_CHAINS)) expect(zeroExSettlerNonce(Number(id), "0x1111111111111111111111111111111111111111")).toBeNull();
     expect(performance.now() - start).toBeLessThan(1_000);
