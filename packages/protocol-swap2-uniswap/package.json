@@ -28,6 +28,11 @@
       "import": "./dist/protocol.js",
       "require": "./dist/protocol.cjs"
     },
+    "./v4pools": {
+      "types": "./dist/v4pools.d.ts",
+      "import": "./dist/v4pools.js",
+      "require": "./dist/v4pools.cjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -38,9 +43,10 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/build-v4-pools.test.mjs",
     "lint": "eslint src",
-    "verify:live": "node scripts/verify-live.mjs"
+    "verify:live": "node scripts/verify-live.mjs",
+    "build:v4-pools": "node scripts/build-v4-pools.mjs"
   },
   "dependencies": {
     "@anywalletkit/protocol-swap2-core": "workspace:*",
