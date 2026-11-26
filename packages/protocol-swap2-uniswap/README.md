@@ -275,9 +275,11 @@ uniswapRemoteProvider({ baseUrl: "/api/v2/swap2", multiQuotes: true })
 
 ## Price impact: information, or a refusal you opt into
 
-Every quote carries `providerData.priceImpactBps`: the best route's full-size rate against a 1/1000
-probe on the same route (pool fees cancel). By default it is information only — nothing is refused
-for impact, so a wallet can warn and let the user decide.
+A quote carries `providerData.priceImpactBps` when the probe could be measured: the best route's
+full-size rate against a 1/1000 probe on the same route (pool fees cancel). It is left out when the
+input is under 1,000 raw units, or the probe reverted, failed, came back empty, paid 0 or did not
+decode — not a 0, not a broken quote. By default it is information only — nothing is refused for
+impact, so a wallet can warn and let the user decide.
 
 `maxPriceImpactBps` (an integer 1..10000, unset by default) turns it into a refusal, for an app that
 never wants to offer such a route (a web swap page might set 500):
@@ -294,14 +296,21 @@ uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
 - The measure is the larger of the probe and the spot value loss against the pools' `slot0()` mid
   prices, fees included (`providerData.valueLossBps`), rounded down to a whole bp; the pools' floor
   rounding counts as loss (it is value the recipient does not get). A probe too small to run (under
-  1,000 raw units), reverted or empty falls back to spot.
+  1,000 raw units), reverted, empty or unanswered after the retries falls back to spot.
+- The pool fees count toward the limit: a limit at or under a route's fee (100 on a 1% pool, 60 on
+  two 0.3% pools) refuses that route however deep its pools are. Set the limit well above the fee
+  tiers you expect (500 refuses no route on fees alone).
 - Spot must be measured: the probe alone is blind to a pool parked past an empty range. When the
   pool lookups or `slot0()` reads go unanswered after the retries, or come back reverted, zero or in
   another shape, the quote is refused as `rate_limited` / `upstream_unavailable` ("could not measure
   the price impact … try again"), or as `insufficient_liquidity` when the probe alone already reaches
   the limit. A quote never passes with part of the check skipped.
 - At or above the limit: `insufficient_liquidity`, "loses 99.8% of the value to price impact — its
-  pools are too thin for this amount (limit 5%; best route via USDC 0.3% → 0.01%)".
+  pools are too thin for this amount (limit 5%; best route via USDC 0.3% → 0.01%)" when the price
+  impact alone (the probe, or the spot loss net of the pools' fees) reaches the limit; when only the
+  fees bring it there, "loses 1.0% of the value to price impact and pool fees — the route's fees (1%)
+  bring it to the limit; its price impact alone is under it (limit 1%; best route direct 1%)". Both
+  start "loses X% of the value to price impact".
 - `preflightDeposit` does not apply it: the signed minimum governs there.
 - On the app's side `uniswapV4VerifyQuote(params, quote, {maxPriceImpactBps})` gates the same G: the
   larger of the quote's `priceImpactBps` and `valueLossBps` (a gated quote whose probe could not run
@@ -329,37 +338,50 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   | the others | none known: the block gas limit |
 
   The 2²⁴ and 2²⁵ caps were read live on 2026-11-26: `eth_estimateGas` of an endless loop names the
-  most gas a transaction may have, well below those chains' blocks (40M–2B). `pnpm verify:live`
-  (`scripts/verify-live.mjs`, read-only) checks every chain against the tables again, and fails on a
-  chain it cannot reach — and on a check that could not run: the v4 build probe is tried on each RPC
-  until one returns revert data (none: a FAIL), and a quotable v4 chain without a V4Quoter canary
-  pinned is a FAIL. On OP-stack chains every block opens with the L1-info deposit (gasLimit
+  most gas a transaction may have, well below those chains' blocks (30M–2B). Monad's node does not
+  name its allowance: its 30M is the documented limit, not one read live. `pnpm verify:live`
+  (`scripts/verify-live.mjs`, read-only) checks every chain against the tables again — the
+  per-transaction caps, the block reserves, the known block limits and Nitro's execution cap below —
+  and fails on a chain it cannot reach, and on a check that could not run: the v4 build probe is
+  tried on each RPC until one returns revert data (none: a FAIL), and a quotable v4 chain without a
+  V4Quoter canary pinned is a FAIL. On OP-stack chains every block opens with the L1-info deposit (gasLimit
   1,000,000), so a transaction whose limit is the whole block is never included: there the block's
-  limit counts less 1,000,000 (it binds on Celo, a 30M block, and X Layer); MegaETH's deposit is 100,000,000.
+  limit counts less 1,000,000 (it binds on Celo, a 30M block, and X Layer, 210M); MegaETH's deposit is
+  100,000,000. Until their own block has been read, Celo and X Layer are taken to have those blocks.
   Arbitrum One and Robinhood Chain (Nitro) report a 2⁵⁰ block gas limit, but execute at most 32M gas
   per transaction (`ArbGasInfo.getMaxTxGasLimit()`): a need above 32M is refused, and the limit is
   never clamped to 32M (it also pays the L1 gas). zkSync Era also reports 2⁵⁰; its per-transaction
   limit is not known, so only that header applies there.
   The block gas limit is read on its own (`eth_getBlockByNumber`), once per chain, and kept for 10
   minutes (1 minute after a failed read). It is optional: a node that does not serve it, or answers
-  with an error, leaves only the known caps and never fails a quote. A quote waits for it at most
-  1.5 s after the read began, and never past the caller's abort; then it goes by the known caps
-  alone, and the read fills the cache when it lands.
+  with an error, leaves only the known caps and never fails a quote. A quote waits for the first read
+  at most 1.5 s after it began, and never past the caller's abort; then it goes by the known caps
+  alone, and the read fills the cache when it lands. Once a read is in, a quote never waits for the
+  next: while a re-read is pending or has failed, the last answer stands, for up to an hour after it
+  was read.
 - **RPC errors.** A per-item JSON-RPC error that is a revert (code 3; "execution reverted" and other
   EVM errors, out of gas included; revert data whose message names no rate limit or node fault)
   means no candidate, as before. A rate limit (`-32005`, `-32007`, `429`, or its text), a node error
-  or a call without an answer (left out, sent with no `result`, an `eth_call` answering `null`, an
-  error the node sent without an id) is retried, then refused as `rate_limited` /
-  `upstream_unavailable`. It is never read as "no pool" (before 0.4.12, a rate-limited best pool
-  silently lost to a worse route). The retries wait 300–600 ms, then 1–1.5 s, at random. Batches
-  carry at most 10 calls and go out at once, as in 0.4.11; each gets 12 s per endpoint, also when
-  the caller passes its own signal. URLs are taken out of node and transport error text.
-- **`rpcCallsPerSecond` (opt-in).** A server whose keyed endpoint serves a known good-item rate
-  (QuickNode answered 50 calls a second on Monad and `-32007` the rest) sets it: at most that many
-  calls go to one endpoint in any second, across every quote of the provider, in batches of at most
-  that many. A batch waits for its turn, first come first served; one that would wait more than 4 s
-  goes to the next endpoint instead, or with none left is refused as `rate_limited` — the queue never
-  outlives its callers, signal or not. Unset (the default), nothing is limited.
+  or a call without an answer (left out, sent with no `result`, an `eth_call` or `eth_blockNumber`
+  answering `null`, an error the node sent without an id, a candidate quote in a shape QuoterV2
+  never answers — a number, bytes that do not decode, and with `maxPriceImpactBps` an empty `0x`) is
+  retried, then refused as `rate_limited` / `upstream_unavailable`. It is never read as "no pool"
+  (before 0.4.12, a rate-limited best pool silently lost to a worse route). The retries wait
+  300–600 ms, then 1–1.5 s, at random. Batches carry at most 10 calls and go out at once, as in
+  0.4.11; each gets 12 s per endpoint, also when the caller passes its own signal. URLs are taken out
+  of node and transport error text, and so is every spelling of the configured endpoints — one given
+  without a scheme too, which fetch echoes as given.
+- **`rpcCallsPerSecond` (opt-in, an integer ≥ 13).** A server whose keyed endpoint serves a known
+  good-item rate (QuickNode answered 50 calls a second on Monad and `-32007` the rest) sets it: at
+  most that many calls go to one endpoint in any second, across every quote of the provider, counted
+  at the moment each batch went (a batch whose timer fired late keeps the next one waiting), in
+  batches of at most 10. A batch waits for its turn: the quote that began first goes first (its later
+  reads before newer quotes' first ones, so a burst serves the quotes it can), then first come first
+  served. One that would wait more than 4 s, or go later than 5 s after its quote began, goes to the
+  next endpoint instead, or with none left is refused as `rate_limited` — a quote is refused by then
+  rather than run into the router's 8 s, signal or not. 13 is the least that carries the largest quote (51 calls in five passes
+  one after another) on an idle endpoint answering within 0.5 s; a lower value is refused when the
+  provider is built. Unset (the default), nothing is limited.
 
 ## Activity
 

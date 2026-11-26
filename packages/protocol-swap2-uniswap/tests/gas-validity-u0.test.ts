@@ -17,7 +17,7 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import type {Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import {uniswapProvider} from "../src/provider.js";
-import {GAS_NEED_PCT, KNOWN_BLOCK_GAS_RESERVE, KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, gasNeedOf} from "../src/impact.js";
+import {GAS_NEED_PCT, KNOWN_BLOCK_GAS_LIMIT, KNOWN_BLOCK_GAS_RESERVE, KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, gasNeedOf} from "../src/impact.js";
 import {D, ME, USDC, USDT, rpcStub, type StubOptions} from "./fixtures.js";
 
 afterEach(() => {
@@ -70,7 +70,11 @@ describe("gas validity (always on)", () => {
     expect(gasBoundsOf(57073, 30_000_000n)).toEqual({limit: P24});
     expect(gasBoundsOf(57073, 10_000_000n)).toEqual({limit: 9_000_000n});
     expect(gasBoundsOf(42220, 500_000n)).toEqual({limit: 0n}); // a block that holds less than its own deposit: nothing fits
-    expect(gasBoundsOf(42220, undefined)).toEqual({});
+    // Before the block has been read (or after a read failed): the known block limit where the reserve binds (U0-SEC-R3-3).
+    expect(KNOWN_BLOCK_GAS_LIMIT).toEqual({196: 210_000_000n, 42220: 30_000_000n});
+    expect(gasBoundsOf(42220, undefined)).toEqual({limit: 29_000_000n});
+    expect(gasBoundsOf(196, undefined)).toEqual({limit: 209_000_000n});
+    expect(gasBoundsOf(42220, 50_000_000n)).toEqual({limit: 49_000_000n}); // the chain's own block, once read, replaces it
     for (const id of [10, 56, 130, 480, 8453, 57073, 59144]) expect([id, gasBoundsOf(id, undefined)]).toEqual([id, {limit: P24}]);
     expect(gasBoundsOf(8453, 40_000_000n)).toEqual({limit: P24});
     expect(gasBoundsOf(59144, 2_000_000_000n)).toEqual({limit: P24});

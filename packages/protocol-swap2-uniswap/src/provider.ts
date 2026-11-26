@@ -6,8 +6,8 @@ import {refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2Refusal
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
-import {isUnsupportedMethod, shortOfFunds, uniswapRpc, type RpcCall, type RpcSlot} from "./rpc.js";
-import {KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, hopsOf, impactRefusalText, probeImpactBps, spotValueLossBps, validMaxImpactBps} from "./impact.js";
+import {MIN_CALLS_PER_SECOND, QUOTE_WAIT_MAX_MS, isUnsupportedMethod, shortOfFunds, uniswapRpc, type RpcCall, type RpcSlot, type SlotOptions} from "./rpc.js";
+import {KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, hopsOf, impactRefusalText, probeImpactBps, spotImpactNetOfFeesBps, spotValueLossBps, validMaxImpactBps} from "./impact.js";
 import {UNISWAP_V4, V4_NATIVE, uniswapV4DeploymentOf, type UniswapV4Deployment} from "./v4/addresses.js";
 import {UNISWAP_V4_POOLS} from "./v4pools/index.js";
 import {v4ServedDeployment, v4ServesFlow} from "./v4/serve.js";
@@ -65,6 +65,12 @@ const PARTIAL_FILL = "pool liquidity runs out before the full amount (partial fi
 /** How long a chain's block gas limit is trusted before it is read again (ms); a read that failed, for less. */
 const BLOCK_GAS_TTL_MS = 10 * 60_000;
 const BLOCK_GAS_RETRY_MS = 60_000;
+/**
+ * How long a block gas limit read before stays in use while the reads after it are pending or fail (ms): a quote never
+ * waits for a re-read when an answer is in hand (U0-LIVE-5), and a value older than this is dropped, so a wrong
+ * answer does not stay for good when the node stops serving the method.
+ */
+const BLOCK_GAS_STALE_MS = 60 * 60_000;
 /**
  * How long after a block read starts a quote waits for it (ms). The read goes out alongside the quote's own reads, so a
  * healthy node has answered long before; past this, a quote uses the known caps alone (the "node did not say" path)
@@ -252,27 +258,34 @@ export interface UniswapProviderConfig {
    */
   refundNativeInput?: boolean;
   /**
-   * Refuse a quote that loses this many basis points or more of its value to price impact, as `insufficient_liquidity`
-   * (an integer 1..10000; a web swap page sets e.g. 500). Unset (the default): nothing is refused for impact, which
-   * rides on the quote as information (`providerData.priceImpactBps`) — the wallet warns and the user decides.
+   * Refuse a quote that loses this many basis points or more of its value to price impact and pool fees, as
+   * `insufficient_liquidity` (an integer 1..10000; a web swap page sets e.g. 500). Unset (the default): nothing is
+   * refused for impact, which rides on the quote as information (`providerData.priceImpactBps`, when the probe could be
+   * measured) — the wallet warns and the user decides.
    *
    * When set: every candidate is ranked as always and only the best route is gated (a lower-output candidate is never
    * the better offer); every read of the quote is pinned to one block; the measure is the larger of the 1/1000 probe
    * (`priceImpactBps`, fees excluded, transient RPC errors retried) and the spot value loss against the pools'
-   * `slot0()` mid prices (fees included, `providerData.valueLossBps`). A probe too small to run, reverted or empty
-   * leaves spot to decide. Spot must be measured (the probe alone is blind to a pool parked past an empty range): when
-   * its reads go unanswered after the retries, or come back reverted, zero or in another shape, the quote is refused —
+   * `slot0()` mid prices (fees included, `providerData.valueLossBps`). The fees count: a limit at or under the route's
+   * pool fee (100 on a 1% pool, 60 on two 0.3% pools) refuses that route however deep its pools are — the text then
+   * names the fees ("loses 1.0% of the value to price impact and pool fees — the route's fees (1%) bring it to the
+   * limit; …") instead of thin pools. A probe too small to run, reverted, empty or unanswered after the retries leaves
+   * spot to decide. Spot must be measured (the probe alone is blind to a pool parked past an empty range): when its
+   * reads go unanswered after the retries, or come back reverted, zero or in another shape, the quote is refused —
    * `rate_limited` / `upstream_unavailable` (as `insufficient_liquidity` when the probe alone already reaches the
    * limit), never a quote with the check skipped. `preflightDeposit` does not apply it: the signed minimum governs there.
    */
   maxPriceImpactBps?: number;
   /**
    * Most JSON-RPC calls sent to one endpoint in any one second, across every quote, check and read of this provider (an
-   * integer ≥ 1; a server sets the good-item rate its keyed endpoint serves — QuickNode answered 50 calls a second on
-   * Monad and `-32007` the rest, UNISWAP-V4-RESEARCH §5.3). Batches then carry at most this many calls and wait for
-   * their turn on their endpoint, first come first served; one that would wait more than 4 s is sent to the next
-   * endpoint instead, and with none left refused as `rate_limited` (a queue never outlives its callers). Unset (the
-   * default): no limit, every batch goes at once as in 0.4.11 — what the node rate-limits is retried, then refused.
+   * integer ≥ 13, MIN_CALLS_PER_SECOND: the least that carries one quote; a server sets the good-item rate its keyed
+   * endpoint serves — QuickNode answered 50 calls a second on Monad and `-32007` the rest, UNISWAP-V4-RESEARCH §5.3).
+   * Batches then carry at most 10 calls and wait for their turn on their endpoint, counted at the moment each batch
+   * went; turns go to the quote that began first (its later reads before newer quotes' first ones), then first come first
+   * served. A batch that would wait more than 4 s, or go later than 5 s after its quote began, is sent to the next
+   * endpoint instead, and with none left refused as `rate_limited`: a quote is refused by then rather than run past the
+   * router's 8 s. Unset (the default): no limit, every batch goes at once as in 0.4.11 — what the node rate-limits is
+   * retried, then refused.
    */
   rpcCallsPerSecond?: number;
   /**
@@ -371,12 +384,19 @@ export interface UniswapProviderConfig {
   onV4Warning?: (text: string, info: {chainId: number; reason: Swap2RefusalReason}) => void;
 }
 
-/** A chain's block gas read: kept until `until`; a quote waits for it until `waitUntil`; `limit` once `done` (if any). */
+/**
+ * A chain's block gas read: kept until `until`; a quote waits for it until `waitUntil`; `limit` once `done` (if any).
+ * `last` is the newest good answer before it (read at `lastAt`): used, without waiting, while this read is pending or
+ * when it failed.
+ */
 interface BlockGasRead {
   until: number;
   readonly waitUntil: number;
   done: boolean;
   limit?: bigint;
+  readonly last?: bigint;
+  readonly lastAt?: number;
+  readAt?: number;
   read: Promise<void>;
 }
 
@@ -433,7 +453,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const maxImpact = config.maxPriceImpactBps;
   if (maxImpact !== undefined && !validMaxImpactBps(maxImpact)) throw new Error("uniswap: maxPriceImpactBps must be an integer 1..10000");
   const perSecond = config.rpcCallsPerSecond;
-  if (perSecond !== undefined && !(typeof perSecond === "number" && Number.isInteger(perSecond) && perSecond >= 1)) throw new Error("uniswap: rpcCallsPerSecond must be an integer ≥ 1");
+  if (perSecond !== undefined && !(typeof perSecond === "number" && Number.isInteger(perSecond) && perSecond >= MIN_CALLS_PER_SECOND)) {
+    throw new Error(`uniswap: rpcCallsPerSecond must be an integer ≥ ${MIN_CALLS_PER_SECOND} (the least that carries one quote)`);
+  }
   const verified = new Map<number, Promise<void>>();
   /** Each chain's block gas read: until when it holds, until when a quote waits for it, and its answer once in. */
   const blockGas = new Map<number, BlockGasRead>();
@@ -480,6 +502,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   /** The chain's v4 deployment when this provider quotes v4 there (see `v4`), else undefined. Pool provenance (§6.5
    *  row 9): only where the app can check the pools — the shipped list or the integrator's own. */
   const v4Of = (id: number): UniswapV4Deployment | undefined => v4ServedDeployment(id, v4Mode, v4Deployments, v4Extra);
+  /** `rpcCallsPerSecond`: quotes numbered as they begin, for their turns. */
+  let quotesBegun = 0;
 
   const chainIdOf = (caip2: string): number | null => {
     if (!isEvm(caip2)) return null;
@@ -488,7 +512,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   };
 
   /** JSON-RPC for the getQuote/preflight paths: a revert is null; a call the node did not answer throws, classified. */
-  const rpc = (chainId: number, calls: RpcCall[], policy: "none" | "items" | "all", signal?: AbortSignal) => net.results(chainId, calls, policy, signal);
+  const rpc = (chainId: number, calls: RpcCall[], policy: "none" | "items" | "all", signal?: AbortSignal, options?: SlotOptions) => net.results(chainId, calls, policy, signal, options);
   const call = (to: string, data: Hex, block: string = "latest"): RpcCall => ({method: "eth_call", params: [{to, data}, block]});
 
   /** The pinned addresses still describe one deployment (router + quoter agree on factory and WETH). */
@@ -516,31 +540,39 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * its own (`eth_getBlockByNumber("latest", false)`, one pass over the endpoints, never the caller's abort) and kept for
    * BLOCK_GAS_TTL_MS, so a wrong or stale answer does not stay. Optional: a node that does not serve it, errs, or answers
    * without a gasLimit leaves undefined — only the known caps then apply — and never fails a quote; a failed read is
-   * tried again after BLOCK_GAS_RETRY_MS.
+   * tried again after BLOCK_GAS_RETRY_MS. The newest good answer stays in use while a re-read is pending or failed, for
+   * at most BLOCK_GAS_STALE_MS after it was read.
    */
   function blockGasRead(chainId: number): BlockGasRead {
     const now = Date.now();
     const hit = blockGas.get(chainId);
     if (hit && now < hit.until) return hit;
-    const entry: BlockGasRead = {until: now + BLOCK_GAS_TTL_MS, waitUntil: now + BLOCK_GAS_WAIT_MS, done: false, read: Promise.resolve()};
+    const prior = hit?.limit !== undefined ? {last: hit.limit, lastAt: hit.readAt!} : hit?.last !== undefined ? {last: hit.last, lastAt: hit.lastAt!} : {};
+    const entry: BlockGasRead = {until: now + BLOCK_GAS_TTL_MS, waitUntil: now + BLOCK_GAS_WAIT_MS, done: false, ...prior, read: Promise.resolve()};
     entry.read = net.slots(chainId, [{method: "eth_getBlockByNumber", params: ["latest", false]}], "none").then(
       ([s]) => (s && s.ok ? blockGasLimitOf(s.result) : undefined),
       () => undefined,
     ).then((limit) => {
       entry.done = true;
       if (limit === undefined) entry.until = Math.min(entry.until, now + BLOCK_GAS_RETRY_MS);
-      else entry.limit = limit;
+      else {
+        entry.limit = limit;
+        entry.readAt = now;
+      }
     });
     blockGas.set(chainId, entry);
     return entry;
   }
 
   /**
-   * The block gas limit one quote goes by: the read's answer when it is in; else it waits at most until the read's
-   * `waitUntil`, and never past the caller's abort — then undefined (the known caps alone), the read going on.
+   * The block gas limit one quote goes by: the read's answer when it is in; else the newest good answer before it
+   * (still fresh), at once; else it waits at most until the read's `waitUntil`, and never past the caller's abort —
+   * then undefined (the known caps alone), the read going on.
    */
   function blockGasLimit(entry: BlockGasRead, signal?: AbortSignal): Promise<bigint | undefined> {
-    if (entry.done) return Promise.resolve(entry.limit);
+    const last = entry.last !== undefined && Date.now() - entry.lastAt! <= BLOCK_GAS_STALE_MS ? entry.last : undefined;
+    if (entry.done) return Promise.resolve(entry.limit ?? last);
+    if (last !== undefined) return Promise.resolve(last);
     const left = entry.waitUntil - Date.now();
     if (left <= 0 || signal?.aborted) return Promise.resolve(undefined);
     return new Promise((resolve) => {
@@ -586,8 +618,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   }
 
   /** The chain's latest block, normalized: every read of a gated quote is pinned to it. */
-  async function pinBlock(chainId: number, signal?: AbortSignal): Promise<Hex> {
-    const [n] = await rpc(chainId, [{method: "eth_blockNumber", params: []}], "all", signal);
+  async function pinBlock(chainId: number, signal: AbortSignal | undefined, o: SlotOptions): Promise<Hex> {
+    const [n] = await rpc(chainId, [{method: "eth_blockNumber", params: []}], "all", signal, o);
     if (typeof n !== "string" || !/^0x[0-9a-fA-F]{1,16}$/.test(n)) throw refusal("upstream_unavailable", `uniswap: the RPC on chain ${chainId} did not name its latest block`);
     return `0x${BigInt(n).toString(16)}`;
   }
@@ -601,13 +633,13 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * unanswered, reverted, zero or in another shape is the node's fault, never "no pool".
    */
   async function measureImpact(
-    chainId: number, d: UniswapDeployment, route: Route, tokenIn: Hex, tokenOut: Hex, amountIn: bigint, out: bigint, block: Hex, signal?: AbortSignal,
-  ): Promise<{probe?: number; probeFailure?: Error} & ({spot: number} | {spotFailure: Error})> {
+    chainId: number, d: UniswapDeployment, route: Route, tokenIn: Hex, tokenOut: Hex, amountIn: bigint, out: bigint, block: Hex, signal: AbortSignal | undefined, o: SlotOptions,
+  ): Promise<{probe?: number; probeFailure?: Error} & ({spot: number; spotNet: number} | {spotFailure: Error})> {
     const hops = hopsOf(tokenIn, tokenOut, route.single, route.path);
     const probeIn = amountIn / 1000n;
     const calls = hops.map((h) => call(d.factory, encodeFunctionData({abi: POOL_ABI, functionName: "getPool", args: [h.tokenIn, h.tokenOut, h.fee]}), block));
     if (probeIn > 0n) calls.push(call(d.quoter, quoteData(route, tokenIn, tokenOut, probeIn), block));
-    const first = await net.slots(chainId, calls, "all", signal);
+    const first = await net.slots(chainId, calls, "all", signal, o);
     const m: {probe?: number; probeFailure?: Error} = {};
     const probe = first[hops.length];
     if (probe && "failed" in probe) m.probeFailure = probe.failed;
@@ -629,7 +661,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       pools.push(pool);
     }
     const slot0 = encodeFunctionData({abi: POOL_ABI, functionName: "slot0"});
-    const second = await net.slots(chainId, pools.map((pool) => call(pool, slot0, block)), "all", signal);
+    const second = await net.slots(chainId, pools.map((pool) => call(pool, slot0, block)), "all", signal, o);
     const prices: bigint[] = [];
     for (const s of second) {
       if ("failed" in s) return {...m, spotFailure: s.failed};
@@ -638,7 +670,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       prices.push(price);
     }
     const spot = spotValueLossBps(hops, prices, amountIn, out);
-    return spot === undefined ? odd("mid prices that give no value loss") : {...m, spot};
+    const spotNet = spotImpactNetOfFeesBps(hops, prices, amountIn, out);
+    return spot === undefined || spotNet === undefined ? odd("mid prices that give no value loss") : {...m, spot, spotNet};
   }
 
   /**
@@ -1045,6 +1078,10 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     const currencyOut4 = nativeOut ? (V4_NATIVE as Hex) : tokenOut;
     if (!d3 && !v4In) return refuse("the Uniswap v4 SwapProxy takes catalog tokens only (this chain has no Uniswap v3 deployment)", "unsupported_pair");
 
+    // rpcCallsPerSecond: no batch of this quote goes later than QUOTE_WAIT_MAX_MS after it began (U0-LIVE-1), and its
+    // turns come before those of quotes that began after it.
+    const turns: SlotOptions = perSecond === undefined ? {} : {waitUntil: Date.now() + QUOTE_WAIT_MAX_MS, quote: ++quotesBegun};
+
     /** The operator's alert (`onV4Warning`): never the caller's refusal, never a reason to fail the quote. */
     const warn = (text: string, reason: Swap2RefusalReason): void => {
       try {
@@ -1200,6 +1237,24 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
      */
     const readV3 = async (block: string, policy: "items" | "all"): Promise<{best: V3Best | null; partial: boolean}> => {
       const candidates = routes(chainId, params.sourceChain, tokenIn, tokenOut);
+      const gated = maxImpact !== undefined;
+      /**
+       * Each candidate's decoded answer. An answer QuoterV2 never gives — it answers four words or reverts — is no
+       * answer (retried, then upstream_unavailable), never "not a candidate": the best pool would drop out silently
+       * and a worse route win (U0-SEC-R3-2). An empty `"0x"` too with maxPriceImpactBps set; unset, it stays "no
+       * candidate", as 0.4.11 read it.
+       */
+      const decoded = new Map<number, ReturnType<typeof decodeQuote>>();
+      const accept = (raw: unknown, i: number): boolean => {
+        if (raw === "0x") return !gated;
+        if (typeof raw !== "string" || !/^0x[0-9a-fA-F]*$/.test(raw)) return false;
+        try {
+          decoded.set(i, decodeQuote(!!candidates[i]!.single, raw as Hex));
+          return true;
+        } catch {
+          return false;
+        }
+      };
       const results = await rpc(
         chainId,
         candidates.map((r) =>
@@ -1213,24 +1268,19 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         ),
         policy,
         signal,
+        {...turns, accept},
       );
       let best: V3Best | null = null;
       let partial = false;
       for (let i = 0; i < results.length; i++) {
         const raw = results[i];
-        if (typeof raw !== "string" || raw === "0x") continue;
-        const r = candidates[i]!;
-        try {
-          const {out, drained, gas} = decodeQuote(!!r.single, raw as Hex);
-          if (out <= 0n) continue;
-          if (drained) {
-            partial = true;
-            continue;
-          }
-          if (!best || out > best.out) best = {route: r, out, gas};
-        } catch {
-          /* a malformed slot is just not a candidate */
+        const q = typeof raw === "string" && raw !== "0x" ? decoded.get(i) : undefined; // a revert (null) or unset's "0x": no candidate
+        if (!q || q.out <= 0n) continue;
+        if (q.drained) {
+          partial = true;
+          continue;
         }
+        if (!best || q.out > best.out) best = {route: candidates[i]!, out: q.out, gas: q.gas};
       }
       return {best, partial};
     };
@@ -1261,6 +1311,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
                 : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [route.path!, probeIn]}))],
               "none",
               signal,
+              turns,
             );
             if (typeof raw === "string" && raw !== "0x") {
               const [probeOut] = decodeFunctionResult({abi: QUOTER_ABI, functionName: route.single ? "quoteExactInputSingle" : "quoteExactInput", data: raw as Hex}) as readonly [bigint];
@@ -1281,7 +1332,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // the trade loses 98.7%, UNISWAP-V4-RESEARCH §7.2). So spot must be measured: when its reads fail the quote is
         // refused (fail closed) — at the limit already on the probe alone, else as the RPC's failure; an unmeasured
         // probe leaves spot to decide.
-        const m = await measureImpact(chainId, d, route, tokenIn, tokenOut, amountIn, out, block as Hex, signal);
+        const m = await measureImpact(chainId, d, route, tokenIn, tokenOut, amountIn, out, block as Hex, signal, turns);
         if ("spotFailure" in m) {
           if (m.probe !== undefined && m.probe >= maxImpact) return no3(impactRefusalText(m.probe, maxImpact, route.label), "insufficient_liquidity");
           return no3("could not measure the price impact (maxPriceImpactBps is set) — nothing was quoted; try again", refusalOf(m.probeFailure ?? m.spotFailure) ?? "upstream_unavailable");
@@ -1289,7 +1340,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         priceImpactBps = m.probe;
         valueLossBps = m.spot;
         const loss = m.probe === undefined ? m.spot : Math.max(m.probe, m.spot);
-        if (loss >= maxImpact) return no3(impactRefusalText(loss, maxImpact, route.label), "insufficient_liquidity");
+        if (loss >= maxImpact) {
+          // The gate goes by the loss with the pools' fees in it; the text names what got it there. Thin pools when
+          // the price impact alone (the probe, or spot net of fees) reaches the limit, else the route's own fees.
+          const thin = (m.probe ?? 0) >= maxImpact || m.spotNet >= maxImpact;
+          return no3(impactRefusalText(loss, maxImpact, route.label, thin ? undefined : route.poolFee), "insufficient_liquidity");
+        }
       }
 
       const bps = params.slippageBps ?? slippageDefault;
@@ -1501,7 +1557,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         if (!needV3 && !v4Ready) return out;
         const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
         const gated = maxImpact !== undefined;
-        const block = gated ? await pinBlock(chainId, signal) : "latest";
+        const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
         const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal) : undefined;
         v4Run?.catch(() => {});
         let v3: {best: V3Best | null; partial: boolean} | undefined;
@@ -1586,7 +1642,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // Unset: at "latest", as 0.4.11 read them (a call the node did not answer is retried, then refused — never
       // read as "no pool").
       const gated = maxImpact !== undefined;
-      const block = gated ? await pinBlock(chainId, signal) : "latest";
+      const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
       // v4 reads go out alongside the v3 ones, at the same block; any of them failing refuses the quote (never a
       // smaller candidate set). Handled here so a v3 failure first leaves no unhandled rejection behind.
       const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal) : undefined;

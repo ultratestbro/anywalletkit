@@ -22,7 +22,11 @@
 //   code override, names the highest gasLimit the node lets a transaction have — "gas required exceeds allowance
 //   (16777216)"; where KNOWN_TX_GAS_CAP lists the chain the two must agree; where it does not, a 2^24 or 2^25 allowance
 //   below the block's is a cap the table misses) and the block's own reserve (an OP-stack L1-info deposit must be covered
-//   by KNOWN_BLOCK_GAS_RESERVE, and a listed chain must still open its blocks with one).
+//   by KNOWN_BLOCK_GAS_RESERVE, and a listed chain must still open its blocks with one), KNOWN_BLOCK_GAS_LIMIT (the
+//   block limit taken before a chain's own block is read: the latest block's gasLimit) and KNOWN_EXECUTION_GAS_CAP
+//   (Arbitrum Nitro: ArbGasInfo(0x…6C).getMaxTxGasLimit(), or the third word of getGasAccountingParams() where the
+//   first is not served). A node that does not name its allowance (ALLOWANCE_UNREPORTED) is reported with its
+//   documented cap: that one is not read live.
 // - corridors, through the built provider with v4 "all" and maxPriceImpactBps 500 (cp0x's setting): Monad 1 / 100 /
 //   62,000 MON → AUSD (a v4 quote under the limit, or the refusal — never a quote at or above it; 1 MON must quote),
 //   100 and 2,000 AUSD → MON and 700 / 20,000 USDC → AUSD (token input: v3, or v4 through the SwapProxy; the 2,000 and
@@ -36,7 +40,8 @@
 //   account.
 // Every chain is a step: an unreachable chain, or an answer in another shape, is a FAIL with a "Reason:" line, and the
 // run exits 1 with a final "Reason:" line naming every chain that is not ok. RPC_<chainId>=url[,url] in the environment
-// replaces the public RPCs below; URLs are never printed.
+// replaces the public RPCs below; URLs are never printed, in any spelling (a URL given without a scheme is echoed by
+// fetch as given).
 //
 // src/impact.ts is imported as TypeScript (Node ≥ 22.18 strips types); build the workspace first (`pnpm -s --filter
 // "@anywalletkit/protocol-swap2-uniswap..." run build`).
@@ -45,7 +50,7 @@ import { UNISWAP_V3, UNISWAP_V4, uniswapPins, uniswapRemoteProvider } from '../d
 import { uniswapProvider } from '../dist/provider.js'
 import { UNISWAP_V4_POOLS } from '../dist/v4pools.js'
 import { UR_ABI, V4_EXACT_IN_SINGLE_ABI, V4_QUOTER_ABI, V4_SETTLE_ABI, V4_SWAP_INPUT_ABI, V4_TAKE_ABI, decodeV4Revert, v4RevertChain } from '../dist/v4.js'
-import { KNOWN_BLOCK_GAS_RESERVE, KNOWN_TX_GAS_CAP } from '../src/impact.ts'
+import { KNOWN_BLOCK_GAS_LIMIT, KNOWN_BLOCK_GAS_RESERVE, KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP } from '../src/impact.ts'
 import { createSwap2Handler } from '@anywalletkit/protocol-swap2-core/server'
 
 const PUBLIC = {
@@ -111,10 +116,40 @@ const CANARY = {
 }
 const POOL_MANAGER = encodeFunctionData({ abi: parseAbi(['function poolManager() view returns (address)']), functionName: 'poolManager' })
 const V3_ABI = parseAbi(['function factory() view returns (address)', 'function WETH9() view returns (address)'])
+const ARB_GAS_INFO = '0x000000000000000000000000000000000000006C'
+const GET_MAX_TX_GAS_LIMIT = '0xaae1cd4c' // getMaxTxGasLimit()
+const GET_GAS_ACCOUNTING_PARAMS = '0x612af178' // getGasAccountingParams(): (speedLimitPerSecond, gasPoolMax, maxTxGasLimit)
 
-const redact = (s) => String(s).replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, '<url>').slice(0, 200)
 const urlsOf = (id) => (process.env[`RPC_${id}`] ? process.env[`RPC_${id}`].split(',').map((u) => u.trim()).filter(Boolean) : PUBLIC[id] ?? [])
 const short = (a) => `${a.slice(0, 10)}…`
+/** Every spelling of every endpoint this run may use, longest first: as given, without its scheme, host + path, path. */
+const SPELLINGS = (() => {
+  const out = new Set()
+  const add = (s) => s && s.length >= 6 && out.add(s)
+  const all = [...Object.values(PUBLIC).flat(), ...Object.keys(process.env).filter((k) => /^RPC_\d+$/.test(k)).flatMap((k) => process.env[k].split(','))]
+  for (const raw of all) {
+    const u = raw.trim()
+    const bare = u.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^\/\//, '')
+    add(u)
+    add(bare)
+    for (const text of [u, `https://${bare}`]) {
+      try {
+        const p = new URL(text)
+        add(p.href)
+        add(p.href.replace(/^[a-z][a-z0-9+.-]*:\/\//i, ''))
+        add(`${p.host}${p.pathname}${p.search}`)
+        if (p.pathname.length > 1 || p.search) add(`${p.pathname}${p.search}`)
+        if (p.username || p.password) add(`${p.username}:${p.password}`)
+      } catch {}
+    }
+  }
+  return [...out].sort((a, b) => b.length - a.length)
+})()
+const redact = (s) => {
+  let t = String(s)
+  for (const u of SPELLINGS) if (t.includes(u)) t = t.split(u).join('<url>')
+  return t.replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, '<url>').slice(0, 200)
+}
 
 /** One JSON-RPC call over the chain's URLs: the first that answers (an error object is an answer). */
 async function rpc(urls, method, params) {
@@ -244,13 +279,15 @@ async function v4Facts(id, urls, problems, notes) {
   problems.push(`build probe did not run: no node returned revert data (${silent.join('; ').slice(0, 160)}) — set RPC_${id} to a node that does`)
 }
 
-// ── gas bounds (unchanged from 0.4.12) ──────────────────────────────────────────────────────────────────────────────
+// ── gas bounds (as 0.4.12 checks them) ──────────────────────────────────────────────────────────────────────────────
 
 async function gasFacts(id, urls, problems, notes) {
   const block = await rpc(urls, 'eth_getBlockByNumber', ['latest', false])
   if (!block.result || !/^0x[0-9a-f]+$/i.test(block.result.gasLimit ?? '')) throw new Error(`the latest block came back without a gasLimit (${redact(JSON.stringify(block.error ?? block.result))})`)
   const blockGas = BigInt(block.result.gasLimit)
   notes.push(`block gasLimit ${blockGas}`)
+  const assumed = KNOWN_BLOCK_GAS_LIMIT[id]
+  if (assumed !== undefined && assumed !== blockGas) problems.push(`KNOWN_BLOCK_GAS_LIMIT has ${assumed}, the latest block's is ${blockGas}`)
 
   // The block's reserve.
   const reserve = KNOWN_BLOCK_GAS_RESERVE[id]
@@ -275,13 +312,30 @@ async function gasFacts(id, urls, problems, notes) {
     const text = String(est.error?.message ?? '')
     const n = /(\d{6,})/.exec(text)?.[1]
     if (n === undefined) {
-      if (ALLOWANCE_UNREPORTED.has(id)) notes.push(`the node does not name its allowance ("${redact(text)}")${known !== undefined ? `; cap ${known} as documented` : ''}`)
+      if (ALLOWANCE_UNREPORTED.has(id)) notes.push(`the node does not name its allowance ("${redact(text)}")${known !== undefined ? `; cap ${known} as documented (not read live)` : ''}`)
       else problems.push(`the estimate did not name the allowance: "${redact(text)}"`)
     } else {
       const allowance = BigInt(n)
       notes.push(`tx allowance ${allowance}`)
       if (known !== undefined && allowance !== known) problems.push(`KNOWN_TX_GAS_CAP has ${known}, the node allows ${allowance}${allowance < known ? ' (a lower cap, or an RPC gas cap: check another endpoint)' : ' (the cap was lifted?)'}`)
       if (known === undefined && POWERS.has(allowance) && allowance < blockGas) problems.push(`a per-transaction cap of ${allowance} below the block's ${blockGas} that KNOWN_TX_GAS_CAP does not have`)
+    }
+  }
+
+  // Nitro's execution cap.
+  const execution = KNOWN_EXECUTION_GAS_CAP[id]
+  if (execution !== undefined) {
+    const word = (r, i) => (typeof r.result === 'string' && /^0x[0-9a-f]*$/i.test(r.result) && r.result.length >= 2 + 64 * (i + 1) ? BigInt(`0x${r.result.slice(2 + 64 * i, 2 + 64 * (i + 1))}`) : undefined)
+    let max = word(await rpc(urls, 'eth_call', [{ to: ARB_GAS_INFO, data: GET_MAX_TX_GAS_LIMIT }, 'latest']), 0)
+    let from = 'getMaxTxGasLimit()'
+    if (max === undefined) {
+      max = word(await rpc(urls, 'eth_call', [{ to: ARB_GAS_INFO, data: GET_GAS_ACCOUNTING_PARAMS }, 'latest']), 2)
+      from = 'getGasAccountingParams()'
+    }
+    if (max === undefined) problems.push('ArbGasInfo answered neither getMaxTxGasLimit() nor getGasAccountingParams()')
+    else {
+      notes.push(`execution cap ${max} (${from})`)
+      if (max !== execution) problems.push(`KNOWN_EXECUTION_GAS_CAP has ${execution}, ArbGasInfo.${from} reads ${max}`)
     }
   }
 }
