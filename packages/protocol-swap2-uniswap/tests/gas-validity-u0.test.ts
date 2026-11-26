@@ -57,8 +57,9 @@ function blockRead(o: StubOptions, answer: object | {http: number} | undefined, 
 describe("gas validity (always on)", () => {
   it("the bounds: 2^24 (EIP-7825) on eight chains, Polygon 2^25, Monad 30M, the block's own limit less its reserve; Nitro's 32M execution cap is never clamped to", () => {
     const P24 = 16_777_216n;
-    expect(KNOWN_TX_GAS_CAP).toEqual({1: P24, 10: P24, 56: P24, 130: P24, 480: P24, 8453: P24, 57073: P24, 59144: P24, 137: 33_554_432n, 143: 30_000_000n});
-    expect(KNOWN_BLOCK_GAS_RESERVE).toEqual({10: 1_000_000n, 130: 1_000_000n, 196: 1_000_000n, 480: 1_000_000n, 8453: 1_000_000n, 42220: 1_000_000n, 57073: 1_000_000n});
+    // 0.5.0: Arc's 2^24 cap and MegaETH's 100M deposit reserve, both v4-only chains, read live by verify:live 2026-11-26.
+    expect(KNOWN_TX_GAS_CAP).toEqual({1: P24, 10: P24, 56: P24, 130: P24, 480: P24, 8453: P24, 57073: P24, 59144: P24, 5042: P24, 137: 33_554_432n, 143: 30_000_000n});
+    expect(KNOWN_BLOCK_GAS_RESERVE).toEqual({10: 1_000_000n, 130: 1_000_000n, 196: 1_000_000n, 480: 1_000_000n, 8453: 1_000_000n, 42220: 1_000_000n, 57073: 1_000_000n, 4326: 100_000_000n});
     expect(KNOWN_EXECUTION_GAS_CAP).toEqual({42161: 32_000_000n, 4663: 32_000_000n});
     expect(gasBoundsOf(1, 60_000_000n)).toEqual({limit: P24});
     expect(gasBoundsOf(1, 10_000_000n)).toEqual({limit: 10_000_000n});

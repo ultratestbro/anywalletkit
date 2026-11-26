@@ -94,6 +94,8 @@ export function impactRefusalText(lossBps: number, limitBps: number, routeLabel:
  *   Linea also enforce it.
  * - 2²⁵ = 33,554,432: Polygon PoS.
  * - 30M: Monad ("Transaction gas limit 30M gas", docs.monad.xyz).
+ * - Arc (5042, a v4-only chain) also enforces 2²⁴: read live by the 0.5.0 `verify:live` on 2026-11-26 (allowance
+ *   16,777,216 against a 30M block).
  * The 2²⁴ and 2²⁵ caps were read live, read-only, on 2026-11-26 (scripts/verify-live.mjs): `eth_estimateGas` of an
  * endless loop (a code override) reports the allowance a transaction can have — "gas required exceeds allowance
  * (16777216)" — against block gas limits of 40M–2B, while the same nodes' `eth_call` runs 100M (so not an RPC gas cap).
@@ -108,6 +110,7 @@ export const KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = Object.freeze(
   8453: 16_777_216n,
   57073: 16_777_216n,
   59144: 16_777_216n,
+  5042: 16_777_216n,
   137: 33_554_432n,
   143: 30_000_000n,
 });
@@ -117,7 +120,9 @@ export const KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = Object.freeze(
  * OP-stack chains each block opens with the L1-info deposit (type 0x7e, gasLimit 1,000,000, about 46k used), so a
  * transaction whose gasLimit is the whole block never fits what is left and is never included — it waits in the pool
  * and holds the account's later nonces. Read live on 2026-11-26 on every chain listed (the latest block's first
- * transaction); it binds where no per-transaction cap is lower: Celo (30M block) and X Layer.
+ * transaction); it binds where no per-transaction cap is lower: Celo (30M block) and X Layer. MegaETH (4326, a v4-only
+ * chain) opens its blocks with a 100,000,000-gas deposit (its blocks hold 10B), read the same way by the 0.5.0
+ * `verify:live` on 2026-11-26.
  */
 export const KNOWN_BLOCK_GAS_RESERVE: Readonly<Record<number, bigint>> = Object.freeze({
   10: 1_000_000n,
@@ -127,6 +132,7 @@ export const KNOWN_BLOCK_GAS_RESERVE: Readonly<Record<number, bigint>> = Object.
   8453: 1_000_000n,
   42220: 1_000_000n,
   57073: 1_000_000n,
+  4326: 100_000_000n,
 });
 
 /**

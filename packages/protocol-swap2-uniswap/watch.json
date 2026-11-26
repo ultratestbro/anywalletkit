@@ -384,6 +384,1051 @@
       "label": "Uniswap deployments.json · every pinned factory / QuoterV2 / SwapRouter02 listed and active"
     },
     {
+      "id": "v4-poolmanager-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+      "label": "Uniswap v4 PoolManager · Ethereum"
+    },
+    {
+      "id": "v4-quoter-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x99bd42B2B22e531f283b7F8a86dFf631EB16A9D1",
+      "label": "Uniswap v4 V4Quoter · Ethereum"
+    },
+    {
+      "id": "v4-stateview-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227",
+      "label": "Uniswap v4 StateView · Ethereum"
+    },
+    {
+      "id": "v4-router-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x23617e59A5925b2A4Bf75d73ff6711cD0b29De85",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Ethereum"
+    },
+    {
+      "id": "v4-swapproxy-ethereum",
+      "type": "evm-code",
+      "chainId": 1,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Ethereum"
+    },
+    {
+      "id": "v4-pm-owner-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Ethereum (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-ethereum",
+      "type": "evm-call",
+      "chainId": 1,
+      "to": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Ethereum (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x9a13F98Cb987694C9F086b1F5eB990EeA8264Ec3",
+      "label": "Uniswap v4 PoolManager · Optimism"
+    },
+    {
+      "id": "v4-quoter-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0xd673F731EDFe5AaF1bDa7FD43D13Bbb5150B87Ca",
+      "label": "Uniswap v4 V4Quoter · Optimism"
+    },
+    {
+      "id": "v4-stateview-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0xc18a3169788F4F75A170290584ECA6395C75Ecdb",
+      "label": "Uniswap v4 StateView · Optimism"
+    },
+    {
+      "id": "v4-router-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0xC09255D86DB563cBc11C2fCf4a0C512e160111B4",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Optimism"
+    },
+    {
+      "id": "v4-swapproxy-op-mainnet",
+      "type": "evm-code",
+      "chainId": 10,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Optimism"
+    },
+    {
+      "id": "v4-pm-owner-op-mainnet",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x9a13F98Cb987694C9F086b1F5eB990EeA8264Ec3",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Optimism (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-op-mainnet",
+      "type": "evm-call",
+      "chainId": 10,
+      "to": "0x9a13F98Cb987694C9F086b1F5eB990EeA8264Ec3",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Optimism (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x28e2Ea090877bF75740558f6BFB36A5ffeE9e9dF",
+      "label": "Uniswap v4 PoolManager · BNB Chain"
+    },
+    {
+      "id": "v4-quoter-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x95C086d7fE28AdD842ee220fef225a777474d781",
+      "label": "Uniswap v4 V4Quoter · BNB Chain"
+    },
+    {
+      "id": "v4-stateview-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0xd13Dd3D6E93f276FAfc9Db9E6BB47C1180aeE0c4",
+      "label": "Uniswap v4 StateView · BNB Chain"
+    },
+    {
+      "id": "v4-router-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0xDc264714F68d84CF29BC605589405E78bDBE7C9f",
+      "label": "Uniswap v4 Universal Router 2.1.2 · BNB Chain"
+    },
+    {
+      "id": "v4-swapproxy-bnb-chain",
+      "type": "evm-code",
+      "chainId": 56,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · BNB Chain"
+    },
+    {
+      "id": "v4-pm-owner-bnb-chain",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x28e2Ea090877bF75740558f6BFB36A5ffeE9e9dF",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · BNB Chain (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-bnb-chain",
+      "type": "evm-call",
+      "chainId": 56,
+      "to": "0x28e2Ea090877bF75740558f6BFB36A5ffeE9e9dF",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · BNB Chain (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x1F98400000000000000000000000000000000004",
+      "label": "Uniswap v4 PoolManager · Unichain"
+    },
+    {
+      "id": "v4-quoter-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0xF885781cB68A0BE66AA2AC7eDa5Fe72Bde7dA907",
+      "label": "Uniswap v4 V4Quoter · Unichain"
+    },
+    {
+      "id": "v4-stateview-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x86e8631A016F9068C3f085fAF484Ee3F5fDee8f2",
+      "label": "Uniswap v4 StateView · Unichain"
+    },
+    {
+      "id": "v4-router-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0xD1b797D92d87B688193A2B976eFc8D577D204343",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Unichain"
+    },
+    {
+      "id": "v4-swapproxy-unichain",
+      "type": "evm-code",
+      "chainId": 130,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Unichain"
+    },
+    {
+      "id": "v4-pm-owner-unichain",
+      "type": "evm-call",
+      "chainId": 130,
+      "to": "0x1F98400000000000000000000000000000000004",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Unichain (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-unichain",
+      "type": "evm-call",
+      "chainId": 130,
+      "to": "0x1F98400000000000000000000000000000000004",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Unichain (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x67366782805870060151383F4BbFF9daB53e5cD6",
+      "label": "Uniswap v4 PoolManager · Polygon"
+    },
+    {
+      "id": "v4-quoter-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x31AB0Dea31FC0ad5A54F03cD59C896eCD067447B",
+      "label": "Uniswap v4 V4Quoter · Polygon"
+    },
+    {
+      "id": "v4-stateview-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x5eA1bD7974c8A611cBAB0bDCAFcB1D9CC9b3BA5a",
+      "label": "Uniswap v4 StateView · Polygon"
+    },
+    {
+      "id": "v4-router-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0xDc264714F68d84CF29BC605589405E78bDBE7C9f",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Polygon"
+    },
+    {
+      "id": "v4-swapproxy-polygon",
+      "type": "evm-code",
+      "chainId": 137,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Polygon"
+    },
+    {
+      "id": "v4-pm-owner-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x67366782805870060151383F4BbFF9daB53e5cD6",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Polygon (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-polygon",
+      "type": "evm-call",
+      "chainId": 137,
+      "to": "0x67366782805870060151383F4BbFF9daB53e5cD6",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Polygon (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e",
+      "label": "Uniswap v4 PoolManager · Monad"
+    },
+    {
+      "id": "v4-quoter-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0xa222Dd357A9076d1091Ed6Aa2e16C9742dD26891",
+      "label": "Uniswap v4 V4Quoter · Monad"
+    },
+    {
+      "id": "v4-stateview-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x77395F3b2E73aE90843717371294fa97cC419D64",
+      "label": "Uniswap v4 StateView · Monad"
+    },
+    {
+      "id": "v4-router-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0xa6CE4F10d83dBdDAc17E68e1837ca9cE6a1b596e",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Monad"
+    },
+    {
+      "id": "v4-swapproxy-monad",
+      "type": "evm-code",
+      "chainId": 143,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Monad"
+    },
+    {
+      "id": "v4-pm-owner-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Monad (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-monad",
+      "type": "evm-call",
+      "chainId": 143,
+      "to": "0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Monad (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "label": "Uniswap v4 PoolManager · X Layer"
+    },
+    {
+      "id": "v4-quoter-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x8928074CA1b241D8Ec02815881c1Af11E8bC5219",
+      "label": "Uniswap v4 V4Quoter · X Layer"
+    },
+    {
+      "id": "v4-stateview-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
+      "label": "Uniswap v4 StateView · X Layer"
+    },
+    {
+      "id": "v4-router-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x1cd182C94fcF42277B80DBB9060F88024809E61E",
+      "label": "Uniswap v4 Universal Router 2.1.2 · X Layer"
+    },
+    {
+      "id": "v4-swapproxy-x-layer",
+      "type": "evm-code",
+      "chainId": 196,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · X Layer"
+    },
+    {
+      "id": "v4-pm-owner-x-layer",
+      "type": "evm-call",
+      "chainId": 196,
+      "to": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · X Layer (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-x-layer",
+      "type": "evm-call",
+      "chainId": 196,
+      "to": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · X Layer (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0xb1860D529182ac3BC1F51Fa2ABd56662b7D13f33",
+      "label": "Uniswap v4 PoolManager · World Chain"
+    },
+    {
+      "id": "v4-quoter-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0xAD02601f1bE313C952AD198c0Cbc3F87f9eE8E63",
+      "label": "Uniswap v4 V4Quoter · World Chain"
+    },
+    {
+      "id": "v4-stateview-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0x51D394718bc09297262e368c1A481217FdEB71eb",
+      "label": "Uniswap v4 StateView · World Chain"
+    },
+    {
+      "id": "v4-router-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f",
+      "label": "Uniswap v4 Universal Router 2.1.2 · World Chain"
+    },
+    {
+      "id": "v4-swapproxy-world-chain",
+      "type": "evm-code",
+      "chainId": 480,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · World Chain"
+    },
+    {
+      "id": "v4-pm-owner-world-chain",
+      "type": "evm-call",
+      "chainId": 480,
+      "to": "0xb1860D529182ac3BC1F51Fa2ABd56662b7D13f33",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · World Chain (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-world-chain",
+      "type": "evm-call",
+      "chainId": 480,
+      "to": "0xb1860D529182ac3BC1F51Fa2ABd56662b7D13f33",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · World Chain (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0x12D4Fd9C5DeDd00ab8a0bCe2CF0167bbf94b6B1F",
+      "label": "Uniswap v4 PoolManager · HyperEVM"
+    },
+    {
+      "id": "v4-quoter-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0x108Bfe38532C98f8Cd8D7Ab49c9dDAa3675a1c5e",
+      "label": "Uniswap v4 V4Quoter · HyperEVM"
+    },
+    {
+      "id": "v4-stateview-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0x1656326235cb9E34Cb58CaDe53AE30789AB32A1A",
+      "label": "Uniswap v4 StateView · HyperEVM"
+    },
+    {
+      "id": "v4-router-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0xeD270A1Bcdc63cf1356D695e7f40961d4819d6bF",
+      "label": "Uniswap v4 Universal Router 2.1.2 · HyperEVM"
+    },
+    {
+      "id": "v4-swapproxy-hyperevm",
+      "type": "evm-code",
+      "chainId": 999,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · HyperEVM"
+    },
+    {
+      "id": "v4-pm-owner-hyperevm",
+      "type": "evm-call",
+      "chainId": 999,
+      "to": "0x12D4Fd9C5DeDd00ab8a0bCe2CF0167bbf94b6B1F",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · HyperEVM (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-hyperevm",
+      "type": "evm-call",
+      "chainId": 999,
+      "to": "0x12D4Fd9C5DeDd00ab8a0bCe2CF0167bbf94b6B1F",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · HyperEVM (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0xaCB7e78fa05D562e0A5D3089ec896D57D057d38E",
+      "label": "Uniswap v4 PoolManager · MegaETH"
+    },
+    {
+      "id": "v4-quoter-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0x94bDC671f0c35F44a1DaA53143fd1f868D1623b9",
+      "label": "Uniswap v4 V4Quoter · MegaETH"
+    },
+    {
+      "id": "v4-stateview-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0x726f84e1DFb8d375a365e0808282f40D52D3E4e8",
+      "label": "Uniswap v4 StateView · MegaETH"
+    },
+    {
+      "id": "v4-router-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0xAedd1CF4C14e833140A61E9C0d2b73a64795c823",
+      "label": "Uniswap v4 Universal Router 2.1.2 · MegaETH"
+    },
+    {
+      "id": "v4-swapproxy-megaeth",
+      "type": "evm-code",
+      "chainId": 4326,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · MegaETH"
+    },
+    {
+      "id": "v4-pm-owner-megaeth",
+      "type": "evm-call",
+      "chainId": 4326,
+      "to": "0xaCB7e78fa05D562e0A5D3089ec896D57D057d38E",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · MegaETH (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-megaeth",
+      "type": "evm-call",
+      "chainId": 4326,
+      "to": "0xaCB7e78fa05D562e0A5D3089ec896D57D057d38E",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · MegaETH (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "label": "Uniswap v4 PoolManager · Robinhood Chain"
+    },
+    {
+      "id": "v4-quoter-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94",
+      "label": "Uniswap v4 V4Quoter · Robinhood Chain"
+    },
+    {
+      "id": "v4-stateview-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+      "label": "Uniswap v4 StateView · Robinhood Chain"
+    },
+    {
+      "id": "v4-router-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x204FAca1764B154221e35c0d20aBb3c525710498",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Robinhood Chain"
+    },
+    {
+      "id": "v4-swapproxy-robinhood-chain",
+      "type": "evm-code",
+      "chainId": 4663,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Robinhood Chain"
+    },
+    {
+      "id": "v4-pm-owner-robinhood-chain",
+      "type": "evm-call",
+      "chainId": 4663,
+      "to": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Robinhood Chain (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-robinhood-chain",
+      "type": "evm-call",
+      "chainId": 4663,
+      "to": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Robinhood Chain (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-arc",
+      "type": "evm-code",
+      "chainId": 5042,
+      "address": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "label": "Uniswap v4 PoolManager · Arc"
+    },
+    {
+      "id": "v4-quoter-arc",
+      "type": "evm-code",
+      "chainId": 5042,
+      "address": "0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94",
+      "label": "Uniswap v4 V4Quoter · Arc"
+    },
+    {
+      "id": "v4-stateview-arc",
+      "type": "evm-code",
+      "chainId": 5042,
+      "address": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+      "label": "Uniswap v4 StateView · Arc"
+    },
+    {
+      "id": "v4-router-arc",
+      "type": "evm-code",
+      "chainId": 5042,
+      "address": "0x8702463e73f74d0b6765aBceb314Ef07aCb92650",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Arc"
+    },
+    {
+      "id": "v4-swapproxy-arc",
+      "type": "evm-code",
+      "chainId": 5042,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Arc"
+    },
+    {
+      "id": "v4-pm-owner-arc",
+      "type": "evm-call",
+      "chainId": 5042,
+      "to": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Arc (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-arc",
+      "type": "evm-call",
+      "chainId": 5042,
+      "to": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Arc (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+      "label": "Uniswap v4 PoolManager · Base"
+    },
+    {
+      "id": "v4-quoter-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xE1A6C5803e3c44368b171BD680c7D32dfc92CA47",
+      "label": "Uniswap v4 V4Quoter · Base"
+    },
+    {
+      "id": "v4-stateview-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71",
+      "label": "Uniswap v4 StateView · Base"
+    },
+    {
+      "id": "v4-router-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0xd6145b2D3F379919E8CdEda7B97e37c4b2Ca9c40",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Base"
+    },
+    {
+      "id": "v4-swapproxy-base",
+      "type": "evm-code",
+      "chainId": 8453,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Base"
+    },
+    {
+      "id": "v4-pm-owner-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Base (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-base",
+      "type": "evm-call",
+      "chainId": 8453,
+      "to": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Base (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "label": "Uniswap v4 PoolManager · Arbitrum"
+    },
+    {
+      "id": "v4-quoter-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x8928074CA1b241D8Ec02815881c1Af11E8bC5219",
+      "label": "Uniswap v4 V4Quoter · Arbitrum"
+    },
+    {
+      "id": "v4-stateview-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
+      "label": "Uniswap v4 StateView · Arbitrum"
+    },
+    {
+      "id": "v4-router-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x2d01411773c8C24805306E89A41F7855C3c4Fe65",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Arbitrum"
+    },
+    {
+      "id": "v4-swapproxy-arbitrum",
+      "type": "evm-code",
+      "chainId": 42161,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Arbitrum"
+    },
+    {
+      "id": "v4-pm-owner-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Arbitrum (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-arbitrum",
+      "type": "evm-call",
+      "chainId": 42161,
+      "to": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Arbitrum (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0x288dc841A52FCA2707c6947B3A777c5E56cd87BC",
+      "label": "Uniswap v4 PoolManager · Celo"
+    },
+    {
+      "id": "v4-quoter-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0x28566da1093609182dFf2cB2A91CFD72e61d66cd",
+      "label": "Uniswap v4 V4Quoter · Celo"
+    },
+    {
+      "id": "v4-stateview-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0xbc21f8720BABf4b20d195eE5C6e99c52b76F2bfb",
+      "label": "Uniswap v4 StateView · Celo"
+    },
+    {
+      "id": "v4-router-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0xe2023F3FA515cF070e07fD9d51c1d236e07843f4",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Celo"
+    },
+    {
+      "id": "v4-swapproxy-celo",
+      "type": "evm-code",
+      "chainId": 42220,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Celo"
+    },
+    {
+      "id": "v4-pm-owner-celo",
+      "type": "evm-call",
+      "chainId": 42220,
+      "to": "0x288dc841A52FCA2707c6947B3A777c5E56cd87BC",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Celo (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-celo",
+      "type": "evm-call",
+      "chainId": 42220,
+      "to": "0x288dc841A52FCA2707c6947B3A777c5E56cd87BC",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Celo (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x06380C0e0912312B5150364B9DC4542BA0DbBc85",
+      "label": "Uniswap v4 PoolManager · Avalanche"
+    },
+    {
+      "id": "v4-quoter-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0xf27e532878B622d6b916F524E8711880107D4eF0",
+      "label": "Uniswap v4 V4Quoter · Avalanche"
+    },
+    {
+      "id": "v4-stateview-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0xc3c9e198C735a4b97e3e683f391cCBDD60B69286",
+      "label": "Uniswap v4 StateView · Avalanche"
+    },
+    {
+      "id": "v4-router-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x661E93cca42AfacB172121EF892830cA3b70F08d",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Avalanche"
+    },
+    {
+      "id": "v4-swapproxy-avalanche",
+      "type": "evm-code",
+      "chainId": 43114,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Avalanche"
+    },
+    {
+      "id": "v4-pm-owner-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x06380C0e0912312B5150364B9DC4542BA0DbBc85",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Avalanche (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-avalanche",
+      "type": "evm-call",
+      "chainId": 43114,
+      "to": "0x06380C0e0912312B5150364B9DC4542BA0DbBc85",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Avalanche (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "label": "Uniswap v4 PoolManager · Ink"
+    },
+    {
+      "id": "v4-quoter-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x8928074CA1b241D8Ec02815881c1Af11E8bC5219",
+      "label": "Uniswap v4 V4Quoter · Ink"
+    },
+    {
+      "id": "v4-stateview-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
+      "label": "Uniswap v4 StateView · Ink"
+    },
+    {
+      "id": "v4-router-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x661E93cca42AfacB172121EF892830cA3b70F08d",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Ink"
+    },
+    {
+      "id": "v4-swapproxy-ink",
+      "type": "evm-code",
+      "chainId": 57073,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Ink"
+    },
+    {
+      "id": "v4-pm-owner-ink",
+      "type": "evm-call",
+      "chainId": 57073,
+      "to": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Ink (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-ink",
+      "type": "evm-call",
+      "chainId": 57073,
+      "to": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Ink (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x248083Fb965359d82b06C1F5322480Dcfc1AD857",
+      "label": "Uniswap v4 PoolManager · Linea"
+    },
+    {
+      "id": "v4-quoter-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x2C125569C0BeE20A66E33E5491C552B37EBD9934",
+      "label": "Uniswap v4 V4Quoter · Linea"
+    },
+    {
+      "id": "v4-stateview-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0xE861de206E460A8b936b05ad3816520B58ccDf9b",
+      "label": "Uniswap v4 StateView · Linea"
+    },
+    {
+      "id": "v4-router-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0xDc264714F68d84CF29BC605589405E78bDBE7C9f",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Linea"
+    },
+    {
+      "id": "v4-swapproxy-linea",
+      "type": "evm-code",
+      "chainId": 59144,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Linea"
+    },
+    {
+      "id": "v4-pm-owner-linea",
+      "type": "evm-call",
+      "chainId": 59144,
+      "to": "0x248083Fb965359d82b06C1F5322480Dcfc1AD857",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Linea (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-linea",
+      "type": "evm-call",
+      "chainId": 59144,
+      "to": "0x248083Fb965359d82b06C1F5322480Dcfc1AD857",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Linea (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-poolmanager-elysium",
+      "type": "evm-code",
+      "chainId": 99901,
+      "address": "0xE2e105d3F7209A9DA11f83cCf3E7398a753823F1",
+      "label": "Uniswap v4 PoolManager · Elysium"
+    },
+    {
+      "id": "v4-quoter-elysium",
+      "type": "evm-code",
+      "chainId": 99901,
+      "address": "0x379F556c5a748BD7Cc9baF0F7A344094Ac1814f5",
+      "label": "Uniswap v4 V4Quoter · Elysium"
+    },
+    {
+      "id": "v4-stateview-elysium",
+      "type": "evm-code",
+      "chainId": 99901,
+      "address": "0x27eD73aE0652fdCf71d6793412A7525f32bE9dfE",
+      "label": "Uniswap v4 StateView · Elysium"
+    },
+    {
+      "id": "v4-router-elysium",
+      "type": "evm-code",
+      "chainId": 99901,
+      "address": "0xA13f7611115752DEB2B13813BDDE16A5073e4b45",
+      "label": "Uniswap v4 Universal Router 2.1.2 · Elysium"
+    },
+    {
+      "id": "v4-swapproxy-elysium",
+      "type": "evm-code",
+      "chainId": 99901,
+      "address": "0x0000000085E102724e78eCd2F45DC9cA239Affad",
+      "label": "Uniswap v4 SwapProxy · Elysium"
+    },
+    {
+      "id": "v4-pm-owner-elysium",
+      "type": "evm-call",
+      "chainId": 99901,
+      "to": "0xE2e105d3F7209A9DA11f83cCf3E7398a753823F1",
+      "signature": "owner()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager owner() · Elysium (sets the protocol-fee controller; governance on every chain)"
+    },
+    {
+      "id": "v4-pm-fee-controller-elysium",
+      "type": "evm-call",
+      "chainId": 99901,
+      "to": "0xE2e105d3F7209A9DA11f83cCf3E7398a753823F1",
+      "signature": "protocolFeeController()",
+      "decode": "address",
+      "label": "Uniswap v4 PoolManager protocolFeeController() · Elysium (may set a protocol fee up to 0.1% per direction)"
+    },
+    {
+      "id": "v4-deployments-status",
+      "type": "json-pins",
+      "url": "https://developers.uniswap.org/deployments.json",
+      "format": "uniswap-deployments",
+      "pins": {
+        "from": "dist/index.js",
+        "export": "UNISWAP_V4",
+        "group": "$key",
+        "roles": {
+          "poolManager": "PoolManager",
+          "quoter": "V4Quoter",
+          "stateView": "StateView",
+          "universalRouter": "UniversalRouter#v2.1.2",
+          "swapProxy": "SwapProxy"
+        }
+      },
+      "status": "active",
+      "label": "Uniswap deployments.json · every pinned v4 PoolManager / V4Quoter / StateView / UniversalRouter#v2.1.2 / SwapProxy listed and active"
+    },
+    {
+      "id": "universal-router",
+      "type": "github-releases",
+      "repo": "Uniswap/universal-router",
+      "label": "Uniswap Universal Router releases (the pinned build is 2.1.2)"
+    },
+    {
+      "id": "v4-periphery",
+      "type": "github-releases",
+      "repo": "Uniswap/v4-periphery",
+      "label": "Uniswap v4 periphery releases (V4Router actions, V4Quoter)"
+    },
+    {
+      "id": "v4-core",
+      "type": "github-releases",
+      "repo": "Uniswap/v4-core",
+      "label": "Uniswap v4 core releases (PoolManager)"
+    },
+    {
       "id": "v4-pools-ethereum",
       "type": "evm-initialize",
       "chainId": 1,
