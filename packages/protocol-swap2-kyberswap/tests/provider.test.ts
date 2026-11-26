@@ -39,6 +39,7 @@ describe("kyberswapProvider.getQuote — dry", () => {
     await quote({}, {calls}, {apiKey: "secret"});
     expect(calls[0]!.url.startsWith("https://api.kyberswap.com/swap/base/api/v1/routes")).toBe(true);
     expect(calls[0]!.headers["x-api-key"]).toBe("secret");
+    expect(calls[0]!.headers["x-client-id"]).toBeUndefined();
   });
 
   it("reuses a dry route for the same request within a few seconds", async () => {

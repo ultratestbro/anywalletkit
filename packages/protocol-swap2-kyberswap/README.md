@@ -28,9 +28,9 @@ returns is checked on the device against the pinned router and the app's own req
 |---|---|---|
 | `rpcUrls` | — | per chain id; without one, execution quotes on that chain are refused |
 | `enabledChains` | all of `KYBER_CHAINS` | |
-| `apiKey` | — | KyberSwap API-gateway key (`X-Api-Key`, `https://api.kyberswap.com/swap`); keep it on a server |
+| `apiKey` | — | KyberSwap API-gateway key (`X-Api-Key`, `https://api.kyberswap.com/swap`); keep it on a server. With a key, `x-client-id` is not sent |
 | `baseUrl` | public API | override the API base |
-| `clientId` | `anywalletkit` | |
+| `clientId` | `anywalletkit` | `x-client-id` (keyless only) and the build's `source` |
 | `defaultSlippageBps` | 50 | KyberSwap accepts under 2000 |
 | `quoteTtlMs` | 30 000 | how long a quote stays executable (the review fits; an approval mined meanwhile gets one re-quote) |
 | `excludeRfqSources` | `true` | RFQ / private market makers quote for seconds only |

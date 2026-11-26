@@ -135,7 +135,9 @@ export function kyberswapProvider(config: KyberswapProviderConfig = {}): CrossCh
   const ttl = config.quoteTtlMs ?? DEFAULT_TTL_MS;
   const timeoutMs = config.timeoutMs ?? 10_000;
   const enabledChains = config.enabledChains ? new Set(config.enabledChains) : null;
-  const headers: Record<string, string> = {"x-client-id": clientId, ...(config.apiKey ? {"x-api-key": config.apiKey} : {})};
+  // KyberSwap asked (2026-11-25): with a key, send X-Api-Key only, without x-client-id.
+  // The build's `source` still carries the client id on-chain.
+  const headers: Record<string, string> = config.apiKey ? {"x-api-key": config.apiKey} : {"x-client-id": clientId};
   const dryCache = new Map<string, {at: number; value: Promise<RoutesResult>}>();
 
   const chainIdOf = (caip2: string): number | null => {
