@@ -142,6 +142,61 @@ test("evm-proxy: implementation() is read when the EIP-1967 slot is empty, a fir
   } finally { srv.close(); }
 });
 
+test("evm-proxy: a failed read of the implementation's code or the beacon's implementation() fails the source, never a change (review 2026-11-26 round 3)", async () => {
+  // A 0x-registry-like ERC-1967 proxy and a beacon proxy. `implCode` / `beaconCall` say how those reads answer today.
+  const REG = "0x0000000000001ff3684f28c67538d4d072c22734", IMPL = "0x0e992c001e375785846eeb9cd69411b53f30f24b";
+  const BP = "0x00000000000000000000000000000000000000bb", BEACON = "0x00000000000000000000000000000000000000bc", BIMPL = "0x00000000000000000000000000000000000000bd";
+  const codes = {[REG]: "0x6080ee", [IMPL]: "0x60ee", [BP]: "0x6080ff", [BIMPL]: "0x60ff"};
+  let implCode = "ok", beaconCall = "ok";
+  const srv = await serve((method, [a, b]) => {
+    if (method === "eth_getCode") {
+      if (a.toLowerCase() === IMPL && implCode === "limited") return {error: {code: -32005, message: "request rate exceeded"}};
+      return {result: codes[a.toLowerCase()] ?? "0x"};
+    }
+    if (method === "eth_getStorageAt") return {result: a === REG && b.startsWith("0x3608") ? pad(IMPL) : a === BP && b.startsWith("0xa3f0") ? pad(BEACON) : ZERO};
+    if (method === "eth_call" && a.to === BEACON && a.data === "0x5c60da1b") {
+      if (beaconCall === "limited") return {error: {code: -32005, message: "request rate exceeded"}};
+      if (beaconCall === "reverted") return {error: {code: 3, message: "execution reverted"}};
+      return {result: pad(BIMPL)};
+    }
+    return {error: {code: -32601, message: "method not found"}};
+  });
+  const root = sandbox({zx: {module: "@anywalletkit/zx", sources: [
+    {id: "registry", type: "evm-proxy", chainId: 1, address: REG, label: "0x Settler registry"},
+    {id: "beacon", type: "evm-proxy", chainId: 1, address: BP, label: "Beacon proxy"},
+  ]}});
+  try {
+    let r = await run(root, srv.url);
+    assert.equal(r.code, 0, r.err);
+    const good = readState(root, "zx");
+    assert.equal(good.registry.meta.implCodeHash, sha16(codes[IMPL]));
+    assert.equal(good.beacon.meta.beaconImpl, BIMPL);
+
+    // Both reads rate-limited: each source fails and keeps its value (it stored the value without implCodeHash /
+    // beaconImpl before, and the next good read was "implementation code changed (— → …)").
+    implCode = "limited"; beaconCall = "limited";
+    r = await run(root, srv.url);
+    assert.match(r.out, /0 changed, 2 unreachable/, r.out);
+    assert.match(r.out, /0x Settler registry: implementation code: request rate exceeded \(previous value kept\)/);
+    assert.match(r.out, /Beacon proxy: beacon implementation\(\): request rate exceeded \(previous value kept\)/);
+    let st = readState(root, "zx");
+    assert.equal(st.registry.value, good.registry.value);
+    assert.equal(st.beacon.value, good.beacon.value);
+
+    // The next good read is no change.
+    implCode = "ok"; beaconCall = "ok";
+    r = await run(root, srv.url);
+    assert.match(r.out, /0 changed, 0 unreachable/, r.out);
+
+    // A beacon whose implementation() reverts is an answer (none), and that is a change.
+    beaconCall = "reverted";
+    r = await run(root, srv.url);
+    assert.match(r.out, /1 changed, 0 unreachable/, r.out);
+    st = readState(root, "zx");
+    assert.equal("beaconImpl" in st.beacon.meta, false, "a reverting implementation() names none, as before");
+  } finally { srv.close(); }
+});
+
 const CALLDATA = (bridge) => `const GENERIC_SWAPS: Readonly<Record<string, {single: boolean}>> = {
   "0x4666fc80": {single: true, from: "erc20", to: "erc20"}, // swapTokensSingleV3ERC20ToERC20
 };

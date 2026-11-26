@@ -99,7 +99,13 @@ const F = {
     ]);
     if (!code || code === "0x") throw new Error("no code at address");
     const meta = {codeHash: sha(code).slice(0, 16), impl: addrOfSlot(impl), admin: addrOfSlot(admin), beacon: addrOfSlot(beacon)};
-    if (meta.beacon) { try { const r = await rpc(url, "eth_call", [{to: meta.beacon, data: "0x5c60da1b"}, "latest"]); meta.beaconImpl = addrOfSlot(r); } catch {} }
+    // The beacon's implementation(): only a revert means "none". Any other failure fails the source (previous value kept):
+    // swallowed, it stored a value without beaconImpl, and the next good read was reported as a change (review
+    // 2026-11-26 round 3, the same as implCodeHash below).
+    if (meta.beacon) {
+      try { meta.beaconImpl = addrOfSlot(await rpc(url, "eth_call", [{to: meta.beacon, data: "0x5c60da1b"}, "latest"])); }
+      catch (e) { if (!(e.rpcError && isRevert(e))) throw new Error(`beacon implementation(): ${e.message}`); }
+    }
     // No EIP-1967 slot: an AragonProxy (stETH) or a FiatTokenProxy (USDC) names its implementation through
     // implementation() instead, and its own code never changes on an upgrade (triage 2026-11-04). Only a revert means
     // "none": any other failure fails the source (previous value kept), so a flaky RPC never reads as a lost implementation.
@@ -113,7 +119,16 @@ const F = {
       meta.implProbe = true;
       if (r) { meta.impl = r; meta.implVia = "implementation()"; }
     }
-    if (meta.impl) { try { const ic = await rpc(url, "eth_getCode", [meta.impl, "latest"]); meta.implCodeHash = sha(ic).slice(0, 16); } catch {} }
+    // The implementation's code: a read that fails fails the source (previous value kept). Swallowed, a rate-limited
+    // eth_getCode stored the value without implCodeHash, and the next good read was reported as "implementation code
+    // changed (— → …)" on a proxy nothing had touched — an RPC fault posted as an upstream change (review 2026-11-26
+    // round 3: the 0x registry on BSC, HTTP 429).
+    if (meta.impl) {
+      let ic;
+      try { ic = await rpc(url, "eth_getCode", [meta.impl, "latest"]); } catch (e) { throw new Error(`implementation code: ${e.message}`); }
+      if (typeof ic !== "string") throw new Error("implementation code: no result");
+      meta.implCodeHash = sha(ic).slice(0, 16);
+    }
     const {implProbe: _probe, ...compared} = meta;
     return {value: canonical(compared), meta};
   },

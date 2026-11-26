@@ -17,7 +17,7 @@ import {createServer} from "node:http";
 import {tmpdir} from "node:os";
 import {dirname, join, resolve} from "node:path";
 import {fileURLToPath, pathToFileURL} from "node:url";
-import {NOTE_MAX, REASON_MAX, failingLines, noteOf, retryTextOf, rpcOverrides, runStatus, severityOf, shortNote} from "./canary-status.mjs";
+import {NOTE_MAX, REASON_MAX, failingLines, higherSeverity, noteOf, retryKept, retryTextOf, rpcOverrides, runStatus, severityOf, shortNote, softLines} from "./canary-status.mjs";
 import {RATE_LIMIT_WAIT_MS, RETRY_WAIT_MS, retryWaitMs} from "./retry-wait.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -112,8 +112,15 @@ test("without a Reason line the note is what it was: cause lines, else the last 
     {status: "fail", lines: ["x".repeat(500)], soft: []},
     {status: "warn", lines: [], soft: ["reserve → Error: frozen", "cap reached FAILED", "3", "4"]},
     {status: "ok", lines: ["ok"], soft: []},
+    // Review 2026-11-26 round 3: edge whitespace is kept as it was — the Morpho warnings in watch/canary/state.json
+    // start with a space (`console.log("   quoteSupply →", …)`), and a trimmed note was a warn → warn transition.
+    {status: "warn", lines: [], soft: ["   quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached)"]},
+    {status: "fail", lines: ["ok quote x", "ok quote y", "something", "nothing to cancel — "], soft: []},
+    {status: "fail", lines: ["  TypeError: fetch failed  ", "  at x  "], soft: []},
   ];
   for (const r of runs) assert.equal(noteOf(r), before(r), JSON.stringify(r).slice(0, 80));
+  assert.equal(noteOf(runs[5]), " quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached)");
+  assert.equal(noteOf(runs[6]), "ok quote x | ok quote y | something | nothing to cancel — ");
   assert.doesNotMatch(noteOf(runs[1]), /secret|x\.example/);
   assert.equal(shortNote("plain note without a reason", 5), "plain");
 });
@@ -158,7 +165,9 @@ const word = (hex) => "0x" + hex.replace(/^0x/, "").toLowerCase().padStart(64, "
  * answers the right chain id and nothing else (no code, empty calls: an RPC with no state); gateway.test answers
  * ownerOf(2) with a gateway error that contains the word "reverted"; keyecho.test answers every eth_call with a rate
  * limit that echoes a key; notjson.test answers HTTP 429 with a text body that echoes a key; badid.test answers
- * eth_chainId with text that is not a chain id; flakyrevert.test reverts the first ownerOf(2) only.
+ * eth_chainId with text that is not a chain id; flakyrevert.test reverts the first ownerOf(2) only. Review 2026-11-26
+ * round 3: emptyowner.test answers ownerOf(2) with an empty result (no Settler) and says so on stderr each time;
+ * partial.test answers everything but rate-limits eth_getCode of the Settler ownerOf(2) names (-32005).
  */
 async function verifyLive(world, urls = {}) {
   const m = await import(pathToFileURL(resolve(pkg, "dist/index.js")).href);
@@ -185,6 +194,8 @@ async function verifyLive(world, urls = {}) {
     if (host === "gateway.test" && isOwnerOf) return fail(-32000, "header not found; request reverted by gateway");
     if (host === "keyecho.test" && method === "eth_call") return fail(-32005, "rate limit exceeded for key SECRETKEYAAAA1234");
     if (host === "flakyrevert.test" && isOwnerOf && (globalThis.flakyRevert = (globalThis.flakyRevert ?? 0) + 1) === 1) { process.stderr.write("stub: ownerOf(2) reverted once\\n"); return fail(3, "execution reverted"); }
+    if (host === "emptyowner.test" && isOwnerOf) { process.stderr.write("stub: ownerOf(2) empty\\n"); return ok("0x"); }
+    if (host === "partial.test" && method === "eth_getCode" && params[0].toLowerCase() === c.current) return fail(-32005, "request rate exceeded");
     if (method === "eth_chainId") return ok("0x" + Number(host === "wrong.test" ? 1 : id).toString(16));
     if (method === "eth_call" && params[0].data.startsWith("0x6352211e")) {
       if (host === "rl.test") return fail(-32005, "request rate exceeded");
@@ -325,7 +336,7 @@ test("the canary's zeroex job gets RPC_<chainId> for every RPC variable set; its
   mkdirSync(join(root, "watch"), {recursive: true});
   writeFileSync(join(root, "watch/addresses.json"), JSON.stringify({eip155: "0x0000000000000000000000000000000000000001", solana: "x", ton: "x"}));
   // A stand-in for the 0x verify-live: it records which RPC_<id> it was given (names, and whether each value is ours,
-  // never the value) and ends as a failed run does. The canary retries a failure once, after 20 s.
+  // never the value) and ends as a failed run does. The canary retries a failure once (after 20 s; --retry-wait 0 here).
   const job = join(root, "packages/protocol-swap2-0x/scripts");
   mkdirSync(job, {recursive: true});
   writeFileSync(join(job, "verify-live.mjs"), `import {writeFileSync} from "node:fs";
@@ -342,7 +353,7 @@ test("the canary's zeroex job gets RPC_<chainId> for every RPC variable set; its
   try {
     // EVM / Base / Arbitrum answer the canary's own block-number reads (approvals jobs); Monad and Polygon are "ours".
     const env = {PATH: process.env.PATH, EVM_RPC_URL: local, BASE_RPC_URL: local, ARBITRUM_RPC_URL: local, MONAD_RPC_URL: "http://ours.example/monad", POLYGON_RPC_URL: "http://ours.example/polygon", OPTIMISM_RPC_URL: ""};
-    const child = spawn(process.execPath, [join(root, "scripts/watch/canary.mjs"), "--only", "zeroex"], {env, stdio: ["ignore", "pipe", "pipe"]});
+    const child = spawn(process.execPath, [join(root, "scripts/watch/canary.mjs"), "--only", "zeroex", "--retry-wait", "0"], {env, stdio: ["ignore", "pipe", "pipe"]});
     let err = "";
     child.stderr.on("data", (c) => (err += c));
     const code = await new Promise((r) => child.on("close", r));
@@ -453,6 +464,13 @@ test("a job without summaryLines: an upstream `Reason:` is one more cause line a
     assert.equal(noteOf(run), legacyNote(run), lines[0]);
     assert.equal(run.severity, null, lines[0]);
   }
+  // indented and trailing-space lines, as Morpho's verify-live prints them (round 3): the note is the old one, untrimmed
+  for (const [code, out] of [[0, "morpho 137\n   quoteSupply → MorphoError Compound USDC: deposits are closed right now (caps reached)\n"], [1, "ok quote x\nnothing to cancel — \n"]]) {
+    for (const summaryLines of [false, true]) {
+      const run = runStatus({code, signal: null, out, summaryLines});
+      if (code === 0 || !summaryLines) assert.equal(noteOf(run), legacyNote(run), `${out} ${summaryLines}`);
+    }
+  }
 });
 
 test("the canary reads Reason / Severity only from the job it declares summaryLines (zeroex), not from another job's output", async () => {
@@ -474,7 +492,7 @@ test("the canary reads Reason / Severity only from the job it declares summaryLi
   const local = `http://127.0.0.1:${srv.address().port}`;
   try {
     const env = {PATH: process.env.PATH, EVM_RPC_URL: local, BASE_RPC_URL: local, ARBITRUM_RPC_URL: local};
-    const child = spawn(process.execPath, [join(root, "scripts/watch/canary.mjs"), "--only", "relay"], {env, stdio: ["ignore", "pipe", "pipe"]});
+    const child = spawn(process.execPath, [join(root, "scripts/watch/canary.mjs"), "--only", "relay", "--retry-wait", "0"], {env, stdio: ["ignore", "pipe", "pipe"]});
     let err = "";
     child.stderr.on("data", (c) => (err += c));
     const code = await new Promise((r) => child.on("close", r));
@@ -487,4 +505,166 @@ test("the canary reads Reason / Severity only from the job it declares summaryLi
     const day = JSON.parse(readFileSync(join(root, "watch/canary", `${new Date().toISOString().slice(0, 10)}.json`), "utf8"));
     assert.deepEqual(day.failing, [{id: "relay", status: "fail", note: state.relay.note}]);
   } finally { srv.close(); }
+});
+
+// ── review 2026-11-26 round 3: the retry keeps the first run's alarm; the registry's word survives a later failed read ──
+
+test("a job that fails its retry too keeps the higher severity of the two runs and the first run's Reason lines (round 3)", () => {
+  const firstOut = ["NEW chain   8453   Base             Settler 0xabc (deployment 24; pinned 23 / previous 22, token sales up to 25)", "FAILED (1)",
+    "Severity: high — sales through the Settler in force are refused today: native-coin sales on 8453 (a new deployment; 0x may keep quoting the previous Settler for a while, which still passes): check it, then update the pins in src/chains.ts",
+    "Reason: NEW on 8453"].join("\n");
+  const secondOut = ["??? chain   8453   Base             no RPC answered (2 tries, RPC_8453; last: eth_call: RPC error -32005 (rate limited)) — the chain is unchecked, which fails this run", "FAILED (1)", "Reason: unreachable on 8453"].join("\n");
+  const first = runStatus({code: 1, signal: null, out: firstOut, summaryLines: true});
+  const second = runStatus({code: 1, signal: null, out: secondOut, summaryLines: true});
+  assert.equal(first.severity, "high");
+  assert.equal(second.severity, null);
+  const kept = retryKept(first, second);
+  assert.equal(kept.severity, "high", "the retry's missing severity does not drop the first run's");
+  assert.ok(kept.note.startsWith("Reason: NEW on 8453 | Reason: unreachable on 8453 | ??? chain 8453 Base no RPC answered"), kept.note);
+  assert.ok(kept.note.length <= NOTE_MAX);
+  // the same Reason on both runs is kept once; the note is the retry's
+  assert.deepEqual(retryKept(second, second), {note: noteOf(second), severity: null});
+  assert.equal(retryKept(first, first).note, noteOf(first));
+  // a higher severity on the retry wins; neither has one: none
+  assert.equal(retryKept(second, first).severity, "high");
+  assert.equal(higherSeverity("low", "medium"), "medium");
+  assert.equal(higherSeverity(null, undefined), null);
+  // a retry that timed out (no Reason line): the first run's Reason leads its note
+  const timedOut = runStatus({code: null, signal: "SIGKILL", out: "ok  chain   1 …\n", summaryLines: true});
+  assert.equal(timedOut.status, "timeout");
+  assert.ok(retryKept(first, timedOut).note.startsWith("Reason: NEW on 8453"), retryKept(first, timedOut).note);
+  assert.equal(retryKept(first, timedOut).severity, "high");
+  // a job without summaryLines: the retry's note as before, no severity
+  const plainFirst = runStatus({code: 1, signal: null, out: firstOut});
+  const plainSecond = runStatus({code: 1, signal: null, out: secondOut});
+  assert.deepEqual(retryKept(plainFirst, plainSecond), {note: noteOf(plainSecond), severity: null});
+});
+
+test("the canary: a zeroex run with Severity: high whose retry fails as unreachable keeps the severity and the NEW (round 3)", async () => {
+  const root = mkdtempSync(join(tmpdir(), "canary-1126c-"));
+  mkdirSync(join(root, "scripts/watch"), {recursive: true});
+  for (const f of ["canary.mjs", "canary-status.mjs", "html-text.mjs", "retry-wait.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  mkdirSync(join(root, "watch"), {recursive: true});
+  writeFileSync(join(root, "watch/addresses.json"), JSON.stringify({eip155: "0x0000000000000000000000000000000000000001", solana: "x", ton: "x"}));
+  const job = join(root, "packages/protocol-swap2-0x/scripts");
+  mkdirSync(job, {recursive: true});
+  // first run: a new deployment on Base; the retry: Base's RPC rate-limited
+  writeFileSync(join(job, "verify-live.mjs"), `import {existsSync, writeFileSync} from "node:fs";
+    const ran = new URL("./ran", import.meta.url);
+    if (!existsSync(ran)) {
+      writeFileSync(ran, "1");
+      console.log("${NEW_LINE(8453, "Base").replace(/"/g, '\\"')}");
+      console.log("FAILED (1)");
+      console.log("Severity: high — sales through the Settler in force are refused today: native-coin sales on 8453 (a new deployment; 0x may keep quoting the previous Settler for a while, which still passes): check it, then update the pins in src/chains.ts");
+      console.log("Reason: NEW on 8453");
+    } else {
+      console.log("??? chain   8453   Base             no RPC answered (2 tries, RPC_8453; last: eth_call: RPC error -32005 (rate limited)) — the chain is unchecked, which fails this run");
+      console.log("FAILED (1)");
+      console.log("Reason: unreachable on 8453");
+    }
+    process.exit(1);`);
+  const srv = createServer((req, res) => { req.resume(); req.on("end", () => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({jsonrpc: "2.0", id: 1, result: "0x10"})); }); });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const local = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const env = {PATH: process.env.PATH, EVM_RPC_URL: local, BASE_RPC_URL: local, ARBITRUM_RPC_URL: local};
+    const t0 = Date.now();
+    const child = spawn(process.execPath, [join(root, "scripts/watch/canary.mjs"), "--only", "zeroex", "--retry-wait", "0"], {env, stdio: ["ignore", "pipe", "pipe"]});
+    let err = "";
+    child.stderr.on("data", (c) => (err += c));
+    const code = await new Promise((r) => child.on("close", r));
+    assert.equal(code, 1, err);
+    assert.ok(Date.now() - t0 < 15_000, "--retry-wait 0 does not wait the 20 s");
+    const state = JSON.parse(readFileSync(join(root, "watch/canary/state.json"), "utf8"));
+    assert.equal(state.zeroex.severity, "high", JSON.stringify(state.zeroex));
+    assert.ok(state.zeroex.note.startsWith("Reason: NEW on 8453 | Reason: unreachable on 8453 | ??? chain 8453 Base"), state.zeroex.note);
+    assert.equal("run" in state.zeroex, false, "the parsed run is not stored");
+    assert.match(err, /^fail +[\d.]+s {2}zeroex \[severity high\] {2}— Reason: NEW on 8453 \| Reason: unreachable on 8453 \| …$/m);
+    const day = JSON.parse(readFileSync(join(root, "watch/canary", `${new Date().toISOString().slice(0, 10)}.json`), "utf8"));
+    assert.equal(day.failing[0].severity, "high");
+    assert.equal(day.results[0].severity, "high");
+  } finally { srv.close(); }
+  // --retry-wait takes seconds, nothing else
+  const bad = spawnSync(process.execPath, [join(root, "scripts/watch/canary.mjs"), "--only", "none", "--retry-wait", "soon"], {env: {PATH: process.env.PATH, EVM_RPC_URL: "http://127.0.0.1:9", BASE_RPC_URL: "http://127.0.0.1:9", ARBITRUM_RPC_URL: "http://127.0.0.1:9"}, encoding: "utf8"});
+  assert.notEqual(bad.status, 0);
+  assert.match(bad.stderr, /--retry-wait takes a number of seconds/);
+});
+
+test("verify:live: a registry that names no Settler is read again when the first URL is down — one answer from the fallback is not reported (round 3)", {skip: !built && "build protocol-swap2-0x first"}, async () => {
+  // ours down, the fallback names no Settler: it is read a second time (it was reported, severity high, from one read)
+  let r = await verifyLive({}, {143: "http://down.test/143,http://emptyowner.test/143"});
+  assert.equal(r.code, 1, r.out);
+  assert.equal(r.lines.filter((l) => l === "stub: ownerOf(2) empty").length, 2, r.out);
+  assert.match(r.out, /^BAD chain {3}143 /m);
+  assert.equal(r.canary.severity, "high");
+  // ours down, the fallback's first ownerOf(2) reverts once, then names the pinned Settler: ok (it was BAD, severity
+  // high), with a note that the reads disagreed — a warning in the canary
+  r = await verifyLive({}, {143: "http://down.test/143,http://flakyrevert.test/143"});
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.lines.filter((l) => l === "stub: ownerOf(2) reverted once").length, 1);
+  assert.match(r.out, /^ok {2}chain {3}143 /m);
+  assert.doesNotMatch(r.out, /^(BAD|Severity|Reason)/m);
+  assert.equal(r.canary.status, "warn", r.out);
+  // a registry that names no Settler on every read is still reported: two answers, on one URL or two
+  for (const urls of ["http://emptyowner.test/143", "http://paused.test/143,http://emptyowner.test/143"]) {
+    r = await verifyLive({}, {143: urls});
+    assert.equal(r.code, 1, `${urls}: ${r.out}`);
+    assert.match(r.out, /^BAD chain {3}143 /m, urls);
+    assert.equal(r.canary.severity, "high", urls);
+  }
+  // a chain no RPC answers: two tries, unreachable, no severity (no third try)
+  r = await verifyLive({}, {143: "http://down.test/143,http://down.test/143"});
+  assert.match(r.out, /^\?\?\? chain {3}143 .*no RPC answered \(2 tries, RPC_143; last: fetch failed\)/m);
+  assert.equal(r.canary.severity, null);
+});
+
+test("verify:live: ownerOf(2) reads that disagree print a note the canary counts as a warning — a paused-looking first read is no longer silent (round 3)", {skip: !built && "build protocol-swap2-0x first"}, async () => {
+  // our RPC reverts ownerOf(2) on every read, the fallback names the pinned Settler: ok, exit 0, and a note line
+  const r = await verifyLive({}, {1: "http://paused.test/1,http://rpc.test/1"});
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /^ok {2}chain {3}1 {6}Ethereum /m);
+  const note = r.lines.find((l) => l.startsWith("note chain   1 "));
+  assert.ok(note, r.out);
+  assert.match(note, /ownerOf\(2\) reads disagree — the verdict's: deployment 22; another read's: none this module can tell/);
+  assert.equal(r.canary.status, "warn", "it was ok, with nothing in the output");
+  assert.deepEqual(softLines([note]), [note]);
+  assert.match(noteOf(r.canary), /^note chain 1 Ethereum ownerOf\(2\) reads disagree/);
+  // the reads agree: no note
+  const same = await verifyLive({}, {1: "http://down.test/1,http://rpc.test/1"});
+  assert.doesNotMatch(same.out, /^note chain/m);
+  assert.equal(same.canary.status, "ok");
+});
+
+test("verify:live: a new deployment whose later reads get no answer is still NEW, severity high — not \"unreachable\" (round 3)", {skip: !built && "build protocol-swap2-0x first"}, async () => {
+  const m = await import(pathToFileURL(resolve(pkg, "dist/index.js")).href);
+  const base = m.ZEROEX_CHAINS[8453], monad = m.ZEROEX_CHAINS[143];
+  // Base: ownerOf(2) names deployment newest + 1, then eth_getCode of that Settler is rate-limited; the fallback is down
+  let r = await verifyLive({8453: [base.newestLiveNonce + 1, base.newestLiveNonce]}, {8453: "http://partial.test/8453,http://down.test/8453"});
+  assert.equal(r.code, 1, r.out);
+  const line = r.lines.find((l) => /^NEW chain {3}8453 /.test(l));
+  assert.ok(line, r.out);
+  assert.match(line, new RegExp(`\\(deployment ${base.newestLiveNonce + 1}; pinned ${base.newestLiveNonce} / previous ${base.previousLiveNonce}, `));
+  assert.match(line, /native-coin sales to it are refused until/);
+  // `last:` is why the try that named it was cut short (the fallback being down says nothing about the registry)
+  assert.match(line, /· the reads after ownerOf\(2\) got no answer \(2 tries, RPC_8453; last: eth_getCode: RPC error -32005 \(rate limited\)\): the chain's other checks are unchecked$/);
+  assert.equal(r.lines.at(-1), "Reason: NEW on 8453");
+  assert.match(r.lines.at(-2), /^Severity: high — .*native-coin sales on 8453 \(a new deployment/);
+  assert.equal(r.canary.severity, "high", "it was unreachable, severity null");
+  assert.match(noteOf(r.canary), /^Reason: NEW on 8453 \| NEW chain 8453 Base /);
+  // one throttled URL on Monad (the CI case), past the margin: PIN, every sale
+  r = await verifyLive({143: [monad.newestLiveNonce + 3, monad.newestLiveNonce]}, {143: "http://partial.test/143"});
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /^PIN chain {3}143 {4}Monad .*last: eth_getCode: RPC error -32005 \(rate limited\)\): the chain's other checks are unchecked$/m);
+  assert.match(r.out, /^Severity: high — .*every sale on 143 \(a new deployment past the margin\)/m);
+  assert.equal(r.lines.at(-1), "Reason: PIN on 143");
+  // the pinned Settler, its code read rate-limited on every try: unchecked, no severity, and it says what was named
+  r = await verifyLive({}, {143: "http://partial.test/143"});
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, new RegExp(`^\\?\\?\\? chain {3}143 {4}Monad {12}no try answered every read \\(2 tries, RPC_143; last: eth_getCode: RPC error -32005 \\(rate limited\\)\\); ownerOf\\(2\\) named the pinned deployment ${monad.newestLiveNonce} before a later read failed — the chain is unchecked, which fails this run$`, "m"));
+  assert.equal(r.canary.severity, null);
+  assert.equal(r.lines.at(-1), "Reason: unreachable on 143");
+  // a later try that reads everything wins: ok (no note: both tries named the same deployment)
+  r = await verifyLive({}, {143: "http://partial.test/143,http://rpc.test/143"});
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /^note chain/m);
 });

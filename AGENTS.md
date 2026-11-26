@@ -308,7 +308,9 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
 - 0x (`zeroExProvider({ apiKey, rpcUrls })` on your server, `zeroExRemoteProvider({ baseUrl, rpcUrls })` in the app;
   conventional env names `ZEROEX_ENABLED` / `ZEROEX_API_KEY`): same-chain exact-input swaps on Ethereum, Base,
   Arbitrum, Optimism, Polygon, Avalanche, BNB Smart Chain and Monad (in the default table since 0.2.0: drop a
-  hand-written `chains: { 143: … }`, but give `rpcUrls[143]` on both sides, or every Monad request is refused; Monad
+  hand-written `chains: { 143: … }`, but give `rpcUrls[143]` on both sides, or every live Monad quote is refused
+  while indicative ones still go out — so the router can show 0x on a Monad route it then cannot quote; or pass
+  `chains: { 143: null }` to keep Monad off; Monad
   bills the gas limit, and a quote whose padded limit is over 6,000,000 is refused, which on Monad means MON sales
   from about $10,000) through the Permit2 flow. The Settler is read from 0x's registry over the app's own RPC (and
   must be a CREATE3 deployment of that registry between the chain's pinned `previousLiveNonce` and

@@ -71,7 +71,23 @@ export function runStatus({code, signal, out, summaryLines = false}) {
 
 // URLs are cut: an RPC URL carries its API key, and the note goes to Telegram and the committed state file.
 const clean = (s) => String(s).replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").trim();
+/**
+ * The note rule before 2026-11-26, as canary.mjs had it inline, byte for byte: URLs cut, whitespace collapsed, at most
+ * {@link NOTE_MAX}, not trimmed. Every warning, and every failure of a job without `summaryLines`, keeps it: a warn note
+ * that changes is a transition, so trimming the indented Morpho lines (" quoteSupply → …") posted unchanged warnings as
+ * changed on the first run after the merge (review 2026-11-26 round 3).
+ */
+const plainNote = (parts) => parts.join(" | ").replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").slice(0, NOTE_MAX);
 const cut = (s, max) => (s.length <= max ? s : `${s.slice(0, max - 1)}…`);
+/** A note led by `reasons` (kept whole up to {@link REASON_MAX}), `rest` filling what room is left of {@link NOTE_MAX}. */
+const ledBy = (reasons, rest) => {
+  if (!reasons.length) return rest.slice(0, NOTE_MAX);
+  const head = cut(reasons.join(" | "), REASON_MAX);
+  const room = NOTE_MAX - head.length - 3;
+  return rest && room > 0 ? `${head} | ${rest.slice(0, room)}` : head;
+};
+/** A run's own `Reason:` lines, cleaned, once each. */
+const reasonsOf = (lines) => [...new Set(lines.map((l) => String(l).trim()).filter((l) => REASON_LINE.test(l)).map(clean))];
 
 /**
  * The lines that say what failed in a run that prints `Reason:` (the detail its Reason line summarises): the job's own
@@ -92,19 +108,47 @@ export function failingLines(lines) {
  * its last four lines, at most {@link NOTE_MAX}. Otherwise the first warning lines.
  */
 export function noteOf({status, lines, soft, summaryLines}) {
-  if (status !== "fail") return clean(soft.slice(0, 3).join(" | ")).slice(0, NOTE_MAX);
+  if (status !== "fail") return plainNote(soft.slice(0, 3));
   const trimmed = lines.map((l) => l.trim());
   if (summaryLines !== true) {
     const cause = [...new Set(trimmed.filter((l) => PLAIN_CAUSE_LINE.test(l)))].slice(0, 4);
-    return clean((cause.length ? cause : lines.slice(-4)).join(" | ")).slice(0, NOTE_MAX);
+    return plainNote(cause.length ? cause : lines.slice(-4));
   }
-  const reasons = [...new Set(trimmed.filter((l) => REASON_LINE.test(l)).map(clean))];
+  const {reasons, rest} = summaryParts(lines);
+  return ledBy(reasons, rest);
+}
+
+/** A failed `summaryLines` run's note in two parts: its own `Reason:` lines, and the rest (cause lines, else failing lines). */
+function summaryParts(lines) {
+  const trimmed = lines.map((l) => String(l).trim());
+  const reasons = reasonsOf(lines);
   const cause = [...new Set(trimmed.filter((l) => CAUSE_LINE.test(l)))].slice(0, 4);
-  const rest = clean((cause.length ? cause : reasons.length ? failingLines(lines) : lines.slice(-4)).join(" | "));
-  if (!reasons.length) return rest.slice(0, NOTE_MAX);
-  const head = cut(reasons.join(" | "), REASON_MAX);
-  const room = NOTE_MAX - head.length - 3;
-  return rest && room > 0 ? `${head} | ${rest.slice(0, room)}` : head;
+  return {reasons, rest: clean((cause.length ? cause : reasons.length ? failingLines(lines) : lines.slice(-4)).join(" | "))};
+}
+
+/** The higher of two severities (`low` < `medium` < `high`), null when neither is one. */
+export const higherSeverity = (a, b) => ([a, b].filter((s) => s in SEVERITY_RANK).sort((x, y) => SEVERITY_RANK[y] - SEVERITY_RANK[x])[0] ?? null);
+
+/**
+ * What the canary keeps of a job that failed on its first run and on its one retry (a fail or a timeout each): the
+ * retry's status and note, with the higher severity of the two runs; for a job with `summaryLines`, the first run's
+ * `Reason:` lines that the retry does not repeat lead the note, before the retry's own. A first run that printed
+ * `NEW on 8453` and `Severity: high`, and a retry that hit a rate-limited RPC (`unreachable on 8453`, no severity),
+ * was kept as the retry alone: no severity, no NEW (review 2026-11-26 round 3). Only adds; nothing of the retry is
+ * dropped but what the note has no room for.
+ */
+export function retryKept(first, second) {
+  const severity = second.summaryLines === true ? higherSeverity(first.severity, second.severity) : null;
+  const note = noteOf(second);
+  if (second.summaryLines !== true) return {note, severity};
+  const earlier = reasonsOf(first.lines);
+  if (second.status !== "fail") {
+    // a retry that timed out printed no Reason line: the first run's lead its note
+    return {note: earlier.length ? ledBy(earlier, note) : note, severity};
+  }
+  const {reasons: own, rest} = summaryParts(second.lines);
+  const extra = earlier.filter((r) => !own.includes(r));
+  return {note: extra.length ? ledBy([...extra, ...own], rest) : note, severity};
 }
 
 /**

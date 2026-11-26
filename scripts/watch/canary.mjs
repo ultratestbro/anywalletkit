@@ -4,14 +4,15 @@
 // report only what changed since the last run (ok → fail, warn → ok, …) plus
 // anything still failing. Nothing is signed or sent on-chain.
 //
-//   node scripts/watch/canary.mjs [--only aave,morpho] [--timeout 240] [--send] [--dry] [--env FILE]
-// --timeout is per job (seconds); a job with its own `timeoutS` gets the longer of the two.
+//   node scripts/watch/canary.mjs [--only aave,morpho] [--timeout 240] [--send] [--dry] [--env FILE] [--retry-wait S]
+// --timeout is per job (seconds); a job with its own `timeoutS` gets the longer of the two. --retry-wait sets the wait
+// before a failed job's one retry (seconds; by default 20, or 60 after a rate limit: retry-wait.mjs) — for tests.
 // State: watch/canary/state.json; today's rows: watch/canary/<date>.json.
 import {spawn} from "node:child_process";
 import {readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync} from "node:fs";
 import {resolve, dirname} from "node:path";
 import {fileURLToPath} from "node:url";
-import {noteOf, retryTextOf, rpcOverrides, runStatus, shortNote} from "./canary-status.mjs";
+import {noteOf, retryKept, retryTextOf, rpcOverrides, runStatus, shortNote} from "./canary-status.mjs";
 import {fitLines} from "./html-text.mjs";
 import {retryWaitMs} from "./retry-wait.mjs";
 
@@ -23,6 +24,8 @@ const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] :
 const ONLY = opt("--only") ? new Set(opt("--only").split(",")) : null;
 const TIMEOUT_MS = Number(opt("--timeout", "240")) * 1000;
 const SEND = flag("--send"), DRY = flag("--dry");
+const RETRY_WAIT = opt("--retry-wait") === undefined ? null : Number(opt("--retry-wait")) * 1000;
+if (RETRY_WAIT !== null && !(RETRY_WAIT >= 0)) throw new Error("--retry-wait takes a number of seconds");
 const TODAY = new Date().toISOString().slice(0, 10);
 if (opt("--env")) for (const l of readFileSync(resolve(opt("--env")), "utf8").split("\n")) { const i = l.indexOf("="); if (i > 0 && !l.startsWith("#") && !(l.slice(0, i).trim() in process.env)) process.env[l.slice(0, i).trim()] = l.slice(i + 1).trim(); }
 const env = process.env;
@@ -124,7 +127,8 @@ function run(job) {
       const note = noteOf(st);
       // What the retry wait is chosen from (not stored): the note, plus every failing line of a job that prints Reason.
       const retryText = retryTextOf(st);
-      done({...job, status: st.status, ms: Date.now() - t0, note, retryText, ...(st.severity ? {severity: st.severity} : {})});
+      // `run` (the parsed output) is for the retry below only; like the retry text it is not stored.
+      done({...job, status: st.status, ms: Date.now() - t0, note, retryText, run: st, ...(st.severity ? {severity: st.severity} : {})});
     });
   });
 }
@@ -133,12 +137,20 @@ const queue = [...selected];
 // One retry after 20 s for a fail / timeout: a single rate-limited or lagging RPC answer is not a module break (aave:1:lido and
 // mellow:lido-earn-* alternated ok/fail across 2026-10-20..23 and passed 8/8 locally). The first failure stays in the note.
 // A 429 / Too Many Requests note waits 60 s instead: 20 s after it the same burst was still on (native-monad, 2026-11-04).
+// A retry that fails too keeps the higher severity of the two runs and, for a job with summaryLines, the first run's
+// Reason lines it does not repeat (canary-status.mjs, retryKept): a retry on a rate-limited RPC no longer replaces a
+// first run's `NEW on 8453` / `Severity: high` with `unreachable on 8453` and no severity.
 async function runWithRetry(job) {
   const first = await run(job);
   if (first.status !== "fail" && first.status !== "timeout") return first;
-  await new Promise((r) => setTimeout(r, retryWaitMs(first.retryText ?? first.note)));
+  await new Promise((r) => setTimeout(r, RETRY_WAIT ?? retryWaitMs(first.retryText ?? first.note)));
   const second = await run(job);
-  if (second.status === "fail" || second.status === "timeout") return second;
+  if (second.status === "fail" || second.status === "timeout") {
+    if (!first.run || !second.run) return second;
+    const {note, severity} = retryKept(first.run, second.run);
+    const {severity: _own, ...rest} = second;
+    return {...rest, note, ...(severity ? {severity} : {})};
+  }
   console.error(`retry   ${job.id} passed on the second try — first: ${shortNote(first.note, 160, job.summaryLines)}`);
   return second;
 }
