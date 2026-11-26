@@ -216,7 +216,7 @@ describe("checkZeroExTransaction and the resolver throw classified ZeroExTransac
     expect(err).toBeInstanceOf(ZeroExTransactionError);
     expect((err as Error).name).toBe("ZeroExTransactionError");
     expectThrown(err, "zeroex: the transaction is for chain 1, not 8453", "vault_mismatch");
-    expectThrown(await caught(() => checkZeroExTransaction({...tx(), gasLimit: "7000000"}, expectation)), "zeroex: the transaction asks for more gas than any 0x swap needs", "policy_refused");
+    expectThrown(await caught(() => checkZeroExTransaction({...tx(), gasLimit: "7000000"}, expectation)), "zeroex: the transaction asks for more gas than any 0x swap needs (its gas limit must be 1 to 6000000 on chain 8453)", "policy_refused");
     expectThrown(await caught(() => checkZeroExTransaction(tx(), {...expectation, settlers: []})), "zeroex: the 0x Settler for chain 8453 is not resolved", "upstream_unavailable");
     expectThrown(await caught(() => checkZeroExTransaction({...tx(), data: "0x1fff991fzz"}, expectation)), "zeroex: the transaction data is not hex bytes", "policy_refused");
     expectThrown(await caught(() => checkZeroExTransaction({...tx(), data: "0x095ea7b3"}, expectation)), "zeroex: the transaction does not call Settler.execute", "policy_refused");

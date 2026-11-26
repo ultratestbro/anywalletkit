@@ -43,7 +43,21 @@ export interface ZeroExChain {
   previousLiveNonce: number;
   /** Wrapped native token; native ↔ wrapped pairs are refused up front (0x answers them with a call to this token, not a Settler). */
   wrappedNative?: string;
+  /**
+   * The most gas a 0x swap on this chain may be given (the padded limit: 0x's `transaction.gas` × 1.2 + 20,000), for a
+   * chain where Settler swaps need more than the cap every other chain keeps (`ZEROEX_MAX_GAS_LIMIT`, 6,000,000). A
+   * bigint, 1…{@link ZEROEX_GAS_CAP_CEILING}; absent: that default. In the default table only Monad sets one (15,000,000).
+   */
+  maxGasLimit?: bigint;
 }
+
+/**
+ * The highest gas cap a chain table entry may set ({@link ZeroExChain.maxGasLimit}): Monad's per-transaction gas limit,
+ * 30,000,000. Config can raise a chain's cap up to it, never remove the bound.
+ */
+export const ZEROEX_GAS_CAP_CEILING = 30_000_000n;
+/** Whether `v` is a gas cap a chain table entry may set: a bigint from 1 to {@link ZEROEX_GAS_CAP_CEILING}. */
+export const isZeroExGasCap = (v: unknown): v is bigint => typeof v === "bigint" && v >= 1n && v <= ZEROEX_GAS_CAP_CEILING;
 
 /**
  * Deployments of the taker feature a token sale (Permit2) may use past {@link ZeroExChain.newestLiveNonce}: room for
@@ -56,21 +70,25 @@ export const ZEROEX_SETTLER_NONCE_MARGIN = 2;
 /** The highest {@link ZeroExChain.newestLiveNonce} a chain table may pin. */
 export const ZEROEX_SETTLER_MAX_NONCE = 1024;
 
-const chain = (name: string, wrappedNative: string, newestLiveNonce: number, previousLiveNonce: number): ZeroExChain =>
-  Object.freeze({name, registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce, previousLiveNonce, wrappedNative});
+const chain = (name: string, wrappedNative: string, newestLiveNonce: number, previousLiveNonce: number, maxGasLimit?: bigint): ZeroExChain =>
+  Object.freeze({name, registry: ZEROEX_SETTLER_REGISTRY, newestLiveNonce, previousLiveNonce, wrappedNative, ...(maxGasLimit !== undefined ? {maxGasLimit} : {})});
 
 /**
- * The default chain table (EVM chain id → entry). The last two arguments are the taker Settler deployments the
- * registry named as current and previous when pinned (2026-11-25, after 0x's 2026-11-24 Settler release;
- * `pnpm verify:live`: both have code). Monad (143) joined in 0.2.0 from the same reads: deployment 12, made on
- * 2026-11-24, and 11; its wrapped native is WMON, the one 0x names as `wnative` there.
+ * The default chain table (EVM chain id → entry). The two numbers are the taker Settler deployments the registry named
+ * as current and previous when pinned (2026-11-25, after 0x's 2026-11-24 Settler release; `pnpm verify:live`: both
+ * have code). Monad (143) joined in 0.2.0 from the same reads: deployment 12, made on 2026-11-24, and 11; its wrapped
+ * native is WMON, the one 0x names as `wnative` there. Monad is also the one chain with a gas cap of its own,
+ * 15,000,000 (every other chain keeps `ZEROEX_MAX_GAS_LIMIT`, 6,000,000): its gas grows with the size of the sale, 0x
+ * splitting a large one across many pools (about 1.6 times Base's on a $25 swap, 6,140,730 for 1,000,000 MON → AUSD on
+ * 2026-11-26), so under one 6,000,000 cap 0x sales of MON from about $10,000 were refused (README). The engine
+ * never sends the quoted limit, so the cap only decides which quotes are refused.
  */
 export const ZEROEX_CHAINS: Readonly<Record<number, ZeroExChain>> = Object.freeze({
   1: chain("Ethereum", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", 22, 21),
   10: chain("Optimism", "0x4200000000000000000000000000000000000006", 22, 21),
   56: chain("BNB Smart Chain", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", 24, 23),
   137: chain("Polygon", "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", 21, 20),
-  143: chain("Monad", "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A", 12, 11),
+  143: chain("Monad", "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A", 12, 11, 15_000_000n),
   8453: chain("Base", "0x4200000000000000000000000000000000000006", 23, 22),
   42161: chain("Arbitrum", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", 21, 20),
   43114: chain("Avalanche", "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", 21, 20),
@@ -81,9 +99,11 @@ const ZERO_ADDRESS = /^0x0{40}$/;
 
 /**
  * The chain table in force: the defaults with `overrides` merged over them (an entry replaces the default for that
- * chain id, `null` removes the chain). An entry whose registry or wrapped native is not an address, or whose pins are
+ * chain id, `null` removes the chain). An entry whose registry or wrapped native is not an address, whose pins are
  * missing or out of order (`newestLiveNonce` 1…{@link ZEROEX_SETTLER_MAX_NONCE}, `previousLiveNonce` 1…newestLiveNonce),
- * throws — a typo here would move the root of every check.
+ * or whose gas cap is given but is not a bigint from 1 to {@link ZEROEX_GAS_CAP_CEILING} (`maxGasLimit`), throws — a
+ * typo here would move the root of every check. An entry replaces the default whole: one without `maxGasLimit` has the
+ * default cap, Monad's included.
  */
 export function zeroExChains(overrides?: Readonly<Record<number, ZeroExChain | null>>): Readonly<Record<number, ZeroExChain>> {
   if (!overrides) return ZEROEX_CHAINS;
@@ -107,7 +127,12 @@ export function zeroExChains(overrides?: Readonly<Record<number, ZeroExChain | n
     if (!Number.isSafeInteger(previous) || previous < 1 || previous > newest) {
       throw new Error(`zeroex: chain ${id} pins no previous live Settler deployment (previousLiveNonce, 1 to its newestLiveNonce)`);
     }
-    out[id] = Object.freeze({name: entry.name, registry: entry.registry, newestLiveNonce: newest, previousLiveNonce: previous, ...(entry.wrappedNative ? {wrappedNative: entry.wrappedNative} : {})});
+    const gasCap = entry.maxGasLimit;
+    if (gasCap !== undefined && !isZeroExGasCap(gasCap)) throw new Error(`zeroex: chain ${id} gas cap (maxGasLimit) is not a bigint from 1 to ${ZEROEX_GAS_CAP_CEILING}`);
+    out[id] = Object.freeze({
+      name: entry.name, registry: entry.registry, newestLiveNonce: newest, previousLiveNonce: previous,
+      ...(entry.wrappedNative ? {wrappedNative: entry.wrappedNative} : {}), ...(gasCap !== undefined ? {maxGasLimit: gasCap} : {}),
+    });
   }
   return Object.freeze(out);
 }

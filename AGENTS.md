@@ -311,8 +311,9 @@ const { status, transactions } = await swaps.getSwap2Status(id)   // poll every 
   hand-written `chains: { 143: … }`, but give `rpcUrls[143]` on both sides, or every live Monad quote is refused
   while indicative ones still go out — so the router can show 0x on a Monad route it then cannot quote; or pass
   `chains: { 143: null }` to keep Monad off; Monad
-  bills the gas limit, and a quote whose padded limit is over 6,000,000 is refused, which on Monad means MON sales
-  from about $10,000) through the Permit2 flow. The Settler is read from 0x's registry over the app's own RPC (and
+  bills the gas limit and its gas grows with the sale (about 1.6 times Base's on a $25 swap, 6.1 million for 1,000,000
+  MON), so its table entry carries its own gas cap, 15,000,000 on the padded limit (`maxGasLimit`; every other chain
+  keeps 6,000,000, and a `chains` entry may set a cap only up to 30,000,000)) through the Permit2 flow. The Settler is read from 0x's registry over the app's own RPC (and
   must be a CREATE3 deployment of that registry between the chain's pinned `previousLiveNonce` and
   `newestLiveNonce` + 2, with code; a native sale goes only to the pinned current or previous Settler — raise both
   pins in `chains.ts` when the watch reports a new deployment); in remote mode the device reads the registry again

@@ -1,0 +1,97 @@
+{
+ "note": "Real 0x Swap API v2 answer (/swap/permit2/price), Monad USDC->MON (25 USDC, as the other chains' /price), recorded 2026-11-26 from api.0x.org with a throwaway taker that holds nothing, keyed (the key is not part of the recording). Response body as 0x sent it; request rebuilt from the recorded query (no headers, no key). registry = what ownerOf(2) / prev(2) answered on that chain at record time (block 125560609), exactly pin era 2026-11-25's pins.",
+ "pinEra": "2026-11-25",
+ "request": {
+  "endpoint": "/swap/permit2/price",
+  "sourceChain": "eip155:143",
+  "sourceToken": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+  "sourceDecimals": 6,
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amountIn": "25000000",
+  "slippageBps": 50,
+  "destAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "refundAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "dry": true,
+  "nowMs": 1795691635000
+ },
+ "registry": {
+  "current": "0xF16D1df42E368e4dd873b1f92ED0670FF4c987eB",
+  "prev": "0x031D28683fFc9936903a31670bC618b8Bc9b65dD"
+ },
+ "response": {
+  "allowanceTarget": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  "blockNumber": "125560622",
+  "buyAmount": "2331635936668209932675",
+  "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "fees": {
+   "integratorFee": null,
+   "integratorFees": null,
+   "zeroExFee": {
+    "amount": "37500",
+    "token": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "type": "volume"
+   },
+   "gasFee": null
+  },
+  "issues": {
+   "allowance": {
+    "actual": "0",
+    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
+   "balance": {
+    "token": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+    "actual": "0",
+    "expected": "25000000"
+   },
+   "simulationIncomplete": false,
+   "invalidSourcesPassed": []
+  },
+  "liquidityAvailable": true,
+  "minBuyAmount": "2319977756984868883012",
+  "mode": "exact-in",
+  "route": {
+   "fills": [
+    {
+     "from": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+     "to": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+     "source": "PancakeSwap_V3",
+     "proportionBps": "5344"
+    },
+    {
+     "from": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+     "to": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+     "source": "Uniswap_V4",
+     "proportionBps": "4656"
+    }
+   ],
+   "tokens": [
+    {
+     "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+     "symbol": "USDC"
+    },
+    {
+     "address": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+     "symbol": "WMON"
+    }
+   ]
+  },
+  "sellAmount": "25000000",
+  "sellToken": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+  "tokenMetadata": {
+   "buyToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   },
+   "sellToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   }
+  },
+  "totalNetworkFee": "55521150000000000",
+  "zid": "0x26a653e83b1fd5dd8f281c09",
+  "gas": "435460",
+  "gasPrice": "127500000000"
+ }
+}

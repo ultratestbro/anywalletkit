@@ -1,0 +1,91 @@
+{
+ "note": "Real 0x Swap API v2 answer (/swap/permit2/price), BNB Smart Chain USDT->BNB, recorded 2026-11-26 from api.0x.org with a throwaway taker that holds nothing, keyed (the key is not part of the recording). Response body as 0x sent it; request rebuilt from the recorded query (no headers, no key). registry = what ownerOf(2) / prev(2) answered on that chain at record time (block 135836735), exactly pin era 2026-11-25's pins.",
+ "pinEra": "2026-11-25",
+ "request": {
+  "endpoint": "/swap/permit2/price",
+  "sourceChain": "eip155:56",
+  "sourceToken": "0x55d398326f99059fF775485246999027B3197955",
+  "sourceDecimals": 18,
+  "destToken": "0x0000000000000000000000000000000000000000",
+  "amountIn": "25000000000000000000",
+  "slippageBps": 50,
+  "destAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "refundAddress": "0x97fE145E77364FE3B113b2192d6DCd0C6C121273",
+  "dry": true,
+  "nowMs": 1795691612000
+ },
+ "registry": {
+  "current": "0x3E62E6b1d3F22408F24f052b5451CDaeE061BAdc",
+  "prev": "0xd52E8e422A352ac1AfDC2bd6EC533D41B20ACB7b"
+ },
+ "response": {
+  "allowanceTarget": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+  "blockNumber": "135836743",
+  "buyAmount": "45315729821726083",
+  "buyToken": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "fees": {
+   "integratorFee": null,
+   "integratorFees": null,
+   "zeroExFee": {
+    "amount": "37500000000000000",
+    "token": "0x55d398326f99059ff775485246999027b3197955",
+    "type": "volume"
+   },
+   "gasFee": null
+  },
+  "issues": {
+   "allowance": {
+    "actual": "0",
+    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+   },
+   "balance": {
+    "token": "0x55d398326f99059ff775485246999027b3197955",
+    "actual": "0",
+    "expected": "25000000000000000000"
+   },
+   "simulationIncomplete": false,
+   "invalidSourcesPassed": []
+  },
+  "liquidityAvailable": true,
+  "minBuyAmount": "45089151172617453",
+  "mode": "exact-in",
+  "route": {
+   "fills": [
+    {
+     "from": "0x55d398326f99059ff775485246999027b3197955",
+     "to": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+     "source": "LunarBase",
+     "proportionBps": "10000"
+    }
+   ],
+   "tokens": [
+    {
+     "address": "0x55d398326f99059ff775485246999027b3197955",
+     "symbol": "USDT"
+    },
+    {
+     "address": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+     "symbol": "WBNB"
+    }
+   ]
+  },
+  "sellAmount": "25000000000000000000",
+  "sellToken": "0x55d398326f99059ff775485246999027b3197955",
+  "tokenMetadata": {
+   "buyToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   },
+   "sellToken": {
+    "buyTaxBps": "0",
+    "sellTaxBps": "0",
+    "transferTaxBps": "0"
+   }
+  },
+  "totalNetworkFee": "15674800000000",
+  "zid": "0xd6d104a4249c84ac1dc866f6",
+  "gas": "313496",
+  "gasPrice": "50000000"
+ }
+}

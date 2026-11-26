@@ -1,15 +1,15 @@
 {
- "note": "The default chain table's taker Settler pins in each era of this module: per EVM chain id, [newestLiveNonce, previousLiveNonce] as src/chains.ts pinned them. Every recording in quotes/ names the era it was recorded in (pinEra) and is replayed with that era's table, and its registry answer must be exactly that era's pins (tests/review-2026-11-15.test.ts). The last era is src/chains.ts as it stands. An era listed in unrecorded has no recording yet: 0x answers need ZEROEX_API_KEY, and remain owed for it. Only the era in force may be listed there (tests/recorded.test.ts): its recording must land before the next pin raise, while 0x still quotes its Settlers and the registry still names its pins. A chain listed in unrecordedChains has no recording in any era yet (owed for the same reason); only a chain that first appears in the era in force may be listed there, so it too must be recorded before the next pin raise.",
+ "note": "The default chain table's taker Settler pins in each era of this module: per EVM chain id, [newestLiveNonce, previousLiveNonce] as src/chains.ts pinned them. Every recording in quotes/ names the era it was recorded in (pinEra) and is replayed with that era's table, and its registry answer must be exactly that era's pins (tests/review-2026-11-15.test.ts). The last era is src/chains.ts as it stands. Every era is recorded on every one of its chains (a native-coin sale, a token sale and an indicative price each, and each era's recordings pinned by name; tests/recorded.test.ts), so unrecorded and unrecordedChains are empty and held empty. No era and no chain may be listed in unrecorded or unrecordedChains, not even the era in force: every pin raise needs keyed recordings (0x answers need ZEROEX_API_KEY), made while 0x still quotes the new era's Settlers and the registry still names its pins, and lands with them; so does a new chain.",
  "eras": {
   "2026-11-15": {
    "pinned": "2026-11-15, verify:live: the Settlers the registry named as current and previous (0.1.0 to 0.1.5)",
    "pins": {"1": [21, 20], "10": [21, 20], "56": [23, 22], "137": [20, 19], "8453": [22, 21], "42161": [20, 19], "43114": [20, 19]}
   },
   "2026-11-25": {
-   "pinned": "2026-11-25T20:58Z, ownerOf(2) / prev(2) after 0x's 2026-11-24 Settler release, verify:live (0.1.6); Monad (143) from the same reads, in the table since 0.2.0",
+   "pinned": "2026-11-25T20:58Z, ownerOf(2) / prev(2) after 0x's 2026-11-24 Settler release, verify:live (0.1.6); Monad (143) from the same reads, in the table since 0.2.0. Recorded 2026-11-26 on all eight chains (keyed, read-only), the registry still naming exactly these pins; 0x quoted the previous Settler (prev(2)) on every chain",
    "pins": {"1": [22, 21], "10": [22, 21], "56": [24, 23], "137": [21, 20], "143": [12, 11], "8453": [23, 22], "42161": [21, 20], "43114": [21, 20]}
   }
  },
- "unrecorded": ["2026-11-25"],
- "unrecordedChains": [143]
+ "unrecorded": [],
+ "unrecordedChains": []
 }

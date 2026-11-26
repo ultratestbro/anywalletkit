@@ -1,7 +1,9 @@
 /**
- * Real 0x answers (fixtures/quotes/*.json), recorded from api.0x.org on 2026-11-15 with a throwaway taker that holds
- * nothing: the response body exactly as 0x sent it, the request rebuilt from the recorded query, the clock of the
- * quote, what the Settler registry answered on that chain, and the pin era it was recorded in. No key, no headers.
+ * Real 0x answers (fixtures/quotes/*.json), recorded from api.0x.org with a throwaway taker that holds nothing: on
+ * 2026-11-15 on the first seven chains (pin era 2026-11-15; `<name>.json`) and on 2026-11-26 on all eight (pin era
+ * 2026-11-25, Monad's first; `<name>.2026-11-25.json`). Each holds the response body exactly as 0x sent it, the request
+ * rebuilt from the recorded query, the clock of the quote, what the Settler registry answered on that chain, and the
+ * pin era it was recorded in. No key, no headers.
  *
  * Pin eras (fixtures/pin-eras.json): the chain table's Settler pins as src/chains.ts held them over time. A recording is
  * replayed with the table of its own era ({@link chainsOf}, {@link chainsConfigOf}) — the registry it recorded is that
@@ -13,7 +15,7 @@ import {fileURLToPath} from "node:url";
 import {vi} from "vitest";
 import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import {ZEROEX_CHAINS, ZEROEX_NATIVE, ZEROEX_SETTLER_REGISTRY, zeroExChains, type ZeroExChain} from "../src/chains.js";
-import {REGISTRY_OWNER_OF_SELECTOR, REGISTRY_PREV_SELECTOR} from "../src/settler.js";
+import {REGISTRY_OWNER_OF_SELECTOR, REGISTRY_PREV_SELECTOR, zeroExSettlerAddress} from "../src/settler.js";
 
 const dir = fileURLToPath(new URL("../fixtures/quotes/", import.meta.url));
 
@@ -27,9 +29,9 @@ const pinEras = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/pin-e
 export const PIN_ERAS: readonly string[] = Object.keys(pinEras.eras);
 /** The newest era: the one src/chains.ts must be. */
 export const CURRENT_PIN_ERA: string = PIN_ERAS.at(-1)!;
-/** Eras with no recording yet (owed: re-recording needs ZEROEX_API_KEY). */
+/** Eras listed as having no recording yet: none (tests/recorded.test.ts holds the list empty). */
 export const UNRECORDED_PIN_ERAS: readonly string[] = pinEras.unrecorded;
-/** Chains of the table with no recording in any era yet (owed: their first recordings need ZEROEX_API_KEY). */
+/** Chains listed as having no recording in any era yet: none (held empty too). */
 export const UNRECORDED_CHAINS: readonly number[] = pinEras.unrecordedChains;
 /** An era's pins, chain id → [newestLiveNonce, previousLiveNonce]. */
 export function eraPins(era: string): Readonly<Record<number, readonly [number, number]>> {
@@ -95,6 +97,25 @@ export const chainsConfigOf = (f: RecordedQuote): Readonly<Record<number, ZeroEx
 /** The recording's chain entry in its era (`chain` for checkZeroExTransaction). */
 export const chainOf = (f: RecordedQuote): ZeroExChain => chainsOf(f)[chainIdOf(f)]!;
 export const nativeSale = (f: RecordedQuote): boolean => /^0x0{40}$/.test(f.request.sourceToken);
+/**
+ * What is wrong with a recording's registry answer, held to its era's pins: null when `current` is exactly the era's
+ * newest pinned deployment and `prev` exactly its previous one — or null where the era pins a single deployment on that
+ * chain (`previousLiveNonce` = `newestLiveNonce`, the registry naming no previous Settler) and `prev` is null. A missing
+ * `prev` in an era that pins one is a mismatch, live answer or /price alike, and so is an address in another case.
+ */
+export function registryMismatch(f: RecordedQuote, eras?: Readonly<Record<string, Readonly<Record<number, readonly [number, number]>>>>): string | null {
+  const id = chainIdOf(f);
+  // `eras` stands in for fixtures/pin-eras.json (a synthetic era in a test)
+  const pins = (eras ? eras[f.pinEra] : eraPins(f.pinEra))?.[id];
+  if (!pins) return `chain ${id} is not in pin era ${f.pinEra}`;
+  const [newest, previous] = pins;
+  const registry = ZEROEX_CHAINS[id]?.registry ?? ZEROEX_SETTLER_REGISTRY;
+  const current = zeroExSettlerAddress(id, newest, registry);
+  const prev = previous < newest ? zeroExSettlerAddress(id, previous, registry) : null;
+  if (f.registry.current !== current) return `registry.current ${String(f.registry.current)} is not deployment ${newest} (${current}) of era ${f.pinEra} on chain ${id}`;
+  if (f.registry.prev !== prev) return `registry.prev ${String(f.registry.prev)} is not ${prev === null ? "null (a single pinned deployment)" : `deployment ${previous} (${prev})`} of era ${f.pinEra} on chain ${id}`;
+  return null;
+}
 export const rpcOf = (f: RecordedQuote) => ({[chainIdOf(f)]: ["https://rpc.recorded.test"]});
 
 /** The swap2 request the recording answered. */
