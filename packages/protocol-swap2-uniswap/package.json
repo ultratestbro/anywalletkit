@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-uniswap",
-  "version": "0.4.11",
+  "version": "0.5.0",
   "description": "Uniswap v3 and v4 same-chain swaps straight from the contracts: on-chain QuoterV2 / V4Quoter quotes, SwapRouter02 / Universal Router 2.1.2 execution, no API, no frontend.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
