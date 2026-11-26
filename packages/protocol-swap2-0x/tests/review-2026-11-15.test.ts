@@ -28,7 +28,7 @@ import {zeroExProvider} from "../src/provider.js";
 import {zeroExKnownSpenders, zeroExRemoteProvider, zeroExVerifyQuote} from "../src/remote.js";
 import {createSettlerResolver, decodeSettlerExecute, zeroExSettlerAddress, zeroExSettlerNonce} from "../src/settler.js";
 import {ME, PREV_SETTLER, RPC, SETTLER, USDC, getKey, permit2Typed, stub} from "./fixtures.js";
-import {CURRENT_PIN_ERA, RECORDED, bodyOf, chainIdOf, chainsConfigOf, chainsOf, eraChains, loadRecorded, paramsOf, recordedFetch, rpcOf} from "./recorded.js";
+import {CURRENT_PIN_ERA, PIN_ERAS, RECORDED, UNRECORDED_PIN_ERAS, bodyOf, chainIdOf, chainsConfigOf, chainsOf, eraChains, loadRecorded, paramsOf, recordedFetch, rpcOf} from "./recorded.js";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
@@ -50,9 +50,12 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
   });
 
   // Each recording is held to the pins of the era it was recorded in (fixtures/pin-eras.json), and the newest era is
-  // the table in force: raising a pin without recording its era (or naming the era unrecorded) fails here.
+  // the table in force. Raising a pin in src/chains.ts without adding its era fails here. So does an era that has no
+  // recording but is not listed as unrecorded, and an era listed as unrecorded that has recordings.
   it("every recorded registry answer is covered by the pins of its era, margin untouched — a newer live deployment fails this and verify:live", () => {
     expect(eraChains(CURRENT_PIN_ERA)).toEqual(ZEROEX_CHAINS);
+    const all = RECORDED.map(loadRecorded);
+    expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era)), "eras with no recording = fixtures/pin-eras.json unrecorded").toEqual(UNRECORDED_PIN_ERAS);
     for (const name of RECORDED) {
       const f = loadRecorded(name);
       const c = chainsOf(f)[chainIdOf(f)]!;

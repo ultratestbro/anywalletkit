@@ -282,7 +282,8 @@ describe("zeroExRemoteProvider — the key on a backend, the checks on the devic
   it("when the backend quotes a Settler newer than the device's read, the device reads the registry again — and only then accepts", async () => {
     // The backend (first reader) and the device share the stubbed chain: read 1 → old pair (device cache), later reads → rotated.
     let reads = 0;
-    // The rotation that really happened on Base: {22, 21} → {23, 22}; 0x already quotes 23.
+    // The rotation that really happened on Base: {22, 21} → {23, 22}. Once 0x moves its quotes over it quotes 23; on
+    // 2026-11-26 it still quoted 22, the previous one.
     const calls = world({onRegistryRead: () => (++reads === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
     const provider = zeroExRemoteProvider({baseUrl: "https://backend.example/api", fetchImpl: backend().fetchImpl, rpcUrls: RPC});
     const q = await provider.getQuote({sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:8453", destToken: ZERO, amountIn: AMOUNT.toString(), destAddress: ME, refundAddress: ME, slippageBps: 50, dry: false} as never);

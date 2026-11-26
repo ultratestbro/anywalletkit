@@ -348,7 +348,8 @@ describe("zeroExProvider — live quote (what will be signed)", () => {
   });
 
   it("when 0x quotes a Settler newer than the cached read, reads the registry once more and accepts it", async () => {
-    // The rotation that really happened on Base: {22, 21} → {23, 22}; 0x already quotes 23.
+    // The rotation that really happened on Base: {22, 21} → {23, 22}. Once 0x moves its quotes over it quotes 23; on
+    // 2026-11-26 it still quoted 22, the previous one.
     const s = setup({onRegistryRead: (n) => (n === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
     const q = (await s.quote(live))!;
     expect(q.txRequest!.to).toBe(SETTLER);

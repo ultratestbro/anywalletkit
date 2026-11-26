@@ -66,6 +66,11 @@ describe("the recordings", () => {
       }
     }
   });
+  it("only the era in force may be listed as unrecorded: its recording is owed before the next pin raise", () => {
+    // An era is recordable only while 0x still quotes its Settlers and the registry still names its pins. Listing a
+    // superseded era as unrecorded would let the shipped table go without a real 0x answer for good.
+    for (const era of UNRECORDED_PIN_ERAS) expect(era, `${era} is unrecorded but no longer the era in force: record it (ZEROEX_API_KEY) before raising the pins again`).toBe(CURRENT_PIN_ERA);
+  });
   it("every era is recorded on each of its chains, except the eras listed as unrecorded (owed: they need ZEROEX_API_KEY)", () => {
     const all = RECORDED.map(loadRecorded);
     expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era))).toEqual(UNRECORDED_PIN_ERAS);

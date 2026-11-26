@@ -1,5 +1,5 @@
 {
- "note": "The default chain table's taker Settler pins in each era of this module: per EVM chain id, [newestLiveNonce, previousLiveNonce] as src/chains.ts pinned them. Every recording in quotes/ names the era it was recorded in (pinEra) and is replayed with that era's table, and its registry answer must be exactly that era's pins (tests/review-2026-11-15.test.ts). The last era is src/chains.ts as it stands. An era listed in unrecorded has no recording yet: 0x answers need ZEROEX_API_KEY, and remain owed for it.",
+ "note": "The default chain table's taker Settler pins in each era of this module: per EVM chain id, [newestLiveNonce, previousLiveNonce] as src/chains.ts pinned them. Every recording in quotes/ names the era it was recorded in (pinEra) and is replayed with that era's table, and its registry answer must be exactly that era's pins (tests/review-2026-11-15.test.ts). The last era is src/chains.ts as it stands. An era listed in unrecorded has no recording yet: 0x answers need ZEROEX_API_KEY, and remain owed for it. Only the era in force may be listed there (tests/recorded.test.ts): its recording must land before the next pin raise, while 0x still quotes its Settlers and the registry still names its pins.",
  "eras": {
   "2026-11-15": {
    "pinned": "2026-11-15, verify:live: the Settlers the registry named as current and previous (0.1.0 to 0.1.5)",
