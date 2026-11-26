@@ -198,20 +198,20 @@ describe("Monad 62,000 MON → AUSD (recorded): Uniswap v3 and Uniswap v4 as two
     expect(qs.map((q) => [q.routeId, q.destAmount])).toEqual([["v3", "871160"], ["v4", "1093251"]]);
   });
 
-  it("maxPriceImpactBps 500: the gate is applied per candidate — v3 (99.8%) is left out, v4 (G 23) stands; every read at the one block", async () => {
+  it("maxPriceImpactBps 500: the gate is applied per candidate — v3 (99.8%) is left out, v4 (G 22) stands; every read at the one block", async () => {
     const {qs, heard, misses, tags} = await candidates(MON(62_000n), {maxPriceImpactBps: 500});
     expect(misses).toEqual([]);
     expect(heard).toEqual([]);
     expect(tags).toEqual([v3fx.block.hex]);
-    expect(qs.map((q) => [q.routeId, q.destAmount, q.providerData?.valueLossBps])).toEqual([["v4", "676608109", "23"]]);
+    expect(qs.map((q) => [q.routeId, q.destAmount, q.providerData?.valueLossBps])).toEqual([["v4", "676608109", "22"]]);
   });
 
-  it("both venues refused (the gate at 23): no candidate, one refusal naming both, classified", async () => {
-    // Each candidate gated as if it had won: v3's thin pools, v4's own fees (net of them it loses 17 bps, U0C-2).
-    const {qs, heard} = await candidates(MON(62_000n), {maxPriceImpactBps: 23});
+  it("both venues refused (the gate at 22): no candidate, one refusal naming both, classified", async () => {
+    // Each candidate gated as if it had won: v3's thin pools, v4's own fees (net of them it loses 16 bps, U0C-2).
+    const {qs, heard} = await candidates(MON(62_000n), {maxPriceImpactBps: 22});
     expect(qs).toEqual([]);
     expect(heard).toEqual([[
-      "uniswap: v3: loses 99.8% of the value to price impact — its pools are too thin for this amount (limit 0.23%; best route via USDC 0.3% → 0.01%); v4: loses 0.2% of the value to price impact and pool fees — the route's fees (0.05% + 0.005%) bring it to the limit; its price impact alone is under it (limit 0.23%; best route v4 via USDC 0.05%/10 → 0.005%/1)",
+      "uniswap: v3: loses 99.8% of the value to price impact — its pools are too thin for this amount (limit 0.22%; best route via USDC 0.3% → 0.01%); v4: loses 0.2% of the value to price impact and pool fees — the route's fees (0.05% + 0.005%) bring it to the limit; its price impact alone is under it (limit 0.22%; best route v4 via USDC 0.05%/10 → 0.005%/1)",
       {reason: "insufficient_liquidity"},
     ]]);
   });

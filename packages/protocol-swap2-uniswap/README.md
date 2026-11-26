@@ -181,7 +181,7 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   otherwise have every app refuse the v4 quote — Uniswap lost wherever v4 wins. A device whose clock may run further
   behind sets `uniswapPinsWith({clockSkewSeconds})` (at most 3600).
 - **Monad, the case behind this (cp0x):** 62,000 MON → AUSD. v3 alone pays 1.13 AUSD (impact 99.8%); v4 pays 676.61 AUSD
-  at block 125,409,523 via MON → USDC (0.05%/10) → AUSD (0.005%/1), G = 23 bps, and passes `maxPriceImpactBps: 500`.
+  at block 125,409,523 via MON → USDC (0.05%/10) → AUSD (0.005%/1), G = 22 bps, and passes `maxPriceImpactBps: 500`.
 - **Token input, recorded:** Monad 700 USDC → AUSD at block 125,499,326: v4 through the SwapProxy pays 700.075685 AUSD
   on the hookless AUSD/USDC 0.005%/1 pool, simulated with the allowance set by `stateDiff`. Live on 2026-11-26 the
   approve + swap from a funded holder paid exactly the quote (≥ the minimum) on Monad (→ AUSD and → MON) and Base
@@ -383,12 +383,15 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   rather than run into the router's 8 s, signal or not. 13 is the least that carries the largest quote (51 calls in five passes
   one after another) on an idle endpoint answering within 0.5 s; a lower value is refused when the
   provider is built. With `v4` on, a quote's v4 reads (discovery, quoter aggregates, probe, the
-  token-input check) go by the same turns and bound, and the floor is 22: the largest v4 quote (a
+  token-input check) go by the same turns and bound, and the floor is 33: the largest v4 quote (a
   gated token input with the sender known on an RPC without `eth_simulateV1`, `venueRoutes:
-  "both"`) is 91 calls in eleven passes, carried by 22 on an idle endpoint answering within 250 ms.
-  Eleven passes alone take the 5 s on an endpoint slower than ~450 ms, so a slow endpoint needs a
-  higher rate, and past that no rate carries such a quote under the limit. Unset (the default),
-  nothing is limited.
+  "both"`, with up to four candidates past the chain's per-transaction cap, each aggregate holding
+  one halved down to the call and the candidate read again at the cap) is up to 127 calls in sixteen
+  passes, carried by 33 on an idle endpoint answering within 250 ms. Candidates past the cap in more
+  aggregates, or a quote that builds the next v4 candidate after its best one is refused, need more.
+  Sixteen passes alone take the 5 s on an endpoint slower than ~310 ms, so a slow endpoint needs a
+  higher rate (47 at 300 ms), and past that no rate carries such a quote under the limit. Unset (the
+  default), nothing is limited.
 
 ## Activity
 

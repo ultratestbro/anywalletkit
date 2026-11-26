@@ -78,6 +78,8 @@ export interface FakeNodeOptions {
   /** The PoolIds whose V4Quoter call fails without revert data, in an aggregate and alone (a route needing more gas
    *  than the call was given: LIVE-1). */
   emptyQuotes?: ReadonlySet<string> | undefined;
+  /** A protocol fee by PoolId, as `getSlot0` reads it (12 bits each direction, low = zeroForOne; default none). */
+  protocolFees?: ReadonlyMap<string, number> | undefined;
 }
 
 /** The PoolId of the single pool a SwapProxy (or router) call's V4_SWAP input swaps through, if it is a single-pool one. */
@@ -101,8 +103,9 @@ export function fakeNode(o: FakeNodeOptions) {
   const seen: {method: string; to?: string; data?: string; gas?: string}[] = [];
   const stateView = (data: Hex): {success: boolean; returnData: Hex} => {
     const d = decodeFunctionData({abi: STATE_VIEW, data});
-    const fee = listed.get((d.args[0] as Hex).toLowerCase());
-    if (d.functionName === "getSlot0") return {success: true, returnData: encodeFunctionResult({abi: STATE_VIEW, functionName: "getSlot0", result: fee === undefined ? [0n, 0, 0, 0] : [Q96, 0, 0, fee]})};
+    const id = (d.args[0] as Hex).toLowerCase();
+    const fee = listed.get(id);
+    if (d.functionName === "getSlot0") return {success: true, returnData: encodeFunctionResult({abi: STATE_VIEW, functionName: "getSlot0", result: fee === undefined ? [0n, 0, 0, 0] : [Q96, 0, o.protocolFees?.get(id) ?? 0, fee]})};
     return {success: true, returnData: encodeFunctionResult({abi: STATE_VIEW, functionName: "getLiquidity", result: fee === undefined ? 0n : 10n ** 24n})};
   };
   const v4Quote = (data: Hex): {success: boolean; returnData: Hex} => {

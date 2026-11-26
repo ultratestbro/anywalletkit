@@ -132,28 +132,32 @@ describe("Monad 62,000 MON → AUSD at block 125,409,523: v3 and v4 ranked toget
     expect(uniswapV3VerifyQuote(params(MON(62_000n)), q!)).toMatch(/not the SwapRouter/);
   });
 
-  it('v4 "native-in", maxPriceImpactBps 500: v4 wins and passes — G = max(probe 17, spot 23) = 23, every read at the one block', async () => {
+  it('v4 "native-in", maxPriceImpactBps 500: v4 wins and passes — G = max(probe 17, spot 22) = 22, every read at the one block', async () => {
     const {q, heard, misses, tags} = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 500});
     expect(misses).toEqual([]);
     expect(heard).toEqual([]);
     expect(tags).toEqual([v3fx.block.hex]);
-    expect(q).toMatchObject({destAmount: "676608109", providerData: {venue: "v4", priceImpactBps: "17", valueLossBps: "23"}});
+    // Spot is the route's exact loss against the pools' mid prices, rounded down (22.47 bps), as v3 measures it (U0V4-1:
+    // it read 23, the loss rounded up).
+    expect(q).toMatchObject({destAmount: "676608109", providerData: {venue: "v4", priceImpactBps: "17", valueLossBps: "22"}});
   });
 
-  it("the gate is the winner's: 23 refuses at a limit of 23, passes at 24", async () => {
-    // G 23 is the probe's 17 bps and the two pools' 0.05% + 0.005%: net of those fees the route loses 17 bps. At 23
-    // only the fees bring it to the limit, and the text names them (U0C-2 on the v4 path — before, "too thin" for
-    // pools whose own impact is under the limit); at 17 the price impact alone reaches it: too thin.
-    const at = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 23});
+  it("the gate is the winner's: 22 refuses at a limit of 22, passes at 23", async () => {
+    // G 22 is the spot loss of 22.47 bps (the probe's 17 and the two pools' 0.05% + 0.005%): net of those fees the route
+    // loses 16.98 bps (16). At 22 only the fees bring it to the limit, and the text names them (U0C-2 on the v4 path —
+    // before, "too thin" for pools whose own impact is under the limit); at 17 the price impact alone (the probe)
+    // reaches it: too thin. At 23 the true loss is under the limit and the quote goes out (U0V4-1: it was refused there,
+    // the loss rounded up to 23).
+    const at = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 22});
     expect(at.q).toBeNull();
-    expect(at.heard).toEqual([["uniswap: loses 0.2% of the value to price impact and pool fees — the route's fees (0.05% + 0.005%) bring it to the limit; its price impact alone is under it (limit 0.23%; best route v4 via USDC 0.05%/10 → 0.005%/1)", {reason: "insufficient_liquidity"}]]);
+    expect(at.heard).toEqual([["uniswap: loses 0.2% of the value to price impact and pool fees — the route's fees (0.05% + 0.005%) bring it to the limit; its price impact alone is under it (limit 0.22%; best route v4 via USDC 0.05%/10 → 0.005%/1)", {reason: "insufficient_liquidity"}]]);
     const thin = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 17});
     expect(thin.heard).toEqual([["uniswap: loses 0.2% of the value to price impact — its pools are too thin for this amount (limit 0.17%; best route v4 via USDC 0.05%/10 → 0.005%/1)", {reason: "insufficient_liquidity"}]]);
     const fees = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 18});
     expect(fees.heard[0]![0]).toMatch(/^uniswap: loses 0\.2% of the value to price impact and pool fees — the route's fees \(0\.05% \+ 0\.005%\) bring it to the limit/);
     // cp0x reads the loss from either text.
     for (const [t] of [...at.heard, ...thin.heard, ...fees.heard]) expect(/^loses ([\d.]+)% of the value to price impact/.exec(t.replace(/^uniswap: /, ""))?.[1]).toBe("0.2");
-    const above = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 24});
+    const above = await quote(MON(62_000n), {v4: "native-in", maxPriceImpactBps: 23});
     expect(above.q?.destAmount).toBe("676608109");
   });
 
@@ -164,10 +168,10 @@ describe("Monad 62,000 MON → AUSD at block 125,409,523: v3 and v4 ranked toget
     expect(heard).toEqual([["uniswap: loses 99.8% of the value to price impact — its pools are too thin for this amount (limit 5%; best route via USDC 0.3% → 0.01%)", {reason: "insufficient_liquidity"}]]);
   });
 
-  it("100 MON at 500: v4 1.093251 AUSD wins (G = 6), while v3 alone (0.871160) is refused", async () => {
+  it("100 MON at 500: v4 1.093251 AUSD wins (G = 5: 5.13 bps against the mids), while v3 alone (0.871160) is refused", async () => {
     const on = await quote(MON(100n), {v4: "native-in", maxPriceImpactBps: 500});
     expect(on.misses).toEqual([]);
-    expect(on.q).toMatchObject({destAmount: "1093251", providerData: {venue: "v4", route: "v4 via USDC 0.05%/10 → 0.0009%/1", priceImpactBps: "0", valueLossBps: "6"}});
+    expect(on.q).toMatchObject({destAmount: "1093251", providerData: {venue: "v4", route: "v4 via USDC 0.05%/10 → 0.0009%/1", priceImpactBps: "0", valueLossBps: "5"}});
     const off = await quote(MON(100n), {maxPriceImpactBps: 500});
     expect(off.q).toBeNull();
     expect(off.heard[0]![1]).toEqual({reason: "insufficient_liquidity"});

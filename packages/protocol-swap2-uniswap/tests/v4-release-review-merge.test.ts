@@ -12,14 +12,14 @@
 // - U0-SEC-R3-2: a V4Quoter candidate answer in a shape the quoter never gives was refused at once; now it is retried
 //   like any unanswered read first (it never read as "no pool").
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {decodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
+import {decodeFunctionData, encodeFunctionData, encodeFunctionResult, getAddress, parseAbi, type Hex} from "viem";
 import type {Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import {uniswapProvider, type UniswapProviderConfig} from "../src/provider.js";
 import {MIN_CALLS_PER_SECOND, MIN_CALLS_PER_SECOND_V4, QUOTE_WAIT_MAX_MS, shortOfFunds, uniswapRpc, type SlotOptions} from "../src/rpc.js";
 import {MULTICALL3} from "../src/v4/discover.js";
 import {poolIdOf} from "../src/v4/pool.js";
-import {v4SpotImpactNetOfFeesBps, v4SpotLossBps, type V4Route} from "../src/v4/quote.js";
+import {V4_QUOTES_PER_AGGREGATE, multicallBatch, v4SpotImpactNetOfFeesBps, v4SpotLossBps, type V4Route} from "../src/v4/quote.js";
 import {AUSD, CHAIN, D3, D4, ME, USDC, V4, fakeNode} from "./v4-fake-node.js";
 import {MON_AUSD_500_1} from "./v4-helpers.js";
 
@@ -49,6 +49,14 @@ const MC3 = parseAbi([
   "struct Call3 { address target; bool allowFailure; bytes callData; }",
   "function aggregate3(Call3[] calls) payable returns ((bool success, bytes returnData)[] returnData)",
 ]);
+const MC3_RESULT = parseAbi([
+  "struct Result { bool success; bytes returnData; }",
+  "function aggregate3((address target, bool allowFailure, bytes callData)[] calls) payable returns (Result[] returnData)",
+]);
+/** Stand-in quoter calldata for the halving count (only its identity matters). */
+const MC3_CALL = parseAbi(["function probe(uint256 i)"]);
+/** Passes multicallBatch takes to halve an aggregate down to the call that starves in it: ⌈log2 V4_QUOTES_PER_AGGREGATE⌉. */
+const HALVINGS = Math.ceil(Math.log2(V4_QUOTES_PER_AGGREGATE));
 /** Whether a request is a Multicall3 aggregate of V4Quoter calls (the candidates' reads, or the probe's). */
 function quoterAggregate(r: Req): boolean {
   const c = r.params?.[0] as {to?: string; data?: Hex} | undefined;
@@ -137,7 +145,7 @@ describe("U0C-2 / U0-LIVE-2 on the v4 path: the loss net of the pools' fees", ()
 
   it("gross against the mids, net of each hop's swap fee (the protocol fee of that direction included)", () => {
     expect([v4SpotLossBps(route(hop(3000)), 1_000_000n, 997_000n), v4SpotImpactNetOfFeesBps(route(hop(3000)), 1_000_000n, 997_000n)]).toEqual([30, 0]);
-    expect([v4SpotLossBps(route(hop(3000)), 1_000_000n, 900_000n), v4SpotImpactNetOfFeesBps(route(hop(3000)), 1_000_000n, 900_000n)]).toEqual([1000, 973]); // 10000 − ⌊900000 × 10000 / 997000⌋, as v4SpotLossBps rounds
+    expect([v4SpotLossBps(route(hop(3000)), 1_000_000n, 900_000n), v4SpotImpactNetOfFeesBps(route(hop(3000)), 1_000_000n, 900_000n)]).toEqual([1000, 972]); // net: the true loss 972.92 bps, rounded down as v3 rounds (U0V4-1: it read 973)
     // Protocol fee 0.1% zeroForOne (low 12 bits): the swap fee is 1000 + 3000 − 3 = 3997 pips.
     expect(v4SpotImpactNetOfFeesBps(route(hop(3000, 1000)), 1_000_000n, 996_003n)).toBe(0);
     expect(v4SpotImpactNetOfFeesBps(route(hop(3000, 1000 << 12)), 1_000_000n, 996_003n)).toBe(10); // the other direction's: not this swap's
@@ -181,10 +189,13 @@ describe("U0-LIVE-1 / U0C-1 on the v4 path: a quote's v4 reads go by its turns, 
     }
   });
 
-  it(`the largest v4 quote (91 calls in eleven passes) fits ${QUOTE_WAIT_MAX_MS / 1000} s at ${MIN_CALLS_PER_SECOND_V4} on an idle endpoint answering within 250 ms; at ${MIN_CALLS_PER_SECOND_V4 - 1}, refused`, async () => {
+  it(`the largest v4 quote (up to 127 calls in sixteen passes) fits ${QUOTE_WAIT_MAX_MS / 1000} s at ${MIN_CALLS_PER_SECOND_V4} on an idle endpoint answering within 250 ms; at ${MIN_CALLS_PER_SECOND_V4 - 1}, refused`, async () => {
     // The passes of a gated token-input quote with the sender known, venueRoutes "both", on an RPC without
-    // eth_simulateV1, for an output token the shipped list does not know, through the provider's own uniswapRpc.
-    const largest = async (rate: number, rtt: number) => {
+    // eth_simulateV1, for an output token the shipped list does not know, through the provider's own uniswapRpc — and,
+    // `pastCap` > 0, with that many V4Quoter candidates past the chain's per-transaction cap, each in its own aggregate
+    // (LIVE-1, the shape of the recorded Monad 2,000 AUSD → MON): each such aggregate halved down to the call, two
+    // aggregates a pass (`HALVINGS` passes, as multicallBatch runs it below), then those candidates read again at the cap.
+    const largest = async (rate: number, rtt: number, pastCap = 0) => {
       const t0 = fake();
       const sent: number[] = [];
       vi.stubGlobal("fetch", (async (_u: RequestInfo | URL, init?: RequestInit) => {
@@ -206,7 +217,15 @@ describe("U0-LIVE-1 / U0C-1 on the v4 path: a quote's v4 reads go by its turns, 
         await r(1, "all", o, "eth_blockNumber"); // the gated quote's block
         await Promise.all([
           r(40, "all"), // v3 candidates
-          (async () => { await r(1, "all"); await r(1, "all"); await Promise.all(Array.from({length: 11}, () => r(1, "all"))); })(), // discovery + grid, 11 V4Quoter aggregates
+          (async () => {
+            await r(1, "all"); // discovery
+            await r(1, "all"); // the unlisted-token grid
+            await Promise.all(Array.from({length: 11}, () => r(1, "all"))); // 11 V4Quoter aggregates
+            if (pastCap) {
+              for (let pass = 0; pass < HALVINGS; pass++) await Promise.all(Array.from({length: 2 * pastCap}, () => r(1, "all"))); // halved
+              await r(pastCap, "all"); // read again at the chain's cap
+            }
+          })(),
         ]);
         await Promise.all([
           (async () => { await r(3, "all"); await r(2, "all"); })(), // v3: pool lookups + probe, slot0()
@@ -218,16 +237,35 @@ describe("U0-LIVE-1 / U0C-1 on the v4 path: a quote's v4 reads go by its turns, 
       vi.useRealTimers();
       return {refused, lastSend: Math.max(...sent), calls: sent.length};
     };
-    for (const rtt of [0, 100, 250]) {
-      const m = await largest(MIN_CALLS_PER_SECOND_V4, rtt);
-      expect([rtt, m.refused]).toEqual([rtt, []]);
-      expect(m.lastSend).toBeLessThanOrEqual(QUOTE_WAIT_MAX_MS);
+    // The halving the model counts is multicallBatch's own: an aggregate of V4_QUOTES_PER_AGGREGATE whose first call
+    // starves (no revert data, alone too) is read again in HALVINGS more passes of two aggregates each (10 → 5 → 3 → 2 → 1).
+    const sizes: number[] = [];
+    const starving = encodeFunctionData({abi: MC3_CALL, functionName: "probe", args: [0n]});
+    await multicallBatch(async (c) => {
+      const calls = decodeFunctionData({abi: MC3, data: c.data}).args[0];
+      sizes.push(calls.length);
+      return encodeFunctionResult({abi: MC3_RESULT, functionName: "aggregate3", result: calls.map((x) => ({success: x.callData !== starving, returnData: (x.callData === starving ? "0x" : `0x${"00".repeat(64)}`) as Hex}))}) as Hex;
+    }, "latest")(Array.from({length: V4_QUOTES_PER_AGGREGATE}, (_, i) => ({to: D4.quoter, data: encodeFunctionData({abi: MC3_CALL, functionName: "probe", args: [BigInt(i)]})})));
+    expect(sizes).toEqual([10, 5, 5, 3, 2, 2, 1, 1, 1]); // the aggregate, then two a pass
+    expect(sizes.length).toBe(1 + 2 * HALVINGS);
+    for (const pastCap of [0, 1, 2, 4]) {
+      for (const rtt of [0, 50, 100, 150, 200, 250]) {
+        const m = await largest(MIN_CALLS_PER_SECOND_V4, rtt, pastCap);
+        expect([pastCap, rtt, m.refused]).toEqual([pastCap, rtt, []]);
+        expect(m.lastSend).toBeLessThanOrEqual(QUOTE_WAIT_MAX_MS);
+      }
     }
-    const under = await largest(MIN_CALLS_PER_SECOND_V4 - 1, 250);
+    const under = await largest(MIN_CALLS_PER_SECOND_V4 - 1, 250, 1);
     expect(under.refused[0]).toMatch(/calls a second are booked past 5 s into the quote/);
+    // U0V4-4: 22, the floor counted without the halving and the re-read, refused a quote with one candidate past the cap
+    // from 150 ms (it carried the quote without one).
+    expect((await largest(22, 250, 0)).refused).toEqual([]);
+    for (const rtt of [150, 200, 250]) expect([rtt, (await largest(22, rtt, 1)).refused.length > 0]).toEqual([rtt, true]);
+    // Not carried (MIN_CALLS_PER_SECOND_V4's doc): candidates past the cap in all eleven aggregates.
+    expect((await largest(MIN_CALLS_PER_SECOND_V4, 250, 11)).refused.length).toBeGreaterThan(0);
     // At 13 (the v3 floor) even an endpoint answering at once refuses it.
     expect((await largest(MIN_CALLS_PER_SECOND, 0)).refused.length).toBeGreaterThan(0);
-  }, 30_000);
+  }, 60_000);
 
   it("a v4 token-input quote on an idle endpoint at the floor (250 ms, no eth_simulateV1): every read within the quote's 5 s, quoted", async () => {
     const t0 = fake();

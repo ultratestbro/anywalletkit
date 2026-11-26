@@ -95,11 +95,11 @@ describe("LIVE-1, Monad block 125,520,066: candidates past the 30M cap are ranke
     expect(off.q!.providerData!.v4Unexecutable).toBeUndefined();
   });
 
-  it("2,000 AUSD → MON at maxPriceImpactBps 500 (cp0x's setting): quoted, G = max(probe 49, spot 54)", async () => {
+  it("2,000 AUSD → MON at maxPriceImpactBps 500 (cp0x's setting): quoted, G = max(probe 49, spot 53)", async () => {
     const {q, heard, misses} = await quote(AUSD_MON, {v4: "all", maxPriceImpactBps: 500});
     expect(misses).toEqual([]);
     expect(heard).toEqual([]);
-    expect(q).toMatchObject({destAmount: "182815619388841801516424", providerData: {venue: "v4", priceImpactBps: "49", valueLossBps: "54", v4Unexecutable: "4"}});
+    expect(q).toMatchObject({destAmount: "182815619388841801516424", providerData: {venue: "v4", priceImpactBps: "49", valueLossBps: "53", v4Unexecutable: "4"}}); // spot: 53.83 bps against the mids, rounded down (U0V4-1)
   });
 
   it("20,000 USDC → AUSD: 20,002.93 AUSD on the AUSD/USDC 0.005%/1 pool (1 candidate past the cap ranked out); v3 alone pays 1.13", async () => {

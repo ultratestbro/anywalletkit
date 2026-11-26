@@ -3,6 +3,7 @@ import {bigintToNumber} from "@anywalletkit/core";
 import {refusal, refusalOf, withReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {MULTICALL3, type V4BlockTag, type V4EthCall, type V4Pool} from "./discover.js";
 import {V4_NATIVE} from "./addresses.js";
+import {spotImpactNetOfFeesBps, spotValueLossBps, type Hop} from "../impact.js";
 
 /**
  * Uniswap v4 quotes on the V4Quoter (research §3.3): single-pool and two-pool exact-input candidates over the pools
@@ -393,13 +394,41 @@ export function v4SpotOut(route: V4Route, amountIn: bigint): bigint {
 }
 
 /**
- * Value lost against the fee-free mid prices, in bps (fees included): 10000 − out × 10000 / spotOut, at least 0.
- * Undefined when the mid output rounds to 0.
+ * The route's pools as the v3 measures read them ({@link spotValueLossBps}): one {@link Hop} per pool — `fee` the swap
+ * fee the pool takes in this direction ({@link swapFeePips}) when `netOfFees` — and the pools' mid prices. A v4 key is
+ * sorted (currency0 < currency1), so the v3 measures' address order is the hop's direction; a hop that says otherwise,
+ * or a fee no pool can charge, is not measured.
+ */
+function midHops(route: V4Route, netOfFees: boolean): {hops: Hop[]; prices: bigint[]} | undefined {
+  const hops: Hop[] = [];
+  const prices: bigint[] = [];
+  for (const h of route.hops) {
+    if ((BigInt(h.currencyIn) < BigInt(h.currencyOut)) !== h.zeroForOne) return undefined;
+    const fee = netOfFees ? swapFeePips(h) : 0;
+    if (fee === undefined) return undefined;
+    hops.push({tokenIn: h.currencyIn, tokenOut: h.currencyOut, fee});
+    prices.push(h.pool.state.sqrtPriceX96);
+  }
+  return {hops, prices};
+}
+
+/**
+ * Value lost against the fee-free mid prices, in bps (fees included), 0..10000: the v3 measure ({@link spotValueLossBps})
+ * over the route's pools — the output's exact shortfall against `amountIn × Π rate`, rounded down to a whole bp, so
+ * `loss ≥ limit` holds exactly when the true loss reaches the limit (U0V4-1: `10000 − ⌊out × 10000 / spotOut⌋` rounded
+ * the loss up by as much as 1 bp, and the gate refused a deep pool under its limit). Undefined when the mid output
+ * rounds to 0.
  */
 export function v4SpotLossBps(route: V4Route, amountIn: bigint, amountOut: bigint): number | undefined {
-  const spot = v4SpotOut(route, amountIn);
-  if (spot <= 0n) return undefined;
-  return Math.max(0, bigintToNumber(10_000n - (amountOut * 10_000n) / spot));
+  if (v4SpotOut(route, amountIn) <= 0n) return undefined;
+  const m = midHops(route, false);
+  return m && spotValueLossBps(m.hops, m.prices, amountIn, amountOut);
+}
+
+/** The protocol fee a hop's pool takes in the swap's direction, in pips (12 bits each, low = zeroForOne). */
+function protocolFeePips(hop: V4Hop): number {
+  const pf = hop.pool.state.protocolFee;
+  return hop.zeroForOne ? pf & 0xfff : (pf >> 12) & 0xfff;
 }
 
 /**
@@ -411,27 +440,35 @@ function swapFeePips(hop: V4Hop): number | undefined {
   const lp = hop.pool.state.lpFee;
   const pf = hop.pool.state.protocolFee;
   if (!Number.isInteger(lp) || lp < 0 || lp >= 1_000_000 || !Number.isInteger(pf) || pf < 0) return undefined;
-  const p = hop.zeroForOne ? pf & 0xfff : (pf >> 12) & 0xfff;
+  const p = protocolFeePips(hop);
   const fee = p === 0 ? lp : p + lp - Math.floor((p * lp) / 1_000_000);
   return fee < 1_000_000 ? fee : undefined;
 }
 
 /**
- * The same value loss net of the pools' fees: against the mid output after each hop's swap fee (`× (1 − fee)` per
- * pool, the protocol fee included where one is taken), so what is left is the price impact alone (and the pools'
- * rounding). It tells a route whose pools are too thin from one that reaches a limit only with its fees (U0C-2 on the
- * v4 path); the gate itself goes by {@link v4SpotLossBps}. Undefined when the mid output rounds to 0.
+ * The same value loss net of the pools' fees: the v3 measure ({@link spotImpactNetOfFeesBps}) against the mid output
+ * after each hop's swap fee (`× (1 − fee)` per pool, the protocol fee included where one is taken), exact and rounded
+ * down as {@link v4SpotLossBps} is, so what is left is the price impact alone (and the pools' rounding). It tells a route
+ * whose pools are too thin from one that reaches a limit only with its fees (U0C-2 on the v4 path); the gate itself goes
+ * by {@link v4SpotLossBps}. Undefined when the mid output rounds to 0.
  */
 export function v4SpotImpactNetOfFeesBps(route: V4Route, amountIn: bigint, amountOut: bigint): number | undefined {
-  let spot = v4SpotOut(route, amountIn);
-  if (spot <= 0n) return undefined;
-  for (const h of route.hops) {
-    const fee = swapFeePips(h);
-    if (fee === undefined) return undefined;
-    spot = (spot * BigInt(1_000_000 - fee)) / 1_000_000n;
-  }
-  if (spot <= 0n) return undefined;
-  return Math.max(0, bigintToNumber(10_000n - (amountOut * 10_000n) / spot));
+  if (v4SpotOut(route, amountIn) <= 0n) return undefined;
+  const m = midHops(route, true);
+  return m && spotImpactNetOfFeesBps(m.hops, m.prices, amountIn, amountOut);
+}
+
+/**
+ * The fees a route's pools take from the input, as the impact refusal names them when only they bring the loss to the
+ * limit (U0C-2): each pool's LP fee, and where the pool takes a protocol fee in the swap's direction that one too
+ * ("0.05% + 0.1% protocol") — the fees {@link v4SpotImpactNetOfFeesBps} nets out (U0V4-2: the text named the LP fees
+ * alone, "0.05%", for a 0.15% swap fee). Without a protocol fee it is the route's `poolFee`.
+ */
+export function v4RouteFeesText(route: V4Route): string {
+  return route.hops.map((h) => {
+    const p = protocolFeePips(h);
+    return p > 0 ? `${pct(h.pool.key.fee)} + ${pct(p)} protocol` : pct(h.pool.key.fee);
+  }).join(" + ");
 }
 
 /**

@@ -69,16 +69,22 @@ export const MIN_CALLS_PER_SECOND = 13;
  * The lowest `rpcCallsPerSecond` with Uniswap v4 on (`v4: "native-in"` or `"all"`): the least with which the largest v4
  * quote fits QUOTE_WAIT_MAX_MS on an idle endpoint that answers within 250 ms. A v4 quote's reads go under the same
  * per-quote bound as its v3 reads (U0-LIVE-1), and the largest — a token input with the sender known, gated, on a chain
- * whose RPC serves no `eth_simulateV1`, an output token the shipped list does not know, `venueRoutes: "both"` — is 91
- * calls in eleven passes one after another: the v3 and v4 deployment checks and the block read (4 + 5 + 1); the latest
- * block; 40 v3 candidates beside the v4 discovery (two Multicall3 reads) and 11 V4Quoter aggregates (104 routes); v3's
- * pool lookups + probe and slot0() reads (3 + 2) beside v4's probe, balance + allowance, `eth_simulateV1`, the access list,
- * 16 allowance-slot read-backs and the swap's `eth_call`. At 21 it is refused as `rate_limited` with nothing else in the
- * queue on a 250 ms endpoint (tests/v4-release-review-merge.test.ts). Eleven passes take the bound's 5 s on their own on
- * an endpoint slower than ~450 ms: there no rate carries that quote, and such an endpoint needs more than this one does
- * at 250 ms (35 at 400 ms).
+ * whose RPC serves no `eth_simulateV1`, an output token the shipped list does not know, `venueRoutes: "both"`, with up
+ * to four candidates that need more gas than the chain's per-transaction cap (LIVE-1; the recorded Monad 2,000 AUSD →
+ * MON has four) — is up to 127 calls in sixteen passes one after another: the v3 and v4 deployment checks and the block
+ * read (4 + 5 + 1); the latest block; 40 v3 candidates beside the v4 discovery (two Multicall3 reads) and 11 V4Quoter
+ * aggregates (104 routes); each aggregate holding such a candidate halved down to the call (10 → 5 → 3 → 2 → 1: four
+ * passes of two aggregates per candidate), then those candidates read again at the cap; v3's pool lookups + probe and
+ * slot0() reads (3 + 2) beside v4's probe, balance + allowance, `eth_simulateV1`, the access list, 16 allowance-slot
+ * read-backs and the swap's `eth_call`. At 32 it is refused as `rate_limited` with nothing else in the queue on a
+ * 250 ms endpoint (tests/v4-release-review-merge.test.ts; U0V4-4: 22, counted without the halving and the re-read,
+ * refused it from 150 ms). Not carried: candidates past the cap in more aggregates (all eleven: 53 at 250 ms), and a
+ * quote whose best v4 build is refused for its own route and that builds the next one (V4_MAX_BUILDS, three passes more
+ * each: with such candidates 47 for a second build, and no rate carries a third at 250 ms). Sixteen passes take the
+ * bound's 5 s on their own on an endpoint slower than ~310 ms: there no rate carries that quote, and such an endpoint
+ * needs more than this one does at 250 ms (47 at 300 ms).
  */
-export const MIN_CALLS_PER_SECOND_V4 = 22;
+export const MIN_CALLS_PER_SECOND_V4 = 33;
 /**
  * Waits before each retry (ms, from..to): long enough for a per-second window to pass, spread at random so that
  * concurrent quotes refused in the same window do not all come back in the next one together.
@@ -91,12 +97,14 @@ const RATE_LIMIT_TEXT = /rate.?limit|too many|request limit|limit (?:reached|exc
 /** The call ran and the EVM stopped it: a revert, or the gas the node lets one call use ran out (an answer either way). */
 const REVERT_TEXT = /revert|out of gas|gas required exceeds|gas limit reached|invalid opcode|invalid jump|stack (?:underflow|overflow|limit reached)|max call depth exceeded|write protection|return data out of bounds|vm execution error/i;
 /**
- * Methods whose answer is never `null`: an `eth_call` returns bytes (`"0x"` at least), `eth_blockNumber` a number and
- * `eth_getCode` bytes (`"0x"` where there is no code), so `null` from any is no answer (U0C-5: pinBlock took a null block
- * number for an answer and never asked again; the v4 deployment check took a null code for "not the pinned build" and
- * turned v4 off for the quote, alerting a mismatch).
+ * Methods whose answer is never `null`: an `eth_call` returns bytes (`"0x"` at least), `eth_blockNumber` a number,
+ * `eth_getCode` bytes (`"0x"` where there is no code) and a served `eth_simulateV1` an array of blocks, so `null` from
+ * any is no answer (U0C-5: pinBlock took a null block number for an answer and never asked again; the v4 deployment
+ * check took a null code for "not the pinned build" and turned v4 off for the quote, alerting a mismatch; U0V4-3: the v4
+ * token-input check took a null simulation for one "in another shape" and set the v4 route aside for v3's at once,
+ * never asking again).
  */
-const NEVER_NULL: ReadonlySet<string> = new Set(["eth_call", "eth_blockNumber", "eth_getCode"]);
+const NEVER_NULL: ReadonlySet<string> = new Set(["eth_call", "eth_blockNumber", "eth_getCode", "eth_simulateV1"]);
 /** The node failed to run the call: hex `data` next to these is not revert bytes. */
 const NODE_FAULT_TEXT = /timeout|timed out|unavailable|internal error|overload|busy|try again|header not found|missing trie node/i;
 
@@ -513,8 +521,9 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
           }
           if (r.error === undefined) {
             // An answer must carry its result: an item with neither, or `null` from a call that always names one
-            // (eth_call, eth_blockNumber), is no answer (it was read as a revert before, so the best pool dropped out
-            // silently). `null` stays an answer where it means one (a receipt not mined yet).
+            // (NEVER_NULL: eth_call, eth_blockNumber, eth_getCode, eth_simulateV1), is no answer (it was read as a
+            // revert before, so the best pool dropped out silently). `null` stays an answer where it means one (a
+            // receipt not mined yet).
             out[r.id] = !Object.prototype.hasOwnProperty.call(r, "result") || (r.result === null && NEVER_NULL.has(calls[r.id]!.method))
               ? {ok: false, failed: refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node answered a call with no result)`)}
               : {ok: true, result: r.result};

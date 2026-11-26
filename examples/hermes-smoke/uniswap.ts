@@ -104,7 +104,7 @@ export async function smokeUniswap(check: Check): Promise<void> {
     check('uniswap: v3 quote from the recording (62,000 MON → 1.130999 AUSD, gasLimit 16,303,291)', v3?.destAmount === '1130999' && v3.txRequest?.gasLimit === '16303291' && v3.txRequest?.to === UNISWAP_V3[143]!.router, `${v3?.destAmount} ${v3?.txRequest?.gasLimit} misses ${node.misses.join(',')}`)
     check('uniswap: the v3 quote passes the shipped pins', !!v3 && uniswapVerifyQuote(params, v3) === null, v3 ? uniswapVerifyQuote(params, v3) ?? '' : 'no quote')
     const v4 = await uniswapProvider({rpcUrls: {143: ['https://monad.fixture']}, v4: 'native-in', maxPriceImpactBps: 500}).getQuote(params)
-    check('uniswap: v4 native-in wins (676.608109 AUSD via USDC, G = 23) and passes the 500 gate', v4?.destAmount === '676608109' && v4.providerData?.venue === 'v4' && v4.providerData?.valueLossBps === '23' && v4.txRequest?.to === UNISWAP_V4[143]!.universalRouter, `${v4?.destAmount} ${JSON.stringify(v4?.providerData ?? null).slice(0, 160)} misses ${node.misses.join(',')}`)
+    check('uniswap: v4 native-in wins (676.608109 AUSD via USDC, G = 22) and passes the 500 gate', v4?.destAmount === '676608109' && v4.providerData?.venue === 'v4' && v4.providerData?.valueLossBps === '22' && v4.txRequest?.to === UNISWAP_V4[143]!.universalRouter, `${v4?.destAmount} ${JSON.stringify(v4?.providerData ?? null).slice(0, 160)} misses ${node.misses.join(',')}`)
     const pins = v4 ? uniswapVerifyQuote(params, v4) : 'no quote'
     check('uniswap: the v4 quote passes the shipped pins (strict decode, canonical re-encode, pinned pools)', pins === null && uniswapPins.callTargets('eip155:143').includes(UNISWAP_V4[143]!.universalRouter), pins ?? '')
 

@@ -13,7 +13,7 @@ import {UNISWAP_V4_POOLS} from "./v4pools/index.js";
 import {v4ServedDeployment, v4ServesFlow} from "./v4/serve.js";
 import {UNISWAP_V4_POOL_KEYS} from "./v4/listed.js";
 import {MULTICALL3, discoverV4Pools, type V4BlockTag, type V4EthCall} from "./v4/discover.js";
-import {buildV4Routes, decodeV4QuoteAnswer, multicallBatch, quoteCallDataOfKeys, quoteV4Routes, rankedV4Candidates, v4ProbeImpactBps, v4SpotImpactNetOfFeesBps, v4SpotLossBps, type V4CallBatch, type V4CallOutcome, type V4GasBound, type V4QuoteResult} from "./v4/quote.js";
+import {buildV4Routes, decodeV4QuoteAnswer, multicallBatch, quoteCallDataOfKeys, quoteV4Routes, rankedV4Candidates, v4ProbeImpactBps, v4RouteFeesText, v4SpotImpactNetOfFeesBps, v4SpotLossBps, type V4CallBatch, type V4CallOutcome, type V4GasBound, type V4QuoteResult} from "./v4/quote.js";
 import {checkedHooklessKey, checkedMaxFeePips, checkedV4ExtraPools} from "./v4/pool.js";
 import {encodeV4Swap} from "./v4/encode.js";
 import {V4_DEFAULT_DEADLINE_SECONDS, uniswapV4ReasonOf, uniswapV4VerifyQuote, v4DeploymentProblem, v4DeploymentReads, v4HopTokens, v4PreflightCall, v4StorageOverride, v4StrandedRecipient, v4StrandedRecipientText, type UniswapV4Mode} from "./v4/verify.js";
@@ -301,7 +301,8 @@ export interface UniswapProviderConfig {
    * `slot0()` mid prices (fees included, `providerData.valueLossBps`). The fees count: a limit at or under the route's
    * pool fee (100 on a 1% pool, 60 on two 0.3% pools) refuses that route however deep its pools are — the text then
    * names the fees ("loses 1.0% of the value to price impact and pool fees — the route's fees (1%) bring it to the
-   * limit; …") instead of thin pools — on a v4 route too, its pools' swap fees (with any protocol fee) counted. A probe too small to run, reverted, empty or unanswered after the retries leaves
+   * limit; …") instead of thin pools — on a v4 route too, its pools' swap fees (with any protocol fee) counted and
+   * named ("0.05% + 0.1% protocol"). A probe too small to run, reverted, empty or unanswered after the retries leaves
    * spot to decide. Spot must be measured (the probe alone is blind to a pool parked past an empty range): when its
    * reads go unanswered after the retries, or come back reverted, zero or in another shape, the quote is refused —
    * `rate_limited` / `upstream_unavailable` (as `insufficient_liquidity` when the probe alone already reaches the
@@ -310,7 +311,7 @@ export interface UniswapProviderConfig {
   maxPriceImpactBps?: number;
   /**
    * Most JSON-RPC calls sent to one endpoint in any one second, across every quote, check and read of this provider (an
-   * integer ≥ 13, MIN_CALLS_PER_SECOND: the least that carries one quote — ≥ 22, MIN_CALLS_PER_SECOND_V4, with `v4` on,
+   * integer ≥ 13, MIN_CALLS_PER_SECOND: the least that carries one quote — ≥ 33, MIN_CALLS_PER_SECOND_V4, with `v4` on,
    * whose reads go under the same bound; a server sets the good-item rate its keyed endpoint serves — QuickNode answered
    * 50 calls a second on Monad and `-32007` the rest, UNISWAP-V4-RESEARCH §5.3).
    * Batches then carry at most 10 calls and wait for their turn on their endpoint, counted at the moment each batch
@@ -1174,11 +1175,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const loss = probe === undefined ? spot : Math.max(probe, spot);
         if (loss >= limit) {
           // As on v3 (U0C-2): the gate goes by the loss with the pools' fees in it, and the text names what got it
-          // there — thin pools when the price impact alone (the probe, or spot net of the pools' fees) reaches the limit,
-          // else the route's own fees.
+          // there — thin pools when the price impact alone (the probe, or spot net of the pools' swap fees) reaches the
+          // limit, else the route's own fees: every fee that measure nets out, a pool's protocol fee too (U0V4-2).
           const net = v4SpotImpactNetOfFeesBps(route, amountIn, out);
           const thin = (probe ?? 0) >= limit || net === undefined || net >= limit;
-          return no(impactRefusalText(loss, limit, route.label, thin ? undefined : route.poolFee), "insufficient_liquidity", "trade");
+          return no(impactRefusalText(loss, limit, route.label, thin ? undefined : v4RouteFeesText(route)), "insufficient_liquidity", "trade");
         }
       }
 
