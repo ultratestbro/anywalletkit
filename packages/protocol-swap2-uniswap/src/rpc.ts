@@ -79,12 +79,17 @@ function itemError(raw: unknown): RpcItemError {
 /** A node's error as refusal text: code and message, URLs taken out (a keyed endpoint may echo its own), kept short. */
 const describe = (e: RpcItemError) => redactUrls(e.code !== undefined ? `${e.code} ${e.message}` : e.message).slice(0, 200);
 
-/** A chunk every endpoint failed: the final error, and whether the last failure was at the JSON-RPC level. */
+/**
+ * A chunk every endpoint failed: the final error, and whether the last failure was at the JSON-RPC level. Told apart
+ * by its brand, not `instanceof` (an Error subclass lowered for Hermes is not guaranteed to keep its prototype).
+ */
 class ChunkFailure extends Error {
+  readonly chunkFailure = true as const;
   constructor(readonly error: Error, readonly jsonRpc: boolean) {
     super(error.message);
   }
 }
+const isChunkFailure = (e: unknown): e is ChunkFailure => !!e && typeof e === "object" && (e as {chunkFailure?: unknown}).chunkFailure === true;
 
 /** Resolves after `ms`, or as soon as the caller aborts (the next attempt then fails with the abort). */
 function pause(ms: number, signal?: AbortSignal): Promise<void> {
@@ -172,7 +177,7 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>)
         try {
           out[i] = await chunk(chainId, chunks[i]!, start, signal);
         } catch (e) {
-          if (!(e instanceof ChunkFailure)) throw e; // the caller's abort
+          if (!isChunkFailure(e)) throw e; // the caller's abort
           // Under `all` (and `items` for a JSON-RPC-level refusal) the chunk's calls are retried like any unanswered call.
           if (policy === "all" || (policy === "items" && e.jsonRpc)) out[i] = chunks[i]!.map(() => ({ok: false, failed: e.error}));
           else throw e.error;
