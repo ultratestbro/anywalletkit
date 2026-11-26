@@ -5,7 +5,11 @@
 //
 // Source: {id, type: "evm-initialize", chainId, poolManager, stateView, pools: {from: "dist/index.js", export: "UNISWAP_V4_POOLS"},
 //          canary: {block, poolId} (required: the positive control below), logsRpc?: "https://…" (a public endpoint with
-//          wide eth_getLogs windows), window?: 10000, feeCap?: 100000, maxCalls?: 300, confirm?: 20}
+//          wide eth_getLogs windows), window?: 10000, feeCap?: 100000, maxCalls?: 300, confirm?: 20, intervalMs?: 0}
+// `intervalMs` (TOOLING-1): for a source whose CI endpoint is a public one that refuses calls sent back to back with HTTP
+// 429 (Arc's rpc.mainnet.arc.io answered the 4th eth_getLogs in a row so, 2026-11-27, and a run at 1.5 s between calls
+// passed): every call of the run starts at least this long after the one before on the same endpoint, and a 429 is waited
+// out (2 × then 4 × intervalMs) and asked again, twice at most, before the source fails. Unset: back to back, a 429 fails.
 // Positive control (SEC-U4-R3-1): an endpoint that answers [] for a range it does not index (a pruned log index, a
 // gateway that drops results) would read as "no new pools", and lastBlock would move past blocks never read. So every run
 // that scans also asks the same logs endpoint, with the scan's own filter, for the one block of `canary` — the known
@@ -145,6 +149,33 @@ export function namedWindow(message) {
   const n = m ? Number(m[1].replace(/,/g, "")) : NaN;
   return Number.isSafeInteger(n) && n >= 1 ? n : undefined;
 }
+/** The most `intervalMs` a source may set (ms), and how often a paced call refused with HTTP 429 is asked again. */
+export const MAX_INTERVAL_MS = 60_000;
+export const RETRIES_429 = 2;
+const is429 = (e) => e?.httpStatus === 429 || /^HTTP 429\b/.test(String(e?.message ?? ""));
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+/**
+ * `call`, paced (`intervalMs`, see the header): each call starts at least `intervalMs` after the one before it began, and
+ * one refused with HTTP 429 is asked again after 2 × and then 4 × `intervalMs`; a third 429, or any other failure,
+ * throws as it came. The calls of one run are sequential.
+ */
+export function pacedCall(call, intervalMs, {sleep = pause, now = () => Date.now()} = {}) {
+  let next = 0;
+  return async (method, params) => {
+    for (let attempt = 0; ; attempt++) {
+      const wait = next - now();
+      if (wait > 0) await sleep(wait);
+      next = now() + intervalMs;
+      try {
+        return await call(method, params);
+      } catch (e) {
+        if (!is429(e) || attempt >= RETRIES_429) throw e;
+        next = now() + intervalMs * 2 ** (attempt + 1);
+      }
+    }
+  };
+}
+
 /** eth_getLogs over [from, to] in `window`-block steps: a window the node refuses is cut to the limit it names (when
  *  smaller), else halved. At most `maxCalls` calls. */
 export async function scanLogs(call, {poolManager, topics, from, to, window, maxCalls}) {
@@ -211,7 +242,12 @@ const canonicalValue = (pending, dead) => JSON.stringify({dead: dead.map((d) => 
  * eth_blockNumber); both throw on failure. `prev` = the stored meta of the last run (undefined on the first). `list` =
  * {tokens, pools, feeCap} of the chain from the module's built pin list. Returns {value, meta, problems}.
  */
-export async function runInitializeSource(s, {call, logsCall = call, prev, list}) {
+export async function runInitializeSource(s, {call: rawCall, logsCall: rawLogsCall = rawCall, prev, list}) {
+  const intervalMs = s.intervalMs ?? 0;
+  if (!Number.isInteger(intervalMs) || intervalMs < 0 || intervalMs > MAX_INTERVAL_MS) throw new Error(`intervalMs must be an integer 0..${MAX_INTERVAL_MS}`);
+  // Paced per endpoint: one pacer when the state and the logs endpoint are the same caller.
+  const call = intervalMs > 0 ? pacedCall(rawCall, intervalMs) : rawCall;
+  const logsCall = rawLogsCall === rawCall ? call : intervalMs > 0 ? pacedCall(rawLogsCall, intervalMs) : rawLogsCall;
   if (!list || !Array.isArray(list.tokens) || !Array.isArray(list.pools)) throw new Error(`no pinned v4 pool list for chain ${s.chainId}`);
   for (const k of ["poolManager", "stateView"]) if (list[k] && lc(list[k]) !== lc(s[k])) throw new Error(`the manifest's ${k} ${s[k]} is not the one the pinned list was built from (${list[k]})`);
   const feeCap = s.feeCap ?? FEE_CAP;

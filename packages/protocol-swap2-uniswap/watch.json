@@ -1619,6 +1619,7 @@
         "poolId": "0xb587e86f28440aafc8bc6d91cde1e003ce624374810d4daf7f37490bc74cc1ce"
       },
       "window": 10000,
+      "intervalMs": 1500,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Arc"
     },
     {

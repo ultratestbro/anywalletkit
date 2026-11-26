@@ -75,7 +75,8 @@ async function rpc(url, method, params) {
     if (RPC_ERROR_STATUS.has(r.status)) { try { body = await r.json(); } catch {} }
     const e = body && typeof body === "object" && body.error && typeof body.error === "object" ? body.error : null;
     if (e && (typeof e.message === "string" || typeof e.code === "number")) throw Object.assign(new Error(String(e.message ?? JSON.stringify(e)).slice(0, 300)), {rpcError: true, httpStatus: r.status});
-    throw new Error(`HTTP ${r.status}`);
+    // The status rides along (same text as before): a source that paces its calls waits out a 429 (evm-initialize `intervalMs`).
+    throw Object.assign(new Error(`HTTP ${r.status}`), {httpStatus: r.status});
   }
   const j = await r.json();
   if (j.error) throw Object.assign(new Error(j.error.message || JSON.stringify(j.error)), {rpcError: true});

@@ -444,17 +444,73 @@ test("watch.mjs (LIVE2-1): an HTTP 400 range refusal is read as the node's answe
   }
 });
 
+// ── TOOLING-1: a public endpoint that refuses calls sent back to back with HTTP 429 (Arc's, 2026-11-27) ─────────────
+
+/** `inner` behind an endpoint that answers HTTP 429 (as watch.mjs's rpc() throws it) to a call when `burst` calls already
+ *  went in the last `perMs` ms, and to the first `refuseFirst` eth_getLogs whatever the pace. `at`: when each call went. */
+function burstLimited(inner, {burst = 3, perMs = 100, refuseFirst = 0} = {}) {
+  const at = [];
+  let logs = 0;
+  const call = async (method, params) => {
+    const now = Date.now();
+    const recent = at.filter((t) => t > now - perMs).length;
+    at.push(now);
+    if (method === "eth_getLogs" && logs++ < refuseFirst) throw Object.assign(new Error("HTTP 429"), {httpStatus: 429});
+    if (recent >= burst) throw Object.assign(new Error("HTTP 429"), {httpStatus: 429});
+    return inner(method, params);
+  };
+  return {call, at};
+}
+
+test("TOOLING-1: intervalMs paces a source's calls, so an endpoint that 429s the 4th call in a row covers the run", async () => {
+  const fresh = {currency0: ZERO, currency1: USDC, fee: 500, tickSpacing: 10};
+  // 10 windows of 100 blocks, the canary and the liveness read: 13 calls.
+  const back = burstLimited(chain({head: 1000, logs: [rawLog(fresh, 640)]}).call);
+  await assert.rejects(runInitializeSource({...SRC}, {call: back.call, prev: {lastBlock: 0}, list: LIST}), /HTTP 429/, "back to back, the 4th call is refused and the source fails (Arc before)");
+  const paced = burstLimited(chain({head: 1000, logs: [rawLog(fresh, 640)]}).call);
+  const r = await runInitializeSource({...SRC, intervalMs: 40}, {call: paced.call, prev: {lastBlock: 0}, list: LIST});
+  assert.equal(r.meta.lastBlock, 990);
+  assert.equal(r.meta.pending.length, 1);
+  assert.deepEqual(r.problems, []);
+  assert.equal(paced.at.length, 13);
+  for (let i = 1; i < paced.at.length; i++) assert.ok(paced.at[i] - paced.at[i - 1] >= 39, `call ${i} went ${paced.at[i] - paced.at[i - 1]} ms after the one before`);
+});
+
+test("TOOLING-1: a paced source waits out a 429 and asks again (twice at most); unpaced, or for any other failure, the source fails as before", async () => {
+  const once = burstLimited(chain({head: 1000}).call, {burst: 99, refuseFirst: 1});
+  const r = await runInitializeSource({...SRC, intervalMs: 5}, {call: once.call, prev: {lastBlock: 0}, list: LIST});
+  assert.equal(r.meta.lastBlock, 990);
+  assert.equal(once.at.length, 14, "the refused window is asked once more");
+  const thrice = burstLimited(chain({head: 1000}).call, {burst: 99, refuseFirst: 3});
+  await assert.rejects(runInitializeSource({...SRC, intervalMs: 5}, {call: thrice.call, prev: {lastBlock: 0}, list: LIST}), /HTTP 429/);
+  assert.equal(thrice.at.length, 4, "eth_blockNumber, then the first window three times");
+  const unpaced = burstLimited(chain({head: 1000}).call, {burst: 99, refuseFirst: 1});
+  await assert.rejects(runInitializeSource({...SRC}, {call: unpaced.call, prev: {lastBlock: 0}, list: LIST}), /HTTP 429/);
+  // Any other failure is not asked again.
+  const c = chain({head: 1000});
+  let n = 0;
+  const down = async (method, params) => { if (method === "eth_call") { n++; throw Object.assign(new Error("HTTP 503"), {httpStatus: 503}); } return c.call(method, params); };
+  await assert.rejects(runInitializeSource({...SRC, intervalMs: 5}, {call: down, prev: {lastBlock: 0}, list: LIST}), /HTTP 503/);
+  assert.equal(n, 1);
+  for (const bad of [-1, 1.5, 60_001, "1500"]) await assert.rejects(runInitializeSource({...SRC, intervalMs: bad}, {call: chain().call, prev: {lastBlock: 0}, list: LIST}), /intervalMs must be an integer/);
+});
+
 test("LIVE2-1: the three sources on capped public RPCs can cover a day; the CI maps the keyed endpoints before the watch runs", () => {
   const ROOT = join(here, "../..");
   const manifest = JSON.parse(readFileSync(join(ROOT, "packages/protocol-swap2-uniswap/watch.json"), "utf8"));
+  const yml = readFileSync(join(ROOT, ".github/workflows/watch.yml"), "utf8");
   // Blocks a day and the public eth_getLogs cap, read 2026-11-26: X Layer 86,400 / 100, World Chain 43,200 / 100, Ink 86,400 / 1,000.
-  for (const [chainId, perDay, cap] of [[196, 86_400, 100], [480, 43_200, 100], [57073, 86_400, 1000]]) {
+  // Arc (TOOLING-1): ~94,000 blocks a day at the source's 10,000-block window on its public endpoint, which CI uses
+  // (watch.yml maps no ARC_RPC_URL) and which answers HTTP 429 to the 4th call in a row — about ten eth_getLogs a day,
+  // so its calls must be paced (1.5 s apart passed live, 2026-11-27).
+  for (const [chainId, perDay, cap] of [[196, 86_400, 100], [480, 43_200, 100], [57073, 86_400, 1000], [5042, 94_000, 10_000]]) {
     const s = manifest.sources.find((x) => x.type === "evm-initialize" && x.chainId === chainId);
     assert.ok(s, `chain ${chainId}`);
     const calls = s.maxCalls ?? 300;
     assert.ok(calls >= Math.ceil(perDay / cap) + 10, `chain ${chainId}: maxCalls ${calls} covers ${perDay} blocks a day at ${cap}`);
   }
-  const yml = readFileSync(join(ROOT, ".github/workflows/watch.yml"), "utf8");
+  const arc = manifest.sources.find((x) => x.type === "evm-initialize" && x.chainId === 5042);
+  if (!yml.includes("ARC_RPC_URL")) assert.ok((arc.intervalMs ?? 0) >= 1500, `Arc runs on its public endpoint in CI: intervalMs ${arc.intervalMs} must pace its calls`);
   const map = yml.indexOf("WORLDCHAIN:worldchain-mainnet"), run = yml.indexOf("node scripts/watch/watch.mjs --send");
   assert.ok(map > 0 && run > map, "the map and the run");
   // $GITHUB_ENV reaches later steps only: the map must be in a step of its own, before the watch step.
