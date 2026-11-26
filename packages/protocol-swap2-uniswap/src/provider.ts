@@ -656,13 +656,16 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const best = ranked[0]!;
         const after = ranked.slice(1);
         const settle = (r: Quote | V3Refused): Quote | null => ("refused" in r ? refuse(r.refused, r.info) : r);
-        if (after.length && measuresGas(best) && !fits(best, sureGasBounds(chainId, gasRead))) {
+        // Only a later candidate the chain's caps let through can ever stand in for the best: with none, nothing waits
+        // for the bounds here and the best goes on exactly as in 039db9fe (its gas step takes them, as it always did).
+        const insteadPossible = after.some((c) => fits(c, gasCapsOf(chainId)));
+        if (insteadPossible && measuresGas(best) && !fits(best, sureGasBounds(chainId, gasRead))) {
           const b = await takeBounds();
           const next = after.find((c) => fits(c, b));
           if (next) return settle(await finish(next));
         }
         const first = await finish(best);
-        if (!("refused" in first) || !after.length || !measuresGas(best)) return settle(first);
+        if (!("refused" in first) || !insteadPossible || !measuresGas(best)) return settle(first);
         if (bounds === undefined && fits(best, gasBoundsOf(chainId, blockGasInHand(gasRead)))) return settle(first);
         const b = await takeBounds();
         const next = fits(best, b) ? undefined : after.find((c) => fits(c, b));

@@ -184,6 +184,27 @@ describe("LIVE-VR-3 review: the route picked and the route bounded go by one blo
     expect(s!.ms).toBeLessThan(50);
   });
 
+  it("a best the caps rank out with no later route under the caps either: refused at once for its loss, as in 039db9fe (b39901dc: held by the block read)", async () => {
+    // Monad (30M per transaction), maxPriceImpactBps 500, the block read never answers. The best (40M) loses 75%; the
+    // only other route (30M quoter gas, need over 30M) no read can let through, so there is nothing to wait for.
+    const n = node({500: {out: 1_000_000n, gas: 40_000_000n}, 3000: {out: 990_000n, gas: 30_000_000n}}, ["hang"], 0, {slot0: {500: 2n ** 97n}});
+    const [r] = await quotes(143, n, [0], {maxPriceImpactBps: 500});
+    expect(r!.q).toBeNull();
+    expect(r!.heard).toEqual([["uniswap: loses 75.0% of the value to price impact — its pools are too thin for this amount (limit 5%; best route direct 0.05%)", {reason: "insufficient_liquidity"}]]);
+    expect(r!.ms).toBeLessThan(50);
+  });
+
+  it("a best over Ethereum's 2^24 with no later route under it: the gas refusal comes with the block read, alongside the probe, as in 039db9fe (b39901dc: one after the other)", async () => {
+    // Ethereum: the read answers at 1.2 s, the probe after 400 ms. Best 20M, the other 18M: neither fits 2^24.
+    const n = node({500: {out: 1_000_000n, gas: 20_000_000n}, 3000: {out: 990_000n, gas: 18_000_000n}}, [{limit: 60_000_000n, ms: 1_200}], 400);
+    const [r] = await quotes(1, n, [0]);
+    expect(r!.q).toBeNull();
+    expect(r!.heard).toHaveLength(1);
+    expect(r!.heard[0]![0]).toMatch(/^uniswap: the swap needs \d+ gas, more than chain 1 takes in one transaction \(16777216\) — its pools are too thin for this amount$/);
+    expect(n.log).toEqual(["0 block read", "0 probe 500"]);
+    took(r!.ms, 1_200);
+  });
+
   it("the gas step's refusal with nothing else under its bounds: the best's own text, one block read", async () => {
     const n = node({500: {out: 1_000_000n, gas: 16_000_000n}, 3000: {out: 990_000n, gas: 15_000_000n}}, [{limit: 20_000_000n, ms: 0}, {limit: 15_000_000n, ms: 200}], 400);
     const [, second] = await quotes(43114, n, [0, 11 * MIN]);
