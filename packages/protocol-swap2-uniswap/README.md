@@ -96,7 +96,9 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   Universal Router, SwapProxy, PoolManager, PositionManager, V4Quoter, StateView or Permit2 — refused before any read
   for every venue once v4 is on (v3 output paid there is stranded too; the 0.5.0 pins refuse a v3 quote paying one on
   a chain with v4 pins). A candidate whose gas need is above the chain's bound (per-transaction cap or block gas limit) is
-  ranked out before ranking, like the LIVE-1 ones, and counted in `providerData.v4Unexecutable`. Live on Monad
+  ranked out, like the LIVE-1 ones, and counted in `providerData.v4Unexecutable`; it never displaces a route that can
+  be mined, v3's or v4's, and v4 competes with v3's best route the chain can carry, never one ranked out for gas — one
+  block read for both venues (LIVE-VR-3, "Gas limit and RPC errors" below). Live on Monad
   (2026-11-26, fault injection): 700 USDC → AUSD from a funded holder on an RPC with no access list and no
   `eth_call` state overrides now quotes v3 (before: refused), and on v4 alone is still refused with the node's reason.
 - **Pools: hookless only.** The hook allowlist is empty (hooks can take a swap's whole slippage, price the quoter and the
@@ -156,7 +158,8 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
 - **`providerData`** of a v4 quote: `venue: "v4"`, `route` (e.g. "v4 via USDC 0.05%/10 → 0.005%/1"), `poolFee`, `router`,
   `currencyIn` (`address(0)` for the native coin), `currencyOut`, `amountIn`, `minOut`, `poolKeys` (JSON), `path`,
   `priceImpactBps` (`valueLossBps` when gated), `sender`, for a token input `simulated`, and `v4Unexecutable` (the count
-  of candidates ranked out for gas, when any — on a v3 quote too, with v4 on). A v3 quote has no `venue`, as before.
+  of candidates ranked out for gas, when any — on a v3 quote too, with v4 on — against the quote's block read, or the
+  caps alone when the quote never needed the read). A v3 quote has no `venue`, as before.
 - **Rollout.** A 0.4.x app's `uniswapPins` names SwapRouter02 only: it drops a Universal Router or SwapProxy quote, and
   since a stub gets one quote per pair, that app loses Uniswap on the pair. So: release; apps bump to ≥ 0.5.0 pins
   (`uniswapRemoteProvider`); only then does the server set `v4: "native-in"`, later `"all"`. With `v4: "off"` the server
@@ -373,6 +376,17 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   quote takes its block read first (waiting only while a chain's first read is out). A quote that
   ranks out its best route while a chain's first read is out waits for it, at most 1.5 s, before it
   measures the next.
+  With v4 on, the same one read goes for both venues. v3's and v4's candidates are taken in the
+  order the quote ranks them — a v4 route ahead of a v3 route only when it pays more by more than
+  `v4MinEdgeBps` — and each by the rules above: a route the read refuses is ranked out (a v4 one is
+  counted in `v4Unexecutable`, never "set aside"), so v4 is compared with v3's best route the chain
+  can carry, and a v4 route that cannot be mined never displaces one that can. Nothing waits for the
+  read before a v4 route is measured unless what is already known (the caps, or the read once in)
+  rules it out and another route could stand in: its probe goes out with the quote, its gas step
+  takes the read, and a v4 refusal that needs no gas figure (the impact gate, the minimum, the
+  floor) comes at once when the route fits the read in hand. A `venueRoutes: "both"` pass bounds
+  its v3 row and its v4 row by the same read, and each row is the route its venue alone would
+  return.
 - **RPC errors.** A per-item JSON-RPC error that is a revert (code 3; "execution reverted" and other
   EVM errors, out of gas included; revert data whose message names no rate limit or node fault)
   means no candidate, as before. A rate limit (`-32005`, `-32007`, `429`, or its text), a node error

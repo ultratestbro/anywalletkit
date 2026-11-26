@@ -112,9 +112,10 @@ const NODE_GAS_CAP_TEXT = /allowance|gas cap|gas limit too high|exceeds (?:the )
 const NO_SIMULATE_V1_TTL_MS = 10 * 60_000;
 /**
  * Most v4 candidates built for one quote (review R2-2): when the best v4 route's build is refused for a reason of its own
- * (the simulation of that route reverts, the module's own check, the gas bound), the next one is built — up to this many
- * — before the quote falls back to v3. A reason that holds for every v4 build of the quote (the RPC cannot simulate, the
- * approval fails) goes straight to v3.
+ * (the simulation of that route reverts, the module's own check), the next one is built — up to this many — before the
+ * quote falls back to v3. A reason that holds for every v4 build of the quote (the RPC cannot simulate, the approval
+ * fails) goes straight to v3. A route the quote's gas bounds refuse is ranked out, not built (LIVE-VR-3): it counts
+ * toward neither this limit nor the route set aside.
  */
 const V4_MAX_BUILDS = 3;
 /** Most storage keys tried as a token's allowance slot (from its access list), and most slots kept. */
@@ -1172,16 +1173,20 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       }
     };
 
-    // LIVE-VR-3: a v3 route's gas need against the chain's bounds: the quoter's figure, the router's 120k and this
-    // request's unwrap and refund legs. A figure under MIN_POOL_GAS a pool measures nothing: no limit is derived from it,
-    // so such a route fits any bounds (the wallet's own estimate decides).
+    // LIVE-VR-3: a route's gas need against the chain's bounds. v3: the quoter's figure, the router's 120k and this
+    // request's unwrap and refund legs; v4: the V4Quoter's figure, the Universal Router's own gas and, for a token input,
+    // the SwapProxy's. A figure under MIN_POOL_GAS a pool measures nothing: no limit is derived from it, so such a route
+    // fits any bounds (the wallet's own estimate decides).
     const refund = nativeIn && refundNative;
     const extra3 = (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n);
     const gasBound3 = (g: bigint, b: GasBounds) => boundGasLimit(g + 120_000n + extra3, (g * 3n) / 2n + 120_000n + extra3, b);
+    const overhead4 = V4_ROUTER_GAS + (nativeIn ? 0n : V4_PROXY_GAS);
+    const gasBound4 = (g: bigint, b: GasBounds) => boundGasLimit(g + overhead4, (g * 3n) / 2n + overhead4, b);
+    const measures4 = (c: {route: {hops: readonly unknown[]}; gasEstimate: bigint}): boolean => c.gasEstimate >= MIN_POOL_GAS * BigInt(c.route.hops.length);
 
     /**
-     * LIVE-VR-3: the gas bounds one pass's v3 routes go by — one set for every one of them, so the route picked and the
-     * route bounded are judged by the same block read. `take` takes them once, when first needed, with the wait
+     * LIVE-VR-3: the gas bounds one pass goes by — one set for every route of the pass, v3's and v4's, so the route picked
+     * and the route bounded are judged by the same block read. `take` takes them once, when first needed, with the wait
      * the gas step always had (blockGasLimit: the read in hand at once, else at most until the first read's 1.5 s and
      * never past the caller's abort); every later call, and every route after, goes by the same answer. Before they are
      * taken: `sure`, what they are known to be whatever the node answers (sureGasBounds: the read's own answer once it is
@@ -1214,13 +1219,14 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
      * A refusal says how far it reaches (review R2-2): the trade's verdicts — the impact gate, a minimum that rounds to
      * 0, the caller's floor, a wallet short of the input, a recipient that cannot take the native coin — hold for any
      * route and refuse the quote ("trade"); a refusal of this build — its simulated swap reverts, the module's own
-     * check, the encoder, the gas bound — leaves the next candidate ("route"); a check that cannot run for this quote
+     * check, the encoder — leaves the next candidate ("route"; the gas bound refuses as "route" too, and the pass's walk
+     * ranks such a route out: LIVE-VR-3); a check that cannot run for this quote
      * (the endpoint cannot simulate the approval and the swap, the approval fails) leaves v3 ("quote"). v4 being on
      * never costs the pair the v3 route it had. A read of that check no endpoint answered is not such a fact: it refuses
      * the quote with the node's reason, as every other failed read of the quote does (decision 5, review R3-1) — never
      * the v3 quote in its place.
      */
-    const finishV4 = async (chainId: number, d4: UniswapV4Deployment, v4: NonNullable<Awaited<ReturnType<typeof quoteV4>>>, winner: NonNullable<V4QuoteResult["best"]>, currencyIn: Hex, currencyOut: Hex, amountIn: bigint, gated: boolean, gasRead: BlockGasRead, unexecutable: number, signal?: AbortSignal): Promise<V4Build> => {
+    const finishV4 = async (chainId: number, d4: UniswapV4Deployment, v4: NonNullable<Awaited<ReturnType<typeof quoteV4>>>, winner: NonNullable<V4QuoteResult["best"]>, currencyIn: Hex, currencyOut: Hex, amountIn: bigint, gated: boolean, pb: PassBounds, unexecutable: () => number, signal?: AbortSignal): Promise<V4Build> => {
       const no = (text: string, info: Swap2RefusalReason | Swap2RefusalInfo | undefined, scope: "trade" | "route" | "quote"): V4Build => ({refused: text, ...(info !== undefined ? {info} : {}), scope});
       const {route, amountOut: out, gasEstimate: gas} = winner;
       // The same two measures as v3: the 1/1000 probe on the same route (`priceImpactBps`, fees excluded) and the
@@ -1267,18 +1273,20 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       }
 
       // Quoter gas covers the pools only; the router call (intrinsic, calldata, unlock, SETTLE, TAKE) rides on top, and
-      // for a token input the SwapProxy and its transferFrom into the router. The same bound as v3: a need above the
-      // chain's per-transaction cap or block gas limit can never be mined (such candidates are ranked out before this).
-      const pools = BigInt(route.hops.length);
-      const overhead = V4_ROUTER_GAS + (enc.flow === "swap-proxy" ? V4_PROXY_GAS : 0n);
+      // for a token input the SwapProxy and its transferFrom into the router (gasBound4; `enc.flow` is "swap-proxy"
+      // exactly for a token input). The same bound as v3: a need above the chain's per-transaction cap or block gas limit
+      // can never be mined. The bounds are the pass's own (`pb`, LIVE-VR-3): taken here, with the wait they always had,
+      // unless the ranking took them already; a route refused here is ranked out, and the pass goes on to the next route
+      // the same bounds let through.
       let gasLimit: bigint | undefined;
-      if (gas >= MIN_POOL_GAS * pools) {
-        const bounded = boundGasLimit(gas + overhead, (gas * 3n) / 2n + overhead, gasBoundsOf(chainId, await blockGasLimit(gasRead, signal)));
+      if (measures4(winner)) {
+        const bounded = gasBound4(gas, await pb.take());
         if ("refuse" in bounded) {
           return no(`the swap needs ${bounded.refuse.need} gas, more than chain ${chainId} takes in one transaction (${bounded.refuse.cap}) — its pools are too thin for this amount`, "insufficient_liquidity", "route");
         }
         gasLimit = bounded.gasLimit;
       }
+      const v4Unexecutable = unexecutable();
       const sender = typeof params.sender === "string" && /^0x[0-9a-fA-F]{40}$/.test(params.sender) ? getAddress(params.sender) : undefined;
       const quote: Quote = {
         provider: "uniswap",
@@ -1314,7 +1322,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           ...(priceImpactBps !== undefined ? {priceImpactBps: String(priceImpactBps)} : {}),
           ...(valueLossBps !== undefined ? {valueLossBps: String(valueLossBps)} : {}),
           ...(sender !== undefined ? {sender} : {}),
-          ...(unexecutable > 0 ? {v4Unexecutable: String(unexecutable)} : {}),
+          ...(v4Unexecutable > 0 ? {v4Unexecutable: String(v4Unexecutable)} : {}),
         },
       };
       // The app's pins check the same quote with the shipped list alone (plus the extra pools they pin themselves); here
@@ -1545,85 +1553,164 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     };
 
     /**
-     * LIVE-VR-3 (0.4.12): v3's answer from its candidates ranked by output (`ranked`, never empty), each judged by the
-     * pass's one set of gas bounds (`pb`). A route whose gas need is above what one transaction on the chain may carry can
-     * never be mined, so it never displaces a route that can (as Uniswap v4's candidates are ranked).
-     * - A best by output that the bounds refuse whatever the node answers (the chain's caps, or the block read already
-     *   in: `pb.sure`) is ranked out before anything is measured: the bounds are taken and the first candidate they let
-     *   through goes on. With none, the best goes on and is refused as before.
-     * - Otherwise the best goes on exactly as before: the same reads at the same moments, the bounds taken at its gas
-     *   step. When that step refuses it, the first candidate after it the same bounds let through goes on instead. A
-     *   refusal before the gas step (the impact gate or measure, the minimum, the floor) stands, at once, when the best
-     *   fits the block gas limit in hand (`pb.inHand`); else the bounds are taken, and it stands when they let the best
-     *   through.
-     * Only a later candidate the chain's caps let through can ever stand in for the best: with none, nothing waits for
-     * the bounds and the best goes on as before (its gas step takes them, as it always did). A route that goes on in
-     * place of the best is final: its refusal is v3's. With v4 off this is the whole quote, as 0.4.12 quotes it.
+     * A pass's v4 candidates in rank order, gas not judged yet (the walk judges it, by the pass's bounds). `restrict`:
+     * only pools an app's pins can check compete (`v4RankedPools`, `v4RankedListBlock`).
      */
-    const v3Walk = async (ranked: readonly V3Candidate[], block: string, pb: PassBounds, v4Unexecutable: () => number): Promise<VenueAnswer> => {
-      const finish = (c: V3Candidate): Promise<VenueAnswer> => buildV3(c, block, pb, v4Unexecutable);
-      const fits = (c: V3Candidate, b: GasBounds): boolean => !measuresGas(c) || !("refuse" in gasBound3(c.gas, b));
-      const best = ranked[0]!;
-      const after = ranked.slice(1);
-      const insteadPossible = after.some((c) => fits(c, gasCapsOf(chainId)));
-      if (insteadPossible && measuresGas(best) && !fits(best, pb.sure())) {
-        const b = await pb.take();
-        const next = after.find((c) => fits(c, b));
-        if (next) return finish(next);
-      }
-      const first = await finish(best);
-      if ("quote" in first || !insteadPossible || !measuresGas(best)) return first;
-      if (pb.taken() === undefined && fits(best, pb.inHand())) return first;
-      const b = await pb.take();
-      const next = fits(best, b) ? undefined : after.find((c) => fits(c, b));
-      return next ? finish(next) : first;
-    };
-
-    /**
-     * The v4 candidates a transaction on the chain can carry, ranked by output, with how many were ranked out for gas and
-     * the cap that did it. A candidate whose gas need is above the chain's bound can never be mined: ranked out before
-     * ranking (as LIVE-1 ranks out a route no transaction can carry), so it never displaces a route that can (review
-     * R2-2). `restrict`: only pools an app's pins can check compete (`v4RankedPools`, `v4RankedListBlock`).
-     */
-    const rankV4 = async (v4: V4Read, restrict: boolean, gasRead: BlockGasRead): Promise<{ranked: V4Ranked[]; gasOut: number; gasCap: bigint | undefined}> => {
-      const bounds = gasBoundsOf(chainId, await blockGasLimit(gasRead, signal));
-      const overhead = V4_ROUTER_GAS + (nativeIn ? 0n : V4_PROXY_GAS);
-      let gasCap: bigint | undefined = v4ReadBoundOf(chainId);
-      const minable = (c: {route: {hops: readonly unknown[]}; gasEstimate: bigint}): boolean => {
-        const g = c.gasEstimate;
-        if (g < MIN_POOL_GAS * BigInt(c.route.hops.length)) return true; // no gas figure: the wallet's own estimate decides
-        const bounded = boundGasLimit(g + overhead, (g * 3n) / 2n + overhead, bounds);
-        if ("refuse" in bounded) gasCap = bounded.refuse.cap;
-        return !("refuse" in bounded);
-      };
-      const gasOut = rankedV4Candidates(v4.candidates).filter((c) => !minable(c)).length;
+    const rankedV4 = (v4: V4Read, restrict: boolean): V4Ranked[] => {
+      if (!restrict) return rankedV4Candidates(v4.candidates);
       const newer = newerListedOf(chainId);
-      const ranked = restrict
-        ? rankedV4Candidates(v4.candidates, (p) => (p.source === "listed" && !newer.has(p.id.toLowerCase())) || (v4Ranked === "extra" && p.source === "extra"), minable)
-        : rankedV4Candidates(v4.candidates, undefined, minable);
-      return {ranked, gasOut, gasCap};
+      return rankedV4Candidates(v4.candidates, (p) => (p.source === "listed" && !newer.has(p.id.toLowerCase())) || (v4Ranked === "extra" && p.source === "extra"));
     };
 
     /**
-     * The first of the ranked v4 candidates (at most V4_MAX_BUILDS) whose build stands (`finishV4`). `beats` (a "best"
-     * pass: v4 must pay more than v3 by more than `v4MinEdgeBps`) stops at the first that does not. The trade's verdict
-     * ends it (`trade`); a refusal of that build moves to the next, one shared by every v4 build of the quote stops;
-     * `setAside` is then the best route's own reason.
+     * The v4 candidates (every one the V4Quoter priced, whatever its pools) ranked out because one transaction on the
+     * chain cannot carry them, and the cap that did it (with none, the chain's LIVE-1 bound): counted by the pass's
+     * bounds once taken, else by what they are known to be whatever the node answers (`sure`) — never by a block read
+     * the pass did not go by.
      */
-    const buildV4 = async (v4: V4Read, ranked: readonly V4Ranked[], unexecutable: number, gated: boolean, gasRead: BlockGasRead, beats?: (out: bigint) => boolean): Promise<{quote: Quote} | {trade: V4Refused} | {setAside?: V4Refused}> => {
-      let setAside: V4Refused | undefined;
-      for (const pick of ranked.slice(0, V4_MAX_BUILDS)) {
-        if (beats && !beats(pick.amountOut)) break;
-        const built = await finishV4(chainId, v4In!, v4, pick, currencyIn4, currencyOut4, amountIn, gated, gasRead, unexecutable, signal);
-        if ("quote" in built) {
-          if (setAside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${setAside.refused}) — quoted another v4 route`, reasonOfInfo(setAside.info));
-          return {quote: built.quote};
+    const v4GasOut = (v4: V4Read, pb: PassBounds): {count: number; cap: bigint | undefined} => {
+      const b = pb.taken() ?? pb.sure();
+      let count = 0;
+      let cap: bigint | undefined = v4ReadBoundOf(chainId);
+      for (const c of rankedV4Candidates(v4.candidates)) {
+        if (!measures4(c)) continue; // no gas figure: the wallet's own estimate decides
+        const bounded = gasBound4(c.gasEstimate, b);
+        if ("refuse" in bounded) {
+          count++;
+          cap = bounded.refuse.cap;
         }
-        if (built.scope === "trade") return {trade: built};
-        setAside ??= built; // the best route's reason is the one reported
-        if (built.scope === "quote") break;
       }
-      return setAside ? {setAside} : {};
+      return {count, cap};
+    };
+
+    /** A candidate of a pass's ranking: a v3 route or a v4 one. */
+    type Entry = {venue: "v3"; c: V3Candidate} | {venue: "v4"; c: V4Ranked};
+    const measuresOf = (e: Entry): boolean => (e.venue === "v3" ? measuresGas(e.c) : measures4(e.c));
+    /** The candidate fits the bounds `b`: its gas need is within them, or it has no gas figure. */
+    const fitsOf = (e: Entry, b: GasBounds): boolean => !measuresOf(e) || !("refuse" in (e.venue === "v3" ? gasBound3(e.c.gas, b) : gasBound4(e.c.gasEstimate, b)));
+
+    /**
+     * v3's candidates and v4's in the order a "best" pass ranks them: by output, a v4 route ahead of a v3 one only when it
+     * pays more than it by more than `v4MinEdgeBps` (a tie goes to v3), each venue's own order kept. Walked in this order,
+     * the v4 routes tried are those that beat v3's best route the chain can carry — not one ranked out for gas.
+     */
+    const merged = (r3: readonly V3Candidate[], r4: readonly V4Ranked[]): Entry[] => {
+      const out: Entry[] = [];
+      let j = 0;
+      for (const c of r3) {
+        while (j < r4.length && r4[j]!.amountOut * 10_000n > c.out * BigInt(10_000 + v4MinEdge)) out.push({venue: "v4", c: r4[j++]!});
+        out.push({venue: "v3", c});
+      }
+      while (j < r4.length) out.push({venue: "v4", c: r4[j++]!});
+      return out;
+    };
+
+    /** What a pass's walk came to: the answer one candidate gave, and the first v4 build set aside on the way. */
+    interface Walked {
+      /** A quote, or a refusal that is the pass's: v3's, or a v4 verdict on the trade. */
+      answer?: {venue: UniswapRouteId; a: VenueAnswer};
+      /** The first v4 build refused for a reason of its own (the best v4 route's reason, the one reported). */
+      setAside?: V4Refused;
+    }
+
+    /**
+     * LIVE-VR-3: a pass's candidates (`list`: v3's and v4's merged as a "best" pass ranks them, or one venue's alone)
+     * walked in rank order, each judged by the pass's one set of gas bounds (`pb`): a route whose need is above them can
+     * never be mined, so it never goes on in place of one that can — v3's as v4's.
+     * - Once the bounds are taken, a candidate they refuse is ranked out.
+     * - Before, a candidate the bounds refuse whatever the node answers (`pb.sure`) is ranked out before it is measured.
+     *   When a later candidate the chain's caps let through could still stand in for it, the bounds are taken first (the
+     *   wait the gas step always had) and the first route they let through goes on. When none could, a v4 candidate is
+     *   ranked out all the same, and v3's best by output goes on and is refused as before.
+     * - Any other candidate goes on, its gas step taking the bounds: when they refuse it there, it is ranked out and the
+     *   next route they let through goes on. A refusal before the gas step (the impact gate, the minimum, the floor, v4's
+     *   encoder) stands at once when the candidate fits the block gas limit in hand or no later candidate could stand in
+     *   for it, else once the bounds are taken and let it through (else it is ranked out).
+     * - A v3 candidate's answer that stands is the pass's. A v4 build's goes by its scope (`finishV4`): a quote or a
+     *   verdict on the trade is the pass's; a refusal of that route moves on to the next v4 candidate (at most
+     *   V4_MAX_BUILDS builds), one of the quote's to v3 alone — the first such refusal is `setAside`. A v4 candidate
+     *   ranked out for gas is no build and sets nothing aside.
+     * - With no answer by the end, v3's best by output goes on (unless it did) and its refusal is the pass's: with no v3
+     *   candidate the chain can carry, the best is refused as it always was.
+     * `go.v3Final` hears the first v4 build set aside (if any) right before a v3 answer is certain to be the pass's: before
+     * that v3 build when it is certain already, else once it stands.
+     */
+    const walk = async (
+      list: readonly Entry[],
+      pb: PassBounds,
+      go: {v3?: (c: V3Candidate) => Promise<VenueAnswer>; v4?: (c: V4Ranked) => Promise<V4Build>; v3Final?: (setAside: V4Refused | undefined) => void},
+    ): Promise<Walked> => {
+      const w: Walked = {};
+      const v3Best = list.find((e): e is Extract<Entry, {venue: "v3"}> => e.venue === "v3");
+      let v3BestAnswer: VenueAnswer | undefined;
+      let v4Open = true;
+      let builds = 0;
+      let finalHeard = false;
+      const final = (): void => {
+        if (finalHeard) return;
+        finalHeard = true;
+        go.v3Final?.(w.setAside);
+      };
+      const caps = gasCapsOf(chainId);
+      /** A later candidate the chain's caps let through, which could still go on in place of the one at `i`. */
+      const instead = (i: number): boolean => list.slice(i + 1).some((x) => (x.venue === "v3" || v4Open) && fitsOf(x, caps));
+      /** A candidate that went on and was refused: its refusal stands (true), it is ranked out for gas (false), or the bounds must be taken to tell. */
+      const stands = (e: Entry, i: number): boolean | "take" => {
+        if (!measuresOf(e)) return true;
+        const b = pb.taken();
+        if (b) return fitsOf(e, b);
+        return !instead(i) || fitsOf(e, pb.inHand()) ? true : "take";
+      };
+      for (let i = 0; i < list.length; i++) {
+        const e = list[i]!;
+        if (e.venue === "v4" && !v4Open) continue;
+        const b = pb.taken();
+        if (b) {
+          if (!fitsOf(e, b)) continue;
+        } else if (measuresOf(e) && !fitsOf(e, pb.sure())) {
+          if (instead(i)) {
+            await pb.take();
+            continue;
+          }
+          if (e.venue === "v4") continue;
+        }
+        if (e.venue === "v3") {
+          if (b !== undefined || !measuresOf(e) || !instead(i)) final();
+          const a = await go.v3!(e.c);
+          if (e === v3Best) v3BestAnswer = a;
+          if (!("quote" in a)) {
+            const s = stands(e, i);
+            if (!(s === "take" ? fitsOf(e, await pb.take()) : s)) continue;
+          }
+          final();
+          w.answer = {venue: "v3", a};
+          return w;
+        }
+        const built = await go.v4!(e.c);
+        if ("quote" in built) {
+          w.answer = {venue: "v4", a: {quote: built.quote}};
+          return w;
+        }
+        const s = stands(e, i);
+        if (!(s === "take" ? fitsOf(e, await pb.take()) : s)) continue;
+        if (built.scope === "trade") {
+          w.answer = {venue: "v4", a: {refused: built.refused, ...(built.info !== undefined ? {info: built.info} : {})}};
+          return w;
+        }
+        w.setAside ??= built; // the best route's reason is the one reported
+        if (built.scope === "quote" || ++builds >= V4_MAX_BUILDS) v4Open = false;
+      }
+      if (v3Best) {
+        final();
+        w.answer = {venue: "v3", a: v3BestAnswer ?? (await go.v3!(v3Best.c))};
+      }
+      return w;
+    };
+
+    /** The v3 candidate of a venue-routes pass: as a "best" pass with v4 off quotes it — v3's best route the chain can carry. */
+    const v3Row = async (ranked: readonly V3Candidate[], block: string, pb: PassBounds): Promise<VenueAnswer> => {
+      const w = await walk(ranked.map((c): Entry => ({venue: "v3", c})), pb, {v3: (c) => buildV3(c, block, pb, () => 0)});
+      return w.answer!.a; // `ranked` is never empty here: the walk always answers
     };
 
     /** A refusal as a venue's answer. */
@@ -1635,33 +1722,35 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
      * (`v3Route`: v3 has a route for the pair, or may have — then only the ranked pools compete, as in a "best" pass),
      * built exactly as a winning one is — or why there is none. `v3Unread`: why v3 may have a route — its reads failed
      * (the deployment check or the quotes); routes only over pools outside the ranked set are then refused with that
-     * failure, which a retry can clear, never as "no route" (review F1).
+     * failure, which a retry can clear, never as "no route" (review F1). Gas goes by the pass's bounds (`pb`, LIVE-VR-3).
      */
-    const v4Candidate = async (v4: V4Read, v3Route: boolean, gated: boolean, gasRead: BlockGasRead, v3Unread: VenueRefusal | undefined): Promise<VenueAnswer> => {
+    const v4Candidate = async (v4: V4Read, v3Route: boolean, gated: boolean, pb: PassBounds, v3Unread: VenueRefusal | undefined): Promise<VenueAnswer> => {
       const restrict = v3Route && v4Ranked !== "all";
-      let gasOut = 0;
-      let gasCap: bigint | undefined = v4ReadBoundOf(chainId);
-      let outside = false;
-      if (v4.candidates.some((c) => c.outcome === "quoted")) {
-        const r = await rankV4(v4, restrict, gasRead);
-        gasOut = r.gasOut;
-        gasCap = r.gasCap;
-        const built = await buildV4(v4, r.ranked, v4.unexecutable + gasOut, gated, gasRead);
-        if ("quote" in built) return built;
-        if ("trade" in built) return venueNo(built.trade.refused, built.trade.info);
-        if (built.setAside) {
-          warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${built.setAside.refused}) — no v4 route is offered`, reasonOfInfo(built.setAside.info));
-          return {...venueNo(built.setAside.refused, built.setAside.info), alerted: true};
-        }
-        // Routes the chain can mine, all through pools outside the ranked set: not offered next to v3's.
-        outside = restrict && r.ranked.length === 0 && rankedV4Candidates(v4.candidates).length > gasOut;
+      const unexecutable = (): number => v4.unexecutable + v4GasOut(v4, pb).count;
+      const w = await walk(rankedV4(v4, restrict).map((c): Entry => ({venue: "v4", c})), pb, {
+        v4: (c) => finishV4(chainId, v4In!, v4, c, currencyIn4, currencyOut4, amountIn, gated, pb, unexecutable, signal),
+      });
+      if (w.answer) {
+        if ("quote" in w.answer.a && w.setAside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${w.setAside.refused}) — quoted another v4 route`, reasonOfInfo(w.setAside.info));
+        return w.answer.a;
       }
+      if (w.setAside) {
+        warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${w.setAside.refused}) — no v4 route is offered`, reasonOfInfo(w.setAside.info));
+        return {...venueNo(w.setAside.refused, w.setAside.info), alerted: true};
+      }
+      // Every route over the ranked pools is ranked out for gas, or there is none. What is said turns on whether a route
+      // outside them can be mined: where the bounds are not taken and one could be, they are taken to tell.
+      const all = rankedV4Candidates(v4.candidates);
+      if (restrict && pb.taken() === undefined && all.some((c) => measures4(c) && !("refuse" in gasBound4(c.gasEstimate, pb.sure())))) await pb.take();
+      const gas = v4GasOut(v4, pb);
+      // Routes the chain can mine, all through pools outside the ranked set: not offered next to v3's.
+      const outside = restrict && all.length > gas.count;
       if (outside && v3Unread) {
         // Whether v3 has a route is unknown, so whether these routes may stand is too: refused for the read that failed.
         return venueNo(`the only Uniswap v4 routes for this pair go through pools outside the ranked pool lists (v4RankedPools), which stand only where Uniswap v3 has no route — and v3 could not be read: ${v3Unread.refused}`, v3Unread.info);
       }
       if (outside) return venueNo("the only Uniswap v4 routes for this pair go through pools outside the ranked pool lists (v4RankedPools) — not offered next to the v3 route", "no_route");
-      if (!v4.partial && v4.unexecutable + gasOut > 0) return venueNo(`every Uniswap v4 route for this pair and amount needs more gas than one transaction on chain ${chainId} may have (${String(gasCap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
+      if (!v4.partial && v4.unexecutable + gas.count > 0) return venueNo(`every Uniswap v4 route for this pair and amount needs more gas than one transaction on chain ${chainId} may have (${String(gas.cap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
       return v4.partial ? venueNo(PARTIAL_FILL, "insufficient_liquidity") : venueNo("no Uniswap v4 pool route for this pair and amount", "no_route");
     };
 
@@ -1710,7 +1799,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const needV3 = v3Known && (wantV3 || v4Ready);
         if (!needV3 && !v4Ready) return out;
         const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
-        const pb = passBounds(gasRead); // one set of gas bounds for the pass's v3 routes (LIVE-VR-3)
+        const pb = passBounds(gasRead); // one set of gas bounds for the pass, both venues' rows (LIVE-VR-3)
         const gated = maxImpact !== undefined;
         const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
         const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal, turns) : undefined;
@@ -1736,10 +1825,10 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const [a3, a4] = await Promise.all([
           wantV3 && !out.v3 && v3
             ? v3.ranked.length
-              ? v3Walk(v3.ranked, block, pb, () => 0).catch(venueFailed)
+              ? v3Row(v3.ranked, block, pb).catch(venueFailed)
               : Promise.resolve(v3.partial ? venueNo(PARTIAL_FILL, "insufficient_liquidity") : venueNo("no Uniswap v3 pool route for this pair and amount", "no_route"))
             : undefined,
-          wantV4 && !out.v4 && v4 ? v4Candidate(v4, v3Route, gated, gasRead, v3Unread).catch(venueFailed) : undefined,
+          wantV4 && !out.v4 && v4 ? v4Candidate(v4, v3Route, gated, pb, v3Unread).catch(venueFailed) : undefined,
         ]);
         if (a3) out.v3 = a3;
         if (a4) out.v4 = a4;
@@ -1793,7 +1882,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         await verifyDeployment(chainId);
       }
       const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
-      const pb = passBounds(gasRead); // one set of gas bounds for the quote's v3 routes (LIVE-VR-3)
+      const pb = passBounds(gasRead); // one set of gas bounds for the quote, v3's routes and v4's (LIVE-VR-3)
       // maxPriceImpactBps set: the candidates, the probe and the mid prices are all read at one block, with retries.
       // Unset: at "latest", as 0.4.11 read them (a call the node did not answer is retried, then refused — never
       // read as "no pool").
@@ -1806,43 +1895,40 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // With v4 on, the v3 reads go out alongside v4's and are retried the same way (a 429 under the doubled load is
       // not a missing route); with it off, as 0.4.11 read them.
       const v3Read = d3 ? await readV3(block, gated || v4Run ? "all" : "items") : {ranked: [] as V3Candidate[], partial: false};
-      const best = v3Read.ranked[0] ?? null;
       let partial = v3Read.partial;
       const v4 = v4Run ? await v4Run : undefined;
       // Ranked together by output (v4MinEdgeBps: v4 must pay more than that much over v3); the gate applies to the
       // winner only. Against a v3 route, only a v4 route the apps' pins can check competes (`v4RankedPools`): a route
       // through a grid or an extra pool, or a shipped-list pool an app on an older list lacks (`v4RankedListBlock`),
       // would be refused there and cost them the v3 quote. With no v3 route, the best v4 route stands whatever its
-      // pools (nothing is lost).
-      /** v4 candidates ranked out because the chain could never mine them (their gas need above its bound). */
-      let gasOut = 0;
-      /** The gas cap that ranked them out, for the text. */
-      let gasCap: bigint | undefined = v4ReadBoundOf(chainId);
-      /** The best v4 route's build, when it was refused for a reason of the build (the quote falls back past it). */
-      let setAside: V4Refused | undefined;
-      if (v4 && v4.candidates.some((c) => c.outcome === "quoted")) {
-        const r = await rankV4(v4, !(best === null || v4Ranked === "all"), gasRead);
-        gasOut = r.gasOut;
-        gasCap = r.gasCap;
-        const v3Out = best?.out;
-        const built = await buildV4(v4, r.ranked, v4.unexecutable + gasOut, gated, gasRead, v3Out === undefined ? undefined : (o) => o * 10_000n > v3Out * BigInt(10_000 + v4MinEdge));
-        if ("quote" in built) return built.quote;
-        if ("trade" in built) return refuse(built.trade.refused, built.trade.info);
-        setAside = built.setAside;
+      // pools (nothing is lost). LIVE-VR-3: both venues' candidates are walked in that order by one set of gas bounds
+      // (`walk`), so v4 is compared against v3's best route the chain can carry — never one ranked out for gas — and a
+      // v4 route no transaction can carry never displaces one that can; with v4 off, the v3 walk alone.
+      const r3 = v3Read.ranked;
+      const r4 = v4 ? rankedV4(v4, !(r3.length === 0 || v4Ranked === "all")) : [];
+      /** The v4 candidates ranked out for gas (with LIVE-1's), carried as information on the quote. */
+      const unexecutable = (): number => (v4 !== undefined ? v4.unexecutable + v4GasOut(v4, pb).count : 0);
+      const w = await walk(merged(r3, r4), pb, {
+        v3: (c) => buildV3(c, block, pb, unexecutable),
+        v4: (c) => finishV4(chainId, v4In!, v4!, c, currencyIn4, currencyOut4, amountIn, gated, pb, unexecutable, signal),
+        v3Final: (aside) => {
+          if (aside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${aside.refused}) — quoted v3`, reasonOfInfo(aside.info));
+        },
+      });
+      if (w.answer) {
+        const a = w.answer.a;
+        if (!("quote" in a)) return refuse(a.refused, a.info);
+        if (w.answer.venue === "v4" && w.setAside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${w.setAside.refused}) — quoted another v4 route`, reasonOfInfo(w.setAside.info));
+        return a.quote;
       }
-      if (setAside) {
-        if (!best) return refuse(setAside.refused, setAside.info);
-        warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${setAside.refused}) — quoted v3`, reasonOfInfo(setAside.info));
-      }
+      // No v3 candidate (the walk answers whenever there is one) and no v4 one that stood.
+      if (w.setAside) return refuse(w.setAside.refused, w.setAside.info);
       if (v4) partial = partial || v4.partial;
-      const tooMuchGas = !partial && v4 !== undefined && v4.unexecutable + gasOut > 0;
-      if (!best) {
-        if (tooMuchGas) return refuse(`every Uniswap ${d3 ? "v3 and v4 route" : "v4 route"} for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${chainId} may have (${String(gasCap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
-        return refuse(partial ? PARTIAL_FILL : v4 ? (d3 ? "no Uniswap v3 or v4 pool route for this pair and amount" : "no Uniswap v4 pool route for this pair and amount") : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
+      const gas4 = v4 !== undefined ? v4GasOut(v4, pb) : undefined;
+      if (!partial && v4 !== undefined && v4.unexecutable + gas4!.count > 0) {
+        return refuse(`every Uniswap ${d3 ? "v3 and v4 route" : "v4 route"} for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${chainId} may have (${String(gas4!.cap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
       }
-      // LIVE-VR-3: v3's best route the chain can carry (`v3Walk`); with v4 off, the whole quote as 0.4.12 quotes it.
-      const built3 = await v3Walk(v3Read.ranked, block, pb, () => (v4 !== undefined ? v4.unexecutable + gasOut : 0));
-      return "quote" in built3 ? built3.quote : refuse(built3.refused, built3.info);
+      return refuse(partial ? PARTIAL_FILL : v4 ? (d3 ? "no Uniswap v3 or v4 pool route for this pair and amount" : "no Uniswap v4 pool route for this pair and amount") : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
     } catch (e) {
       return refuse(e instanceof Error ? e.message.replace(/^uniswap: /, "") : String(e), refusalOf(e));
     }
