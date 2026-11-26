@@ -61,16 +61,17 @@ const chain = (name: string, wrappedNative: string, newestLiveNonce: number, pre
 
 /**
  * The default chain table (EVM chain id → entry). The last two arguments are the taker Settler deployments the
- * registry named as current and previous when pinned (2026-11-15, `pnpm verify:live`: both have code).
+ * registry named as current and previous when pinned (2026-11-25, after 0x's 2026-11-24 Settler release;
+ * `pnpm verify:live`: both have code).
  */
 export const ZEROEX_CHAINS: Readonly<Record<number, ZeroExChain>> = Object.freeze({
-  1: chain("Ethereum", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", 21, 20),
-  10: chain("Optimism", "0x4200000000000000000000000000000000000006", 21, 20),
-  56: chain("BNB Smart Chain", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", 23, 22),
-  137: chain("Polygon", "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", 20, 19),
-  8453: chain("Base", "0x4200000000000000000000000000000000000006", 22, 21),
-  42161: chain("Arbitrum", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", 20, 19),
-  43114: chain("Avalanche", "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", 20, 19),
+  1: chain("Ethereum", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", 22, 21),
+  10: chain("Optimism", "0x4200000000000000000000000000000000000006", 22, 21),
+  56: chain("BNB Smart Chain", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", 24, 23),
+  137: chain("Polygon", "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270", 21, 20),
+  8453: chain("Base", "0x4200000000000000000000000000000000000006", 23, 22),
+  42161: chain("Arbitrum", "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", 21, 20),
+  43114: chain("Avalanche", "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", 21, 20),
 });
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;

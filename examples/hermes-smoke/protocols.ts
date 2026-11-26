@@ -44,6 +44,7 @@ import { zeroExPins, zeroExRemoteProvider, zeroExVerifyQuote } from '@anywalletk
 import { ZEROEX_CHAINS } from '@anywalletkit/protocol-swap2-0x/chains'
 import zeroExTokenLive from '../../packages/protocol-swap2-0x/fixtures/quotes/base-usdc-eth.json'
 import zeroExNativeLive from '../../packages/protocol-swap2-0x/fixtures/quotes/base-eth-usdc.json'
+import zeroExPinEras from '../../packages/protocol-swap2-0x/fixtures/pin-eras.json'
 import { curveProvider } from '@anywalletkit/protocol-swap2-curve/provider'
 import { CurveSwap2Protocol } from '@anywalletkit/protocol-swap2-curve/protocol'
 import { CURVE_DEPLOYMENTS, CURVE_POOLS, EXCHANGE_SELECTOR, curveVerifyQuote, decodeExchange, encodeExchange, findRoutes, routeArgs } from '@anywalletkit/protocol-swap2-curve'
@@ -469,8 +470,8 @@ export async function smokeProtocols(check: Check): Promise<void> {
   {
     // 0x Settler: the word-level execute decoder and the pre-signing check run under Hermes (bigint words, checksums).
     const dead = '0x000000000000000000000000000000000000dEaD'
-    // Base deployment 22: the Settler pinned as live on 2026-11-15 (a native sale goes only to a pinned one).
-    const settler = zeroExSettlerAddress(8453, 22)
+    // Base deployment 23: the Settler pinned as live on 2026-11-25 (a native sale goes only to a pinned one).
+    const settler = zeroExSettlerAddress(8453, 23)
     const usdc = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
     // Under Hermes the key is refused outright (it belongs on a server); the app runs the remote provider.
     let keyRefused = false
@@ -489,17 +490,21 @@ export async function smokeProtocols(check: Check): Promise<void> {
     check('zeroex: refuses another recipient, a lower minimum, a foreign target', refuses({ to: settler, data, value: '1000000000000000', chainId: 8453 }, { ...expected, recipient: '0x1111111111111111111111111111111111111111' }) && refuses({ to: settler, data, value: '1000000000000000', chainId: 8453 }, { ...expected, minBuyAmount: 2_487_501n }) && refuses({ to: dead, data, value: '1000000000000000', chainId: 8453 }, expected))
     const notNativeCheck = encodeFunctionData({ abi: executeAbi, functionName: 'execute', args: [{ recipient: dead, buyToken: usdc, minAmountOut: 2_487_500n }, [`0x38c9c147${'00'.repeat(160)}`], `0x${'00'.repeat(32)}`] })
     check('zeroex: refuses a native sale whose first action is not NATIVE_CHECK', refuses({ to: settler, data: notNativeCheck, value: '1000000000000000', chainId: 8453 }, expected))
-    // Native value only to a Settler live when the table was pinned (Base 22 / 21), never into the margin (23, which a
-    // lying RPC can claim holds code); a replaced Settler (20) for no sale at all.
+    // Native value only to a Settler live when the table was pinned (Base 23 / 22), never into the margin (24, which a
+    // lying RPC can claim holds code); a replaced Settler (21) for no sale at all.
     const reason = (to: string): string | undefined => { try { checkZeroExTransaction({ to, data, value: '1000000000000000', chainId: 8453 }, { ...expected, settlers: [to] }); return 'passed' } catch (e) { return refusalOf(e)?.reason } }
-    check('zeroex: a native sale goes to the pinned current or previous Settler only (the margin and a replaced one: vault_mismatch)', reason(zeroExSettlerAddress(8453, 21)) === 'passed' && reason(zeroExSettlerAddress(8453, 23)) === 'vault_mismatch' && reason(zeroExSettlerAddress(8453, 20)) === 'vault_mismatch')
+    check('zeroex: a native sale goes to the pinned current or previous Settler only (the margin and a replaced one: vault_mismatch)', reason(zeroExSettlerAddress(8453, 22)) === 'passed' && reason(zeroExSettlerAddress(8453, 24)) === 'vault_mismatch' && reason(zeroExSettlerAddress(8453, 21)) === 'vault_mismatch')
   }
   {
     // 0x on REAL recorded answers (fixtures/quotes, 2026-11-15): the Permit2 reader and rebuild, the signature appended,
     // the Settler as a CREATE3 deployment of the registry (keccak under Hermes), the device check and the remote verifier
-    // with the server's intent tag — each at the recording's own clock.
-    const tok = zeroExTokenLive as unknown as { request: { nowMs: number; sourceToken: string; destAddress: string; amountIn: string; destToken: string; refundAddress: string; sourceDecimals: number }; registry: { current: string; prev: string }; response: { minBuyAmount: string; buyAmount: string; transaction: { to: string; data: string; value: string }; permit2: { hash: string; eip712: { domain: unknown; types: unknown; primaryType: string; message: Record<string, unknown> & { permitted: Record<string, unknown> } } } } }
+    // with the server's intent tag — each at the recording's own clock and with the Base pins of its pin era
+    // (fixtures/pin-eras.json), as the package's own recorded tests replay it.
+    const tok = zeroExTokenLive as unknown as { pinEra: string; request: { nowMs: number; sourceToken: string; destAddress: string; amountIn: string; destToken: string; refundAddress: string; sourceDecimals: number }; registry: { current: string; prev: string }; response: { minBuyAmount: string; buyAmount: string; transaction: { to: string; data: string; value: string }; permit2: { hash: string; eip712: { domain: unknown; types: unknown; primaryType: string; message: Record<string, unknown> & { permitted: Record<string, unknown> } } } } }
     const nat = zeroExNativeLive as unknown as typeof tok
+    const eraPins = (zeroExPinEras as unknown as { eras: Record<string, { pins: Record<string, [number, number]> }> }).eras[tok.pinEra]!.pins['8453']!
+    const eraBase = { ...ZEROEX_CHAINS[8453]!, newestLiveNonce: eraPins[0], previousLiveNonce: eraPins[1] }
+    const eraChains = { ...ZEROEX_CHAINS, 8453: eraBase }
     const nowMs = tok.request.nowMs
     const typedJson = (edit: (t: Record<string, any>) => void = () => {}) => { const t = JSON.parse(JSON.stringify(tok.response.permit2.eip712)) as Record<string, any>; edit(t); return JSON.stringify({ domain: t.domain, types: t.types, primaryType: t.primaryType, message: t.message }) }
     const want = { chainId: 8453, token: tok.request.sourceToken, amount: BigInt(tok.request.amountIn), spender: tok.response.transaction.to, nowMs }
@@ -513,9 +518,9 @@ export async function smokeProtocols(check: Check): Promise<void> {
     check('zeroex: appends uint256(65) and the signature to the real calldata', appendPermit2Signature(tok.response.transaction.data, sig) === `${tok.response.transaction.data}${'0'.repeat(62)}41${'ab'.repeat(65)}`)
     check('zeroex: the recorded Settlers are CREATE3 deployments of the registry; another address is not', zeroExSettlerNonce(8453, tok.registry.current) === 22 && zeroExSettlerNonce(8453, tok.registry.prev) === 21 && zeroExSettlerNonce(8453, '0x1111111111111111111111111111111111111111') === null)
     const started = Date.now()
-    check('zeroex: a deployment past the token-sale ceiling (pinned newest + margin) is not accepted, and a miss stays cheap under Hermes', zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 25)) === null && zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 24)) === 24 && zeroExSettlerNonce(1, '0x2222222222222222222222222222222222222222') === null && Date.now() - started < 1_000, `${Date.now() - started} ms`)
+    check('zeroex: a deployment past the token-sale ceiling (pinned newest + margin) is not accepted, and a miss stays cheap under Hermes', zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 26)) === null && zeroExSettlerNonce(8453, zeroExSettlerAddress(8453, 25)) === 25 && zeroExSettlerNonce(1, '0x2222222222222222222222222222222222222222') === null && Date.now() - started < 1_000, `${Date.now() - started} ms`)
     const txOf = (r: typeof tok, permit2Transfer?: string) => ({ to: r.response.transaction.to, data: r.response.transaction.data, value: r.response.transaction.value, chainId: 8453, ...(permit2Transfer ? { approvalAddress: '0x000000000022D473030F116dDEE9F6B43aC78BA3', permit2Transfer } : {}) })
-    const expectOf = (r: typeof tok) => ({ chainId: 8453, settlers: [r.registry.current, r.registry.prev], sellToken: r.request.sourceToken, buyToken: r.request.destToken, sellAmount: BigInt(r.request.amountIn), recipient: r.request.destAddress, minBuyAmount: BigInt(r.response.minBuyAmount), nowMs: r.request.nowMs })
+    const expectOf = (r: typeof tok) => ({ chainId: 8453, chain: eraBase, settlers: [r.registry.current, r.registry.prev], sellToken: r.request.sourceToken, buyToken: r.request.destToken, sellAmount: BigInt(r.request.amountIn), recipient: r.request.destAddress, minBuyAmount: BigInt(r.response.minBuyAmount), nowMs: r.request.nowMs })
     let tokenChecked: ReturnType<typeof checkZeroExTransaction> | null = null
     try { tokenChecked = checkZeroExTransaction(txOf(tok, permit ? permit2TransferJson(permit) : undefined), expectOf(tok)) } catch { /* reported below */ }
     check('zeroex: the device check accepts the real token sale (TRANSFER_FROM of exactly the input, signature slot at the end)', tokenChecked?.permitAction === 'TRANSFER_FROM')
@@ -527,7 +532,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
       feeUsd: 0, etaSeconds: 15, reliability: 0.96, validUntilMs: nowMs + 45_000, txRequest: { ...txOf(tok, permit ? permit2TransferJson(permit) : undefined) },
     }
     const params = { sourceChain: 'eip155:8453', destChain: 'eip155:8453', sourceToken: tok.request.sourceToken, sourceDecimals: tok.request.sourceDecimals, destToken: tok.request.destToken, amountIn: tok.request.amountIn, slippageBps: 50, destAddress: tok.request.destAddress, refundAddress: tok.request.refundAddress, dry: false }
-    const ctx = { chains: ZEROEX_CHAINS, settlers: () => [tok.registry.current, tok.registry.prev], nowMs }
+    const ctx = { chains: eraChains, settlers: () => [tok.registry.current, tok.registry.prev], nowMs }
     check('zeroex: zeroExVerifyQuote passes the real quote with the server tag', zeroExVerifyQuote(params, quote, ctx) === null)
     const foreign = zeroExVerifyQuote({ ...params, destAddress: '0x1111111111111111111111111111111111111111' }, quote, ctx)
     check('zeroex: and refuses it for another recipient, classified through reasonOf', typeof foreign === 'string' && zeroExPins().reasonOf!(foreign)?.reason === 'recipient_mismatch')

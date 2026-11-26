@@ -282,7 +282,7 @@ describe("zeroExRemoteProvider — the key on a backend, the checks on the devic
   it("when the backend quotes a Settler newer than the device's read, the device reads the registry again — and only then accepts", async () => {
     // The backend (first reader) and the device share the stubbed chain: read 1 → old pair (device cache), later reads → rotated.
     let reads = 0;
-    // The rotation that really happened on Base: {21, 20} → {22, 21}; 0x already quotes 22.
+    // The rotation that really happened on Base: {22, 21} → {23, 22}; 0x already quotes 23.
     const calls = world({onRegistryRead: () => (++reads === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
     const provider = zeroExRemoteProvider({baseUrl: "https://backend.example/api", fetchImpl: backend().fetchImpl, rpcUrls: RPC});
     const q = await provider.getQuote({sourceChain: "eip155:8453", sourceToken: "USDC", destChain: "eip155:8453", destToken: ZERO, amountIn: AMOUNT.toString(), destAddress: ME, refundAddress: ME, slippageBps: 50, dry: false} as never);
@@ -364,7 +364,7 @@ describe("zeroExVerifyQuote / zeroExVerifyBuild", () => {
     world({registry: {current: PREV_SETTLER, prev: null}});
     expect(await check()).toMatch(/is not a 0x Settler from the on-chain registry/);
     world({registry: {current: OLDER_SETTLER, prev: null}});
-    expect(await check()).toMatch(/\(Settler deployment 20\) as the 0x Settler, older than the oldest this module accepts there \(21\)/);
+    expect(await check()).toMatch(/\(Settler deployment 21\) as the 0x Settler, older than the oldest this module accepts there \(22\)/);
     world({registry: {current: null}});
     expect(await check()).toMatch(/reports no taker Settler in force/);
   });

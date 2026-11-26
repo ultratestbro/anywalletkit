@@ -88,6 +88,28 @@ describe("which addresses are 0x Settlers (CREATE3 from the registry, offline)",
     expect(zeroExSettlerNonce(chainId, address)).toBe(nonce);
     expect(zeroExSettlerNonce(chainId, address.toLowerCase())).toBe(nonce);
   });
+  // ownerOf(2) / prev(2) after 0x's 2026-11-24 release, read 2026-11-25T20:58Z (verify:live): the pairs the table pins.
+  const pinned: [number, string, number][] = [
+    [1, "0xD2666EF1f105e504034cf87af517a121C59f46f4", 22], [1, "0xaddC26a3854feaBFd20d6BF658254088D83a425A", 21],
+    [10, "0x3E41fB68700E84F66Fb4Ee65367E45736CafC239", 22], [10, "0x11B9a527DFD522888A366C511A7bfd08C7d54Df0", 21],
+    [56, "0x3E62E6b1d3F22408F24f052b5451CDaeE061BAdc", 24], [56, "0xd52E8e422A352ac1AfDC2bd6EC533D41B20ACB7b", 23],
+    [137, "0x43570b7D5BA5A452EF0FD9c232f5Ad13Ec656404", 21], [137, "0x73Dae2FdF839AF5f6BC62890f65A4357937cCf04", 20],
+    [8453, "0x7130a552999C7e2cae6B38F9336e90c457ABD47d", 23], [8453, "0x103502909141F7025a94b7b99A276dCD128e21a8", 22],
+    [42161, "0x2a5DB34853e857B488E9bAC92F01A42370d685E6", 21], [42161, "0xf41429fc96ff446B8118359Ba16854e07c393591", 20],
+    [43114, "0x178055c9f4Fc60BBDbfC7E6BD6D83474A5089187", 21], [43114, "0x584A4e93F11331D318165B04099e53708b1FA915", 20],
+  ];
+  it.each(pinned)("chain %i: %s is deployment %i of the taker feature (pinned 2026-11-25)", (chainId, address, nonce) => {
+    expect(zeroExSettlerAddress(chainId, nonce)).toBe(address);
+    expect(zeroExSettlerNonce(chainId, address)).toBe(nonce);
+    expect(zeroExSettlerNonce(chainId, address.toLowerCase())).toBe(nonce);
+  });
+  it("the table pins exactly those Settlers as newest and previous on every chain (a typo in a pin moves the root of every check)", () => {
+    expect(Object.keys(ZEROEX_CHAINS).map(Number).sort((a, b) => a - b)).toEqual([...new Set(pinned.map(([id]) => id))].sort((a, b) => a - b));
+    for (const [id, c] of Object.entries(ZEROEX_CHAINS).map(([k, v]) => [Number(k), v] as const)) {
+      const [newest, previous] = pinned.filter(([chainId]) => chainId === id);
+      expect([zeroExSettlerAddress(id, c.newestLiveNonce), zeroExSettlerAddress(id, c.previousLiveNonce)], String(id)).toEqual([newest![1], previous![1]]);
+    }
+  });
   it("is chain-bound, and never an EOA, Permit2, AllowanceHolder or a malformed value", () => {
     expect(zeroExSettlerNonce(1, "0x103502909141F7025a94b7b99A276dCD128e21a8")).toBeNull(); // Base's Settler, asked on Ethereum
     for (const a of ["0x9999999999999999999999999999999999999999", ZEROEX_PERMIT2, "0x0000000000001fF3684f28c67538d4D072C22734", "0x12", ""]) expect(zeroExSettlerNonce(8453, a)).toBeNull();
@@ -146,7 +168,7 @@ describe("createSettlerResolver", () => {
 
   it("follows a rotation on the next fresh read", async () => {
     const {r} = resolver({onRegistryRead: (n) => (n === 1 ? {current: PREV_SETTLER, prev: OLDER_SETTLER} : {current: SETTLER, prev: PREV_SETTLER})});
-    // before the rotation the previous one (20) is older than the pinned previous (21): left out
+    // before the rotation the previous one (21) is older than the pinned previous (22): left out
     expect(await r.resolve(8453)).toEqual([PREV_SETTLER]);
     expect(await r.resolve(8453, {fresh: true})).toEqual([SETTLER, PREV_SETTLER]);
   });
@@ -165,7 +187,7 @@ describe("createSettlerResolver", () => {
     const r = resolver({registry: {current: "0x9999999999999999999999999999999999999999"}}).r;
     await expect(r.resolve(8453)).rejects.toThrow("zeroex: the RPC on chain 8453 names 0x9999999999999999999999999999999999999999 as the 0x Settler, which is not an address the 0x registry deploys Settlers to");
     expect(await resolver({registry: {prev: "0x9999999999999999999999999999999999999999"}}).r.resolve(8453)).toEqual([SETTLER]);
-    // Base's deployment 22 is not a Settler on Ethereum
+    // Base's deployment 23 is not a Settler on Ethereum
     await expect(resolver({}, {rpcUrls: {1: ["https://rpc.test"]}}).r.resolve(1)).rejects.toThrow(/is not an address the 0x registry deploys Settlers to/);
   });
 

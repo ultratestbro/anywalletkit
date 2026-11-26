@@ -28,7 +28,7 @@ import {zeroExProvider} from "../src/provider.js";
 import {zeroExKnownSpenders, zeroExRemoteProvider, zeroExVerifyQuote} from "../src/remote.js";
 import {createSettlerResolver, decodeSettlerExecute, zeroExSettlerAddress, zeroExSettlerNonce} from "../src/settler.js";
 import {ME, PREV_SETTLER, RPC, SETTLER, USDC, getKey, permit2Typed, stub} from "./fixtures.js";
-import {RECORDED, bodyOf, chainIdOf, loadRecorded, paramsOf, recordedFetch, rpcOf} from "./recorded.js";
+import {CURRENT_PIN_ERA, RECORDED, bodyOf, chainIdOf, chainsConfigOf, chainsOf, eraChains, loadRecorded, paramsOf, recordedFetch, rpcOf} from "./recorded.js";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
@@ -44,15 +44,18 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
     return createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: RPC});
   };
 
-  it("pins the newest deployment live on 2026-11-15 plus a small margin on every chain", () => {
+  it("pins the newest deployment live on 2026-11-25 (0x's 2026-11-24 release) plus a small margin on every chain", () => {
     expect(ZEROEX_SETTLER_NONCE_MARGIN).toBe(2);
-    expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, c.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN]))).toEqual({1: 23, 10: 23, 56: 25, 137: 22, 8453: 24, 42161: 22, 43114: 22});
+    expect(Object.fromEntries(Object.entries(ZEROEX_CHAINS).map(([id, c]) => [id, c.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN]))).toEqual({1: 24, 10: 24, 56: 26, 137: 23, 8453: 25, 42161: 23, 43114: 23});
   });
 
-  it("every recorded registry answer is covered by the pins, margin untouched — a newer live deployment fails this and verify:live", () => {
+  // Each recording is held to the pins of the era it was recorded in (fixtures/pin-eras.json), and the newest era is
+  // the table in force: raising a pin without recording its era (or naming the era unrecorded) fails here.
+  it("every recorded registry answer is covered by the pins of its era, margin untouched — a newer live deployment fails this and verify:live", () => {
+    expect(eraChains(CURRENT_PIN_ERA)).toEqual(ZEROEX_CHAINS);
     for (const name of RECORDED) {
       const f = loadRecorded(name);
-      const c = ZEROEX_CHAINS[chainIdOf(f)]!;
+      const c = chainsOf(f)[chainIdOf(f)]!;
       for (const a of [f.registry.current, f.registry.prev]) {
         if (!a) continue;
         const n = zeroExSettlerNonce(chainIdOf(f), a, c.registry, c.newestLiveNonce);
@@ -62,15 +65,15 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
     }
   });
 
-  it("refuses a deployment inside the margin that holds no contract (Base 23 on 2026-11-15)", async () => {
-    const empty = zeroExSettlerAddress(8453, 23);
+  it("refuses a deployment inside the margin that holds no contract (Base 24 on 2026-11-25)", async () => {
+    const empty = zeroExSettlerAddress(8453, 24);
     const err = await caught(resolver({registry: {current: empty, prev: SETTLER}}).resolve(8453));
-    expect((err as Error).message).toBe(`zeroex: the RPC on chain 8453 names ${empty} (Settler deployment 23) as the 0x Settler, but no contract is deployed there`);
+    expect((err as Error).message).toBe(`zeroex: the RPC on chain 8453 names ${empty} (Settler deployment 24) as the 0x Settler, but no contract is deployed there`);
     expect(refusalOf(err)?.reason).toBe("vault_mismatch");
   });
 
   it("accepts that deployment once it holds code: 0x's next Settler works without a release, up to the pin", async () => {
-    const next = zeroExSettlerAddress(8453, 23);
+    const next = zeroExSettlerAddress(8453, 24);
     expect(await resolver({registry: {current: next, prev: SETTLER}, code: () => true}).resolve(8453)).toEqual([next, SETTLER]);
     const last = zeroExSettlerAddress(8453, BASE_PIN);
     expect(await resolver({registry: {current: last, prev: null}, code: () => true}).resolve(8453)).toEqual([last]);
@@ -87,7 +90,7 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
   });
 
   it("drops a previous Settler without code or past the pin, and refuses when the code cannot be read", async () => {
-    expect(await resolver({registry: {prev: zeroExSettlerAddress(8453, 23)}}).resolve(8453)).toEqual([SETTLER]);
+    expect(await resolver({registry: {prev: zeroExSettlerAddress(8453, 24)}}).resolve(8453)).toEqual([SETTLER]);
     expect(await resolver({registry: {prev: zeroExSettlerAddress(8453, BASE_PIN + 1)}, code: () => true}).resolve(8453)).toEqual([SETTLER]);
     const err = await caught(resolver({code: null}).resolve(8453));
     expect((err as Error).message).toBe("zeroex: the RPC on chain 8453 could not read the 0x Settler's code");
@@ -101,7 +104,8 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
   });
 
   // The reviewer's reproduction (a real native sale; backend = RPC + API): before this fix every step below passed and
-  // the engine sent the native input to the empty address.
+  // the engine sent the native input to the empty address. It runs on the recording's own pin era (Base 22 / 21, where
+  // 23 was the next deployment, not made yet).
   for (const nonce of [23, 1000]) {
     describe(`the reviewer's attack: Base deployment ${nonce} named by a hostile RPC and API`, () => {
       const f = loadRecorded("base-eth-usdc");
@@ -110,7 +114,7 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
 
       it("the resolver refuses it", async () => {
         vi.stubGlobal("fetch", recordedFetch(f, {registry: {current: EMPTY, prev: null}}));
-        const err = await caught(createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: rpcOf(f)}).resolve(8453));
+        const err = await caught(createSettlerResolver({chains: chainsOf(f), rpcUrls: rpcOf(f)}).resolve(8453));
         expect(refusalOf(err)?.reason).toBe("vault_mismatch");
       });
 
@@ -119,7 +123,7 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
         const seen: {url: string; method: string}[] = [];
         vi.stubGlobal("fetch", recordedFetch(f, {seen, body: hostile(), registry: {current: EMPTY, prev: null}}));
         const heard: [string, string | undefined][] = [];
-        const q = await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f)}).getQuote(paramsOf(f, {onRefusal: (t, info) => heard.push([t, info?.reason])}));
+        const q = await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)}).getQuote(paramsOf(f, {onRefusal: (t, info) => heard.push([t, info?.reason])}));
         expect(q).toBeNull();
         expect(heard).toHaveLength(1);
         expect(heard[0]![1]).toBe("vault_mismatch");
@@ -136,7 +140,7 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
           sendTransaction: async (t: unknown) => { sent.push(t); return {hash: `0x${"1".repeat(64)}`}; },
         };
         const e = decodeSettlerExecute(f.response.transaction.data);
-        await expect(new ZeroExSwap2Protocol(account as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: rpcOf(f)})
+        await expect(new ZeroExSwap2Protocol(account as never, {fromChain: "eip155:8453", apiKey: getKey, rpcUrls: rpcOf(f), chains: chainsConfigOf(f)})
           .swap2({fromToken: "ETH", toToken: f.request.destToken, toChain: 8453, recipient: f.request.refundAddress, fromTokenAmount: BigInt(f.request.amountIn), minAmountOut: e.minAmountOut, slippageBps: 50} as never)).rejects.toThrow();
         expect(sent).toEqual([]);
       });
@@ -239,11 +243,11 @@ describe("4. a slow backend does not age a live quote's Settler set out from und
   const setup = async (latencyMs: number) => {
     vi.stubGlobal("fetch", recordedFetch(f));
     let clock = 1_000_000;
-    const resolver = createSettlerResolver({chains: ZEROEX_CHAINS, rpcUrls: rpcOf(f), now: () => clock});
+    const resolver = createSettlerResolver({chains: chainsOf(f), rpcUrls: rpcOf(f), now: () => clock});
     await resolver.resolve(8453);
     clock += 300_000 - 1_000;
     const backend = (async () => { clock += latencyMs; return new Response(JSON.stringify(answer()), {status: 200}); }) as unknown as typeof fetch;
-    const app = zeroExRemoteProvider({baseUrl: "https://backend.invalid/api/swap2", fetchImpl: backend, settlerResolver: resolver});
+    const app = zeroExRemoteProvider({baseUrl: "https://backend.invalid/api/swap2", fetchImpl: backend, settlerResolver: resolver, chains: chainsConfigOf(f)});
     return {app, resolver, crossed: () => resolver.known(8453).length === 0};
   };
 
@@ -268,9 +272,9 @@ describe("4. a slow backend does not age a live quote's Settler set out from und
     const s = await setup(2_000);
     const foreign = answer();
     foreign.txRequest!.to = zeroExSettlerAddress(8453, 5);
-    const app = zeroExRemoteProvider({baseUrl: "https://backend.invalid/api/swap2", fetchImpl: (async () => new Response(JSON.stringify(foreign), {status: 200})) as unknown as typeof fetch, settlerResolver: s.resolver});
+    const app = zeroExRemoteProvider({baseUrl: "https://backend.invalid/api/swap2", fetchImpl: (async () => new Response(JSON.stringify(foreign), {status: 200})) as unknown as typeof fetch, settlerResolver: s.resolver, chains: chainsConfigOf(f)});
     await expect(app.getQuote(params)).rejects.toThrow(/is not a 0x Settler from the on-chain registry/);
-    expect(zeroExVerifyQuote(params, answer(), {chains: ZEROEX_CHAINS, settlers: () => []})).toMatch(/is not resolved/);
+    expect(zeroExVerifyQuote(params, answer(), {chains: chainsOf(f), settlers: () => []})).toMatch(/is not resolved/);
   });
 });
 
