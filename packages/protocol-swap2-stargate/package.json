@@ -21,14 +21,14 @@
     "verify:fork": "node scripts/verify-fork.mjs"
   },
   "dependencies": {
-    "viem": "^2.57.2",
+    "viem": "^2.58.1",
     "@anywalletkit/protocol-swap2-core": "workspace:*",
     "@anywalletkit/swap2-assets": "workspace:*"
   },
   "devDependencies": {
     "@anywalletkit/networks": "workspace:*",
     "@types/node": "^22",
-    "vitest": "^5.0.3",
+    "vitest": "^5.1.1",
     "@anywalletkit/core": "workspace:*",
     "@anywalletkit/conformance": "workspace:*",
     "@anywalletkit/protocol-swap2-router": "workspace:*",

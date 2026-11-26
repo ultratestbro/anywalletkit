@@ -29,8 +29,8 @@
   },
   "devDependencies": {
     "@types/node": "^22",
-    "viem": "^2.57.2",
-    "vitest": "^5.1.0"
+    "viem": "^2.58.1",
+    "vitest": "^5.1.1"
   },
   "keywords": ["shutter", "mev", "encrypted-mempool", "threshold-encryption", "commit-reveal", "timelock", "ibe", "bls12-381", "gnosis", "anywalletkit"],
   "publishConfig": { "access": "public", "provenance": true }

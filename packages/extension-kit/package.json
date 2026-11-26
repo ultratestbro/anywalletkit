@@ -51,8 +51,8 @@
     "@noble/hashes": "^2.4.0"
   },
   "devDependencies": {
-    "vitest": "^5.1.0",
-    "viem": "^2.57.16"
+    "vitest": "^5.1.1",
+    "viem": "^2.58.1"
   },
   "publishConfig": { "access": "public", "provenance": true }
 }
