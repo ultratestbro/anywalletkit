@@ -9,9 +9,12 @@
 //     to it are refused from that day, token sales still use it inside ZEROEX_SETTLER_NONCE_MARGIN, and this run fails
 //     ("NEW") until the pins are raised — past the margin every sale is refused ("PIN"). A rollback ("OLD") or another
 //     previous Settler ("PREV") fails it too, and so does a chain no RPC answered on: its pins are unchecked, so it is
-//     a failure, never an ok. A read the RPC did not answer — a JSON-RPC error that is not a revert (a rate limit), no
-//     result, an answer for another chain — fails the attempt, and the next URL (or the same one, a second later) is
-//     tried; it is never read as the registry's word (a revert is: a paused registry reverts ownerOf(2)).
+//     a failure, never an ok. A read the RPC did not answer — a JSON-RPC error that is not a revert (a rate limit, a
+//     gateway's "request reverted by gateway"; a revert is code 3 or "execution reverted…"), no result, an answer for
+//     another chain, no code at the pinned registry (an RPC with no state) — fails the attempt, and the next URL (or the
+//     same one, a second later) is tried; it is never read as the registry's word (a revert is: a paused registry
+//     reverts ownerOf(2)). A registry that names no Settler is read a second time before it is reported. A failed read
+//     prints its JSON-RPC code and a fixed class, never the RPC's own message.
 //  2. Only with ZEROEX_API_KEY: live quotes for the corridors below through the provider — the Settler call and the
 //     Permit2 payload checked on the way — then held to the request by zeroExVerifyQuote, built, checked by
 //     zeroExVerifyBuild and preflighted; and a token and a native sale through the real server handler and
@@ -46,8 +49,31 @@ const word2 = "0000000000000000000000000000000000000000000000000000000000000002"
 const addressOf = (w) => (typeof w === "string" && /^0x0{24}[0-9a-fA-F]{40}$/.test(w) && !/^0x0{64}$/.test(w) ? `0x${w.slice(26)}` : null);
 const withTimeout = async (ms, run) => { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms); try { return await run(c.signal); } finally { clearTimeout(t); } };
 const cleanText = (s) => String(s ?? "").replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").trim();
+// A long token that is not 0x-hex (an API key an RPC might echo in an error): cut from anything printed.
+const redact = (s) => String(s).replace(/(?<![0-9A-Za-z_-])(?!0x[0-9a-fA-F]+(?![0-9A-Za-z_-]))[A-Za-z0-9_-]{16,}/g, "<redacted>");
 /** A read the RPC did not answer: the attempt fails and the next URL (or the same one, once) is tried. */
 class NoAnswer extends Error {}
+/**
+ * Whether a JSON-RPC error is the chain's own revert: code 3, or a message that starts with "execution reverted"
+ * (-32000 without data). Every RPC the watch reads answered a revert one of these two ways on 2026-11-26; the same
+ * rule as scripts/watch/evm-call.mjs `isRevert`. A message that only contains the word ("request reverted by
+ * gateway") is the RPC failing (review 2026-11-26 round 2, F1: /revert/i read it as the registry's answer).
+ */
+const isRevert = (error) => error?.code === 3 || /^execution reverted\b/i.test(String(error?.message ?? "").trim());
+// What a failed read prints: the JSON-RPC code and a fixed class, never the RPC's own message — the canary hands this job
+// our private RPCs, and the note is committed and posted to Telegram (F4).
+const RATE_LIMIT_CODES = new Set([-32005, -32007, -32029, -32090, 429]);
+const rpcFailure = (error) => {
+  const code = Number.isInteger(error?.code) ? error.code : "?";
+  const limited = RATE_LIMIT_CODES.has(error?.code) || /rate|limit|too many|throttl|capacity|quota|exceeded/i.test(String(error?.message ?? ""));
+  return `RPC error ${code} (${limited ? "rate limited" : "not a revert"})`;
+};
+const failureText = (e) => {
+  if (e instanceof NoAnswer) return e.message;
+  if (e?.name === "AbortError") return "timed out (12 s)";
+  if (e instanceof TypeError && e.message === "fetch failed") return "fetch failed";
+  return `${e?.name ?? "Error"}: ${redact(cleanText(e?.message ?? e)).slice(0, 80)}`;
+};
 // A revert is the chain's answer (a paused registry reverts ownerOf(2); a registry with no previous Settler reverts
 // prev(2)) and comes back as `{reverted: true}`. Anything else that is not a result — a JSON-RPC error such as a rate
 // limit (-32005, -32007), an answer with no result, a body that is not JSON, no answer at all — is the RPC's failure,
@@ -55,11 +81,12 @@ class NoAnswer extends Error {}
 // high) before 2026-11-26, and never retried.
 const call = (url, method, params) => withTimeout(12_000, async (signal) => {
   const r = await fetch(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params}), signal});
-  const j = await r.json();
+  const text = await r.text();
+  let j;
+  try { j = JSON.parse(text); } catch { throw new NoAnswer(`${method}: ${r.status === 429 ? "rate limited" : "not JSON"} (HTTP ${r.status})`); }
   if (j?.error) {
-    const message = String(j.error.message ?? "");
-    if (/revert/i.test(message)) return {reverted: true, message: message.slice(0, 80)};
-    throw new NoAnswer(`${method}: RPC error ${j.error.code ?? "?"} ${cleanText(message).slice(0, 80)}`.trim());
+    if (isRevert(j.error)) return {reverted: true};
+    throw new NoAnswer(`${method}: ${rpcFailure(j.error)}`);
   }
   if (j?.result === undefined || j.result === null) throw new NoAnswer(`${method}: no result (HTTP ${r.status})`);
   return {result: j.result};
@@ -71,63 +98,90 @@ const verdicts = [];
 /** Live corridors that failed, by chain. */
 const failedQuotes = [];
 
+/**
+ * One chain read over one URL: the checks, its verdict and its line, or a throw when the RPC did not answer (NoAnswer).
+ * `current` is null when the registry names no Settler this module can tell (ownerOf(2) reverted, or answered no
+ * address, or one that is not a CREATE3 deployment of it).
+ */
+async function readChain(id, chain, url) {
+  // One call at a time: public endpoints throttle a burst.
+  const chainId = await call(url, "eth_chainId", []);
+  if (typeof chainId.result !== "string" || !/^0x[0-9a-fA-F]{1,16}$/.test(chainId.result)) throw new NoAnswer("eth_chainId: not a chain id");
+  // An RPC that answers for another chain answered nothing about this one: the next URL is tried (its registry
+  // reading would name no Settler of this chain and read as BAD, severity high).
+  if (BigInt(chainId.result) !== BigInt(id)) throw new NoAnswer(`the RPC answered for chain ${BigInt(chainId.result)}`);
+  const proxyCode = (await call(url, "eth_getCode", [chain.registry, "latest"])).result ?? "0x";
+  // The pinned registry is deployed on every chain of the table (and code is not removed since Cancun): no code is an
+  // RPC with no state (unsynced, pruned, broken), not the registry's word — every other read of it would be empty too
+  // and read as BAD, severity high (review 2026-11-26 round 2, F1).
+  if (typeof proxyCode !== "string" || proxyCode.length <= 2) throw new NoAnswer("eth_getCode: the pinned registry has no code here (an RPC with no state?)");
+  const impl = addressOf((await call(url, "eth_getStorageAt", [chain.registry, SLOT_IMPL, "latest"])).result);
+  const implCode = impl ? (await call(url, "eth_getCode", [impl, "latest"])).result ?? "0x" : "0x";
+  const owner = addressOf((await call(url, "eth_call", [{to: chain.registry, data: "0x8da5cb5b"}, "latest"])).result);
+  const current = addressOf((await call(url, "eth_call", [{to: chain.registry, data: `0x6352211e${word2}`}, "latest"])).result);
+  const prevAnswer = await call(url, "eth_call", [{to: chain.registry, data: `0xe2603dc2${word2}`}, "latest"]);
+  const prev = addressOf(prevAnswer.result);
+  const codeOf = async (a) => (a ? ((await call(url, "eth_getCode", [a, "latest"])).result ?? "0x").length > 2 : false);
+  // Derived past the pin too, so a newer 0x deployment is named rather than called "not a Settler".
+  const nonceOf = (a) => (a ? zeroExSettlerNonce(Number(id), a, chain.registry, chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN + ZEROEX_SETTLER_LOOKAHEAD) : null);
+  const nonce = nonceOf(current);
+  const prevNonce = nonceOf(prev);
+  const status = pinStatus({id, chain, current: nonce, previous: prevAnswer.reverted ? null : prevNonce, margin: ZEROEX_SETTLER_NONCE_MARGIN});
+  const checks = {
+    chain: BigInt(chainId.result) === BigInt(id),
+    registryIsProxy: proxyCode.length > 2 && !!impl && implCode.length > 2,
+    owner: !!owner,
+    settler: nonce !== null && (await codeOf(current)),
+    previous: prevAnswer.reverted || (prevNonce !== null && (await codeOf(prev))),
+    permit2: await codeOf(ZEROEX_PERMIT2),
+    wrappedNative: await codeOf(chain.wrappedNative),
+    // the registry names exactly the pinned current and previous Settlers (pin-status.mjs says what to do otherwise)
+    pins: status.tag === "ok",
+  };
+  const ok = Object.values(checks).every(Boolean);
+  const onChain = Object.entries(checks).filter(([k]) => k !== "pins").every(([, v]) => v);
+  const tag = ok ? "ok " : onChain && status.tag !== "BAD" ? status.tag.padEnd(3) : "BAD";
+  const pin = `pinned ${chain.newestLiveNonce} / previous ${chain.previousLiveNonce}, token sales up to ${chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN}`;
+  const advice = status.advice && tag !== "BAD" ? ` — ${status.advice}` : "";
+  // A BAD line names its failing checks first, on the line itself (it printed the check map as a multi-line object
+  // after it, which the canary's note — the line, cut to the room left — never kept).
+  const failing = tag === "BAD" ? `failing: ${Object.entries(checks).filter(([, v]) => !v).map(([k]) => k).join(", ")} · ` : "";
+  return {
+    ok,
+    current: nonce,
+    verdict: {id, tag: tag.trim(), pin: status.tag, native: status.native, token: status.token},
+    line: `${tag} chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} ${failing}Settler ${current ?? "—"} (deployment ${nonce ?? "?"}; ${pin})${prev ? `, previous ${prev} (deployment ${prevNonce ?? "?"})` : ""} · registry impl ${impl ?? "—"} owner ${owner ?? "—"}${advice}`,
+  };
+}
+
 // ── 1. on chain, keyless ─────────────────────────────────────────────────────
 if (!args.includes("--no-chain")) {
   await Promise.all(Object.entries(ZEROEX_CHAINS).map(async ([id, chain]) => {
     const urls = rpcsFor(id);
-    // Why the last attempt failed (no URL: it goes into the run's output).
+    // Why the last attempt failed (no URL, no RPC message: it goes into the run's output).
     let lastFailure = "";
+    let reading = null;
     for (let attempt = 0; urls.length && attempt < 2; attempt++) {
       const url = urls[attempt % urls.length];
       if (attempt) await sleep(1000); // a rate limit, or the same burst, is often over a second later
       try {
-        // One call at a time: public endpoints throttle a burst.
-        const chainId = await call(url, "eth_chainId", []);
-        // An RPC that answers for another chain answered nothing about this one: the next URL is tried (its registry
-        // reading would name no Settler of this chain and read as BAD, severity high).
-        if (BigInt(chainId.result) !== BigInt(id)) throw new NoAnswer(`the RPC answered for chain ${BigInt(chainId.result)}`);
-        const proxyCode = (await call(url, "eth_getCode", [chain.registry, "latest"])).result ?? "0x";
-        const impl = addressOf((await call(url, "eth_getStorageAt", [chain.registry, SLOT_IMPL, "latest"])).result);
-        const implCode = impl ? (await call(url, "eth_getCode", [impl, "latest"])).result ?? "0x" : "0x";
-        const owner = addressOf((await call(url, "eth_call", [{to: chain.registry, data: "0x8da5cb5b"}, "latest"])).result);
-        const current = addressOf((await call(url, "eth_call", [{to: chain.registry, data: `0x6352211e${word2}`}, "latest"])).result);
-        const prevAnswer = await call(url, "eth_call", [{to: chain.registry, data: `0xe2603dc2${word2}`}, "latest"]);
-        const prev = addressOf(prevAnswer.result);
-        const codeOf = async (a) => (a ? ((await call(url, "eth_getCode", [a, "latest"])).result ?? "0x").length > 2 : false);
-        // Derived past the pin too, so a newer 0x deployment is named rather than called "not a Settler".
-        const nonceOf = (a) => (a ? zeroExSettlerNonce(Number(id), a, chain.registry, chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN + ZEROEX_SETTLER_LOOKAHEAD) : null);
-        const nonce = nonceOf(current);
-        const prevNonce = nonceOf(prev);
-        const status = pinStatus({id, chain, current: nonce, previous: prevAnswer.reverted ? null : prevNonce, margin: ZEROEX_SETTLER_NONCE_MARGIN});
-        const checks = {
-          chain: BigInt(chainId.result) === BigInt(id),
-          registryIsProxy: proxyCode.length > 2 && !!impl && implCode.length > 2,
-          owner: !!owner,
-          settler: nonce !== null && (await codeOf(current)),
-          previous: prevAnswer.reverted || (prevNonce !== null && (await codeOf(prev))),
-          permit2: await codeOf(ZEROEX_PERMIT2),
-          wrappedNative: await codeOf(chain.wrappedNative),
-          // the registry names exactly the pinned current and previous Settlers (pin-status.mjs says what to do otherwise)
-          pins: status.tag === "ok",
-        };
-        const ok = Object.values(checks).every(Boolean);
-        if (!ok) bad++;
-        const onChain = Object.entries(checks).filter(([k]) => k !== "pins").every(([, v]) => v);
-        const tag = ok ? "ok " : onChain && status.tag !== "BAD" ? status.tag.padEnd(3) : "BAD";
-        // Every verdict below comes from a registry that answered ownerOf(2) (a result or a revert): a read the RPC did not
-        // answer threw above, so a chain whose reads all failed ends as "unreachable", which carries no severity.
-        verdicts.push({id, tag: tag.trim(), pin: status.tag, native: status.native, token: status.token});
-        const pin = `pinned ${chain.newestLiveNonce} / previous ${chain.previousLiveNonce}, token sales up to ${chain.newestLiveNonce + ZEROEX_SETTLER_NONCE_MARGIN}`;
-        const advice = status.advice && tag !== "BAD" ? ` — ${status.advice}` : "";
-        // A BAD line names its failing checks first, on the line itself (it printed the check map as a multi-line object
-        // after it, which the canary's note — the line, cut to the room left — never kept).
-        const failing = tag === "BAD" ? `failing: ${Object.entries(checks).filter(([, v]) => !v).map(([k]) => k).join(", ")} · ` : "";
-        console.log(`${tag} chain   ${id.padEnd(6)} ${chain.name.padEnd(16)} ${failing}Settler ${current ?? "—"} (deployment ${nonce ?? "?"}; ${pin})${prev ? `, previous ${prev} (deployment ${prevNonce ?? "?"})` : ""} · registry impl ${impl ?? "—"} owner ${owner ?? "—"}${advice}`);
-        return;
+        reading = await readChain(id, chain, url);
+        // A registry that names no Settler refuses every sale (BAD, severity high): it is read again on the next URL
+        // (or the same one, a second later) before it is reported, so one RPC's bad answer is not that alarm; the first
+        // reading stands when the second read gets no answer at all (review 2026-11-26 round 2, F1).
+        if (reading.current !== null) break;
       } catch (e) {
-        // second try; what failed is kept without its URL
-        lastFailure = e instanceof NoAnswer ? e.message : cleanText(e?.name === "AbortError" ? "timed out (12 s)" : e?.message ?? e).slice(0, 80);
+        // second try; what failed is kept without its URL or the RPC's own words
+        lastFailure = failureText(e);
       }
+    }
+    if (reading) {
+      // Every verdict below comes from a registry that answered ownerOf(2) (a result or a revert): a read the RPC did not
+      // answer threw, so a chain whose reads all failed ends as "unreachable", which carries no severity.
+      if (!reading.ok) bad++;
+      verdicts.push(reading.verdict);
+      console.log(reading.line);
+      return;
     }
     // Unchecked is not ok: a new 0x deployment there would go unseen (up to 0.1.6 this printed `ok — no RPC for …`, exit 0).
     bad++;

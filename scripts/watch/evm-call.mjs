@@ -30,6 +30,20 @@ function keccakF(s) {
   }
 }
 
+/**
+ * Whether a JSON-RPC error is the chain's own revert, which is an answer (a view that is gone or now guarded; a proxy
+ * with no implementation()): `code` 3 (geth's revert with data) or a message that starts with "execution reverted"
+ * (every EVM node, `-32000` without data). Anything else — a rate limit, "header not found", a gateway's "request
+ * reverted by gateway" — is the RPC failing, never a reading: matching /revert/ anywhere in the message took that
+ * gateway error for a revert (review 2026-11-26 round 2, F1). Every public and private RPC the watch reads answered a
+ * revert one of these two ways on 2026-11-26 (34 chains).
+ */
+export function isRevert(error) {
+  if (!error || typeof error !== "object") return false;
+  if (error.code === 3) return true;
+  return typeof error.message === "string" && /^execution reverted\b/i.test(error.message.trim());
+}
+
 /** Keccak-256 (the Ethereum one, not SHA3-256) of a UTF-8 string or bytes, as 0x-hex. */
 export function keccak256(input) {
   const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;

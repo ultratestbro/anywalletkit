@@ -15,12 +15,16 @@
  *
  * Run `pnpm build` and `pnpm pack:check` first; bump versions with
  * `pnpm changeset version` before a release.
+ *
+ * A version scripts/release-order.json says must wait for another one (a minor that would swallow a patch apps on the
+ * previous range need) is held back in every mode, with its dependents, until that one is on npm: the run fails.
  */
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadReleaseOrder, releaseOrderBlock } from './release-order.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -32,6 +36,7 @@ const fromDir = valueOf('--from')
 if (packOnly && !outDir) throw new Error('--pack-only needs --out <dir>')
 if (argv.includes('--from') && !fromDir) throw new Error('--from needs a directory')
 const inCi = process.env.GITHUB_ACTIONS === 'true'
+const releaseOrder = loadReleaseOrder(join(root, 'scripts/release-order.json'))
 
 const onNpm = (name, version) => {
   try {
@@ -78,6 +83,16 @@ const skipped = []
 // rest: it is recorded, every package that depends on it is held back, and the run fails at the end.
 const failed = new Map()
 
+/** Hold `entry` back when release-order.json says another version must be on npm first, or a dependency is held back. */
+function heldBack (entry) {
+  const blockedBy = (entry.deps ?? []).filter((d) => failed.has(d))
+  const why = blockedBy.length ? `depends on ${blockedBy.join(', ')}` : releaseOrderBlock(entry, releaseOrder, onNpm)
+  if (!why) return false
+  failed.set(entry.name, `held back: ${why}`)
+  console.log(`held back ${entry.name}@${entry.version} (${why})`)
+  return true
+}
+
 function publishOne (entry, tarball) {
   const blockedBy = entry.deps.filter((d) => failed.has(d))
   if (blockedBy.length) {
@@ -105,12 +120,15 @@ if (packOnly) {
   const manifest = []
   for (const entry of workspacePackages()) {
     if (onNpm(entry.name, entry.version)) { skipped.push(`${entry.name}@${entry.version}`); continue }
+    if (heldBack(entry)) continue
     const file = pack(entry.dir, outDir)
     manifest.push({ name: entry.name, version: entry.version, deps: entry.deps, file: file.split('/').pop() })
     console.log(`packed ${entry.name}@${entry.version}`)
   }
   writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 1) + '\n')
-  console.log(`\n${manifest.length} packed, ${skipped.length} already on npm`)
+  console.log(`\n${manifest.length} packed, ${skipped.length} already on npm, ${failed.size} held back`)
+  for (const [name, why] of failed) console.log(`  ${name}: ${why}`)
+  if (failed.size) process.exitCode = 1
 } else if (fromDir) {
   // Privileged half: no install, no build — the tarballs the pack job produced, in its order.
   const manifest = JSON.parse(readFileSync(join(fromDir, 'manifest.json'), 'utf8'))
@@ -118,6 +136,7 @@ if (packOnly) {
     if (typeof entry.file !== 'string' || !/^[a-z0-9._-]+\.tgz$/i.test(entry.file)) throw new Error(`manifest: bad file name ${String(entry.file)}`)
     if (!/^@anywalletkit\/[a-z0-9-]+$/.test(entry.name)) throw new Error(`manifest: not one of ours: ${String(entry.name)}`)
     if (onNpm(entry.name, entry.version)) { skipped.push(`${entry.name}@${entry.version}`); continue }
+    if (heldBack(entry)) continue
     publishOne(entry, join(fromDir, entry.file))
   }
 } else {
@@ -125,7 +144,7 @@ if (packOnly) {
   try {
     for (const entry of workspacePackages()) {
       if (onNpm(entry.name, entry.version)) { skipped.push(`${entry.name}@${entry.version}`); continue }
-      if (entry.deps.some((d) => failed.has(d))) { publishOne(entry, ''); continue }
+      if (heldBack(entry)) continue
       let tarball
       try { tarball = pack(entry.dir, out) } catch (e) { failed.set(entry.name, `pnpm pack failed (exit ${e.status ?? '?'})`); continue }
       publishOne(entry, tarball)

@@ -33,8 +33,10 @@ export function pinStatus({id, chain, current, previous, margin}) {
 
 // The order the Reason line names its groups in: what refuses the most first.
 const GROUPS = ["PIN", "NEW", "OLD", "PREV", "BAD", "unreachable", "BAD quote", "BAD remote"];
-// Why a sale through the Settler in force is refused today, by the pinStatus tag of the chain's reading.
-const WHY = {PIN: "a new deployment past the margin", NEW: "a new deployment", OLD: "a rollback", BAD: "the registry names no Settler this module can tell"};
+// Why a sale through the Settler in force is refused today, by the pinStatus tag of the chain's reading. On a deployment
+// day 0x keeps quoting the previous Settler for a while (all eight chains on 2026-11-26), and a native-coin sale to it
+// still passes: the NEW line says so, so triage does not read it as every user refused now (review 2026-11-26 round 2).
+const WHY = {PIN: "a new deployment past the margin", NEW: "a new deployment; 0x may keep quoting the previous Settler for a while, which still passes", OLD: "a rollback", BAD: "the registry names no Settler this module can tell"};
 // The tags a pin raise (or a pin update) answers; a registry that names no Settler is not fixed by the pins.
 const PIN_MOVES = new Set(["PIN", "NEW", "OLD", "PREV"]);
 
@@ -44,7 +46,8 @@ const PIN_MOVES = new Set(["PIN", "NEW", "OLD", "PREV"]);
  * canary note, a Telegram line — still has every chain; and a `Severity: high` line when a sale through the Settler in
  * force is refused today on a chain whose registry answered, naming what is refused and why, per chain
  * (`… refused today: every sale on 1 (a new deployment past the margin); native-coin sales on 143, 8453 (a new
- * deployment): …`). A new deployment on a pinned chain refuses native-coin sales from that day; past the margin, or a
+ * deployment; 0x may keep quoting the previous Settler for a while, which still passes): …`). A new deployment on a
+ * pinned chain refuses native-coin sales to it from that day; past the margin, or a
  * rollback below the pinned previous, every sale; a registry with no Settler this module can tell, everything. An
  * unreachable chain carries no severity: verify-live retries a read the RPC did not answer and ends a chain whose reads
  * all failed as unreachable, so every other verdict is the registry's own word. Pure.

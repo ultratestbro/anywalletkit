@@ -8,8 +8,9 @@ import {fileURLToPath, pathToFileURL} from "node:url";
 import {createHash} from "node:crypto";
 import {esc, firstBlocks, fitLines, readCapped, safeLink, visibleText} from "./html-text.mjs";
 import {RECORD_FORMATS, checkPins, decodeFacets, pinsFromModule, selectorsFromSource} from "./pins.mjs";
-import {callData, decodeResult} from "./evm-call.mjs";
+import {callData, decodeResult, isRevert} from "./evm-call.mjs";
 import {checkBranch} from "./zcash-branch.mjs";
+import {severityError} from "./manifest.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(here, "../..");
@@ -66,7 +67,7 @@ async function fetchJson(url, init = {}, timeoutMs = 20_000) {
 }
 async function rpc(url, method, params) {
   const j = await fetchJson(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params})});
-  if (j.error) throw Object.assign(new Error(j.error.message || JSON.stringify(j.error)), {rpcError: true});
+  if (j.error) throw Object.assign(new Error(j.error.message || JSON.stringify(j.error)), {rpcError: true, code: j.error.code});
   return j.result;
 }
 const ghHeaders = () => ({accept: "application/vnd.github+json", "user-agent": "anywalletkit-watch", ...(env.GITHUB_TOKEN ? {authorization: `Bearer ${env.GITHUB_TOKEN}`} : {})});
@@ -108,7 +109,7 @@ const F = {
     if (!meta.impl && !meta.beacon) {
       let r = null;
       try { r = addrOfSlot(await rpc(url, "eth_call", [{to: s.address, data: "0x5c60da1b"}, "latest"])); }
-      catch (e) { if (!(e.rpcError && /revert/i.test(e.message))) throw new Error(`implementation(): ${e.message}`); }
+      catch (e) { if (!(e.rpcError && isRevert(e))) throw new Error(`implementation(): ${e.message}`); }
       meta.implProbe = true;
       if (r) { meta.impl = r; meta.implVia = "implementation()"; }
     }
@@ -134,7 +135,7 @@ const F = {
     let hex;
     try { hex = await rpc(url, "eth_call", [{to: s.to, data}, "latest"]); }
     catch (e) {
-      if (!(e.rpcError && /revert/i.test(e.message))) throw e;
+      if (!(e.rpcError && isRevert(e))) throw e;
       return {value: "reverted", meta: {call, reverted: e.message.slice(0, 120)}};
     }
     const result = decodeResult(hex, s.decode ?? "raw");
@@ -263,12 +264,8 @@ const F = {
 };
 
 // ── manifests ──────────────────────────────────────────────────────────────
-/**
- * A source's optional `severity`: how much a change of it matters to the module (the 0x Settler in force: a new
- * deployment refuses native-coin sales from that day). Carried into the diff entry, the digest and Telegram so triage
- * does not have to infer it; anything else is a manifest error (a typo must not drop it silently).
- */
-const SEVERITIES = ["high", "medium", "low"];
+// A source's optional `severity` (manifest.mjs): anything but high / medium / low is a manifest error (a typo must not
+// drop it silently); CI holds every real manifest to the same rule.
 function loadManifests() {
   const out = [];
   for (const d of readdirSync(resolve(ROOT, "packages"))) {
@@ -284,7 +281,7 @@ function loadManifests() {
     for (const s of m.sources ?? []) {
       if (!s.id) throw new Error(`${m.file}: a source has no id`);
       if (seen.has(s.id)) throw new Error(`${m.module}: source id "${s.id}" appears twice (${seen.get(s.id)}, ${m.file})`);
-      if (s.severity !== undefined && !SEVERITIES.includes(s.severity)) throw new Error(`${m.file}: source "${s.id}" has severity ${JSON.stringify(s.severity).slice(0, 40)} (one of ${SEVERITIES.join(", ")}, or none)`);
+      const badSeverity = severityError(m.file, s); if (badSeverity) throw new Error(badSeverity);
       seen.set(s.id, m.file);
     }
   }

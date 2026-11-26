@@ -1,6 +1,11 @@
 // How the canary reads one job's run: its exit, its signal and what it printed. A job fails on a non-zero exit, warns
 // on a line that says something failed without failing the job, and is ok otherwise. Also what the canary keeps of a
 // run for people (the note in watch/canary and Telegram) and the severity a job reports for itself.
+//
+// Only a job the canary declares with `summaryLines: true` (the 0x verify-live, which prints them last, from its own
+// verdicts) has its `Reason:` line lead the note and its `Severity:` line kept. Every other job's output may carry
+// upstream text (an error message, a revert reason), so there `Reason:` is one more cause line and `Severity:` is
+// ignored: a line an upstream answer put in the output cannot relabel the failure (review 2026-11-26 round 2, F3).
 
 /** A line that reports a failure the job itself did not fail on. */
 export const SOFT_FAIL = /(^|\s)(→|->)\s*\w*Error\b|\bFAILED\b|\bError:|not found|revert/i;
@@ -17,6 +22,8 @@ const SEVERITY_LINE = /^Severity: (high|medium|low)\b/i;
 const SEVERITY_RANK = {low: 1, medium: 2, high: 3};
 /** Lines that name the cause of a failure (viem's Details / Status lines, an error line) rather than the stack tail. */
 const CAUSE_LINE = /^(\w*Error: |(Details|Status|function): )/;
+/** The cause lines of a job that does not print summary lines: a `Reason: …` line is one of them, as before 2026-11-26. */
+const PLAIN_CAUSE_LINE = /^(\w*Error: |(Details|Status|Reason|function): )/;
 /**
  * The lines a job that prints `Reason:` summarises there, by the tag they start with (verify:live: `BAD chain …`,
  * `BAD quote … (HTTP 429)`, `??? chain … no RPC answered`, `NEW chain …`, `PIN`, `OLD`, `PREV`).
@@ -49,14 +56,17 @@ export function severityOf(lines) {
 
 /**
  * A run's status: "timeout" (killed), "none" (a market with nothing listed), "fail", "warn" or "ok", with its warning
- * lines and the severity it reports (null when it reports none).
+ * lines and the severity it reports (null when it reports none, and always for a job without `summaryLines`).
+ * `summaryLines` is true only for a job declared to print `Reason:` / `Severity:` itself; it is carried on the result
+ * for {@link noteOf} and {@link retryTextOf}.
  */
-export function runStatus({code, signal, out}) {
+export function runStatus({code, signal, out, summaryLines = false}) {
   const lines = out.split("\n").filter(Boolean);
   const soft = softLines(lines);
   const expected = code !== 0 && /no listed Morpho (vault|market)/.test(out);
   const status = signal ? "timeout" : expected ? "none" : code !== 0 ? "fail" : soft.length ? "warn" : "ok";
-  return {status, lines, soft, severity: severityOf(lines)};
+  const summary = summaryLines === true;
+  return {status, lines, soft, severity: summary ? severityOf(lines) : null, summaryLines: summary};
 }
 
 // URLs are cut: an RPC URL carries its API key, and the note goes to Telegram and the committed state file.
@@ -75,14 +85,19 @@ export function failingLines(lines) {
 }
 
 /**
- * The note kept for a run. A failure: the job's own `Reason:` lines first and whole (up to {@link REASON_MAX}), then the
- * cause lines in what room is left of {@link NOTE_MAX} — with a Reason line and no cause line, the job's failing lines
- * ({@link failingLines}: `BAD quote … API key rejected (HTTP 401)`, a BAD chain's failing checks), with neither, the last
- * four lines. Otherwise the first warning lines.
+ * The note kept for a run. A failure of a job with `summaryLines`: its own `Reason:` lines first and whole (up to
+ * {@link REASON_MAX}), then the cause lines in what room is left of {@link NOTE_MAX} — with a Reason line and no cause
+ * line, the job's failing lines ({@link failingLines}: `BAD quote … API key rejected (HTTP 401)`, a BAD chain's failing
+ * checks), with neither, the last four lines. A failure of any other job: its cause lines (`Reason:` among them), else
+ * its last four lines, at most {@link NOTE_MAX}. Otherwise the first warning lines.
  */
-export function noteOf({status, lines, soft}) {
+export function noteOf({status, lines, soft, summaryLines}) {
   if (status !== "fail") return clean(soft.slice(0, 3).join(" | ")).slice(0, NOTE_MAX);
   const trimmed = lines.map((l) => l.trim());
+  if (summaryLines !== true) {
+    const cause = [...new Set(trimmed.filter((l) => PLAIN_CAUSE_LINE.test(l)))].slice(0, 4);
+    return clean((cause.length ? cause : lines.slice(-4)).join(" | ")).slice(0, NOTE_MAX);
+  }
   const reasons = [...new Set(trimmed.filter((l) => REASON_LINE.test(l)).map(clean))];
   const cause = [...new Set(trimmed.filter((l) => CAUSE_LINE.test(l)))].slice(0, 4);
   const rest = clean((cause.length ? cause : reasons.length ? failingLines(lines) : lines.slice(-4)).join(" | "));
@@ -94,19 +109,23 @@ export function noteOf({status, lines, soft}) {
 
 /**
  * The text the canary's retry wait is chosen from (retry-wait.mjs: a rate limit waits longer): the note, and for a run
- * that prints `Reason:` every one of its failing lines as well — the note has room for the first few only, and a 429
- * on the fifth corridor must still wait out the rate limit. A run without a Reason line: the note alone, as before.
+ * of a job with `summaryLines` that prints `Reason:` every one of its failing lines as well — the note has room for the
+ * first few only, and a 429 on the fifth corridor must still wait out the rate limit. Any other run: the note alone.
  */
 export function retryTextOf(run) {
   const note = noteOf(run);
-  if (run.status !== "fail" || !run.lines.some((l) => REASON_LINE.test(l.trim()))) return note;
+  if (run.status !== "fail" || run.summaryLines !== true || !run.lines.some((l) => REASON_LINE.test(l.trim()))) return note;
   return [note, ...failingLines(run.lines).map(clean)].join(" | ");
 }
 
-/** A note cut to `max` for one Telegram or log line; a leading `Reason:` part stays whole (the rest becomes "…"). */
-export function shortNote(note, max) {
+/**
+ * A note cut to `max` for one Telegram or log line. For a job with `summaryLines` (the third argument) a leading
+ * `Reason:` part stays whole (the rest becomes "…"); any other note is cut at `max`.
+ */
+export function shortNote(note, max, summaryLines = false) {
   const s = String(note ?? "");
   if (s.length <= max) return s;
+  if (summaryLines !== true) return s.slice(0, max);
   const parts = s.split(" | ");
   let lead = 0;
   while (lead < parts.length && REASON_LINE.test(parts[lead])) lead++;

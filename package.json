@@ -13,7 +13,7 @@
     "test": "pnpm -r --filter './packages/**' run test",
     "typecheck": "pnpm -r --filter './packages/**' run typecheck",
     "lint": "eslint packages/*/src",
-    "lint:rules": "node --test scripts/eslint/no-number-bigint.test.mjs scripts/check-node.test.mjs",
+    "lint:rules": "node --test scripts/eslint/no-number-bigint.test.mjs scripts/check-node.test.mjs scripts/release-order.test.mjs",
     "check:node": "node scripts/check-node.mjs",
     "changeset": "changeset",
     "release": "node scripts/publish.mjs",

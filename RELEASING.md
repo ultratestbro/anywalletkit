@@ -10,6 +10,7 @@ Packages reach npm only through the `release` workflow. Every package is publish
    pnpm install               # refreshes the lockfile for the new versions
    git commit -am "chore: release" && git push
    ```
+   One `changeset version` over a pending patch and a pending minor of one package writes the minor only (0.1.5 → 0.2.0, no 0.1.6), and apps on the previous caret range never get the patch. When a patch must reach them first, version and release it alone, then the rest; `scripts/release-order.json` names such a pair, and `scripts/publish.mjs` (so `pnpm release:dry` and every mode of the workflow) holds the later version back, failing the run, until the earlier one is on npm. Today: `@anywalletkit/protocol-swap2-0x` 0.2.0 (Monad) waits for 0.1.6 (the Settler pins). Drop a rule once both are out.
 2. Actions → **release** → Run workflow:
    - **mode `dry-run`** runs the full gate, packs every package that is not on npm yet and `npm publish --dry-run`s the packed tarballs. The gate is build, typecheck, tests, registry, examples, Hermes and `pack:check`.
    - **mode `publish`** runs the same gate and packs. The `publish` job then waits for approval in the `npm` environment and publishes the packed tarballs (dependencies first); the `tag` job pushes one tag per published package, `@anywalletkit/<name>@<version>`.

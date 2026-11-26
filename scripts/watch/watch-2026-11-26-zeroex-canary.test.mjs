@@ -30,13 +30,13 @@ const built = existsSync(resolve(pkg, "dist/index.js"));
 const NEW_LINE = (id, name) => `NEW chain   ${String(id).padEnd(6)} ${name.padEnd(16)} Settler 0x7130a552999c7e2cae6b38f9336e90c457abd47d (deployment 23; pinned 22 / previous 21, token sales up to 24), previous 0x103502909141f7025a94b7b99a276dcd128e21a8 (deployment 22) · registry impl 0x0e992c001e375785846eeb9cd69411b53f30f24b owner 0xf36b9f50e59870a24f42f9ba43b2ad0a4b8f2f51 — 0x deployed Settler 23: native-coin sales to it are refused until newestLiveNonce / previousLiveNonce for chain ${id} are raised in src/chains.ts (token sales use it inside the margin) — check it, then raise them`;
 const SEVEN = [[42161, "Arbitrum"], [1, "Ethereum"], [10, "Optimism"], [56, "BNB Smart Chain"], [137, "Polygon"], [8453, "Base"], [43114, "Avalanche"]];
 const clean = (s) => String(s).replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").trim();
-const SEVEN_SEVERITY = "Severity: high — sales through the Settler in force are refused today: native-coin sales on 1, 10, 56, 137, 8453, 42161, 43114 (a new deployment): check it, then update the pins in src/chains.ts";
+const SEVEN_SEVERITY = "Severity: high — sales through the Settler in force are refused today: native-coin sales on 1, 10, 56, 137, 8453, 42161, 43114 (a new deployment; 0x may keep quoting the previous Settler for a while, which still passes): check it, then update the pins in src/chains.ts";
 
 test("a failed 0x run's note names every chain that is not ok, whole, and the Telegram cut keeps them", () => {
   assert.ok(NEW_LINE(1, "Ethereum").length > NOTE_MAX, "one NEW line is longer than the whole note");
   const reason = "Reason: NEW on 1, 10, 56, 137, 8453, 42161, 43114";
   const out = [...SEVEN.map(([id, name]) => NEW_LINE(id, name)), "FAILED (7)", SEVEN_SEVERITY, reason].join("\n");
-  const r = runStatus({code: 1, signal: null, out});
+  const r = runStatus({code: 1, signal: null, out, summaryLines: true});
   assert.equal(r.status, "fail");
   assert.equal(r.severity, "high");
   const note = noteOf(r);
@@ -44,31 +44,31 @@ test("a failed 0x run's note names every chain that is not ok, whole, and the Te
   assert.equal(note, `${reason} | ${clean(NEW_LINE(42161, "Arbitrum")).slice(0, NOTE_MAX - reason.length - 3)}`);
   assert.equal(note.length, NOTE_MAX);
   for (const [id] of SEVEN) assert.match(note.slice(0, reason.length), new RegExp(`\\b${id}\\b`));
-  assert.equal(shortNote(note, 160), `${reason} | …`);
-  assert.equal(shortNote(note, 20), `${reason} | …`, "a Reason part is never cut to make a line shorter");
+  assert.equal(shortNote(note, 160, true), `${reason} | …`);
+  assert.equal(shortNote(note, 20, true), `${reason} | …`, "a Reason part is never cut to make a line shorter");
 });
 
 test("a Reason line and no cause line: the note fills its room with the job's failing lines, never with the Severity / count lines", () => {
   // Live 2026-11-26 with a bogus ZEROEX_API_KEY: the note was `Reason: BAD quote on 143` alone, the HTTP 401 dropped.
   const ok = (id) => `ok  chain   ${String(id).padEnd(6)} Chain            Settler 0x${"1".repeat(40)} (deployment 22; pinned 22 / previous 21, token sales up to 24)`;
   const keyRejected = "BAD quote   Monad MON → AUSD (native)              zeroex: API key rejected (HTTP 401) [key_rejected]";
-  let r = runStatus({code: 1, signal: null, out: [ok(1), ok(8453), keyRejected, "FAILED (1)", "Reason: BAD quote on 143"].join("\n")});
+  let r = runStatus({code: 1, signal: null, out: [ok(1), ok(8453), keyRejected, "FAILED (1)", "Reason: BAD quote on 143"].join("\n"), summaryLines: true});
   assert.equal(noteOf(r), `Reason: BAD quote on 143 | ${clean(keyRejected)}`);
   assert.deepEqual(failingLines(r.lines), [keyRejected]);
   // a BAD chain names its failing checks on its own line, and the note keeps them
   const badChain = "BAD chain   143    Monad            failing: owner, settler, pins · Settler — (deployment ?; pinned 12 / previous 11, token sales up to 14) · registry impl 0x1d owner —";
-  r = runStatus({code: 1, signal: null, out: [ok(1), badChain, "FAILED (1)", "Severity: high — x", "Reason: BAD on 143"].join("\n")});
+  r = runStatus({code: 1, signal: null, out: [ok(1), badChain, "FAILED (1)", "Severity: high — x", "Reason: BAD on 143"].join("\n"), summaryLines: true});
   assert.equal(noteOf(r), `Reason: BAD on 143 | ${clean(badChain)}`);
   assert.match(noteOf(r), /failing: owner, settler, pins/);
   // no tagged line: the last four lines that are not Reason / Severity / FAILED
-  r = runStatus({code: 1, signal: null, out: ["a", "b", "c", "d", "e", "FAILED (2)", "Severity: high — x", "Reason: BAD on 1"].join("\n")});
+  r = runStatus({code: 1, signal: null, out: ["a", "b", "c", "d", "e", "FAILED (2)", "Severity: high — x", "Reason: BAD on 1"].join("\n"), summaryLines: true});
   assert.equal(noteOf(r), "Reason: BAD on 1 | b | c | d | e");
 });
 
 test("the retry wait sees a 429 on any failing corridor of a Reason run, not only the ones the note has room for", () => {
   const bad = (i, why) => `BAD quote   Corridor ${i} ${"x".repeat(60)} zeroex: ${why}`;
   const lines = [bad(1, "no route [no_route]"), bad(2, "no route [no_route]"), bad(3, "no route [no_route]"), bad(4, "no route [no_route]"), bad(5, "rate limited (HTTP 429) [upstream_unavailable]"), "FAILED (5)", "Reason: BAD quote on 8453"];
-  const r = runStatus({code: 1, signal: null, out: lines.join("\n")});
+  const r = runStatus({code: 1, signal: null, out: lines.join("\n"), summaryLines: true});
   assert.doesNotMatch(noteOf(r), /429/, "the fifth corridor is past the note's room");
   assert.match(retryTextOf(r), /HTTP 429/);
   assert.equal(retryWaitMs(retryTextOf(r)), RATE_LIMIT_WAIT_MS);
@@ -82,7 +82,7 @@ test("the retry wait sees a 429 on any failing corridor of a Reason run, not onl
 test("a note is at most NOTE_MAX long without a Reason part and at most REASON_MAX with one", () => {
   const long = (n) => `Reason: NEW on ${Array.from({length: n}, (_, i) => i + 1).join(", ")}`;
   for (const n of [1, 5, 40, 60, 80, 120, 400]) {
-    const note = noteOf({status: "fail", lines: [`BAD chain ${"y".repeat(400)}`, "TypeError: z", long(n)], soft: []});
+    const note = noteOf({status: "fail", lines: [`BAD chain ${"y".repeat(400)}`, "TypeError: z", long(n)], soft: [], summaryLines: true});
     assert.ok(note.length <= Math.max(NOTE_MAX, REASON_MAX), `${n}: ${note.length}`);
     if (long(n).length + 3 < NOTE_MAX) assert.equal(note.length, Math.min(NOTE_MAX, long(n).length + 3 + "TypeError: z".length), String(n));
   }
@@ -91,11 +91,11 @@ test("a note is at most NOTE_MAX long without a Reason part and at most REASON_M
 
 test("the Reason part leads; cause lines fill what room is left; a long Reason is capped, not dropped", () => {
   const lines = ["TypeError: fetch failed", "BAD quote Base USDC → ETH (Permit2) boom", "FAILED (2)", "Reason: unreachable on 143; BAD quote on 8453"];
-  const note = noteOf({status: "fail", lines, soft: []});
+  const note = noteOf({status: "fail", lines, soft: [], summaryLines: true});
   assert.equal(note, "Reason: unreachable on 143; BAD quote on 8453 | TypeError: fetch failed");
-  assert.equal(shortNote(note, 30), "Reason: unreachable on 143; BAD quote on 8453 | …");
+  assert.equal(shortNote(note, 30, true), "Reason: unreachable on 143; BAD quote on 8453 | …");
   const long = `Reason: NEW on ${Array.from({length: 400}, (_, i) => i + 1).join(", ")}`;
-  const capped = noteOf({status: "fail", lines: [long], soft: []});
+  const capped = noteOf({status: "fail", lines: [long], soft: [], summaryLines: true});
   assert.equal(capped.length, 600);
   assert.ok(capped.startsWith("Reason: NEW on 1, 2, 3") && capped.endsWith("…"));
 });
@@ -154,7 +154,11 @@ const word = (hex) => "0x" + hex.replace(/^0x/, "").toLowerCase().padStart(64, "
  * pointing each chain at its own stub URL (`urls[id]` instead, when given). The stub's host says how the endpoint
  * behaves: rpc.test answers; down.test is unreachable; wrong.test answers for chain 1; rl.test answers ownerOf(2)
  * with a JSON-RPC rate-limit error (-32005, as rpc.monad.xyz does), every time; flaky.test does that on the first
- * ownerOf(2) only; paused.test reverts ownerOf(2) (a paused registry).
+ * ownerOf(2) only; paused.test reverts ownerOf(2) (a paused registry). Review 2026-11-26 round 2 (F1, F4): unsynced.test
+ * answers the right chain id and nothing else (no code, empty calls: an RPC with no state); gateway.test answers
+ * ownerOf(2) with a gateway error that contains the word "reverted"; keyecho.test answers every eth_call with a rate
+ * limit that echoes a key; notjson.test answers HTTP 429 with a text body that echoes a key; badid.test answers
+ * eth_chainId with text that is not a chain id; flakyrevert.test reverts the first ownerOf(2) only.
  */
 async function verifyLive(world, urls = {}) {
   const m = await import(pathToFileURL(resolve(pkg, "dist/index.js")).href);
@@ -174,6 +178,13 @@ async function verifyLive(world, urls = {}) {
     const {method, params} = JSON.parse(init.body);
     const ok = (result) => new Response(JSON.stringify({jsonrpc: "2.0", id: 1, result}), {headers: {"content-type": "application/json"}});
     const fail = (code, message) => new Response(JSON.stringify({jsonrpc: "2.0", id: 1, error: {code, message}}), {headers: {"content-type": "application/json"}});
+    const isOwnerOf = method === "eth_call" && params[0].data.startsWith("0x6352211e");
+    if (host === "notjson.test") return new Response("rate limit for key SECRETKEYBBBB5678", {status: 429});
+    if (host === "badid.test" && method === "eth_chainId") return ok("0xZZ SECRETKEYCCCC9012");
+    if (host === "unsynced.test" && method !== "eth_chainId") return ok(method === "eth_getStorageAt" ? word("0") : "0x");
+    if (host === "gateway.test" && isOwnerOf) return fail(-32000, "header not found; request reverted by gateway");
+    if (host === "keyecho.test" && method === "eth_call") return fail(-32005, "rate limit exceeded for key SECRETKEYAAAA1234");
+    if (host === "flakyrevert.test" && isOwnerOf && (globalThis.flakyRevert = (globalThis.flakyRevert ?? 0) + 1) === 1) { process.stderr.write("stub: ownerOf(2) reverted once\\n"); return fail(3, "execution reverted"); }
     if (method === "eth_chainId") return ok("0x" + Number(host === "wrong.test" ? 1 : id).toString(16));
     if (method === "eth_call" && params[0].data.startsWith("0x6352211e")) {
       if (host === "rl.test") return fail(-32005, "request rate exceeded");
@@ -196,7 +207,7 @@ async function verifyLive(world, urls = {}) {
   for (const id of Object.keys(chains)) env[`RPC_${id}`] = urls[id] ?? `http://rpc.test/${id}`;
   const r = spawnSync(process.execPath, ["--import", `data:text/javascript,${encodeURIComponent(stub)}`, "scripts/verify-live.mjs", "--no-quotes"], {cwd: pkg, env, encoding: "utf8", timeout: 60_000});
   const out = `${r.stdout}${r.stderr}`;
-  return {code: r.status, out, lines: out.trim().split("\n"), canary: runStatus({code: r.status, signal: r.signal, out})};
+  return {code: r.status, out, lines: out.trim().split("\n"), canary: runStatus({code: r.status, signal: r.signal, out, summaryLines: true})};
 }
 
 test("verify:live: every chain of the table, Monad included, ok on its pins — exit 0, no Reason, no Severity", {skip: !built && "build protocol-swap2-0x first"}, async () => {
@@ -222,7 +233,7 @@ test("verify:live: a new deployment on two pinned chains and Monad unreachable �
   assert.doesNotMatch(r.out, /rpc\.test/, "no RPC URL is printed");
   assert.deepEqual(r.lines.slice(-3), [
     "FAILED (3)",
-    "Severity: high — sales through the Settler in force are refused today: native-coin sales on 1, 8453 (a new deployment): check it, then update the pins in src/chains.ts",
+    "Severity: high — sales through the Settler in force are refused today: native-coin sales on 1, 8453 (a new deployment; 0x may keep quoting the previous Settler for a while, which still passes): check it, then update the pins in src/chains.ts",
     "Reason: NEW on 1, 8453; unreachable on 143",
   ]);
   assert.equal(r.canary.status, "fail");
@@ -263,7 +274,7 @@ test("verify:live: Monad's ownerOf(2) answered with a JSON-RPC rate limit on bot
   assert.equal(r.code, 1, r.out);
   assert.doesNotMatch(r.out, /^BAD chain/m);
   assert.doesNotMatch(r.out, /^Severity:/m);
-  assert.match(r.out, /^\?\?\? chain {3}143 {4}Monad {12}no RPC answered \(2 tries, RPC_143; last: eth_call: RPC error -32005 request rate exceeded\) — the chain is unchecked, which fails this run$/m);
+  assert.match(r.out, /^\?\?\? chain {3}143 {4}Monad {12}no RPC answered \(2 tries, RPC_143; last: eth_call: RPC error -32005 \(rate limited\)\) — the chain is unchecked, which fails this run$/m);
   assert.deepEqual(r.lines.slice(-2), ["FAILED (1)", "Reason: unreachable on 143"]);
   assert.equal(r.canary.severity, null);
   assert.doesNotMatch(r.out, /rl\.test/, "no RPC URL is printed");
@@ -322,7 +333,7 @@ test("the canary's zeroex job gets RPC_<chainId> for every RPC variable set; its
     writeFileSync(new URL("./seen.json", import.meta.url), JSON.stringify(seen));
     console.log("${NEW_LINE(143, "Monad").replace(/"/g, '\\"')}");
     console.log("FAILED (1)");
-    console.log("Severity: high — sales through the Settler in force are refused today: native-coin sales on 143 (a new deployment): check it, then update the pins in src/chains.ts");
+    console.log("Severity: high — sales through the Settler in force are refused today: native-coin sales on 143 (a new deployment; 0x may keep quoting the previous Settler for a while, which still passes): check it, then update the pins in src/chains.ts");
     console.log("Reason: NEW on 143");
     process.exit(1);`);
   const srv = createServer((req, res) => { req.resume(); req.on("end", () => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({jsonrpc: "2.0", id: 1, result: "0x10"})); }); });
@@ -350,5 +361,130 @@ test("the canary's zeroex job gets RPC_<chainId> for every RPC variable set; its
     const day = JSON.parse(readFileSync(join(root, "watch/canary", `${new Date().toISOString().slice(0, 10)}.json`), "utf8"));
     assert.deepEqual(day.failing, [{id: "zeroex", status: "fail", note, severity: "high"}]);
     assert.deepEqual(day.transitions, [{id: "zeroex", module: "zeroex", from: "new", to: "fail", note, severity: "high"}]);
+  } finally { srv.close(); }
+});
+
+// ── review 2026-11-26 round 2: an RPC with no state, a gateway's "reverted", an RPC's own words ─────────────────
+
+test("verify:live: an RPC with no state (right chain id, no code, empty calls) is no answer — the fallback is read; alone, unreachable with no Severity (F1)", {skip: !built && "build protocol-swap2-0x first"}, async () => {
+  let r = await verifyLive({}, {143: "http://unsynced.test/143,http://rpc.test/143"});
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /^ok {2}chain {3}143 {4}Monad /m);
+  assert.doesNotMatch(r.out, /^(BAD|Reason|Severity)/m);
+  // it was `BAD chain 143 Monad failing: registryIsProxy, owner, settler, previous, permit2, wrappedNative, pins` and
+  // `Severity: high — … every sale on 143`, the public URL never tried
+  r = await verifyLive({}, {143: "http://unsynced.test/143"});
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /^\?\?\? chain {3}143 {4}Monad {12}no RPC answered \(2 tries, RPC_143; last: eth_getCode: the pinned registry has no code here \(an RPC with no state\?\)\) — the chain is unchecked, which fails this run$/m);
+  assert.doesNotMatch(r.out, /^(BAD|Severity)/m);
+  assert.deepEqual(r.lines.slice(-2), ["FAILED (1)", "Reason: unreachable on 143"]);
+  assert.equal(r.canary.severity, null);
+});
+
+test("verify:live: a gateway error that only mentions \"reverted\" is no revert — the fallback is read; alone, unreachable with no Severity (F1)", {skip: !built && "build protocol-swap2-0x first"}, async () => {
+  let r = await verifyLive({}, {143: "http://gateway.test/143,http://rpc.test/143"});
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /^ok {2}chain {3}143 {4}Monad /m);
+  r = await verifyLive({}, {143: "http://gateway.test/143"});
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /^\?\?\? chain {3}143 .*last: eth_call: RPC error -32000 \(not a revert\)\) — /m);
+  assert.doesNotMatch(r.out, /^(BAD|Severity)/m);
+  assert.doesNotMatch(r.out, /gateway|header not found/, "the RPC's own words are not printed");
+});
+
+test("verify:live: a registry that names no Settler is read a second time before it is reported — a revert on the first ownerOf(2) only is ok (F1)", {skip: !built && "build protocol-swap2-0x first"}, async () => {
+  const r = await verifyLive({}, {143: "http://flakyrevert.test/143"});
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.lines.filter((l) => l === "stub: ownerOf(2) reverted once").length, 1, "the first read reverted");
+  assert.match(r.out, /^ok {2}chain {3}143 /m);
+  assert.doesNotMatch(r.out, /^(BAD|Severity)/m);
+});
+
+test("verify:live: a failed read prints the JSON-RPC code and a fixed class, never the RPC's own message (F4)", {skip: !built && "build protocol-swap2-0x first"}, async () => {
+  const cases = [
+    ["http://keyecho.test/143", "eth_call: RPC error -32005 (rate limited)"],
+    ["http://notjson.test/143", "eth_chainId: rate limited (HTTP 429)"],
+    ["http://badid.test/143", "eth_chainId: not a chain id"],
+  ];
+  for (const [url, last] of cases) {
+    const r = await verifyLive({}, {143: url});
+    assert.equal(r.code, 1, r.out);
+    assert.ok(r.lines.includes(`??? chain   143    Monad            no RPC answered (2 tries, RPC_143; last: ${last}) — the chain is unchecked, which fails this run`), `${url}: ${r.out}`);
+    assert.doesNotMatch(r.out, /SECRETKEY|rate limit exceeded for key|for key/, url);
+    assert.equal(r.canary.severity, null, url);
+    assert.doesNotMatch(noteOf(r.canary), /SECRETKEY/, url);
+  }
+});
+
+// ── review 2026-11-26 round 2 (F3): only the 0x job's Reason / Severity lines are its own ────────────────────────
+
+// The note rule before 2026-11-26 (canary.mjs inline): a job that is not declared `summaryLines` keeps it exactly.
+const legacyNote = ({status, lines, soft}) => {
+  const cause = [...new Set(lines.map((l) => l.trim()).filter((l) => /^(\w*Error: |(Details|Status|Reason|function): )/.test(l)))].slice(0, 4);
+  return (status === "fail" ? (cause.length ? cause : lines.slice(-4)).join(" | ") : soft.slice(0, 3).join(" | ")).replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/g, " ").slice(0, 300);
+};
+
+test("a job without summaryLines: an upstream `Reason:` is one more cause line and a `Severity:` line is ignored", () => {
+  const injected = "Reason: " + "upstream says everything is fine ".repeat(10);
+  const out = ["ContractFunctionExecutionError: boom", "Details: insufficient liquidity at pool 0xabc", injected, "Severity: low"].join("\n");
+  const r = runStatus({code: 1, signal: null, out});
+  assert.equal(r.summaryLines, false);
+  assert.equal(r.severity, null, "a Severity line in another job's output sets nothing");
+  const note = noteOf(r);
+  assert.equal(note, legacyNote(r));
+  assert.ok(note.startsWith("ContractFunctionExecutionError: boom | Details: insufficient liquidity at pool 0xabc | Reason: upstream"), note);
+  assert.ok(note.length <= NOTE_MAX);
+  assert.equal(retryTextOf(r), note);
+  assert.equal(shortNote(note, 160), note.slice(0, 160), "cut like any note: the Reason part is not kept whole");
+  // the same output from the 0x job (declared): its Reason leads, its Severity is kept
+  const zx = runStatus({code: 1, signal: null, out, summaryLines: true});
+  assert.equal(zx.severity, "low");
+  assert.ok(noteOf(zx).startsWith("Reason: upstream"));
+  // any value other than true is not the flag
+  for (const v of [1, "true", {}]) assert.equal(runStatus({code: 1, signal: null, out, summaryLines: v}).severity, null, JSON.stringify(v));
+  // a run of every shape the earlier tests use: without the flag, the note is the rule before 2026-11-26
+  const shapes = [
+    ["NEW chain x", "FAILED (7)", "Severity: high — x", "Reason: NEW on 1, 10"],
+    ["BAD quote y (HTTP 429)", "FAILED (1)", "Reason: BAD quote on 143"],
+    ["TypeError: fetch failed", "Reason: unreachable on 143", `Reason: NEW on ${"1, ".repeat(200)}2`],
+  ];
+  for (const lines of shapes) {
+    const run = runStatus({code: 1, signal: null, out: lines.join("\n")});
+    assert.equal(noteOf(run), legacyNote(run), lines[0]);
+    assert.equal(run.severity, null, lines[0]);
+  }
+});
+
+test("the canary reads Reason / Severity only from the job it declares summaryLines (zeroex), not from another job's output", async () => {
+  const root = mkdtempSync(join(tmpdir(), "canary-1126b-"));
+  mkdirSync(join(root, "scripts/watch"), {recursive: true});
+  for (const f of ["canary.mjs", "canary-status.mjs", "html-text.mjs", "retry-wait.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  mkdirSync(join(root, "watch"), {recursive: true});
+  writeFileSync(join(root, "watch/addresses.json"), JSON.stringify({eip155: "0x0000000000000000000000000000000000000001", solana: "x", ton: "x"}));
+  // a stand-in relay job whose failure prints upstream text shaped like the 0x job's summary lines
+  const job = join(root, "packages/protocol-swap2-relay/scripts");
+  mkdirSync(job, {recursive: true});
+  writeFileSync(join(job, "verify-live.mjs"), `console.log("ContractFunctionExecutionError: boom");
+    console.log("Details: insufficient liquidity at pool 0xabc");
+    console.log("Reason: " + "upstream says everything is fine ".repeat(10));
+    console.log("Severity: low");
+    process.exit(1);`);
+  const srv = createServer((req, res) => { req.resume(); req.on("end", () => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({jsonrpc: "2.0", id: 1, result: "0x10"})); }); });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const local = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const env = {PATH: process.env.PATH, EVM_RPC_URL: local, BASE_RPC_URL: local, ARBITRUM_RPC_URL: local};
+    const child = spawn(process.execPath, [join(root, "scripts/watch/canary.mjs"), "--only", "relay"], {env, stdio: ["ignore", "pipe", "pipe"]});
+    let err = "";
+    child.stderr.on("data", (c) => (err += c));
+    const code = await new Promise((r) => child.on("close", r));
+    assert.equal(code, 1, err);
+    assert.doesNotMatch(err, /\[severity/, err);
+    const state = JSON.parse(readFileSync(join(root, "watch/canary/state.json"), "utf8"));
+    assert.equal("severity" in state.relay, false);
+    assert.ok(state.relay.note.startsWith("ContractFunctionExecutionError: boom | Details: insufficient liquidity at pool 0xabc | Reason: upstream"), state.relay.note);
+    assert.ok(state.relay.note.length <= NOTE_MAX);
+    const day = JSON.parse(readFileSync(join(root, "watch/canary", `${new Date().toISOString().slice(0, 10)}.json`), "utf8"));
+    assert.deepEqual(day.failing, [{id: "relay", status: "fail", note: state.relay.note}]);
   } finally { srv.close(); }
 });

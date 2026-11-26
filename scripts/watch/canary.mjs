@@ -94,7 +94,8 @@ if (existsSync(pkg("protocol-swap2-relay"))) jobs.push({id: "relay", module: "re
 // does not fail the job on its own. It ends a failed run with `Reason:` (every chain that is not ok) and, when a sale
 // through the Settler in force is refused today (what is refused and why, per chain), `Severity: high`. Live quotes
 // (local and through createSwap2Handler) only with ZEROEX_API_KEY; without it the script says so in a neutral line.
-if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], env: rpcOverrides(env, RPC_ENV, PUBLIC_RPC), timeoutS: 300});
+// `summaryLines`: its Reason / Severity lines are its own (canary-status.mjs); no other job's are read as such.
+if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], env: rpcOverrides(env, RPC_ENV, PUBLIC_RPC), timeoutS: 300, summaryLines: true});
 // Across: every pin on chain (SpokePool proxy, chainId, admin = HubPool, wrapped native, buffers, not paused, token
 // decimals, the HubPool's registry) and /suggested-fees on nine corridors on the pinned SpokePools — keyless, always.
 // Live quotes (local and through createSwap2Handler) only with ACROSS_API_KEY; without it a neutral line, exit 0.
@@ -113,13 +114,14 @@ function run(job) {
     const timer = setTimeout(() => child.kill("SIGKILL"), Math.max(TIMEOUT_MS, (job.timeoutS ?? 0) * 1000)); // a job's own timeoutS can only extend --timeout
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      const {status, lines, soft, severity} = runStatus({code, signal, out});
-      // A failure note leads with the job's own `Reason:` line, whole (every chain that is not ok), then names the cause
-      // (viem's Details / Status lines, the error line) rather than the stack tail; URLs are cut (canary-status.mjs).
-      const note = noteOf({status, lines, soft});
+      const st = runStatus({code, signal, out, summaryLines: job.summaryLines === true});
+      // A failure note names the cause (viem's Details / Status lines, the error line) rather than the stack tail; a job
+      // with `summaryLines` leads it with its own `Reason:` line, whole (every chain that is not ok). URLs are cut
+      // (canary-status.mjs).
+      const note = noteOf(st);
       // What the retry wait is chosen from (not stored): the note, plus every failing line of a job that prints Reason.
-      const retryText = retryTextOf({status, lines, soft});
-      done({...job, status, ms: Date.now() - t0, note, retryText, ...(severity ? {severity} : {})});
+      const retryText = retryTextOf(st);
+      done({...job, status: st.status, ms: Date.now() - t0, note, retryText, ...(st.severity ? {severity: st.severity} : {})});
     });
   });
 }
@@ -134,10 +136,10 @@ async function runWithRetry(job) {
   await new Promise((r) => setTimeout(r, retryWaitMs(first.retryText ?? first.note)));
   const second = await run(job);
   if (second.status === "fail" || second.status === "timeout") return second;
-  console.error(`retry   ${job.id} passed on the second try — first: ${shortNote(first.note, 160)}`);
+  console.error(`retry   ${job.id} passed on the second try — first: ${shortNote(first.note, 160, job.summaryLines)}`);
   return second;
 }
-await Promise.all(Array.from({length: 4}, async () => { for (;;) { const j = queue.shift(); if (!j) return; const r = await runWithRetry(j); results.push(r); console.error(`${r.status.padEnd(7)} ${(r.ms / 1000).toFixed(1).padStart(6)}s  ${r.id}${r.severity ? ` [severity ${r.severity}]` : ""}${r.note ? "  — " + shortNote(r.note, 140) : ""}`); } }));
+await Promise.all(Array.from({length: 4}, async () => { for (;;) { const j = queue.shift(); if (!j) return; const r = await runWithRetry(j); results.push(r); console.error(`${r.status.padEnd(7)} ${(r.ms / 1000).toFixed(1).padStart(6)}s  ${r.id}${r.severity ? ` [severity ${r.severity}]` : ""}${r.note ? "  — " + shortNote(r.note, 140, r.summaryLines) : ""}`); } }));
 
 // ── compare with the last run ──────────────────────────────────────────────
 const dir = resolve(ROOT, "watch/canary"); mkdirSync(dir, {recursive: true});
@@ -172,8 +174,9 @@ if (SEND && (transitions.length || failing.length || flag("--quiet-ok"))) {
   else {
     const h = [`${failing.length ? "🔴" : transitions.length ? "🟡" : "🟢"} <b>Canary · ${TODAY}</b> — ${results.length} checks: ${esc(summary)}`];
     const severity = (x) => (x.severity ? ` · <b>severity ${esc(x.severity)}</b>` : "");
-    if (transitions.length) { h.push("", "<i>changed since last run:</i>"); for (const t of transitions.slice(0, 20)) h.push(`• ${ICON[t.from] ?? ""}→${ICON[t.to]} <b>${esc(t.id)}</b>${severity(t)}${t.note ? `: ${esc(shortNote(t.note, 160))}` : ""}`); if (transitions.length > 20) h.push(`• …and ${transitions.length - 20} more`); }
-    if (failing.length) { h.push("", "<i>still failing:</i>"); for (const f of failing.slice(0, 12)) h.push(`• ${esc(f.id)}${severity(f)}: ${esc(shortNote(f.note || f.status, 160))}`); }
+    const summaryJob = new Set(results.filter((r) => r.summaryLines === true).map((r) => r.id));
+    if (transitions.length) { h.push("", "<i>changed since last run:</i>"); for (const t of transitions.slice(0, 20)) h.push(`• ${ICON[t.from] ?? ""}→${ICON[t.to]} <b>${esc(t.id)}</b>${severity(t)}${t.note ? `: ${esc(shortNote(t.note, 160, summaryJob.has(t.id)))}` : ""}`); if (transitions.length > 20) h.push(`• …and ${transitions.length - 20} more`); }
+    if (failing.length) { h.push("", "<i>still failing:</i>"); for (const f of failing.slice(0, 12)) h.push(`• ${esc(f.id)}${severity(f)}: ${esc(shortNote(f.note || f.status, 160, f.summaryLines))}`); }
     const body = {chat_id: chat, text: fitLines(h), parse_mode: "HTML", disable_web_page_preview: true};
     if (env.TELEGRAM_WATCH_TOPIC) body.message_thread_id = Number(env.TELEGRAM_WATCH_TOPIC);
     const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000)});

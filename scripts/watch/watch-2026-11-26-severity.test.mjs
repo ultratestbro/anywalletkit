@@ -5,12 +5,13 @@
 // the header. A value outside the three is a manifest error. Same sandbox as watch-2026-11-05-evm-call.test.mjs.
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync} from "node:fs";
+import {copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync} from "node:fs";
 import {createServer} from "node:http";
 import {tmpdir} from "node:os";
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {spawn} from "node:child_process";
+import {SEVERITIES, severityError} from "./manifest.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TODAY = () => new Date().toISOString().slice(0, 10);
@@ -19,7 +20,7 @@ const word = (hex) => hex.replace(/^0x/, "").toLowerCase().padStart(64, "0");
 function sandbox(manifests) {
   const root = mkdtempSync(join(tmpdir(), "watch-1126-"));
   mkdirSync(join(root, "scripts/watch"), {recursive: true});
-  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
+  for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs", "manifest.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
   for (const [dir, m] of Object.entries(manifests)) { mkdirSync(join(root, "packages", dir), {recursive: true}); writeFileSync(join(root, "packages", dir, "watch.json"), JSON.stringify(m)); }
   return root;
 }
@@ -98,4 +99,29 @@ test("a severity outside high / medium / low is a manifest error, not a silent d
     assert.notEqual(r.code, 0, JSON.stringify(bad));
     assert.match(r.err, /source "a" has severity .* \(one of high, medium, low, or none\)/, JSON.stringify(bad));
   }
+});
+
+// Review 2026-11-26 round 2 (R2-1): a bad value in any real manifest stops the whole 06:15 watch in loadManifests, so
+// every module goes unwatched that day. The same rule watch.mjs applies (manifest.mjs) is held here over every real
+// manifest, at PR time.
+test("every real manifest's severities are ones the watch accepts (packages/*/watch.json, watch/pending)", () => {
+  const ROOT = join(here, "../..");
+  const files = readdirSync(join(ROOT, "packages")).map((d) => join(ROOT, "packages", d, "watch.json")).filter(existsSync);
+  const pending = join(ROOT, "watch/pending");
+  if (existsSync(pending)) for (const f of readdirSync(pending)) if (f.endsWith(".watch.json")) files.push(join(pending, f));
+  assert.ok(files.length > 20, `${files.length} manifests`);
+  let withSeverity = 0;
+  for (const f of files) {
+    for (const s of JSON.parse(readFileSync(f, "utf8")).sources ?? []) {
+      assert.equal(severityError(f, s), null);
+      if (s.severity !== undefined) withSeverity++;
+    }
+  }
+  assert.ok(withSeverity >= 8, "the 0x Settler in force is severity high on every chain of its table");
+});
+
+test("the manifest rule: none or one of high / medium / low; the rest are named in the error", () => {
+  assert.deepEqual([...SEVERITIES], ["high", "medium", "low"]);
+  for (const ok of [undefined, "high", "medium", "low"]) assert.equal(severityError("m.json", {id: "a", ...(ok ? {severity: ok} : {})}), null);
+  for (const bad of ["High", "critical", 3, "", null, ["high"]]) assert.match(severityError("m.json", {id: "a", severity: bad}), /^m\.json: source "a" has severity .* \(one of high, medium, low, or none\)$/, JSON.stringify(bad));
 });

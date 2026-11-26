@@ -397,8 +397,10 @@ export interface ZeroExTransaction {
 }
 
 /**
- * The most gas a 0x swap may be given. Unused gas is refunded, but a reverting route burns up to the limit, so a
- * quote that asks for a block's worth is refused. Real Settler swaps sit well under 2 million.
+ * The most gas a 0x swap may be given (the padded limit: 0x's gas × 1.2 + 20,000). Unused gas is refunded, but a
+ * reverting route burns up to the limit, so a quote that asks for a block's worth is refused. Settler swaps on the
+ * first seven chains sit well under 2 million; on Monad the same swap takes 7–10 times as much, and on 2026-11-26 0x
+ * sales of MON from about $10,000 asked for more than this allows (one cap for every chain; see the README).
  */
 export const ZEROEX_MAX_GAS_LIMIT = 6_000_000n;
 

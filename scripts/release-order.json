@@ -1,0 +1,11 @@
+{
+  "about": "Versions publish.mjs holds back until another version of the same package is on npm (scripts/release-order.mjs). Drop a rule once both versions are out.",
+  "rules": [
+    {
+      "package": "@anywalletkit/protocol-swap2-0x",
+      "from": "0.2.0",
+      "needs": "0.1.6",
+      "why": "0.1.6 raises the Settler pins to 0x's 2026-11-24 deployments for apps on ^0.1.5; version and publish it alone, before the minor that adds Monad"
+    }
+  ]
+}

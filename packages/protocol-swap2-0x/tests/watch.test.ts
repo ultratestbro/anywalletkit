@@ -96,10 +96,10 @@ describe("verify:live's run summary", () => {
   it("names what is refused and why, every sale first", () => {
     const {reason, severity} = runSummary({chains: [verdict(1, 23, 22), verdict(10, 25, 24), verdict(56, 20, 19), verdict(137, null), verdict(8453, 23, 22), verdict(42161, 22, 20), verdict(43114, 22, 21)]});
     expect(reason).toBe("Reason: PIN on 10; NEW on 1, 8453; OLD on 56; PREV on 42161; BAD on 137");
-    expect(severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 10 (a new deployment past the margin); every sale on 56 (a rollback below the pinned previous); every sale on 137 (the registry names no Settler this module can tell); native-coin sales on 1, 8453 (a new deployment): check it, then update the pins in src/chains.ts");
+    expect(severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 10 (a new deployment past the margin); every sale on 56 (a rollback below the pinned previous); every sale on 137 (the registry names no Settler this module can tell); native-coin sales on 1, 8453 (a new deployment; 0x may keep quoting the previous Settler for a while, which still passes): check it, then update the pins in src/chains.ts");
   });
   it("one kind alone: a new deployment is native-coin sales; a registry that names no Settler asks for no pin raise", () => {
-    expect(runSummary({chains: [verdict(143, 23, 22)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: native-coin sales on 143 (a new deployment): check it, then update the pins in src/chains.ts");
+    expect(runSummary({chains: [verdict(143, 23, 22)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: native-coin sales on 143 (a new deployment; 0x may keep quoting the previous Settler for a while, which still passes): check it, then update the pins in src/chains.ts");
     expect(runSummary({chains: [verdict(143, 25, 24)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 143 (a new deployment past the margin): check it, then update the pins in src/chains.ts");
     expect(runSummary({chains: [verdict(143, 20, 19)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 143 (a rollback below the pinned previous): check it, then update the pins in src/chains.ts");
     expect(runSummary({chains: [verdict(143, null)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 143 (the registry names no Settler this module can tell): check the registry and the Settler it names (no pin raise fixes it)");
@@ -111,7 +111,7 @@ describe("verify:live's run summary", () => {
   });
   it("a BAD chain whose reading is a new deployment says so; a BAD chain with the pins in step, PREV, unreachable and quotes carry no severity", () => {
     // another check failed (BAD), the reading itself is NEW: why comes from the reading
-    expect(runSummary({chains: [{id: 8453, tag: "BAD", pin: "NEW", native: false, token: true}]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: native-coin sales on 8453 (a new deployment): check it, then update the pins in src/chains.ts");
+    expect(runSummary({chains: [{id: 8453, tag: "BAD", pin: "NEW", native: false, token: true}]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: native-coin sales on 8453 (a new deployment; 0x may keep quoting the previous Settler for a while, which still passes): check it, then update the pins in src/chains.ts");
     const quiet = runSummary({chains: [{id: 1, tag: "BAD", pin: "ok", native: true, token: true}, verdict(10, 22, 20), {id: 143, tag: "unreachable"}], quotes: [{id: 8453, kind: "quote"}, {id: 8453, kind: "remote"}]});
     expect(quiet).toEqual({reason: "Reason: PREV on 10; BAD on 1; unreachable on 143; BAD quote on 8453; BAD remote on 8453", severity: null});
     expect(runSummary({chains: [verdict(1, 22, 21)]})).toEqual({reason: null, severity: null});
