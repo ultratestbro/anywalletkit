@@ -2,11 +2,11 @@
 //   node --test scripts/build-v4-pools.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { encodeAbiParameters, encodeFunctionResult, decodeFunctionData } from 'viem'
 import {
   CHAINS, FEE_CAP, INITIALIZE_TOPIC, MC3_ABI, Rpc, ZERO, atBound, classifyRpcError, decodeAggregate, decodeInitializeLog, gate, gateVerdict,
-  pairFilterSet, poolIdOf, renderChainFile, renderIndex, scanInitialize, sortPools, staticRules, toEntry, topicOf,
+  mergeEntries, pairFilterSet, parseChainFile, poolIdOf, renderChainFile, renderIndex, scanInitialize, sortPools, staticRules, toEntry, topicOf,
 } from './build-v4-pools.mjs'
 
 const PM = '0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e' // Monad PoolManager
@@ -192,4 +192,48 @@ test('output: deterministic order, checksummed keys, lower-case ids, a header th
   assert.match(text, /Floor: live/)
   assert.match(text, new RegExp(`id: "${poolIdOf(c)}"`))
   assert.match(renderIndex([8453, 143]), /import \{V4_POOLS_143\} from "\.\/143\.js";\nimport \{V4_POOLS_8453\}/)
+})
+
+test('R2-1: every shipped list reads back (parseChainFile), and render → parse is the identity, since included', () => {
+  const dir = new URL('../src/v4pools/', import.meta.url)
+  const files = readdirSync(dir).filter((f) => /^\d+\.ts$/.test(f))
+  assert.ok(files.length >= 18)
+  for (const f of files) {
+    const text = readFileSync(new URL(f, dir), 'utf8')
+    const entries = parseChainFile(text)
+    const lines = text.split('\n').filter((l) => /^\s*\{currency0: /.test(l))
+    assert.equal(entries.length, lines.length, f)
+    assert.ok(entries.every((e) => e.since === undefined), `${f}: the 0.5.0 lists are the baseline (no since)`)
+  }
+  const cfg = CHAINS.find((c) => c.chainId === 143)
+  const a = toEntry({ currency0: ZERO, currency1: AUSD, fee: 500, tickSpacing: 1, id: poolIdOf({ currency0: ZERO, currency1: AUSD, fee: 500, tickSpacing: 1 }) })
+  const b = { ...toEntry({ currency0: ZERO, currency1: USDC, fee: 500, tickSpacing: 10, id: poolIdOf({ currency0: ZERO, currency1: USDC, fee: 500, tickSpacing: 10 }) }), since: 130_000_000 }
+  const text = renderChainFile(cfg, { builtAt: '2026-12-01', block: 130_000_000, fromBlock: cfg.deployBlock, tokens: [ZERO, AUSD, USDC], feeCap: FEE_CAP, initialized: 2, kept: 1 }, sortPools([a, b]))
+  assert.match(text, /since: 130000000\}/)
+  assert.match(text, /Lists only grow: 1 pool\(s\) of earlier builds kept/)
+  assert.deepEqual(parseChainFile(text), sortPools([a, b]))
+  // A line it cannot read, or an entry whose id is not its key's, fails (a list is never shrunk by a parse error).
+  assert.throws(() => parseChainFile(text.replace('fee: 500, tickSpacing: 1,', 'fee: 500, tickSpacing: 1, hooks: "0x01",')), /cannot read/)
+  assert.throws(() => parseChainFile(text.replace(a.id, '0x' + '11'.repeat(32))), /does not match its key/)
+  assert.throws(() => parseChainFile('export const X = {}'), /does not parse/)
+})
+
+test('R2-1: lists only grow — earlier pools kept with their since, new pools marked with the build block', () => {
+  const key = (currency1, fee, tickSpacing) => ({ currency0: ZERO, currency1, fee, tickSpacing, id: poolIdOf({ currency0: ZERO, currency1, fee, tickSpacing }) })
+  const A = key(AUSD, 500, 1), B = key(USDC, 500, 10), C = key(USDC, 3000, 60)
+  const prev = [toEntry(A), { ...toEntry(B), since: 150 }]
+  // A rebuild at block 200: A no longer passes the gate (kept, still no since), B kept with its since, C new (since 200).
+  const r = mergeEntries(prev, [B, C].map(toEntry), { block: 200 })
+  assert.equal(r.added, 1)
+  assert.equal(r.kept, 1)
+  const by = new Map(r.entries.map((e) => [e.id, e]))
+  assert.equal(by.get(A.id).since, undefined)
+  assert.equal(by.get(B.id).since, 150)
+  assert.equal(by.get(C.id).since, 200)
+  assert.deepEqual(r.entries, sortPools(r.entries))
+  // A chain's first file: every pool carries the build block (apps on earlier releases have no list for the chain) …
+  assert.ok(mergeEntries(null, [A, B].map(toEntry), { block: 300 }).entries.every((e) => e.since === 300))
+  // … unless --baseline (a list in the first release that ships v4 pins, before it is released).
+  assert.ok(mergeEntries(null, [A, B].map(toEntry), { block: 300, baseline: true }).entries.every((e) => e.since === undefined))
+  assert.ok(mergeEntries(prev, [C].map(toEntry), { block: 300, baseline: true }).entries.find((e) => e.id === C.id).since === undefined)
 })

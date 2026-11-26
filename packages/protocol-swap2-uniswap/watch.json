@@ -1520,6 +1520,7 @@
         "export": "UNISWAP_V4_POOLS"
       },
       "window": 10000,
+      "maxCalls": 1000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · X Layer"
     },
     {
@@ -1533,6 +1534,7 @@
         "export": "UNISWAP_V4_POOLS"
       },
       "window": 10000,
+      "maxCalls": 600,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · World Chain"
     },
     {
@@ -1639,6 +1641,7 @@
         "export": "UNISWAP_V4_POOLS"
       },
       "window": 10000,
+      "maxCalls": 200,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Ink"
     },
     {

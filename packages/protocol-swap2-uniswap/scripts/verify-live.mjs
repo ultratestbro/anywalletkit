@@ -14,8 +14,10 @@
 //   pin is compared so drift is reported); the shipped pool list (if any) names the pinned PoolManager and
 //   StateView. Then the build probe: a native single-pool swap encoded in the UR 2.1.x layout with an unreachable
 //   `minHopPriceX36`, `eth_call`ed with a balance override, must revert `V4TooLittleReceivedPerHopSingle` — the router
-//   reads the layout this module writes (a 2.0 router would read other words). And one V4Quoter canary on a known pool,
-//   gas ≠ 0. A chain pinned `quotable: false` (HyperEVM) has neither: it is reported, never enabled.
+//   reads the layout this module writes (a 2.0 router would read other words); each URL is tried until one returns
+//   revert data, and when none does the probe did not run — a FAIL. And one V4Quoter canary on a known pool, gas ≠ 0.
+//   A chain pinned `quotable: false` (HyperEVM) has neither: it is reported, never enabled; a quotable chain without a
+//   CANARY entry is a FAIL.
 // - the gas bounds the provider holds every chain to: the per-transaction cap (`eth_estimateGas` of an endless loop, a
 //   code override, names the highest gasLimit the node lets a transaction have — "gas required exceeds allowance
 //   (16777216)"; where KNOWN_TX_GAS_CAP lists the chain the two must agree; where it does not, a 2^24 or 2^25 allowance
@@ -186,8 +188,13 @@ async function v4Facts(id, urls, problems, notes) {
   if (list && (getAddress(list.poolManager) !== getAddress(d4.poolManager) || getAddress(list.stateView) !== getAddress(d4.stateView))) problems.push('v4: the shipped pool list was built from another PoolManager / StateView than the pins')
   notes.push(`v4 linkage + codehashes ok${list ? `, ${list.pools.length} listed pools (block ${list.block})` : ', no shipped pool list (not quoted)'}`)
 
-  if (d4.quotable === false || !CANARY[id]) {
+  if (d4.quotable === false) {
     notes.push('quotable: false — no canary, not enabled')
+    return
+  }
+  // A quotable chain must have its canary (and with it the build probe): a missing one is a problem, never a pass.
+  if (!CANARY[id]) {
+    problems.push('no V4Quoter canary pinned for a quotable chain (add it to CANARY): neither the canary nor the build probe ran')
     return
   }
   const [other, fee, tickSpacing, amountIn, nativeAs] = CANARY[id]
@@ -211,12 +218,25 @@ async function v4Facts(id, urls, problems, notes) {
   }
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 600)
   const data = v4Swap(key, zeroForOne, amountIn, 1n, 1n << 200n, deadline)
-  const r = await rpc(urls, 'eth_call', [{ from: ACTOR, to: d4.universalRouter, data, value: toHex(amountIn) }, 'latest', { [ACTOR]: { balance: toHex(10n ** 24n) } }])
-  const chain = r.error !== undefined ? v4RevertChain(decodeV4Revert(r.error?.data)).map((x) => x.name) : []
-  if (chain.includes('V4TooLittleReceivedPerHopSingle')) notes.push('build probe: the router reads the 2.1.x layout (V4TooLittleReceivedPerHopSingle)')
-  else if (r.error === undefined) problems.push('build probe: an unreachable minHopPriceX36 did not revert — the router does not read the 2.1.x layout')
-  else if (chain.length === 0 || chain.every((n) => n === 'unknown' || n === 'empty')) notes.push(`build probe skipped (the node returned no revert data: ${redact(r.error?.message ?? '')})`)
-  else problems.push(`build probe: reverted ${chain.join(' > ')}, not V4TooLittleReceivedPerHopSingle`)
+  // Each URL in turn until one answers with revert data: a node that reverts without data says nothing about the layout,
+  // and when none gives data the probe did not run — a problem, never a pass (SEC-U4-R2-3).
+  const probe = [{ from: ACTOR, to: d4.universalRouter, data, value: toHex(amountIn) }, 'latest', { [ACTOR]: { balance: toHex(10n ** 24n) } }]
+  const silent = []
+  for (const url of urls) {
+    let r
+    try {
+      r = await rpc([url], 'eth_call', probe)
+    } catch (e) {
+      silent.push(redact(e?.message ?? e))
+      continue
+    }
+    const chain = r.error !== undefined ? v4RevertChain(decodeV4Revert(r.error?.data)).map((x) => x.name) : []
+    if (chain.includes('V4TooLittleReceivedPerHopSingle')) return notes.push('build probe: the router reads the 2.1.x layout (V4TooLittleReceivedPerHopSingle)')
+    if (r.error === undefined) return problems.push('build probe: an unreachable minHopPriceX36 did not revert — the router does not read the 2.1.x layout')
+    if (chain.length && !chain.every((n) => n === 'unknown' || n === 'empty')) return problems.push(`build probe: reverted ${chain.join(' > ')}, not V4TooLittleReceivedPerHopSingle`)
+    silent.push(`no revert data: ${redact(r.error?.message ?? '')}`)
+  }
+  problems.push(`build probe did not run: no node returned revert data (${silent.join('; ').slice(0, 160)}) — set RPC_${id} to a node that does`)
 }
 
 // ── gas bounds (unchanged from 0.4.12) ──────────────────────────────────────────────────────────────────────────────

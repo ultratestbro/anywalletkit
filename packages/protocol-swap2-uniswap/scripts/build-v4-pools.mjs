@@ -9,6 +9,8 @@
 //   node scripts/build-v4-pools.mjs --dry                print the summary, write nothing
 //   node scripts/build-v4-pools.mjs --env FILE           load RPC_<chainId>=url[,url] lines (never printed)
 //   node scripts/build-v4-pools.mjs --cache DIR          keep the Initialize index per chain in DIR and resume from it
+//   node scripts/build-v4-pools.mjs --baseline           write no `since` (only for a list in the first release that
+//                                                        ships v4 pins, 0.5.0, before that release: every app has it)
 //
 // Method (UNISWAP-V4-RESEARCH.md §5.3, decision 5):
 //   1. Index: PoolManager `Initialize` logs over [deployBlock, B], pair-filtered in the RPC
@@ -24,6 +26,11 @@
 //      Any failed read fails the chain; it never drops a pool.
 //   4. Value floor: "live" (step 3). No USD floor and no age rule (research §8.2: GeckoTerminal TVL may only rank, and
 //      a $10k floor drops winning pools; recall is 100% at "live").
+//   5. Lists only grow (review R2-1 / SEC-U4-R2-2): the chain's previous file is read back; a pool it listed stays listed
+//      (with its `since`) even when it no longer passes the gate — a server on that older list may route through it, and
+//      an app on the newer one must still accept it — and a pool this build adds carries `since: B`, the build block. A
+//      chain's first file carries `since` on every pool (apps on earlier releases have no list for it at all), unless
+//      --baseline. A server ranks a pool with `since` against v3 only once its `v4RankedListBlock` reaches that block.
 // RPC: the public endpoints in CHAINS; RPC_<chainId> (or UNISWAP_V4_RPC_<chainId>) adds keyed endpoints, used first
 // for state reads and as a failover (or extra workers) for logs. URLs are never printed or written: labels only.
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync, renameSync } from 'node:fs'
@@ -419,7 +426,52 @@ const q = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 const cs = (a) => (lc(a) === ZERO ? ZERO : getAddress(a))
 
 export function toEntry(p) {
-  return { currency0: cs(p.currency0), currency1: cs(p.currency1), fee: p.fee, tickSpacing: p.tickSpacing, id: lc(p.id) }
+  return { currency0: cs(p.currency0), currency1: cs(p.currency1), fee: p.fee, tickSpacing: p.tickSpacing, id: lc(p.id), ...(p.since !== undefined ? { since: p.since } : {}) }
+}
+
+const ENTRY_LINE = /^\s*\{currency0: "(0x[0-9a-fA-F]{40})", currency1: "(0x[0-9a-fA-F]{40})", fee: (\d+), tickSpacing: (\d+), id: "(0x[0-9a-f]{64})"(?:, since: (\d+))?\},\s*$/
+
+/**
+ * The pools a generated chain file lists (what renderChainFile wrote), each with its `since` when it has one. Every
+ * entry line must parse and recompute to its own PoolId: a file this cannot read back fails the build of the chain (a
+ * list is never shrunk by a parse error).
+ */
+export function parseChainFile(text) {
+  const lines = String(text).split('\n')
+  const at = lines.findIndex((l) => l.trim() === 'pools: [')
+  const end = at < 0 ? -1 : lines.findIndex((l, i) => i > at && l.trim() === '],')
+  if (at < 0 || end < 0) throw new Error('the previous pool list does not parse (no pools: [ … ] block)')
+  const out = []
+  for (const line of lines.slice(at + 1, end)) {
+    const m = ENTRY_LINE.exec(line)
+    if (!m) throw new Error(`the previous pool list has a line it cannot read: ${line.trim().slice(0, 80)}`)
+    const e = { currency0: m[1], currency1: m[2], fee: Number(m[3]), tickSpacing: Number(m[4]), id: m[5], ...(m[6] !== undefined ? { since: Number(m[6]) } : {}) }
+    if (poolIdOf({ ...e, hooks: ZERO }) !== e.id) throw new Error(`the previous pool list entry ${e.id} does not match its key`)
+    out.push(e)
+  }
+  return out
+}
+
+/**
+ * The list a build writes (step 5): every pool of `previous` (null: the chain had no file) kept with its `since`; every
+ * pool of `fresh` not in it added with `since: block` — or with none when `baseline`, or when it was listed before.
+ * Returns {entries (sorted), added, kept} (`kept`: previous pools this build's gate no longer passes).
+ */
+export function mergeEntries(previous, fresh, { block, baseline = false }) {
+  const byId = new Map()
+  for (const p of previous ?? []) byId.set(lc(p.id), toEntry(p))
+  let added = 0
+  const freshIds = new Set()
+  for (const p of fresh) {
+    const id = lc(p.id)
+    freshIds.add(id)
+    if (byId.has(id)) continue
+    const { since: _ignored, ...e } = toEntry(p)
+    byId.set(id, baseline ? e : { ...e, since: block })
+    added++
+  }
+  const kept = [...byId.keys()].filter((id) => !freshIds.has(id)).length
+  return { entries: sortPools([...byId.values()]), added, kept }
 }
 
 export function renderChainFile(cfg, meta, entries) {
@@ -430,6 +482,8 @@ export function renderChainFile(cfg, meta, entries) {
     `// Index: Initialize logs over blocks ${n(meta.fromBlock)}..${n(meta.block)}, pair-filtered on the ${meta.tokens.length} tokens below (${meta.initialized} pools).`,
     `// Rules: hookless; both currencies in the catalog by address; fee <= ${meta.feeCap} pips; PoolId recomputed. Live at block ${n(meta.block)}:`,
     `// sqrtPriceX96 != 0, lpFee = fee, liquidity > 0, tick more than one spacing inside the bounds. Floor: live.`,
+    ...(meta.kept ? [`// Lists only grow: ${meta.kept} pool(s) of earlier builds kept although not live at block ${n(meta.block)}.`] : []),
+    ...(entries.some((e) => e.since !== undefined) ? ['// `since`: the build block of the list that added the pool (a server ranks it against v3 once v4RankedListBlock covers it).'] : []),
     `import type {V4ChainPools} from "./types.js";`,
     '',
     `export const V4_POOLS_${cfg.chainId}: V4ChainPools = {`,
@@ -443,7 +497,7 @@ export function renderChainFile(cfg, meta, entries) {
     ...meta.tokens.map((t) => `    ${q(cs(t))},`),
     '  ],',
     '  pools: [',
-    ...entries.map((e) => `    {currency0: ${q(e.currency0)}, currency1: ${q(e.currency1)}, fee: ${e.fee}, tickSpacing: ${e.tickSpacing}, id: ${q(e.id)}},`),
+    ...entries.map((e) => `    {currency0: ${q(e.currency0)}, currency1: ${q(e.currency1)}, fee: ${e.fee}, tickSpacing: ${e.tickSpacing}, id: ${q(e.id)}${e.since !== undefined ? `, since: ${e.since}` : ''}},`),
     '  ],',
     '} as const;',
     '',
@@ -548,6 +602,7 @@ async function main() {
   const opt = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined }
   const only = opt('--chain') ? new Set(opt('--chain').split(',').map(Number)) : null
   const dry = args.includes('--dry')
+  const baseline = args.includes('--baseline')
   if (opt('--env')) loadEnvFile(opt('--env'))
   const cacheDir = opt('--cache') ?? null
   if (cacheDir) mkdirSync(cacheDir, { recursive: true })
@@ -559,7 +614,6 @@ async function main() {
   const chains = CHAINS.filter((c) => !only || only.has(c.chainId))
   if (only) for (const id of only) if (!CHAINS.some((c) => c.chainId === id)) throw new Error(`chain ${id} is not in CHAINS`)
   const failed = new Set()
-  const written = []
   const rows = []
   // Chains run in parallel: each has its own endpoints.
   await Promise.all(chains.map(async (cfg) => {
@@ -571,13 +625,19 @@ async function main() {
     for (const [, why] of r.dropped) reasons[why] = (reasons[why] ?? 0) + 1
     console.error(`  ${cfg.name}: block ${r.block}; dropped by reason: ${JSON.stringify(reasons)}; live ${r.final.length}`)
     for (const p of r.final) console.error(`    + ${cfg.chainId} ${cs(p.currency0)}/${cs(p.currency1)} ${p.fee}/${p.tickSpacing} L=${p.liquidity} ${p.id.slice(0, 10)}`)
-    if (!r.final.length) { console.error(`  ${cfg.name}: nothing passed, no file`); if (!dry) rmSync(join(OUT_DIR, `${cfg.chainId}.ts`), { force: true }); return }
-    if (!dry) writeFileSync(join(OUT_DIR, `${cfg.chainId}.ts`), renderChainFile(cfg, { builtAt, block: r.block, fromBlock: cfg.deployBlock, tokens: r.tokens, feeCap, initialized: r.summary.initialized }, r.final.map(toEntry)))
-    written.push(cfg.chainId)
+    // Step 5: the previous file, read back; lists only grow.
+    const file = join(OUT_DIR, `${cfg.chainId}.ts`)
+    let previous = null
+    try { previous = existsSync(file) ? parseChainFile(readFileSync(file, 'utf8')) : null } catch (e) { console.error(`  ${cfg.name} FAILED: ${e.message}`); failed.add(cfg.chainId); rows.push({ chain: cfg.name, chainId: cfg.chainId, error: e.message }); return }
+    const merged = mergeEntries(previous, r.final, { block: r.block, baseline })
+    console.error(`  ${cfg.name}: ${merged.added} added${merged.added && !baseline ? ` (since ${r.block})` : ''}, ${merged.kept} kept from earlier builds although not live now`)
+    if (!merged.entries.length) { console.error(`  ${cfg.name}: nothing passed, no file`); return }
+    if (!dry) writeFileSync(file, renderChainFile(cfg, { builtAt, block: r.block, fromBlock: cfg.deployBlock, tokens: r.tokens, feeCap, initialized: r.summary.initialized, kept: merged.kept }, merged.entries))
   }))
   if (!dry) {
-    // A full run drops files of chains that no longer pass; a chain that failed keeps its last file.
-    if (!only) for (const f of readdirSync(OUT_DIR)) { const m = /^(\d+)\.ts$/.exec(f); if (m && !written.includes(Number(m[1])) && !failed.has(Number(m[1]))) rmSync(join(OUT_DIR, f)) }
+    // A full run drops the files of chains no longer in CHAINS (lists only grow: a chain in CHAINS keeps its file); a
+    // chain that failed keeps its last file.
+    if (!only) for (const f of readdirSync(OUT_DIR)) { const m = /^(\d+)\.ts$/.exec(f); if (m && !CHAINS.some((c) => c.chainId === Number(m[1])) && !failed.has(Number(m[1]))) rmSync(join(OUT_DIR, f)) }
     const present = readdirSync(OUT_DIR).map((f) => /^(\d+)\.ts$/.exec(f)?.[1]).filter(Boolean).map(Number)
     writeFileSync(join(OUT_DIR, 'index.ts'), renderIndex(present))
   }

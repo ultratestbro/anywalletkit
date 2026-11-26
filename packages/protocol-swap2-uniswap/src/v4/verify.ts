@@ -55,8 +55,8 @@ export interface UniswapV4VerifyOptions {
   /** Default "all": pins accept both flows a server may build; "native-in" refuses token input; "off" refuses all. */
   v4?: UniswapV4Mode;
   /** The shipped per-chain pool list. A pool must be in it or in `extraPools` (PoolId recomputed): provenance is never
-   *  a server-supplied key alone. A chain with neither list refuses every v4 quote. The lists are read as immutable
-   *  (their PoolIds are cached per array). */
+   *  a server-supplied key alone. A chain with neither list refuses every v4 quote. A frozen list of frozen keys has its
+   *  PoolIds cached; any other list is read anew on every call (a change to it is heard). */
   pools?: Readonly<Record<number, readonly V4PoolKey[]>>;
   /** The integrator's own pools (`v4ExtraPools`): hookless only, PoolId recomputed. */
   extraPools?: Readonly<Record<number, readonly V4PoolKey[]>>;
@@ -71,8 +71,10 @@ export interface UniswapV4VerifyOptions {
   clockSkewSeconds?: number;
   /** Per chain, the currencies a two-hop route may pass through (replaces {@link v4HopTokens}' default set). */
   hopTokens?: Readonly<Record<number, readonly string[]>>;
-  /** Opt-in (§7.2): refuse a quote whose `providerData.priceImpactBps` is at or above this, or missing. Unset: impact is
-   *  information, never a refusal. */
+  /** Opt-in (§7.2): refuse a quote whose impact measure G — the larger of `providerData.priceImpactBps` (the probe, fees
+   *  excluded) and `providerData.valueLossBps` (the spot value loss, fees included), over the ones present — is at or
+   *  above this, or that carries neither (or one that does not read as bps). Unset: impact is information, never a
+   *  refusal. */
   maxPriceImpactBps?: number;
   /** Clock (unix ms), for tests. */
   now?: () => number;
@@ -260,22 +262,27 @@ export function v4HopTokens(chainId: number, d: UniswapV4Deployment, override?: 
   return out;
 }
 
+/**
+ * PoolIds per list, cached only for a list nobody can change afterwards: a frozen array of frozen keys (the shipped
+ * `UNISWAP_V4_POOL_KEYS` lists, the pins' own copies of `v4ExtraPools`). Any other array is read anew on every
+ * call (SEC-U4-R2-1): a cache keyed by a mutable array's identity kept accepting a pool the caller had since removed
+ * from it — provenance failing open.
+ */
 const poolIdCache = new WeakMap<readonly V4PoolKey[], ReadonlySet<string>>();
 function poolIds(list: readonly V4PoolKey[] | undefined): ReadonlySet<string> {
   if (!list) return new Set();
-  let ids = poolIdCache.get(list);
-  if (!ids) {
-    const s = new Set<string>();
-    for (const key of list) {
-      try {
-        if (v4PoolKeyProblem(key, V4_MAX_LP_FEE) === null) s.add(lower(poolIdOf(key)));
-      } catch {
-        /* a malformed listed key is not a pool */
-      }
+  const hit = poolIdCache.get(list);
+  if (hit) return hit;
+  const ids = new Set<string>();
+  for (const key of list) {
+    try {
+      if (v4PoolKeyProblem(key, V4_MAX_LP_FEE) === null) ids.add(lower(poolIdOf(key)));
+    } catch {
+      /* a malformed listed key is not a pool */
     }
-    ids = s;
-    poolIdCache.set(list, ids);
   }
+  // Frozen is for good: a frozen array of frozen keys (whose fields are strings and numbers) reads the same forever.
+  if (Object.isFrozen(list) && list.every((k) => Object.isFrozen(k))) poolIdCache.set(list, ids);
   return ids;
 }
 const own = <T>(rec: Readonly<Record<number, T>> | undefined, id: number): T | undefined =>
@@ -446,9 +453,18 @@ function check(params: QuoteParams, quote: Quote, options: UniswapV4VerifyOption
   if (options.maxPriceImpactBps !== undefined) {
     const limit = options.maxPriceImpactBps;
     if (!Number.isInteger(limit) || limit < 1 || limit > 10_000) return notes.note("maxPriceImpactBps must be an integer in 1..10000", "policy_refused");
-    const raw = quote.providerData?.priceImpactBps;
-    if (raw === undefined || !/^[0-9]{1,5}$/.test(raw)) return notes.note("the quote carries no price-impact measure", "upstream_unavailable");
-    const bps = Number(raw);
+    // G = max(probe, spot) over the measures the quote carries (§7.2), as the provider gates: the probe alone is blind to
+    // a pool parked past an empty range, and a gated quote whose probe could not run carries the spot measure alone.
+    const pd = quote.providerData ?? {};
+    const measured: number[] = [];
+    for (const field of ["priceImpactBps", "valueLossBps"] as const) {
+      const raw: unknown = pd[field];
+      if (raw === undefined) continue;
+      if (typeof raw !== "string" || !/^[0-9]{1,5}$/.test(raw)) return notes.note(`the quote carries no price-impact measure it can read (${field})`, "upstream_unavailable");
+      measured.push(Number(raw));
+    }
+    if (measured.length === 0) return notes.note("the quote carries no price-impact measure", "upstream_unavailable");
+    const bps = Math.max(...measured);
     if (bps >= limit) return notes.note(`loses ${(bps / 100).toFixed(2)}% of the value to price impact (limit ${(limit / 100).toFixed(2)}%)`, "insufficient_liquidity");
   }
   return null;

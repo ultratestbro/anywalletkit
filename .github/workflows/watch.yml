@@ -30,6 +30,21 @@ jobs:
       - run: node scripts/check-node.mjs   # stop here on a Node that misses a security release
       - run: pnpm install --frozen-lockfile
       - run: pnpm build            # the canary runs each package's verify-live against dist/
+      - name: other EVM RPCs from the QuickNode multichain endpoint
+        # Its own step: what a step writes to $GITHUB_ENV reaches only the steps after it, so the watch step below (and
+        # the canaries) see WORLDCHAIN_RPC_URL, XLAYER_RPC_URL, INK_RPC_URL, MONAD_RPC_URL… (LIVE2-1: written in the
+        # watch step itself, the watch ran those chains on capped public RPCs).
+        env:
+          QUICKNODE_MULTICHAIN_BASE: ${{ secrets.QUICKNODE_MULTICHAIN_BASE }}
+        run: |
+          # One QuickNode multichain endpoint serves the other EVM chains: "<name>.%NET%.quiknode.pro/<token>/".
+          [ -z "$QUICKNODE_MULTICHAIN_BASE" ] && exit 0
+          for p in UNICHAIN:unichain-mainnet LINEA:linea-mainnet SONIC:sonic-mainnet ZKSYNC:zksync-mainnet HYPEREVM:hype-mainnet CELO:celo-mainnet GNOSIS:xdai PLASMA:plasma-mainnet MEGAETH:megaeth-mainnet ROBINHOOD:robinhood-mainnet MONAD:monad-mainnet SCROLL:scroll-mainnet BERACHAIN:bera-mainnet WORLDCHAIN:worldchain-mainnet SEI:sei-pacific INK:ink-mainnet XLAYER:xlayer-mainnet KATANA:katana-mainnet MANTLE:mantle-mainnet SONEIUM:soneium-mainnet; do
+            url="${QUICKNODE_MULTICHAIN_BASE/\%NET\%/${p##*:}}"
+            [ "${p%%:*}" = HYPEREVM ] && url="${url%/}/evm"   # QuickNode serves HyperEVM JSON-RPC under /evm
+            echo "::add-mask::$url"   # built from a secret, so Actions does not mask it on its own (the token was in the logs)
+            echo "${p%%:*}_RPC_URL=$url" >> "$GITHUB_ENV"
+          done
       - name: run watch
         id: watch
         env:
@@ -45,19 +60,9 @@ jobs:
           BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
           SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
           TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
-          QUICKNODE_MULTICHAIN_BASE: ${{ secrets.QUICKNODE_MULTICHAIN_BASE }}
           # The dispatch input goes in through env, never into the script text (shell injection).
           ONLY: ${{ inputs.only }}
         run: |
-          # One QuickNode multichain endpoint serves the other EVM chains: "<name>.%NET%.quiknode.pro/<token>/".
-          if [ -n "$QUICKNODE_MULTICHAIN_BASE" ]; then
-            for p in UNICHAIN:unichain-mainnet LINEA:linea-mainnet SONIC:sonic-mainnet ZKSYNC:zksync-mainnet HYPEREVM:hype-mainnet CELO:celo-mainnet GNOSIS:xdai PLASMA:plasma-mainnet MEGAETH:megaeth-mainnet ROBINHOOD:robinhood-mainnet MONAD:monad-mainnet SCROLL:scroll-mainnet BERACHAIN:bera-mainnet WORLDCHAIN:worldchain-mainnet SEI:sei-pacific INK:ink-mainnet XLAYER:xlayer-mainnet KATANA:katana-mainnet MANTLE:mantle-mainnet SONEIUM:soneium-mainnet; do
-              url="${QUICKNODE_MULTICHAIN_BASE/\%NET\%/${p##*:}}"
-              [ "${p%%:*}" = HYPEREVM ] && url="${url%/}/evm"   # QuickNode serves HyperEVM JSON-RPC under /evm
-              echo "::add-mask::$url"   # built from a secret, so Actions does not mask it on its own (the token was in the logs)
-              echo "${p%%:*}_RPC_URL=$url" >> "$GITHUB_ENV"
-            done
-          fi
           set --
           if [ -n "$ONLY" ]; then
             case "$ONLY" in *[!a-z0-9,_-]*) echo "only: lowercase letters, digits, ',', '_' and '-'" >&2; exit 1 ;; esac

@@ -4,7 +4,7 @@ import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-
 import {refusalNotes} from "@anywalletkit/protocol-swap2-core/errors";
 import {UNISWAP_V4, uniswapV4DeploymentOf} from "./v4/addresses.js";
 import {UNISWAP_V4_POOL_KEYS} from "./v4/listed.js";
-import {V4_MAX_FEE_PIPS, checkedHooklessKey, type V4PoolKey} from "./v4/pool.js";
+import {checkedV4ExtraPools, type V4PoolKey} from "./v4/pool.js";
 import {V4_MAX_CLOCK_SKEW_SECONDS, uniswapV4ReasonOf, uniswapV4VerifyQuote} from "./v4/verify.js";
 
 /**
@@ -193,12 +193,7 @@ export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | 
  * every text it returns.
  */
 export function uniswapPinsWith(options: UniswapPinsOptions = {}): RemotePins {
-  const extra: Record<number, readonly V4PoolKey[]> = {};
-  for (const [id, keys] of Object.entries(options.v4ExtraPools ?? {})) {
-    if (!/^[0-9]+$/.test(id) || !Array.isArray(keys)) throw new Error(`uniswap: v4ExtraPools[${id}] is not a list of pool keys`);
-    extra[Number(id)] = Object.freeze(keys.map((k: V4PoolKey) => Object.freeze(checkedHooklessKey(k, V4_MAX_FEE_PIPS))));
-  }
-  Object.freeze(extra);
+  const extra = checkedV4ExtraPools(options.v4ExtraPools);
   const skew = options.clockSkewSeconds;
   if (skew !== undefined && !(Number.isInteger(skew) && skew >= 0 && skew <= V4_MAX_CLOCK_SKEW_SECONDS)) throw new Error(`uniswap: clockSkewSeconds must be an integer 0..${V4_MAX_CLOCK_SKEW_SECONDS}`);
   const v4Options = {v4: "all" as const, pools: UNISWAP_V4_POOL_KEYS, extraPools: extra, ...(skew !== undefined ? {clockSkewSeconds: skew} : {})};

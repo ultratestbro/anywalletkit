@@ -64,8 +64,20 @@ async function fetchJson(url, init = {}, timeoutMs = 20_000) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
+/** HTTP statuses some nodes answer a JSON-RPC error with (a refused eth_getLogs range: World Chain / X Layer 400, Ink 413):
+ *  the body's error is the node's answer, so it is read as one — the range halving needs its text (LIVE2-1). Any other
+ *  status (429, auth, 5xx) stays a transport failure. */
+const RPC_ERROR_STATUS = new Set([400, 413]);
 async function rpc(url, method, params) {
-  const j = await fetchJson(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params})});
+  const r = await fetch(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params}), signal: AbortSignal.timeout(20_000)});
+  if (!r.ok) {
+    let body = null;
+    if (RPC_ERROR_STATUS.has(r.status)) { try { body = await r.json(); } catch {} }
+    const e = body && typeof body === "object" && body.error && typeof body.error === "object" ? body.error : null;
+    if (e && (typeof e.message === "string" || typeof e.code === "number")) throw Object.assign(new Error(String(e.message ?? JSON.stringify(e)).slice(0, 300)), {rpcError: true, httpStatus: r.status});
+    throw new Error(`HTTP ${r.status}`);
+  }
+  const j = await r.json();
   if (j.error) throw Object.assign(new Error(j.error.message || JSON.stringify(j.error)), {rpcError: true});
   return j.result;
 }

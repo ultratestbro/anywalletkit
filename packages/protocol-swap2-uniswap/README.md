@@ -73,10 +73,21 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   `allowance[sender][SwapProxy]` slot set by `stateDiff` (the slot from `eth_createAccessList`, verified by reading the
   allowance back; the account's own code kept); with no slot that verifies, a 61-byte executor installed as the
   account's code by an override runs approve → swap through Multicall3. A revert is decoded and mapped as in the
-  preflight; a balance under the input, an unanswered read or nothing simulable refuses — the check is never skipped,
-  so nobody approves a swap that would revert. `providerData.simulated` says how (`"approve+swap"`, `"swap"` when the
-  allowance already stood, `"approve+swap (allowance override)"`, `"approve+swap (executor override)"`, or `"none"` on a
-  quote without a sender — a price quote nothing is approved on).
+  preflight; a balance under the input, an unanswered read or nothing simulable refuses that v4 quote — the check is
+  never skipped, so nobody approves a swap that would revert. `providerData.simulated` says how (`"approve+swap"`,
+  `"swap"` when the allowance already stood, `"approve+swap (allowance override)"`, `"approve+swap (executor
+  override)"`, or `"none"` on a quote without a sender — a price quote nothing is approved on).
+- **v4 on never costs a pair its v3 route.** A v4 build refused for a reason of the build falls back instead of
+  refusing the quote: when the best v4 route's own pools fail its simulated swap (`V4TooLittleReceived`,
+  `CurrencyNotSettled`…), its encoding or the module's own check refuses it, the next v4 candidate is built (at most 3);
+  when what every v4 build shares fails — the RPC cannot simulate the approval and the swap, the approval or the
+  token's pull into the SwapProxy fails — the quote goes straight to v3, and with no v3 route the best route's reason
+  refuses it. The trade's own verdicts still refuse the quote outright (no route could pass them): the impact gate, a
+  minimum that rounds to 0, the caller's floor, a wallet holding less than the input, a recipient that cannot take
+  the native coin. A candidate whose gas need is above the chain's bound (per-transaction cap or block gas limit) is
+  ranked out before ranking, like the LIVE-1 ones, and counted in `providerData.v4Unexecutable`. Live on Monad
+  (2026-11-26, fault injection): 700 USDC → AUSD from a funded holder on an RPC with no access list and no
+  `eth_call` state overrides now quotes v3 (before: refused), and on v4 alone is still refused with the node's reason.
 - **Pools: hookless only.** The hook allowlist is empty (hooks can take a swap's whole slippage, price the quoter and the
   router differently, or revert); dynamic fees are therefore out too; the LP fee is at most `v4MaxFeePips` (default
   100,000 = 10%; a setting can lower it, never raise it — the verifier's `maxFeePips` too). The candidates are the
@@ -109,7 +120,10 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   without a release. Before the first v4 quote on
   a chain the provider reads `poolManager()` of the router, the V4Quoter and the StateView, the router's codehash and,
   with `"all"`, the SwapProxy's: a router mismatch turns v4 off on that chain, a SwapProxy mismatch token input only,
-  never v3. On Monad the v4 reads name 30M gas (its RPCs give an `eth_call` 8.1M by default, which starved a two-hop
+  never v3 — and alerts (§6.5 row 15, "refuse + alert"): `onV4Warning(text, {chainId, reason: "vault_mismatch"})`
+  names what does not match, on every quote while it lasts. The same hook hears a v4 build set aside for a fallback
+  (above). It is the operator's channel, not the caller's `onRefusal` (first-wins, and dropped by the handlers when a
+  quote stands); a throw or a rejected promise in it is ignored. On Monad the v4 reads name 30M gas (its RPCs give an `eth_call` 8.1M by default, which starved a two-hop
   quote inside a Multicall3 aggregate).
 - **Preflight.** Right before signing (for a token input, after the approval), the route is re-quoted on the V4Quoter
   (a partial fill or less than the signed minimum refuses it) and the exact transaction is `eth_call`ed from the quote's
@@ -133,11 +147,20 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   since a stub gets one quote per pair, that app loses Uniswap on the pair. So: release; apps bump to ≥ 0.5.0 pins
   (`uniswapRemoteProvider`); only then does the server set `v4: "native-in"`, later `"all"`. With `v4: "off"` the server
   keeps serving v3 to every app, and with `"native-in"` token input stays on v3.
+- **List rebuilds (`v4RankedListBlock`).** The lists are rebuilt and released when the watch reports a new live hookless
+  pool, so a server can run a newer list than some of the apps it serves — and an app refuses a route over a pool its
+  own list lacks. So the lists only grow (a rebuild keeps every pool it listed before, so an older server's routes stay
+  acceptable to newer apps), and a rebuild marks each pool it adds with its build block (`since`; a chain's first list
+  in a later release marks all of them). By default a server ranks against v3 only the pools of the chain's first
+  shipped list; a pool with `since` is ranked like a grid pool — returned only when v3 has no route. Once every app it
+  serves runs a release whose list for the chain was built at block B or later (`UNISWAP_V4_POOLS[chain].block`), the
+  server sets `v4RankedListBlock: {[chain]: B}` and those pools compete. With `v4RankedPools: "extra"` the same order
+  holds for `v4ExtraPools`: add a pool to every app's `uniswapPinsWith({v4ExtraPools})` first, then to the server's.
 - **Pool provenance across the corridor (`v4RankedPools`).** An app's pins accept a v4 pool only from the shipped list or
   from the `v4ExtraPools` it pins itself (`uniswapPinsWith`). A pool the server's unlisted-token grid found is neither,
   and is found per request, so it cannot be shared. By default (`"listed"`) the server ranks only shipped-list routes
-  against v3: a route through a grid or an extra pool is returned only when v3 has no route for the pair, so an app
-  never loses the v3 quote it had. `"extra"` ranks the server's `v4ExtraPools` too — set it when every app pins the same
+  against v3 (the first list's pools, see `v4RankedListBlock` above): a route through a grid or an extra pool is
+  returned only when v3 has no route for the pair, so an app never loses the v3 quote it had. `"extra"` ranks the server's `v4ExtraPools` too — set it when every app pins the same
   pools with `uniswapPinsWith({v4ExtraPools})`; `"all"` ranks everything, for a provider running in the app itself.
 - **Deadline.** A v4 swap's deadline is at most 600 s ahead, whatever `deadlineSeconds` says (v3 keeps the full value):
   that is the bound the pins hold a v4 quote to, plus 60 s of clock skew. A server at `deadlineSeconds: 1200` would
@@ -164,7 +187,9 @@ uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
 ```
 
 - Every candidate is ranked as always; only the best route is gated, and a refused quote never
-  falls back to a lower-output candidate.
+  falls back to a lower-output candidate. (A v4 route that cannot be built or simulated is not a
+  refused quote: the next route is built and gated in turn — see "v4 on never costs a pair its v3
+  route".)
 - All reads of the quote are pinned to one block, with transient RPC errors retried.
 - The measure is the larger of the probe and the spot value loss against the pools' `slot0()` mid
   prices, fees included (`providerData.valueLossBps`), rounded down to a whole bp; the pools' floor
@@ -178,6 +203,9 @@ uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
 - At or above the limit: `insufficient_liquidity`, "loses 99.8% of the value to price impact — its
   pools are too thin for this amount (limit 5%; best route via USDC 0.3% → 0.01%)".
 - `preflightDeposit` does not apply it: the signed minimum governs there.
+- On the app's side `uniswapV4VerifyQuote(params, quote, {maxPriceImpactBps})` gates the same G: the
+  larger of the quote's `priceImpactBps` and `valueLossBps` (a gated quote whose probe could not run
+  carries spot alone); neither, or one that does not read as bps, refuses as `upstream_unavailable`.
 
 Unset, impact is never a refusal, and a healthy RPC sees 0.4.11's requests, sent as 0.4.11 sent them
 (every batch at once, no queue shared by concurrent quotes), plus one `eth_getBlockByNumber` per chain
@@ -203,7 +231,9 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   The 2²⁴ and 2²⁵ caps were read live on 2026-11-26: `eth_estimateGas` of an endless loop names the
   most gas a transaction may have, well below those chains' blocks (40M–2B). `pnpm verify:live`
   (`scripts/verify-live.mjs`, read-only) checks every chain against the tables again, and fails on a
-  chain it cannot reach. On OP-stack chains every block opens with the L1-info deposit (gasLimit
+  chain it cannot reach — and on a check that could not run: the v4 build probe is tried on each RPC
+  until one returns revert data (none: a FAIL), and a quotable v4 chain without a V4Quoter canary
+  pinned is a FAIL. On OP-stack chains every block opens with the L1-info deposit (gasLimit
   1,000,000), so a transaction whose limit is the whole block is never included: there the block's
   limit counts less 1,000,000 (it binds on Celo, a 30M block, and X Layer); MegaETH's deposit is 100,000,000.
   Arbitrum One and Robinhood Chain (Nitro) report a 2⁵⁰ block gas limit, but execute at most 32M gas

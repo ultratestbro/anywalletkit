@@ -178,3 +178,21 @@ export function checkedMaxFeePips(value: number | undefined): number {
   if (!Number.isInteger(v) || v < 1 || v > V4_MAX_FEE_PIPS) throw new Error(`uniswap v4: v4MaxFeePips must be an integer in 1..${V4_MAX_FEE_PIPS}`);
   return v;
 }
+
+/**
+ * An integrator's `v4ExtraPools`, checked once: the one parser of the provider and of `uniswapPinsWith`, so a server and
+ * the apps that pin the same pools read the same configuration (SEC-U4-R2-4: the provider took `"0x8f"` as chain 143 and
+ * dropped `"abc"` silently while the pins threw on both). Every key a decimal chain id (`/^[0-9]+$/`, a safe integer, each
+ * chain once), every value a list of hookless keys within the 10% cap, the PoolId recomputable; the lists and keys come
+ * back frozen. Anything else throws.
+ */
+export function checkedV4ExtraPools(raw: Readonly<Record<number, readonly V4PoolKey[]>> | undefined): Readonly<Record<number, readonly V4PoolKey[]>> {
+  const out: Record<number, readonly V4PoolKey[]> = {};
+  for (const [id, keys] of Object.entries(raw ?? {})) {
+    const n = /^[0-9]+$/.test(id) ? Number(id) : NaN;
+    if (!Number.isSafeInteger(n) || !Array.isArray(keys)) throw new Error(`uniswap: v4ExtraPools[${id}] is not a list of pool keys`);
+    if (Object.prototype.hasOwnProperty.call(out, n)) throw new Error(`uniswap: v4ExtraPools names chain ${n} twice`);
+    out[n] = Object.freeze(keys.map((k: V4PoolKey) => Object.freeze(checkedHooklessKey(k, V4_MAX_FEE_PIPS))));
+  }
+  return Object.freeze(out);
+}

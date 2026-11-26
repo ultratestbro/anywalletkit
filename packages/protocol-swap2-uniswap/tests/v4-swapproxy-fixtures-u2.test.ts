@@ -218,10 +218,21 @@ describe("the approve + swap check refuses before any approval", () => {
     expect(heard[0]![1]).toEqual({reason: "price_check_failed"});
   });
   it("the token refuses the pull (TRANSFER_FROM_FAILED, Monad's stateDiff path) → simulation_failed, the message named", async () => {
-    const {q, heard} = await quote(MONAD_TOKEN, USDC_AUSD(), {}, (s) => (isProxyCall(D143)(s) ? {error: {code: 3, message: "execution reverted: TRANSFER_FROM_FAILED", data: transferFromFailed}} : undefined));
+    const pull: Odd = (s) => (isProxyCall(D143)(s) ? {error: {code: 3, message: "execution reverted: TRANSFER_FROM_FAILED", data: transferFromFailed}} : undefined);
+    // v4 alone (no v3 table): the quote is refused, the token's own reason named — the v4 quote is never returned.
+    const {q, heard} = await quote(MONAD_TOKEN, USDC_AUSD(), {deployments: {}}, pull);
     expect(q).toBeNull();
     expect(heard[0]![1]).toEqual({reason: "simulation_failed"});
     expect(heard[0]![0]).toMatch(/TRANSFER_FROM_FAILED.*with the allowance set by a state override/);
+    // Review R2-2: with v3 on the chain the v4 build is set aside (the same refusal, to the operator's onV4Warning) and the
+    // pair keeps its v3 quote — v4 being on never costs the v3 route (with v4 off this pair quotes on v3).
+    const warned: Array<[string, unknown]> = [];
+    const both = await quote(MONAD_TOKEN, USDC_AUSD(), {onV4Warning: (t, i) => { warned.push([t, i]); }}, pull);
+    expect(both.heard).toEqual([]);
+    expect(both.q).toMatchObject({txRequest: {to: UNISWAP_V3[143]!.router, approvalAddress: UNISWAP_V3[143]!.router}});
+    expect(both.q!.providerData!.venue).toBeUndefined();
+    expect(uniswapV3VerifyQuote(USDC_AUSD(), both.q!)).toBeNull();
+    expect(warned).toEqual([[expect.stringMatching(/best Uniswap v4 route on chain 143 was set aside \(.*TRANSFER_FROM_FAILED.*\) — quoted v3/), {chainId: 143, reason: "simulation_failed"}]]);
   });
   it("the approval step fails in the simulated block → simulation_failed", async () => {
     const odd: Odd = (s) => {
@@ -258,7 +269,17 @@ describe("the approve + swap check refuses before any approval", () => {
   }, 15_000);
   it("Monad: no eth_simulateV1, no access list, and the executor's eth_call unanswered → refused (never a silent skip)", async () => {
     const unsupported = {error: {code: -32601, message: "the method eth_createAccessList does not exist/is not available"}};
-    const {q, heard, seen} = await quote(MONAD_TOKEN, USDC_AUSD(), {}, (s) => (s.method === "eth_createAccessList" ? unsupported : undefined));
+    const noSim: Odd = (s) => (s.method === "eth_createAccessList" ? unsupported : undefined);
+    // Review R2-2: with v3 on the chain the unsimulable v4 build is set aside and the v3 quote stands (before, v4 on made
+    // this pair unquotable while v4 off quoted it on v3); the v4 SwapProxy quote is still never returned unsimulated.
+    const warned: Array<[string, unknown]> = [];
+    const both = await quote(MONAD_TOKEN, USDC_AUSD(), {onV4Warning: (t, i) => { warned.push([t, i]); }}, noSim);
+    expect(both.heard).toEqual([]);
+    expect(both.q).toMatchObject({txRequest: {to: UNISWAP_V3[143]!.router}});
+    expect(both.q!.providerData!.venue).toBeUndefined();
+    expect(warned).toEqual([[expect.stringMatching(/best Uniswap v4 route on chain 143 was set aside .* — quoted v3/), {chainId: 143, reason: "upstream_unavailable"}]]);
+    // v4 alone: refused with the node's reason.
+    const {q, heard, seen} = await quote(MONAD_TOKEN, USDC_AUSD(), {deployments: {}}, noSim);
     expect(q).toBeNull();
     expect(heard[0]![1]).toEqual({reason: "upstream_unavailable"});
     // It tried the executor: an eth_call to the holder itself with the executor installed as its code.

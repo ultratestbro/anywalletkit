@@ -23,6 +23,13 @@ export interface V4ListedPool {
   tickSpacing: number;
   /** PoolId, lower-case. */
   id: Hex;
+  /**
+   * The build block of the list that first shipped this pool, when that list came after the chain's first shipped one
+   * (scripts/build-v4-pools.mjs; lists only grow). Absent: in every list this module has shipped for the chain. An app
+   * on an older release may not pin such a pool, so a server ranks it against v3 only once its `v4RankedListBlock`
+   * reaches this block (UNISWAP-V4-RESEARCH §6.5 row 9, review R2-1).
+   */
+  since?: number;
 }
 
 /** The pinned pools of one chain, as built by scripts/build-v4-pools.mjs. */

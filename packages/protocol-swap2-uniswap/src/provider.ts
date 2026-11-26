@@ -13,8 +13,8 @@ import {UNISWAP_V4_POOLS} from "./v4pools/index.js";
 import {v4ServedDeployment, v4ServesFlow} from "./v4/serve.js";
 import {UNISWAP_V4_POOL_KEYS} from "./v4/listed.js";
 import {discoverV4Pools, type V4BlockTag, type V4EthCall} from "./v4/discover.js";
-import {bestV4Candidate, buildV4Routes, decodeV4QuoteAnswer, multicallBatch, quoteCallDataOfKeys, quoteV4Routes, v4ProbeImpactBps, v4SpotLossBps, type V4CallBatch, type V4CallOutcome, type V4GasBound, type V4QuoteResult} from "./v4/quote.js";
-import {V4_MAX_FEE_PIPS, checkedHooklessKey, checkedMaxFeePips} from "./v4/pool.js";
+import {buildV4Routes, decodeV4QuoteAnswer, multicallBatch, quoteCallDataOfKeys, quoteV4Routes, rankedV4Candidates, v4ProbeImpactBps, v4SpotLossBps, type V4CallBatch, type V4CallOutcome, type V4GasBound, type V4QuoteResult} from "./v4/quote.js";
+import {checkedHooklessKey, checkedMaxFeePips, checkedV4ExtraPools} from "./v4/pool.js";
 import {encodeV4Swap} from "./v4/encode.js";
 import {V4_DEFAULT_DEADLINE_SECONDS, uniswapV4ReasonOf, uniswapV4VerifyQuote, v4DeploymentProblem, v4DeploymentReads, v4HopTokens, v4PreflightCall, v4StorageOverride, type UniswapV4Mode} from "./v4/verify.js";
 import {classifyV4Revert} from "./v4/errors.js";
@@ -103,9 +103,33 @@ const NODE_GAS_CAP_TEXT = /allowance|gas cap|gas limit too high|exceeds (?:the )
 /** How long a chain whose RPC does not serve `eth_simulateV1` is remembered so (ms): later quotes go straight to the
  *  fallbacks; then it is asked again (an endpoint may start serving it). */
 const NO_SIMULATE_V1_TTL_MS = 10 * 60_000;
+/**
+ * Most v4 candidates built for one quote (review R2-2): when the best v4 route's build is refused for a reason of its own
+ * (the simulation of that route reverts, the module's own check, the gas bound), the next one is built — up to this many
+ * — before the quote falls back to v3. A reason that holds for every v4 build of the quote (the RPC cannot simulate, the
+ * approval fails) goes straight to v3.
+ */
+const V4_MAX_BUILDS = 3;
 /** Most storage keys tried as a token's allowance slot (from its access list), and most slots kept. */
 const MAX_SLOT_CANDIDATES = 16;
 const MAX_CACHED_SLOTS = 256;
+
+/**
+ * How far a refusal of the token-input check (`v4TokenSwapCheck`) reaches (review R2-2): "trade" — no route can do this
+ * swap (the wallet holds less than the input, the recipient cannot take the native coin) and the quote is refused;
+ * "route" — that v4 route's pools fail the simulated swap (`V4TooLittleReceived`, `CurrencyNotSettled`,
+ * `NotEnoughLiquidity`, `PoolNotInitialized`…), so the next v4 candidate may still build. Unmarked: what every v4 build of the quote shares
+ * fails — the RPC cannot simulate, the approval or the token's pull into the SwapProxy fails — and the quote falls back
+ * to v3 (whose spender is another contract).
+ */
+const V4_CHECK_SCOPE = new WeakMap<object, "trade" | "route">();
+/** The reasons `classifyV4Revert` gives a revert of the route's own pools (a moved price, a partial fill, a pool not
+ *  initialised, a hop swapping zero): the next v4 candidate may build. */
+const ROUTE_REVERTS: ReadonlySet<Swap2RefusalReason> = new Set<Swap2RefusalReason>(["price_check_failed", "insufficient_liquidity", "no_route", "amount_too_small"]);
+const scoped = (e: Error, scope: "trade" | "route"): Error => {
+  V4_CHECK_SCOPE.set(e, scope);
+  return e;
+};
 
 /** The ERC-20 reads and the approval the SwapProxy flow simulates. */
 const ERC20_ABI = parseAbi([
@@ -160,6 +184,9 @@ function firstWord(raw: unknown): bigint | undefined {
   const v = BigInt(raw.slice(0, 66));
   return v > 0n && v < 1n << 160n ? v : undefined;
 }
+
+/** The reason of a refusal's classification (a bare reason, or the `reason` of an info). */
+const reasonOfInfo = (info: Swap2RefusalReason | Swap2RefusalInfo | undefined): Swap2RefusalReason => (info === undefined ? "policy_refused" : typeof info === "string" ? info : info.reason);
 
 /** An own entry of a per-chain table (never a prototype property). */
 const ownKey = <T,>(rec: Readonly<Record<number, T>>, id: number): T | undefined => (Object.prototype.hasOwnProperty.call(rec, id) ? rec[id] : undefined);
@@ -258,8 +285,31 @@ export interface UniswapProviderConfig {
    *   `uniswapPinsWith({v4ExtraPools})` with the same pools; grid routes still only when v3 has none.
    * - `"all"`: every route ranked by output — a provider running in the app itself (its own check is the one that
    *   counts, and it accepts the pools its own discovery read on chain).
+   *
+   * "Shipped-list pools" means the pools of every list this module has shipped for the chain: a rebuilt list marks each
+   * pool it adds with its build block (`since`, see {@link v4RankedListBlock}), and such a pool ranks against v3 only once
+   * `v4RankedListBlock` covers it — an app on an older release does not pin it yet (review R2-1).
    */
   v4RankedPools?: "listed" | "extra" | "all";
+  /**
+   * Per chain, the build block of the oldest pool list among the apps this server serves — the `block` of
+   * `UNISWAP_V4_POOLS[chain]` in the oldest release they run. A shipped-list pool that a later list added (its `since`
+   * above this block, or any `since` when the chain has no entry) is ranked like a grid pool: returned only when v3 has
+   * no route for the pair, since an app on the older list refuses it ("not in the pinned pool list") and a stub gets one
+   * quote per pair. Unset (the default): only the pools of the chain's first shipped list rank against v3. Raise it per
+   * chain once every app has bumped. Ignored with `v4RankedPools: "all"`.
+   */
+  v4RankedListBlock?: Readonly<Record<number, number>>;
+  /**
+   * Called when v4 is set aside on a quote that still goes out (§6.5 row 15, "refuse + alert"): the chain's v4 deployment
+   * does not match its pins (the router's code or linkage, or with `v4: "all"` the SwapProxy's — `reason:
+   * "vault_mismatch"`; v4, or its token input, is off on that chain for the quote, v3 untouched), or the best v4 route's
+   * build was refused for a reason of the build and the quote fell back to another route (the build's reason). Also
+   * called on a deployment mismatch that leaves the chain without a route (the quote's `onRefusal` hears that refusal
+   * too). It is the operator's alert, not the caller's refusal: `onRefusal` is first-wins and dropped by the handlers when
+   * a quote stands, so a note there would hide the real reason or go nowhere. A throw (or a rejected promise) is ignored.
+   */
+  onV4Warning?: (text: string, info: {chainId: number; reason: Swap2RefusalReason}) => void;
 }
 
 /** A chain's block gas read: kept until `until`; a quote waits for it until `waitUntil`; `limit` once `done` (if any). */
@@ -275,7 +325,14 @@ interface BlockGasRead {
 interface V4DeploymentState {
   native: boolean;
   token: boolean;
+  /** What does not match, when a flow is off: the router's problem, else the SwapProxy's. */
+  problem?: string;
 }
+
+/** What one v4 build came to: a quote, or a refusal that is the trade's (final), that route's own, or the quote's. */
+type V4Build =
+  | {quote: Quote}
+  | {refused: string; info?: Swap2RefusalReason | Swap2RefusalInfo; scope: "trade" | "route" | "quote"};
 
 interface Route {
   /** Human description for the review / logs. */
@@ -309,14 +366,28 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   if (!Number.isInteger(v4MinEdge) || v4MinEdge < 0 || v4MinEdge > 10_000) throw new Error("uniswap: v4MinEdgeBps must be an integer 0..10000");
   const v4Ranked = config.v4RankedPools ?? "listed";
   if (v4Ranked !== "listed" && v4Ranked !== "extra" && v4Ranked !== "all") throw new Error('uniswap: v4RankedPools must be "listed", "extra" or "all"');
+  const v4RankedBlock: Record<number, number> = {};
+  for (const [id, block] of Object.entries(config.v4RankedListBlock ?? {})) {
+    const n = /^[0-9]+$/.test(id) ? Number(id) : NaN;
+    if (!Number.isSafeInteger(n) || !Number.isSafeInteger(block) || block < 0) throw new Error(`uniswap: v4RankedListBlock[${id}] must be a block number (an integer ≥ 0)`);
+    v4RankedBlock[n] = block;
+  }
+  /** Per chain, the shipped-list pools an app on an older list may not pin (`since` above `v4RankedListBlock`). */
+  const newerListed = new Map<number, ReadonlySet<string>>();
+  const newerListedOf = (chainId: number): ReadonlySet<string> => {
+    let ids = newerListed.get(chainId);
+    if (!ids) {
+      const upTo = ownKey(v4RankedBlock, chainId);
+      ids = new Set((ownKey(UNISWAP_V4_POOLS, chainId)?.pools ?? []).filter((p) => p.since !== undefined && (upTo === undefined || p.since > upTo)).map((p) => p.id.toLowerCase()));
+      newerListed.set(chainId, ids);
+    }
+    return ids;
+  };
   /** A v4 swap's deadline: never further ahead than the shipped pins accept (see `deadlineSeconds`). */
   const v4DeadlineS = Math.min(deadlineS, V4_DEFAULT_DEADLINE_SECONDS);
-  /** `v4ExtraPools`, checked once: a configuration error is never skipped silently. */
-  const v4Extra: Record<number, readonly V4PoolKey[]> = {};
-  for (const [id, keys] of Object.entries(config.v4ExtraPools ?? {})) {
-    if (!Array.isArray(keys)) throw new Error(`uniswap: v4ExtraPools[${id}] is not a list of pool keys`);
-    v4Extra[Number(id)] = Object.freeze(keys.map((k: V4PoolKey) => Object.freeze(checkedHooklessKey(k, V4_MAX_FEE_PIPS))));
-  }
+  /** `v4ExtraPools`, checked once with the pins' own parser: a configuration error is never skipped silently, and a key
+   *  the apps' `uniswapPinsWith` would refuse (`"0x8f"`, `" 143"`) is refused here too. */
+  const v4Extra = checkedV4ExtraPools(config.v4ExtraPools);
   const v4Verified = new Map<number, Promise<V4DeploymentState>>();
   /** Chains whose RPC answered `eth_simulateV1` with "not served", until when (ms). */
   const noSimulateV1 = new Map<number, number>();
@@ -500,8 +571,10 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const proxy = v4Mode === "all";
       p = (async () => {
         const answers = await rpc(chainId, v4DeploymentReads(d4, {swapProxy: proxy}), "items");
-        const native = v4DeploymentProblem(d4, answers.slice(0, 4), {swapProxy: false}) === null;
-        return {native, token: proxy && native && v4DeploymentProblem(d4, answers, {swapProxy: true}) === null};
+        const router = v4DeploymentProblem(d4, answers.slice(0, 4), {swapProxy: false});
+        const swapProxy = proxy && router === null ? v4DeploymentProblem(d4, answers, {swapProxy: true}) : null;
+        const problem = router ?? swapProxy;
+        return {native: router === null, token: proxy && router === null && swapProxy === null, ...(problem !== null ? {problem} : {})};
       })();
       const self = p;
       const forget = () => { if (v4Verified.get(chainId) === self) v4Verified.delete(chainId); };
@@ -672,7 +745,10 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     const noted = (what: string) => `uniswap: ${what}. Nothing was approved; refresh the quote.`;
     const reverted = (data: unknown, how: string): never => {
       const c = classifyV4Revert(data);
-      throw refusal(c.reason, noted(`${c.text} (the approval and the swap were simulated ${how} from ${sender})`));
+      // A recipient that cannot take the native coin (NativeTransferFailed) refuses any route; a pool's revert is this
+      // route's; anything else (the token's own pull, the deadline) is shared by every v4 build of the quote.
+      const err = refusal(c.reason, noted(`${c.text} (the approval and the swap were simulated ${how} from ${sender})`));
+      throw c.reason === "recipient_mismatch" ? scoped(err, "trade") : ROUTE_REVERTS.has(c.reason) ? scoped(err, "route") : err;
     };
     const value = (s: RpcSlot | undefined, what: string): bigint => {
       if (!s || "failed" in s) throw s && "failed" in s ? s.failed : refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId}`);
@@ -691,7 +767,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     const [b, a] = await net.slots(chainId, [call(token, encodeFunctionData({abi: ERC20_ABI, functionName: "balanceOf", args: [sender]})), call(token, allowanceData)], "all", signal);
     const balance = value(b, "balance");
     const allowance = value(a, "allowance");
-    if (balance < amount) throw refusal("simulation_failed", noted(`the wallet holds ${balance} of the input, less than the ${amount} it sells — the swap would revert`));
+    if (balance < amount) throw scoped(refusal("simulation_failed", noted(`the wallet holds ${balance} of the input, less than the ${amount} it sells — the swap would revert`)), "trade");
     if (allowance >= amount) {
       const [r] = await net.slots(chainId, [swapCall()], "items", signal);
       mustRun(r, "(the allowance already in place)");
@@ -859,14 +935,32 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const currencyOut4 = nativeOut ? (V4_NATIVE as Hex) : tokenOut;
       if (!d3 && !v4In) return refuse("the Uniswap v4 SwapProxy takes catalog tokens only (this chain has no Uniswap v3 deployment)", "unsupported_pair");
 
+      /** The operator's alert (`onV4Warning`): never the caller's refusal, never a reason to fail the quote. */
+      const warn = (text: string, reason: Swap2RefusalReason): void => {
+        try {
+          const r = config.onV4Warning?.(`uniswap: ${text}`, {chainId: chainId!, reason}) as unknown;
+          if (r && typeof (r as Promise<unknown>).then === "function") (r as Promise<unknown>).then(undefined, () => {});
+        } catch {
+          /* diagnostics only */
+        }
+      };
+
       /**
-       * The v4 winner as a quote: the impact measures (and the gate, when set), the minimum, the router call (directly
+       * One v4 candidate as a quote: the impact measures (and the gate, when set), the minimum, the router call (directly
        * for a native input, through the SwapProxy for a token), the gas bound, and this module's own strict check of what
        * it built (UNISWAP-V4-RESEARCH §6.5, "on the server after build") — a build its own verifier refuses is never
        * returned. A token input with a known sender is then simulated with its approval (`v4TokenSwapCheck`): a swap that
        * would revert is refused before anyone is asked to approve it.
+       *
+       * A refusal says how far it reaches (review R2-2): the trade's verdicts — the impact gate, a minimum that rounds to
+       * 0, the caller's floor, a wallet short of the input, a recipient that cannot take the native coin — hold for any
+       * route and refuse the quote ("trade"); a refusal of this build — its simulated swap reverts, the module's own
+       * check, the encoder, the gas bound — leaves the next candidate ("route"); a check that cannot run for this quote
+       * (the RPC cannot simulate the approval and the swap, the approval fails) leaves v3 ("quote"). v4 being on never
+       * costs the pair the v3 route it had.
        */
-      const finishV4 = async (chainId: number, d4: UniswapV4Deployment, v4: NonNullable<Awaited<ReturnType<typeof quoteV4>>>, winner: NonNullable<V4QuoteResult["best"]>, currencyIn: Hex, currencyOut: Hex, amountIn: bigint, gated: boolean, gasRead: BlockGasRead, signal?: AbortSignal): Promise<Quote | null> => {
+      const finishV4 = async (chainId: number, d4: UniswapV4Deployment, v4: NonNullable<Awaited<ReturnType<typeof quoteV4>>>, winner: NonNullable<V4QuoteResult["best"]>, currencyIn: Hex, currencyOut: Hex, amountIn: bigint, gated: boolean, gasRead: BlockGasRead, unexecutable: number, signal?: AbortSignal): Promise<V4Build> => {
+        const no = (text: string, info: Swap2RefusalReason | Swap2RefusalInfo | undefined, scope: "trade" | "route" | "quote"): V4Build => ({refused: text, ...(info !== undefined ? {info} : {}), scope});
         const {route, amountOut: out, gasEstimate: gas} = winner;
         // The same two measures as v3: the 1/1000 probe on the same route (`priceImpactBps`, fees excluded) and the
         // value lost against the pools' mid prices read at the discovery block (fees included). The probe's transient
@@ -879,20 +973,20 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           const limit = maxImpact!;
           const spot = v4SpotLossBps(route, amountIn, out);
           if (spot === undefined) {
-            if (probe !== undefined && probe >= limit) return refuse(impactRefusalText(probe, limit, route.label), "insufficient_liquidity");
-            return refuse("could not measure the price impact (maxPriceImpactBps is set) — nothing was quoted; try again", "upstream_unavailable");
+            if (probe !== undefined && probe >= limit) return no(impactRefusalText(probe, limit, route.label), "insufficient_liquidity", "trade");
+            return no("could not measure the price impact (maxPriceImpactBps is set) — nothing was quoted; try again", "upstream_unavailable", "trade");
           }
           priceImpactBps = probe;
           valueLossBps = spot;
           const loss = probe === undefined ? spot : Math.max(probe, spot);
-          if (loss >= limit) return refuse(impactRefusalText(loss, limit, route.label), "insufficient_liquidity");
+          if (loss >= limit) return no(impactRefusalText(loss, limit, route.label), "insufficient_liquidity", "trade");
         }
 
         const bps = params.slippageBps ?? slippageDefault;
         const minOut = (out * BigInt(10_000 - bps)) / 10_000n;
-        if (minOut <= 0n) return refuse(`the minimum output rounds to 0 (quoted ${out} at ${bps} bps slippage) — the amount is too small for this pool`, "amount_too_small");
+        if (minOut <= 0n) return no(`the minimum output rounds to 0 (quoted ${out} at ${bps} bps slippage) — the amount is too small for this pool`, "amount_too_small", "trade");
         if (params.minAmountOut !== undefined && minOut < BigInt(params.minAmountOut)) {
-          return refuse(`floor breach (min=${minOut} < floor=${params.minAmountOut})`, "price_check_failed");
+          return no(`floor breach (min=${minOut} < floor=${params.minAmountOut})`, "price_check_failed", "trade");
         }
         const recipient = getAddress(params.destAddress);
         const deadline = BigInt(Math.floor(Date.now() / 1000) + v4DeadlineS);
@@ -901,19 +995,19 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         try {
           enc = encodeV4Swap({chainId, currencyIn, currencyOut, pools: keys, amountIn, amountOutMinimum: minOut, recipient, deadline}, v4Deployments);
         } catch (e) {
-          return refuse(e instanceof Error ? e.message.replace(/^uniswap v4: /, "") : String(e), "policy_refused");
+          return no(e instanceof Error ? e.message.replace(/^uniswap v4: /, "") : String(e), "policy_refused", "route");
         }
 
         // Quoter gas covers the pools only; the router call (intrinsic, calldata, unlock, SETTLE, TAKE) rides on top, and
         // for a token input the SwapProxy and its transferFrom into the router. The same bound as v3: a need above the
-        // chain's per-transaction cap or block gas limit can never be mined.
+        // chain's per-transaction cap or block gas limit can never be mined (such candidates are ranked out before this).
         const pools = BigInt(route.hops.length);
         const overhead = V4_ROUTER_GAS + (enc.flow === "swap-proxy" ? V4_PROXY_GAS : 0n);
         let gasLimit: bigint | undefined;
         if (gas >= MIN_POOL_GAS * pools) {
           const bounded = boundGasLimit(gas + overhead, (gas * 3n) / 2n + overhead, gasBoundsOf(chainId, await blockGasLimit(gasRead, signal)));
           if ("refuse" in bounded) {
-            return refuse(`the swap needs ${bounded.refuse.need} gas, more than chain ${chainId} takes in one transaction (${bounded.refuse.cap}) — its pools are too thin for this amount`, "insufficient_liquidity");
+            return no(`the swap needs ${bounded.refuse.need} gas, more than chain ${chainId} takes in one transaction (${bounded.refuse.cap}) — its pools are too thin for this amount`, "insufficient_liquidity", "route");
           }
           gasLimit = bounded.gasLimit;
         }
@@ -952,7 +1046,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             ...(priceImpactBps !== undefined ? {priceImpactBps: String(priceImpactBps)} : {}),
             ...(valueLossBps !== undefined ? {valueLossBps: String(valueLossBps)} : {}),
             ...(sender !== undefined ? {sender} : {}),
-            ...(v4.unexecutable > 0 ? {v4Unexecutable: String(v4.unexecutable)} : {}),
+            ...(unexecutable > 0 ? {v4Unexecutable: String(unexecutable)} : {}),
           },
         };
         // The app's pins check the same quote with the shipped list alone (plus the extra pools they pin themselves); here
@@ -963,13 +1057,22 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const problem = uniswapV4VerifyQuote(params, quote, {
           deployments: v4Deployments, v4: v4Mode, pools: UNISWAP_V4_POOL_KEYS, extraPools: {[chainId]: [...own, ...v4.gridPools]}, maxFeePips: v4MaxFee, deadlineSeconds: v4DeadlineS,
         });
-        if (problem) return refuse(`the v4 swap fails this module's own check — ${problem}`, uniswapV4ReasonOf(problem) ?? "policy_refused");
+        if (problem) return no(`the v4 swap fails this module's own check — ${problem}`, uniswapV4ReasonOf(problem) ?? "policy_refused", "route");
         if (enc.flow === "swap-proxy") {
           // Before any approval: the exact call with its approval, simulated from the sender. A quote without a sender (a
           // price quote: nothing will be approved on it) says so; preflightDeposit dry-runs it again before signing.
-          quote.providerData!.simulated = sender === undefined ? "none" : await v4TokenSwapCheck(chainId, d4, sender, getAddress(currencyIn), amountIn, {to: enc.to, data: enc.data}, signal);
+          if (sender === undefined) quote.providerData!.simulated = "none";
+          else {
+            try {
+              quote.providerData!.simulated = await v4TokenSwapCheck(chainId, d4, sender, getAddress(currencyIn), amountIn, {to: enc.to, data: enc.data}, signal);
+            } catch (e) {
+              rethrowAbort(e, signal);
+              const err = e instanceof Error ? e : new Error(String(e));
+              return no(err.message.replace(/^uniswap: /, ""), refusalOf(err) ?? "simulation_failed", V4_CHECK_SCOPE.get(err) ?? "quote");
+            }
+          }
         }
-        return quote;
+        return {quote};
       };
 
       try {
@@ -977,7 +1080,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         if (v4In) {
           const [, ok] = await Promise.all([d3 ? verifyDeployment(chainId) : undefined, verifyV4Deployment(chainId, v4In)]);
           v4Ready = nativeIn ? ok.native : ok.token;
-          if (!v4Ready && !d3) return refuse(`the Uniswap v4 deployment on chain ${chainId} does not match its pins — refusing`, "vault_mismatch");
+          if (!v4Ready) {
+            // §6.5 row 15: refuse + alert. v4 (or its token input) is off on this chain for this quote; v3 is not touched.
+            warn(`Uniswap v4 ${nativeIn || !ok.native ? "" : "token input "}is off on chain ${chainId}: the deployment does not match its pins (${ok.problem ?? "the check got no answer"})`, "vault_mismatch");
+            if (!d3) return refuse(`the Uniswap v4 deployment on chain ${chainId} does not match its pins — refusing`, "vault_mismatch");
+          }
         } else {
           await verifyDeployment(chainId);
         }
@@ -1028,19 +1135,56 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         });
         }
         const v4 = v4Run ? await v4Run : undefined;
-        // Ranked together by output (v4MinEdgeBps: v4 must pay more than that much over v3); the gate below applies to
-        // the winner only. Against a v3 route, only a v4 route the apps' pins can check competes (`v4RankedPools`): a
-        // route through a grid or an extra pool would be refused there and cost them the v3 quote. With no v3 route,
-        // the best v4 route stands whatever its pools (nothing is lost).
+        // Ranked together by output (v4MinEdgeBps: v4 must pay more than that much over v3); the gate applies to the
+        // winner only. Against a v3 route, only a v4 route the apps' pins can check competes (`v4RankedPools`): a route
+        // through a grid or an extra pool, or a shipped-list pool an app on an older list lacks (`v4RankedListBlock`),
+        // would be refused there and cost them the v3 quote. With no v3 route, the best v4 route stands whatever its
+        // pools (nothing is lost).
         const v3Best = best as {route: Route; out: bigint; gas: bigint} | null;
-        const v4Pick = !v4 ? null : v3Best === null || v4Ranked === "all" ? v4.best : bestV4Candidate(v4.candidates, (p) => p.source === "listed" || (v4Ranked === "extra" && p.source === "extra"));
-        if (v4 && v4Pick && (v3Best === null || v4Pick.amountOut * 10_000n > v3Best.out * BigInt(10_000 + v4MinEdge))) {
-          return await finishV4(chainId, v4In!, v4, v4Pick, currencyIn4, currencyOut4, amountIn, gated, gasRead, signal);
+        /** v4 candidates ranked out because the chain could never mine them (their gas need above its bound). */
+        let gasOut = 0;
+        /** The gas cap that ranked them out, for the text. */
+        let gasCap: bigint | undefined = ownKey(KNOWN_TX_GAS_CAP, chainId);
+        /** The best v4 route's build, when it was refused for a reason of the build (the quote falls back past it). */
+        let setAside: Extract<V4Build, {refused: string}> | undefined;
+        if (v4 && v4.candidates.some((c) => c.outcome === "quoted")) {
+          // A candidate whose gas need is above the chain's bound can never be mined: ranked out before ranking (as
+          // LIVE-1 ranks out a route no transaction can carry), so it never displaces a route that can (review R2-2).
+          const bounds = gasBoundsOf(chainId, await blockGasLimit(gasRead, signal));
+          const overhead = V4_ROUTER_GAS + (nativeIn ? 0n : V4_PROXY_GAS);
+          const minable = (c: {route: {hops: readonly unknown[]}; gasEstimate: bigint}): boolean => {
+            const g = c.gasEstimate;
+            if (g < MIN_POOL_GAS * BigInt(c.route.hops.length)) return true; // no gas figure: the wallet's own estimate decides
+            const bounded = boundGasLimit(g + overhead, (g * 3n) / 2n + overhead, bounds);
+            if ("refuse" in bounded) gasCap = bounded.refuse.cap;
+            return !("refuse" in bounded);
+          };
+          gasOut = rankedV4Candidates(v4.candidates).filter((c) => !minable(c)).length;
+          const newer = newerListedOf(chainId);
+          const ranked = v3Best === null || v4Ranked === "all"
+            ? rankedV4Candidates(v4.candidates, undefined, minable)
+            : rankedV4Candidates(v4.candidates, (p) => (p.source === "listed" && !newer.has(p.id.toLowerCase())) || (v4Ranked === "extra" && p.source === "extra"), minable);
+          const unexecutable = v4.unexecutable + gasOut;
+          for (const pick of ranked.slice(0, V4_MAX_BUILDS)) {
+            if (v3Best !== null && !(pick.amountOut * 10_000n > v3Best.out * BigInt(10_000 + v4MinEdge))) break;
+            const built = await finishV4(chainId, v4In!, v4, pick, currencyIn4, currencyOut4, amountIn, gated, gasRead, unexecutable, signal);
+            if ("quote" in built) {
+              if (setAside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${setAside.refused}) — quoted another v4 route`, reasonOfInfo(setAside.info));
+              return built.quote;
+            }
+            if (built.scope === "trade") return refuse(built.refused, built.info);
+            setAside ??= built; // the best route's reason is the one reported
+            if (built.scope === "quote") break;
+          }
+        }
+        if (setAside) {
+          if (!best) return refuse(setAside.refused, setAside.info);
+          warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${setAside.refused}) — quoted v3`, reasonOfInfo(setAside.info));
         }
         if (v4) partial = partial || v4.partial;
-        const tooMuchGas = !partial && v4 !== undefined && v4.unexecutable > 0;
+        const tooMuchGas = !partial && v4 !== undefined && v4.unexecutable + gasOut > 0;
         if (!best) {
-          if (tooMuchGas) return refuse(`every Uniswap ${d3 ? "v3 and v4 route" : "v4 route"} for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${chainId} may have (${String(ownKey(KNOWN_TX_GAS_CAP, chainId))}) — its pools are too thin for this amount`, "insufficient_liquidity");
+          if (tooMuchGas) return refuse(`every Uniswap ${d3 ? "v3 and v4 route" : "v4 route"} for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${chainId} may have (${String(gasCap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
           return refuse(partial ? PARTIAL_FILL : v4 ? (d3 ? "no Uniswap v3 or v4 pool route for this pair and amount" : "no Uniswap v4 pool route for this pair and amount") : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
         }
         const {route, out, gas} = best as {route: Route; out: bigint; gas: bigint};
@@ -1164,7 +1308,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             ...(route.single ? {fee: String(route.single.fee)} : {path: route.path!}),
             ...(priceImpactBps !== undefined ? {priceImpactBps: String(priceImpactBps)} : {}),
             ...(valueLossBps !== undefined ? {valueLossBps: String(valueLossBps)} : {}),
-            ...(v4 !== undefined && v4.unexecutable > 0 ? {v4Unexecutable: String(v4.unexecutable)} : {}),
+            ...(v4 !== undefined && v4.unexecutable + gasOut > 0 ? {v4Unexecutable: String(v4.unexecutable + gasOut)} : {}),
           },
         };
       } catch (e) {

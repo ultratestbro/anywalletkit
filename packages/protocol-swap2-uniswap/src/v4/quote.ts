@@ -237,13 +237,25 @@ function better(a: {route: V4Route; amountOut: bigint}, b: {route: V4Route; amou
  * lower fee sum, then the label — or null.
  */
 export function bestV4Candidate(candidates: readonly V4Candidate[], allow: (pool: V4Pool) => boolean = () => true): V4QuoteResult["best"] {
-  let best: V4QuoteResult["best"] = null;
+  return rankedV4Candidates(candidates, allow)[0] ?? null;
+}
+
+/**
+ * Every full fill among `candidates` whose every pool `allow`s (default: all) and that `keep` keeps (default: all), best
+ * first — the order {@link bestV4Candidate} picks by: a provider that cannot build the best one falls back to the next.
+ */
+export function rankedV4Candidates(
+  candidates: readonly V4Candidate[],
+  allow: (pool: V4Pool) => boolean = () => true,
+  keep: (c: NonNullable<V4QuoteResult["best"]>) => boolean = () => true,
+): NonNullable<V4QuoteResult["best"]>[] {
+  const out: NonNullable<V4QuoteResult["best"]>[] = [];
   for (const c of candidates) {
     if (c.outcome !== "quoted" || c.amountOut === undefined || c.gasEstimate === undefined || !c.route.hops.every((h) => allow(h.pool))) continue;
     const x = {route: c.route, amountOut: c.amountOut, gasEstimate: c.gasEstimate};
-    if (!best || better(x, best)) best = x;
+    if (keep(x)) out.push(x);
   }
-  return best;
+  return out.sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0));
 }
 
 const asQuoterReadFailure = (e: unknown): Error => (refusalOf(e) ? (e as Error) : withReason(new Error(`uniswap v4: the quoter read failed (${e instanceof Error ? e.message : String(e)})`), "upstream_unavailable"));

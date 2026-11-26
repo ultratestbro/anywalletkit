@@ -132,7 +132,16 @@ export async function readPools(call, stateView, ids, blockTag, chunk = 150) {
 }
 
 const RANGE = /block range|range|too large|limited to|exceed|max(imum)? .*block|more than|response size|logs count|too many|result/i;
-/** eth_getLogs over [from, to] in `window`-block steps, halving a window the node refuses. At most `maxCalls` calls. */
+/** The window a range refusal names, when it names one: "block range greater than 100 max", "up to a 100 block range",
+ *  "ranges over 100 blocks", "limited to a 10,000 range". */
+const NAMED_WINDOW = /(\d[\d,]{0,12})\s*(?:max\b|blocks?\b|block range|range\b)/i;
+export function namedWindow(message) {
+  const m = NAMED_WINDOW.exec(String(message ?? ""));
+  const n = m ? Number(m[1].replace(/,/g, "")) : NaN;
+  return Number.isSafeInteger(n) && n >= 1 ? n : undefined;
+}
+/** eth_getLogs over [from, to] in `window`-block steps: a window the node refuses is cut to the limit it names (when
+ *  smaller), else halved. At most `maxCalls` calls. */
 export async function scanLogs(call, {poolManager, topics, from, to, window, maxCalls}) {
   const logs = [];
   let calls = 0, a = from, win = window;
@@ -144,7 +153,11 @@ export async function scanLogs(call, {poolManager, topics, from, to, window, max
     try {
       got = await call("eth_getLogs", [{address: poolManager, topics, fromBlock: "0x" + a.toString(16), toBlock: "0x" + b.toString(16)}]);
     } catch (e) {
-      if (e.rpcError && RANGE.test(e.message) && b > a) { win = Math.max(1, Math.floor((b - a + 1) / 2)); continue; }
+      if (e.rpcError && RANGE.test(e.message) && b > a) {
+        const asked = b - a + 1, named = namedWindow(e.message);
+        win = named !== undefined && named < asked ? named : Math.max(1, Math.floor(asked / 2));
+        continue;
+      }
       throw e;
     }
     if (!Array.isArray(got)) throw new Error("eth_getLogs answered a non-array");

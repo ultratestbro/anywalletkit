@@ -17,7 +17,7 @@ import {tmpdir} from "node:os";
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {spawn} from "node:child_process";
-import {DEAD_RUNS, INITIALIZE_TOPIC, ZERO, decodeAggregate3, decodeInitialize, describeInitialize, disqualify, encodeAggregate3, poolIdOf, runInitializeSource} from "./evm-initialize.mjs";
+import {DEAD_RUNS, INITIALIZE_TOPIC, ZERO, decodeAggregate3, decodeInitialize, describeInitialize, disqualify, encodeAggregate3, namedWindow, poolIdOf, runInitializeSource} from "./evm-initialize.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PM = "0x188d586ddcf52439676ca21a244753fa19f9ea8e", SV = "0x77395f3b2e73ae90843717371294fa97cc419d64";
@@ -314,4 +314,82 @@ test("coverage: every chain the uniswap module ships a v4 pool list for has an e
     if (s.logsRpc) assert.match(s.logsRpc, /^https:\/\/[a-z0-9.-]+(\/[a-z0-9/_-]*)?$/i, "a public endpoint, no key in the manifest");
   }
   assert.deepEqual(sources.map((s) => s.chainId).sort((a, b) => a - b), lists.map((l) => l.chainId).sort((a, b) => a - b), "no source for a chain without a list");
+});
+
+// ── LIVE2-1: public nodes that cap eth_getLogs and answer a wider range with HTTP 400 + a JSON-RPC error ─────────────
+
+test("LIVE2-1: a refusal that names its limit cuts the window to it (else halves); the public nodes' texts read", async () => {
+  assert.equal(namedWindow("block range greater than 100 max"), 100); // X Layer, World Chain public RPC
+  assert.equal(namedWindow("You can make eth_getLogs requests with up to a 100 block range."), 100); // Alchemy public
+  assert.equal(namedWindow("ranges over 100 blocks are not supported on freemium"), 100); // dRPC
+  assert.equal(namedWindow("eth_getLogs is limited to a 10,000 range"), 10_000); // Ink's QuickNode gateway (HTTP 413)
+  assert.equal(namedWindow("block range greater than 1000 max"), 1000); // Ink public RPC
+  assert.equal(namedWindow("query returned more than 10000 results"), undefined);
+  assert.equal(namedWindow("block range too large"), undefined);
+  const c = chain({head: 10_000, logs: [rawLog({currency0: ZERO, currency1: USDC, fee: 500, tickSpacing: 10}, 9_950)]});
+  c.call = ((inner) => async (method, params) => {
+    if (method === "eth_getLogs" && Number(BigInt(params[0].toBlock)) - Number(BigInt(params[0].fromBlock)) + 1 > 100) throw Object.assign(new Error("block range greater than 100 max"), {rpcError: true});
+    return inner(method, params);
+  })(c.call);
+  const r = await runInitializeSource({...SRC, window: 10_000, maxCalls: 200}, {call: c.call, prev: {lastBlock: 0}, list: LIST});
+  assert.equal(r.meta.lastBlock, 9_990);
+  assert.equal(r.meta.pending.length, 1);
+  assert.equal(r.problems.length, 0);
+  // One refused 10,000-block window, then 100-block windows straight away (no halving ladder): 1 + 100 calls.
+  assert.equal(r.meta.calls, 1 + 100);
+});
+
+/** A node that answers an eth_getLogs over more than `maxRange` blocks as World Chain's and X Layer's public RPCs do:
+ *  HTTP 400 with the JSON-RPC error in the body. */
+async function serveCapped(c, maxRange) {
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (x) => (body += x));
+    req.on("end", async () => {
+      const {method, params} = JSON.parse(body);
+      res.setHeader("content-type", "application/json");
+      if (method === "eth_getLogs" && Number(BigInt(params[0].toBlock)) - Number(BigInt(params[0].fromBlock)) + 1 > maxRange) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({jsonrpc: "2.0", id: 1, error: {code: -32602, message: `block range greater than ${maxRange} max`}}));
+      }
+      try { res.end(JSON.stringify({jsonrpc: "2.0", id: 1, result: await c.call(method, params)})); }
+      catch (e) { res.end(JSON.stringify({jsonrpc: "2.0", id: 1, error: {code: -32000, message: e.message}})); }
+    });
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  return {url: `http://127.0.0.1:${server.address().port}`, close: () => server.close()};
+}
+
+test("watch.mjs (LIVE2-1): an HTTP 400 range refusal is read as the node's answer — the window is cut, the source runs, the pool is reported", async () => {
+  const fresh = {currency0: ZERO, currency1: USDC, fee: 500, tickSpacing: 10};
+  const c = chain({head: 2000, logs: [rawLog(fresh, 1500)], live: {[poolIdOf(LISTED)]: true, [poolIdOf(fresh)]: true}});
+  const srv = await serveCapped(c, 50);
+  try {
+    const root = sandbox(srv.url, {...LIST_BARE, block: 1200});
+    const first = await run(root, srv.url);
+    assert.equal(first.code, 0, first.err);
+    assert.match(first.out, /0 unreachable/, "before the fix: HTTP 400 was thrown before its body was read, the source unreachable every day");
+    assert.match(first.out, /new hookless pool .* 500\/10 .* at block 1500/);
+    assert.equal(stateOf(root).meta.lastBlock, 1990);
+  } finally {
+    srv.close();
+  }
+});
+
+test("LIVE2-1: the three sources on capped public RPCs can cover a day; the CI maps the keyed endpoints before the watch runs", () => {
+  const ROOT = join(here, "../..");
+  const manifest = JSON.parse(readFileSync(join(ROOT, "packages/protocol-swap2-uniswap/watch.json"), "utf8"));
+  // Blocks a day and the public eth_getLogs cap, read 2026-11-26: X Layer 86,400 / 100, World Chain 43,200 / 100, Ink 86,400 / 1,000.
+  for (const [chainId, perDay, cap] of [[196, 86_400, 100], [480, 43_200, 100], [57073, 86_400, 1000]]) {
+    const s = manifest.sources.find((x) => x.type === "evm-initialize" && x.chainId === chainId);
+    assert.ok(s, `chain ${chainId}`);
+    const calls = s.maxCalls ?? 300;
+    assert.ok(calls >= Math.ceil(perDay / cap) + 10, `chain ${chainId}: maxCalls ${calls} covers ${perDay} blocks a day at ${cap}`);
+  }
+  const yml = readFileSync(join(ROOT, ".github/workflows/watch.yml"), "utf8");
+  const map = yml.indexOf("WORLDCHAIN:worldchain-mainnet"), run = yml.indexOf("node scripts/watch/watch.mjs --send");
+  assert.ok(map > 0 && run > map, "the map and the run");
+  // $GITHUB_ENV reaches later steps only: the map must be in a step of its own, before the watch step.
+  const stepOf = (i) => yml.lastIndexOf("\n      - ", i);
+  assert.notEqual(stepOf(map), stepOf(run), "the QuickNode map is in its own step");
 });
