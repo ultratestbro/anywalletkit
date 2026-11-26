@@ -383,11 +383,11 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   rather than run into the router's 8 s, signal or not. 13 is the least that carries the largest quote (51 calls in five passes
   one after another) on an idle endpoint answering within 0.5 s; a lower value is refused when the
   provider is built. With `v4` on, a quote's v4 reads (discovery, quoter aggregates, probe, the
-  token-input check) go by the same turns and bound, and the floor is 33: the largest v4 quote (a
+  token-input check) go by the same turns and bound, and the floor is 34: the largest v4 quote (a
   gated token input with the sender known on an RPC without `eth_simulateV1`, `venueRoutes:
   "both"`, with up to four candidates past the chain's per-transaction cap, each aggregate holding
   one halved down to the call and the candidate read again at the cap) is up to 127 calls in sixteen
-  passes, carried by 33 on an idle endpoint answering within 250 ms. Candidates past the cap in more
+  passes, carried by 34 on an idle endpoint answering within 250 ms. Candidates past the cap in more
   aggregates, or a quote that builds the next v4 candidate after its best one is refused, need more.
   Sixteen passes alone take the 5 s on an endpoint slower than ~310 ms, so a slow endpoint needs a
   higher rate (47 at 300 ms), and past that no rate carries such a quote under the limit. Unset (the

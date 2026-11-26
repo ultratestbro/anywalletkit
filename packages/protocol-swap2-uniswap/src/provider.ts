@@ -311,7 +311,7 @@ export interface UniswapProviderConfig {
   maxPriceImpactBps?: number;
   /**
    * Most JSON-RPC calls sent to one endpoint in any one second, across every quote, check and read of this provider (an
-   * integer ≥ 13, MIN_CALLS_PER_SECOND: the least that carries one quote — ≥ 33, MIN_CALLS_PER_SECOND_V4, with `v4` on,
+   * integer ≥ 13, MIN_CALLS_PER_SECOND: the least that carries one quote — ≥ 34, MIN_CALLS_PER_SECOND_V4, with `v4` on,
    * whose reads go under the same bound; a server sets the good-item rate its keyed endpoint serves — QuickNode answered
    * 50 calls a second on Monad and `-32007` the rest, UNISWAP-V4-RESEARCH §5.3).
    * Batches then carry at most 10 calls and wait for their turn on their endpoint, counted at the moment each batch

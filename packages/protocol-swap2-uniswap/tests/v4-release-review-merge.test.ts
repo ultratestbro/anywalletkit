@@ -248,14 +248,17 @@ describe("U0-LIVE-1 / U0C-1 on the v4 path: a quote's v4 reads go by its turns, 
     }, "latest")(Array.from({length: V4_QUOTES_PER_AGGREGATE}, (_, i) => ({to: D4.quoter, data: encodeFunctionData({abi: MC3_CALL, functionName: "probe", args: [BigInt(i)]})})));
     expect(sizes).toEqual([10, 5, 5, 3, 2, 2, 1, 1, 1]); // the aggregate, then two a pass
     expect(sizes.length).toBe(1 + 2 * HALVINGS);
-    for (const pastCap of [0, 1, 2, 4]) {
-      for (const rtt of [0, 50, 100, 150, 200, 250]) {
+    // Every answer time up to 250 ms, 5 ms apart, and 1 ms apart over 190–250 ms where four such candidates are tightest
+    // (U0V4-4 recheck: 33 refused four at every answer time from 201 to 249 ms and fit only at 200 and 250).
+    const rtts = (pastCap: number) => [...Array.from({length: 51}, (_, i) => i * 5), ...(pastCap >= 3 ? Array.from({length: 61}, (_, i) => 190 + i) : [])];
+    for (const pastCap of [0, 1, 2, 3, 4]) {
+      for (const rtt of rtts(pastCap)) {
         const m = await largest(MIN_CALLS_PER_SECOND_V4, rtt, pastCap);
         expect([pastCap, rtt, m.refused]).toEqual([pastCap, rtt, []]);
         expect(m.lastSend).toBeLessThanOrEqual(QUOTE_WAIT_MAX_MS);
       }
     }
-    const under = await largest(MIN_CALLS_PER_SECOND_V4 - 1, 250, 1);
+    const under = await largest(MIN_CALLS_PER_SECOND_V4 - 1, 230, 4);
     expect(under.refused[0]).toMatch(/calls a second are booked past 5 s into the quote/);
     // U0V4-4: 22, the floor counted without the halving and the re-read, refused a quote with one candidate past the cap
     // from 150 ms (it carried the quote without one).

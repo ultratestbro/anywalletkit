@@ -76,15 +76,15 @@ export const MIN_CALLS_PER_SECOND = 13;
  * aggregates (104 routes); each aggregate holding such a candidate halved down to the call (10 → 5 → 3 → 2 → 1: four
  * passes of two aggregates per candidate), then those candidates read again at the cap; v3's pool lookups + probe and
  * slot0() reads (3 + 2) beside v4's probe, balance + allowance, `eth_simulateV1`, the access list, 16 allowance-slot
- * read-backs and the swap's `eth_call`. At 32 it is refused as `rate_limited` with nothing else in the queue on a
- * 250 ms endpoint (tests/v4-release-review-merge.test.ts; U0V4-4: 22, counted without the halving and the re-read,
+ * read-backs and the swap's `eth_call`. At 33 it is refused as `rate_limited` with nothing else in the queue on an
+ * endpoint answering in 201–249 ms with four such candidates (34 carries 0–4 at every answer time up to 250 ms) (tests/v4-release-review-merge.test.ts; U0V4-4: 22, counted without the halving and the re-read,
  * refused it from 150 ms). Not carried: candidates past the cap in more aggregates (all eleven: 53 at 250 ms), and a
  * quote whose best v4 build is refused for its own route and that builds the next one (V4_MAX_BUILDS, three passes more
  * each: with such candidates 47 for a second build, and no rate carries a third at 250 ms). Sixteen passes take the
  * bound's 5 s on their own on an endpoint slower than ~310 ms: there no rate carries that quote, and such an endpoint
  * needs more than this one does at 250 ms (47 at 300 ms).
  */
-export const MIN_CALLS_PER_SECOND_V4 = 33;
+export const MIN_CALLS_PER_SECOND_V4 = 34;
 /**
  * Waits before each retry (ms, from..to): long enough for a per-second window to pass, spread at random so that
  * concurrent quotes refused in the same window do not all come back in the next one together.
