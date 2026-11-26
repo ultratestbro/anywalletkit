@@ -363,6 +363,24 @@ describe("review R3-1: a read of the approve + swap check that went unanswered r
     expect(viaExecutor.q?.providerData?.simulated).toBe("approve+swap (executor override)");
     expect(viaExecutor.seen.filter((s) => s.method === "eth_createAccessList")).toHaveLength(1); // a fact: not retried
   }, 30_000);
+  it("RPC-2: an endpoint that takes no state override (-32602 on every override) is asked each override call once, then v3", async () => {
+    // eth_simulateV1 not served (the recording), the access list names the allowance slots, and every eth_call that
+    // carries a state override is refused -32602 — a fact about the endpoint, the same on every attempt. Before, each
+    // slot read-back and the executor were sent three times (300–600 ms, then 1–1.5 s apart): ~2.9 s on every quote.
+    const invalid = {error: {code: -32602, message: "invalid params: state override is not supported"}};
+    const warned: Array<[string, unknown]> = [];
+    const {q, heard, seen} = await quote(MONAD_TOKEN, USDC_AUSD(), {onV4Warning: (t, i) => { warned.push([t, i]); }}, (s) => (s.method === "eth_call" && overrideOf(s) !== undefined ? invalid : undefined));
+    expect(heard).toEqual([]);
+    expect(q?.txRequest?.to).toBe(UNISWAP_V3[143]!.router);
+    expect(warned).toEqual([[expect.stringMatching(/best Uniswap v4 route on chain 143 was set aside .*-32602 invalid params: state override is not supported.* — quoted v3/), {chainId: 143, reason: "upstream_unavailable"}]]);
+    const overrides = seen.filter((s) => s.method === "eth_call" && overrideOf(s) !== undefined);
+    const readBacks = overrides.filter((s) => getAddress((s.params[0] as {to: string}).to) === M_USDC);
+    const executor = overrides.filter((s) => getAddress((s.params[0] as {to: string}).to) === HOLDER);
+    expect(readBacks.length).toBeGreaterThan(0);
+    expect(new Set(readBacks.map((s) => s.key)).size).toBe(readBacks.length); // each slot read back once
+    expect(executor).toHaveLength(1);
+    expect(overrides).toHaveLength(readBacks.length + 1);
+  });
 });
 
 describe("the executor fallback (no eth_simulateV1, no allowance slot)", () => {

@@ -1046,7 +1046,14 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       {target: token, allowFailure: false, callData: approveData(amount)},
       {target: tx.to, allowFailure: true, callData: tx.data},
     ]]});
-    const [r] = await slots([{method: "eth_call", params: [{from: sender, to: sender, data: plan, value: "0x0"}, "latest", {[sender]: {code: EXECUTOR_CODE}}]}], "items");
+    // Sent once; retried only when the failure is not a fact about the endpoint (an override it does not take is the
+    // same on every attempt: the check then falls back to v3 at once, review RPC-2).
+    const exec: RpcCall = {method: "eth_call", params: [{from: sender, to: sender, data: plan, value: "0x0"}, "latest", {[sender]: {code: EXECUTOR_CODE}}]};
+    let [r] = await net.slots(chainId, [exec], "none", signal, o).catch((e: unknown): RpcSlot[] => {
+      rethrowAbort(e, signal);
+      return [{ok: false, failed: e instanceof Error ? e : new Error(String(e))}];
+    });
+    if (r && "failed" in r && !endpointFact(r)) [r] = await slots([exec], "items");
     if (!r || "failed" in r) throw failure(r);
     if (!r.ok) throw refusal("simulation_failed", noted("the input token's approval of the SwapProxy fails in simulation"));
     let results: readonly {success: boolean; returnData: Hex}[];
@@ -1092,7 +1099,23 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     }
     const candidates = [...keys].slice(0, MAX_SLOT_CANDIDATES) as Hex[];
     if (!candidates.length) return null;
-    const answers = await net.slots(chainId, candidates.map((k) => ({method: "eth_call", params: [{to: token, data}, "latest", v4StorageOverride(token, k, amount)]})), "items", signal, o);
+    // Sent once, as eth_simulateV1 and the access list are: a read-back the endpoint refuses for a fact about itself
+    // (-32602, a node that takes no state override) gets the same answer on every attempt, so only the ones that
+    // failed otherwise are retried (review RPC-2: the read-backs and the executor were each retried twice, 300–600 ms
+    // and 1–1.5 s apart, on every token-input quote on such an endpoint).
+    const readBacks: RpcCall[] = candidates.map((k) => ({method: "eth_call", params: [{to: token, data}, "latest", v4StorageOverride(token, k, amount)]}));
+    const answers = await net.slots(chainId, readBacks, "none", signal, o).catch((e: unknown): RpcSlot[] => {
+      rethrowAbort(e, signal);
+      const failed = e instanceof Error ? e : new Error(String(e));
+      return readBacks.map((): RpcSlot => ({ok: false, failed}));
+    });
+    const again = answers.flatMap((s, i) => ("failed" in s && !endpointFact(s) ? [i] : []));
+    if (again.length) {
+      const retried = await net.slots(chainId, again.map((i) => readBacks[i]!), "items", signal, o);
+      again.forEach((i, k) => {
+        answers[i] = retried[k]!;
+      });
+    }
     const at = answers.findIndex((s) => s.ok && uintWord(s.result) === amount);
     if (at < 0) {
       const failed = answers.find((s): s is Extract<RpcSlot, {failed: Error}> => "failed" in s && !endpointFact(s));
