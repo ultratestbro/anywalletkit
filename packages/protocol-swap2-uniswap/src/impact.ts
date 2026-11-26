@@ -50,6 +50,19 @@ const SQRT_PRICE_MAX = 1n << 160n;
  * (3 raw units in, 2 out) it is most of the loss. Undefined when a price is outside (0, 2¹⁶⁰) or the counts do not match.
  */
 export function spotValueLossBps(hops: readonly Hop[], sqrtPrices: readonly bigint[], amountIn: bigint, out: bigint): number | undefined {
+  return valueLossBps(hops, sqrtPrices, amountIn, out, false);
+}
+
+/**
+ * The same loss net of the pools' fees: against the mid output after each hop's fee (`× (1 − fee)` per pool), so what
+ * is left is the price impact alone (and the pools' floor rounding). It tells a quote whose pools are too thin from one
+ * that reaches a limit only with its fees (U0C-2, U0-LIVE-2); the gate itself goes by the gross loss.
+ */
+export function spotImpactNetOfFeesBps(hops: readonly Hop[], sqrtPrices: readonly bigint[], amountIn: bigint, out: bigint): number | undefined {
+  return valueLossBps(hops, sqrtPrices, amountIn, out, true);
+}
+
+function valueLossBps(hops: readonly Hop[], sqrtPrices: readonly bigint[], amountIn: bigint, out: bigint, netOfFees: boolean): number | undefined {
   if (hops.length === 0 || hops.length !== sqrtPrices.length || amountIn <= 0n || out < 0n) return undefined;
   let num = 1n;
   let den = 1n;
@@ -65,6 +78,12 @@ export function spotValueLossBps(hops: readonly Hop[], sqrtPrices: readonly bigi
       num *= Q192;
       den *= sq;
     }
+    if (netOfFees) {
+      const fee = hops[i]!.fee;
+      if (!Number.isInteger(fee) || fee < 0 || fee >= 1_000_000) return undefined;
+      num *= BigInt(1_000_000 - fee); // the pool keeps `fee` (hundredths of a bip) of the input
+      den *= 1_000_000n;
+    }
   }
   const paid = out * den * 10_000n;
   const mid = amountIn * num;
@@ -78,13 +97,21 @@ export function validMaxImpactBps(value: unknown): value is number {
 }
 
 /**
- * The refusal text when the measure G reaches the limit (`/^loses ([\d.]+)% of the value to price impact/` after the
- * provider prefix, as cp0x's refusals.ts reads it): "loses 99.8% of the value to price impact — its pools are too thin
- * for this amount (limit 5%; best route via USDC 0.3% → 0.01%)".
+ * The refusal text when the measure G (fees included) reaches the limit. Both forms start as cp0x's refusals.ts reads
+ * it, `/^loses ([\d.]+)% of the value to price impact/` after the provider prefix:
+ * - the price impact alone reaches the limit (the probe, or the spot loss net of the pools' fees): "loses 99.8% of the
+ *   value to price impact — its pools are too thin for this amount (limit 5%; best route via USDC 0.3% → 0.01%)";
+ * - only the pools' fees bring it there (`poolFee` given: a deep pool, a limit at or under its fee): "loses 1.0% of the
+ *   value to price impact and pool fees — the route's fees (1%) bring it to the limit; its price impact alone is under
+ *   it (limit 1%; best route direct 1%)" — never "too thin" for a pool that is not (U0C-2, U0-LIVE-2).
  */
-export function impactRefusalText(lossBps: number, limitBps: number, routeLabel: string): string {
+export function impactRefusalText(lossBps: number, limitBps: number, routeLabel: string, poolFee?: string): string {
   const pct = lossBps >= 9_995 ? "99.9" : (lossBps / 100).toFixed(1);
-  return `loses ${pct}% of the value to price impact — its pools are too thin for this amount (limit ${String(limitBps / 100)}%; best route ${routeLabel})`;
+  const tail = `(limit ${String(limitBps / 100)}%; best route ${routeLabel})`;
+  if (poolFee !== undefined) {
+    return `loses ${pct}% of the value to price impact and pool fees — the route's fees (${poolFee}) bring it to the limit; its price impact alone is under it ${tail}`;
+  }
+  return `loses ${pct}% of the value to price impact — its pools are too thin for this amount ${tail}`;
 }
 
 /**
@@ -96,7 +123,8 @@ export function impactRefusalText(lossBps: number, limitBps: number, routeLabel:
  * - 30M: Monad ("Transaction gas limit 30M gas", docs.monad.xyz).
  * The 2²⁴ and 2²⁵ caps were read live, read-only, on 2026-11-26 (scripts/verify-live.mjs): `eth_estimateGas` of an
  * endless loop (a code override) reports the allowance a transaction can have — "gas required exceeds allowance
- * (16777216)" — against block gas limits of 40M–2B, while the same nodes' `eth_call` runs 100M (so not an RPC gas cap).
+ * (16777216)" — against block gas limits of 30M–2B, while the same nodes' `eth_call` runs 100M (so not an RPC gas cap).
+ * Monad's node does not name its allowance: its 30M is the documented limit, not one read live.
  * Elsewhere the block gas limit, read on chain, is the cap (less KNOWN_BLOCK_GAS_RESERVE).
  */
 export const KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = Object.freeze({
@@ -130,6 +158,17 @@ export const KNOWN_BLOCK_GAS_RESERVE: Readonly<Record<number, bigint>> = Object.
 });
 
 /**
+ * The block gas limit of a chain whose reserve binds (KNOWN_BLOCK_GAS_RESERVE, no lower per-transaction cap), taken
+ * until its own block has been read: before the read is in (or after it failed), a padded limit in the block's last
+ * 1M gas would otherwise go out unbounded and never be included (U0-SEC-R3-3). Read live on 2026-11-26 (Celo 30M, X
+ * Layer 210M); `scripts/verify-live.mjs` checks it. The chain's own block, once read, replaces it.
+ */
+export const KNOWN_BLOCK_GAS_LIMIT: Readonly<Record<number, bigint>> = Object.freeze({
+  196: 210_000_000n,
+  42220: 30_000_000n,
+});
+
+/**
  * Arbitrum Nitro chains: the most gas one transaction can spend on execution. Their block header carries a 2⁵⁰
  * placeholder; `ArbGasInfo(0x…6C).getMaxTxGasLimit()` read 32,000,000 on Arbitrum One (42161) and Robinhood Chain
  * (4663), read-only on 2026-11-26 (`getGasAccountingParams()` = 7M, 32M, 32M). Nitro holds any gas above it back from
@@ -149,11 +188,12 @@ export interface GasBounds {
 
 const own = (table: Readonly<Record<number, bigint>>, chainId: number) => (Object.prototype.hasOwnProperty.call(table, chainId) ? table[chainId] : undefined);
 
-/** The chain's gas bounds from the known caps and its block gas limit (undefined: the node did not say). */
+/** The chain's gas bounds from the known caps and its block gas limit (undefined: the node did not say — KNOWN_BLOCK_GAS_LIMIT then). */
 export function gasBoundsOf(chainId: number, blockGasLimit: bigint | undefined): GasBounds {
   const known = own(KNOWN_TX_GAS_CAP, chainId);
   const reserve = own(KNOWN_BLOCK_GAS_RESERVE, chainId) ?? 0n;
-  const block = blockGasLimit === undefined ? undefined : blockGasLimit > reserve ? blockGasLimit - reserve : 0n;
+  const blockLimit = blockGasLimit ?? own(KNOWN_BLOCK_GAS_LIMIT, chainId);
+  const block = blockLimit === undefined ? undefined : blockLimit > reserve ? blockLimit - reserve : 0n;
   const limit = known === undefined ? block : block === undefined || known < block ? known : block;
   const execution = own(KNOWN_EXECUTION_GAS_CAP, chainId);
   return {...(limit !== undefined ? {limit} : {}), ...(execution !== undefined ? {execution} : {})};

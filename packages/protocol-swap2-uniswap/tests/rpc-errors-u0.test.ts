@@ -7,7 +7,7 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 import {decodeFunctionData, parseAbi, type Hex} from "viem";
 import {refusalOf, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import {uniswapProvider} from "../src/provider.js";
-import {RATE_WAIT_MAX_MS, RATE_WINDOW_MS, RETRY_DELAYS_MS, RPC_BATCH_MAX, rpcErrorKind, uniswapRpc} from "../src/rpc.js";
+import {MIN_CALLS_PER_SECOND, RATE_WAIT_MAX_MS, RATE_WINDOW_MS, RETRY_DELAYS_MS, RPC_BATCH_MAX, rpcErrorKind, uniswapRpc} from "../src/rpc.js";
 import {D, ME, RPC, USDT, rpcStub, type StubOptions} from "./fixtures.js";
 
 afterEach(() => {
@@ -371,11 +371,12 @@ describe("rpcCallsPerSecond (opt-in): at most N calls a second per endpoint, a b
     return Date.now();
   };
 
-  it("must be an integer ≥ 1; unset is the default (no limit)", () => {
-    for (const bad of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "50", null]) {
-      expect(() => uniswapProvider({rpcUrls: RPC, rpcCallsPerSecond: bad as never})).toThrow("uniswap: rpcCallsPerSecond must be an integer ≥ 1");
+  it(`must be an integer ≥ ${MIN_CALLS_PER_SECOND}, the least that carries one quote (U0C-1); unset is the default (no limit)`, () => {
+    expect(MIN_CALLS_PER_SECOND).toBe(13);
+    for (const bad of [0, -1, 1, 5, 12, 13.5, Number.NaN, Number.POSITIVE_INFINITY, "50", null]) {
+      expect(() => uniswapProvider({rpcUrls: RPC, rpcCallsPerSecond: bad as never})).toThrow("uniswap: rpcCallsPerSecond must be an integer ≥ 13 (the least that carries one quote)");
     }
-    for (const ok of [1, 50, 1000]) expect(() => uniswapProvider({rpcUrls: RPC, rpcCallsPerSecond: ok})).not.toThrow();
+    for (const ok of [13, 50, 1000]) expect(() => uniswapProvider({rpcUrls: RPC, rpcCallsPerSecond: ok})).not.toThrow();
   });
 
   it("no window of 1 s holds more than N calls on an endpoint, across concurrent requests, first come first served", async () => {
