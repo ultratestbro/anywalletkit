@@ -69,3 +69,33 @@ describe('QUOTES-4: a v4 read\'s refusal names the venue once (before: "uniswap:
     expect(r).toMatchObject({destAmount: "1000000"});
   });
 });
+
+// Monad 700 USDC → AUSD, v4 "all": v4 AUSD/USDC 0.0009%/1 pays 700.5 and 0.005%/1 700.2 AUSD, both of their simulated
+// swaps revert (V4TooLittleReceived), v3 USDC/AUSD 0.01% pays 699.
+const M_AUSD = getAddress("0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a");
+const M_USDC_IN = 700_000_000n;
+const AUSD_USDC_9_1 = "0xd112fde908d7342135fc7297cc53d25bf7a11d6c6e21fe7ac3e73c40f70827e8";
+const AUSD_USDC_50_1 = "0x092b650478145f0aee73a1b400b342b9c6314db2e07aeb91faf7e75e8159ce72";
+async function monad(extra: Partial<QuoteParams>, node: Partial<FakeNodeOptions> = {}) {
+  vi.stubGlobal("fetch", fakeNode({amount: M_USDC_IN, v3: {tokenOut: M_AUSD, fee: 100, out: 699_000_000n}, v4: new Map([[AUSD_USDC_9_1, {out: 700_500_000n, gas: 60_000n}], [AUSD_USDC_50_1, {out: 700_200_000n, gas: 60_000n}]]), simulateReverts: new Set([AUSD_USDC_9_1, AUSD_USDC_50_1]), ...node}).fetch);
+  const heard: Array<[string, Swap2RefusalInfo | undefined]> = [];
+  const warned: Array<[string, unknown]> = [];
+  const p = uniswapProvider({rpcUrls: {143: ["https://monad.fake"]}, v4Deployments: v4PinsFor(143), v4: "all", onV4Warning: (t, i) => { warned.push([t, i]); }});
+  const q = await p.getQuote({sourceChain: "eip155:143", destChain: "eip155:143", sourceToken: "USDC", destToken: M_AUSD, amountIn: M_USDC_IN.toString(), destAddress: ME, refundAddress: ME, sender: ME, ...extra, onRefusal: (t: string, i?: Swap2RefusalInfo) => { heard.push([t, i]); }});
+  return {q, heard, warned};
+}
+
+describe("QUOTES-3: the alert for a v4 route set aside says what v3 then did", () => {
+  it('v3 refused too (the caller\'s floor): the alert says so — before: "— quoted v3" beside the refusal', async () => {
+    const {q, heard, warned} = await monad({minAmountOut: "696000000"});
+    expect(q).toBeNull();
+    expect(heard).toEqual([["uniswap: floor breach (min=695505000 < floor=696000000)", {reason: "price_check_failed"}]]);
+    expect(warned).toEqual([[expect.stringMatching(/^uniswap: the best Uniswap v4 route on chain 143 was set aside \(price moved .*\) — v3 was refused too \(floor breach \(min=695505000 < floor=696000000\)\)$/), {chainId: 143, reason: "price_check_failed"}]]);
+  });
+
+  it('v3 quoted: "— quoted v3", as before', async () => {
+    const {q, warned} = await monad({});
+    expect(q).toMatchObject({destAmount: "699000000"});
+    expect(warned).toEqual([[expect.stringMatching(/set aside \(price moved .*\) — quoted v3$/), {chainId: 143, reason: "price_check_failed"}]]);
+  });
+});

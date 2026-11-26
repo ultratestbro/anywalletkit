@@ -1936,6 +1936,15 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
     if (pick !== "best") return venuePass(pick);
 
+    /**
+     * The first v4 build set aside before the pass's answer became v3's (the walk's `v3Final`), alerted once that answer
+     * is known — "quoted v3", or v3's own refusal or failed read (review QUOTES-3: it said "quoted v3" before the v3
+     * build, also when that build was then refused).
+     */
+    let asideForV3: V4Refused | undefined;
+    const aside3 = (outcome: string): void => {
+      if (asideForV3) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${asideForV3.refused}) — ${outcome}`, reasonOfInfo(asideForV3.info));
+    };
     try {
       let v4Ready = false;
       if (v4In) {
@@ -1982,12 +1991,16 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         v3: (c) => buildV3(c, block, own, unexecutable),
         v4: (c) => finishV4(chainId, v4In!, v4!, c, currencyIn4, currencyOut4, amountIn, gated, own, unexecutable, signal),
         v3Final: (aside) => {
-          if (aside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${aside.refused}) — quoted v3`, reasonOfInfo(aside.info));
+          asideForV3 = aside;
         },
       });
       if (w.answer) {
         const a = w.answer.a;
-        if (!("quote" in a)) return refuse(a.refused, a.info);
+        if (!("quote" in a)) {
+          aside3(`v3 was refused too (${a.refused})`);
+          return refuse(a.refused, a.info);
+        }
+        aside3("quoted v3");
         if (w.answer.venue === "v4" && w.setAside) warn(`the best Uniswap v4 route on chain ${chainId} was set aside (${w.setAside.refused}) — quoted another v4 route`, reasonOfInfo(w.setAside.info));
         return a.quote;
       }
@@ -2001,7 +2014,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       return refuse(partial ? PARTIAL_FILL : v4 ? (d3 ? "no Uniswap v3 or v4 pool route for this pair and amount" : "no Uniswap v4 pool route for this pair and amount") : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
     } catch (e) {
       // A v4 read's text begins "uniswap v4: …": refused as "uniswap: v4: …", the venue named once (review QUOTES-4).
-      return refuse(e instanceof Error ? e.message.replace(/^uniswap: /, "").replace(/^uniswap v4: /, "v4: ") : String(e), refusalOf(e));
+      const why = e instanceof Error ? e.message.replace(/^uniswap: /, "").replace(/^uniswap v4: /, "v4: ") : String(e);
+      if (!signal?.aborted) aside3(`v3 could not be read (${why})`);
+      return refuse(why, refusalOf(e));
     }
   }
 
