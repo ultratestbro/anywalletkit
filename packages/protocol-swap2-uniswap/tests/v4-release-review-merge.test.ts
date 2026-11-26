@@ -180,7 +180,7 @@ describe("U0-LIVE-1 / U0C-1 on the v4 path: a quote's v4 reads go by its turns, 
   it(`with v4 on the provider refuses a rate under ${MIN_CALLS_PER_SECOND_V4}; with v4 off ${MIN_CALLS_PER_SECOND} stands as in 0.4.12`, () => {
     const rpcUrls = {[CHAIN]: ["https://monad.fake"]};
     for (const v4 of ["native-in", "all"] as const) {
-      expect(() => uniswapProvider({rpcUrls, v4, rpcCallsPerSecond: MIN_CALLS_PER_SECOND_V4 - 1})).toThrow(`uniswap: rpcCallsPerSecond must be an integer ≥ ${MIN_CALLS_PER_SECOND_V4} with Uniswap v4 on (the least that carries one v4 quote)`);
+      expect(() => uniswapProvider({rpcUrls, v4, rpcCallsPerSecond: MIN_CALLS_PER_SECOND_V4 - 1})).toThrow(`uniswap: rpcCallsPerSecond must be an integer ≥ ${MIN_CALLS_PER_SECOND_V4} with Uniswap v4 on (it carries the largest v4 quote, with a margin)`);
       expect(() => uniswapProvider({rpcUrls, v4, rpcCallsPerSecond: MIN_CALLS_PER_SECOND_V4})).not.toThrow();
     }
     for (const off of [{}, {v4: "off" as const}]) {

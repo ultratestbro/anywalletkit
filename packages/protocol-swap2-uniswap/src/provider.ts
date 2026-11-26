@@ -515,7 +515,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const minPerSecond = v4On ? MIN_CALLS_PER_SECOND_V4 : MIN_CALLS_PER_SECOND;
   if (perSecond !== undefined && !(typeof perSecond === "number" && Number.isInteger(perSecond) && perSecond >= minPerSecond)) {
     throw new Error(v4On
-      ? `uniswap: rpcCallsPerSecond must be an integer ≥ ${minPerSecond} with Uniswap v4 on (the least that carries one v4 quote)`
+      ? `uniswap: rpcCallsPerSecond must be an integer ≥ ${minPerSecond} with Uniswap v4 on (it carries the largest v4 quote, with a margin)`
       : `uniswap: rpcCallsPerSecond must be an integer ≥ ${minPerSecond} (the least that carries one quote)`);
   }
   const verified = new Map<number, Promise<void>>();

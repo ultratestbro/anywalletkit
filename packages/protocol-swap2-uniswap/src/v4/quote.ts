@@ -499,8 +499,8 @@ export async function v4ProbeImpactBps(args: {quoter: Hex; route: V4Route; amoun
  * Both measures for the chosen route: `probeBps` (the 1/1000 probe, fees excluded) and `spotBps` (the spot value loss
  * against the pools' mid prices, fees included), each when it could be measured, and `impactBps`, the larger of the
  * ones that were — the probe alone when spot could not be. The provider's own gate (`maxPriceImpactBps`) never passes
- * on the probe alone (it is blind to a pool parked past an empty range): without `spotBps` it refuses unless the probe
- * already reaches the limit. An app gating with this helper does the same — refuse when `spotBps` is undefined (and
+ * on the probe alone (it is blind to a pool parked past an empty range): without `spotBps` it refuses either way — for
+ * impact when the probe already reaches the limit, else as unmeasured. An app gating with this helper does the same — refuse when `spotBps` is undefined (and
  * when `impactBps` is), else gate on `impactBps`. The provider does not call it.
  */
 export async function measureV4Impact(args: {quoter: Hex; route: V4Route; amountIn: bigint; amountOut: bigint}, batch: V4CallBatch): Promise<{probeBps?: number; spotBps?: number; impactBps?: number}> {
