@@ -16,6 +16,7 @@ import {toFunctionSelector} from "viem";
 import {ZEROEX_CHAINS, ZEROEX_PERMIT2} from "../src/chains.js";
 import {zeroExProvider} from "../src/provider.js";
 import {REGISTRY_OWNER_OF_SELECTOR, REGISTRY_PREV_SELECTOR} from "../src/settler.js";
+import {pinStatus, runSummary} from "../scripts/pin-status.mjs";
 
 interface Source {id: string; type: string; chainId?: number; address?: string; to?: string; signature?: string; args?: unknown[]; decode?: string; repo?: string; label?: string; severity?: string}
 const read = (file: string) => JSON.parse(readFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), "utf8"));
@@ -80,5 +81,39 @@ describe("watch.json coverage", () => {
   it("ids are unique", () => {
     const ids = manifest.sources.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+// verify:live's last lines (scripts/pin-status.mjs): the Severity line says what is refused and why, per chain — it said
+// "(a new deployment: native-coin sales)" for a past-the-margin Settler, a rollback and a registry with no Settler too
+// (review 2026-11-26) — and only for a chain whose registry answered.
+describe("verify:live's run summary", () => {
+  const chain = {newestLiveNonce: 22, previousLiveNonce: 21};
+  const verdict = (id: number, current: number | null, previous: number | null = null) => {
+    const s = pinStatus({id, chain, current, previous, margin: 2});
+    return {id, tag: s.tag, pin: s.tag, native: s.native, token: s.token};
+  };
+  it("names what is refused and why, every sale first", () => {
+    const {reason, severity} = runSummary({chains: [verdict(1, 23, 22), verdict(10, 25, 24), verdict(56, 20, 19), verdict(137, null), verdict(8453, 23, 22), verdict(42161, 22, 20), verdict(43114, 22, 21)]});
+    expect(reason).toBe("Reason: PIN on 10; NEW on 1, 8453; OLD on 56; PREV on 42161; BAD on 137");
+    expect(severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 10 (a new deployment past the margin); every sale on 56 (a rollback below the pinned previous); every sale on 137 (the registry names no Settler this module can tell); native-coin sales on 1, 8453 (a new deployment): check it, then update the pins in src/chains.ts");
+  });
+  it("one kind alone: a new deployment is native-coin sales; a registry that names no Settler asks for no pin raise", () => {
+    expect(runSummary({chains: [verdict(143, 23, 22)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: native-coin sales on 143 (a new deployment): check it, then update the pins in src/chains.ts");
+    expect(runSummary({chains: [verdict(143, 25, 24)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 143 (a new deployment past the margin): check it, then update the pins in src/chains.ts");
+    expect(runSummary({chains: [verdict(143, 20, 19)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 143 (a rollback below the pinned previous): check it, then update the pins in src/chains.ts");
+    expect(runSummary({chains: [verdict(143, null)]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: every sale on 143 (the registry names no Settler this module can tell): check the registry and the Settler it names (no pin raise fixes it)");
+    // a rollback between the pins: native-coin sales only
+    const gap = {newestLiveNonce: 22, previousLiveNonce: 20};
+    const s = pinStatus({id: 1, chain: gap, current: 21, previous: 20, margin: 2});
+    expect(s).toMatchObject({tag: "OLD", native: false, token: true});
+    expect(runSummary({chains: [{id: 1, tag: s.tag, pin: s.tag, native: s.native, token: s.token}]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: native-coin sales on 1 (a rollback): check it, then update the pins in src/chains.ts");
+  });
+  it("a BAD chain whose reading is a new deployment says so; a BAD chain with the pins in step, PREV, unreachable and quotes carry no severity", () => {
+    // another check failed (BAD), the reading itself is NEW: why comes from the reading
+    expect(runSummary({chains: [{id: 8453, tag: "BAD", pin: "NEW", native: false, token: true}]}).severity).toBe("Severity: high — sales through the Settler in force are refused today: native-coin sales on 8453 (a new deployment): check it, then update the pins in src/chains.ts");
+    const quiet = runSummary({chains: [{id: 1, tag: "BAD", pin: "ok", native: true, token: true}, verdict(10, 22, 20), {id: 143, tag: "unreachable"}], quotes: [{id: 8453, kind: "quote"}, {id: 8453, kind: "remote"}]});
+    expect(quiet).toEqual({reason: "Reason: PREV on 10; BAD on 1; unreachable on 143; BAD quote on 8453; BAD remote on 8453", severity: null});
+    expect(runSummary({chains: [verdict(1, 22, 21)]})).toEqual({reason: null, severity: null});
   });
 });

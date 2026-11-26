@@ -139,6 +139,24 @@ describe("quotes on Monad through the provider", () => {
     expect(q!.txRequest!.value).toBe("0");
     expect(q!.txRequest!.approvalAddress).toBe(ZEROEX_PERMIT2);
   });
+  it("the 6,000,000 gas cap is on the padded limit (gas × 1.2 + 20,000): 0x asking for 4,983,334 passes, 4,983,335 is refused", async () => {
+    // README / changeset wording (review 2026-11-26): the bound in 0x's own `transaction.gas` terms.
+    const withGas = (gas: string) => (body: Record<string, any>) => ({...body, transaction: {...body.transaction, gas}});
+    const run = async (gas: string) => {
+      vi.stubGlobal("fetch", stub({settler: at(12), registry: {current: at(12), prev: at(11)}, code: deployedUpTo(12), out: 100_000_000n, tamper: withGas(gas)}));
+      const heard: [string, string | undefined][] = [];
+      const q = await zeroExProvider({apiKey: getKey, rpcUrls: RPC}).getQuote(params({onRefusal: (t, info) => heard.push([t, info?.reason])}));
+      return {q, heard};
+    };
+    const top = await run("4983334");
+    expect(top.heard).toEqual([]);
+    expect(top.q!.txRequest!.gasLimit).toBe("6000000");
+    const over = await run("4983335");
+    expect(over.q).toBeNull();
+    expect(over.heard).toHaveLength(1);
+    expect(over.heard[0]![0]).toContain("more gas than any 0x swap needs");
+    expect(over.heard[0]![1]).toBe("policy_refused");
+  });
   it("MON ↔ WMON is a wrap, not a 0x swap: refused up front", async () => {
     const {q, heard} = await quote(at(12), {destToken: WMON});
     expect(q).toBeNull();

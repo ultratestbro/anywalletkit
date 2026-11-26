@@ -17,7 +17,18 @@ const SEVERITY_LINE = /^Severity: (high|medium|low)\b/i;
 const SEVERITY_RANK = {low: 1, medium: 2, high: 3};
 /** Lines that name the cause of a failure (viem's Details / Status lines, an error line) rather than the stack tail. */
 const CAUSE_LINE = /^(\w*Error: |(Details|Status|function): )/;
-/** The longest note the canary stores. */
+/**
+ * The lines a job that prints `Reason:` summarises there, by the tag they start with (verify:live: `BAD chain …`,
+ * `BAD quote … (HTTP 429)`, `??? chain … no RPC answered`, `NEW chain …`, `PIN`, `OLD`, `PREV`).
+ */
+const FAILING_LINE = /^(\?\?\?|(BAD|NEW|PIN|OLD|PREV)\b)/;
+/** A job's own count line (`FAILED (2)`): it says nothing the Reason line does not. */
+const COUNT_LINE = /^FAILED \(\d+\)$/;
+/**
+ * The room a note has. A note without a `Reason:` part is at most this long; with one, the Reason part is kept whole up
+ * to {@link REASON_MAX} and what follows it only fills what is left of this, so a note is at most
+ * `Math.max(NOTE_MAX, REASON_MAX)` (600) long.
+ */
 export const NOTE_MAX = 300;
 /** The longest the leading `Reason:` part may grow to (it is kept whole up to this). */
 export const REASON_MAX = 600;
@@ -53,20 +64,43 @@ const clean = (s) => String(s).replace(/https?:\/\/\S+/g, "<url>").replace(/\s+/
 const cut = (s, max) => (s.length <= max ? s : `${s.slice(0, max - 1)}…`);
 
 /**
+ * The lines that say what failed in a run that prints `Reason:` (the detail its Reason line summarises): the job's own
+ * failing lines ({@link FAILING_LINE}), or, with none, its last four lines that are not a Reason / Severity / count
+ * line. Trimmed, not cleaned.
+ */
+export function failingLines(lines) {
+  const trimmed = lines.map((l) => String(l).trim()).filter(Boolean);
+  const failing = trimmed.filter((l) => FAILING_LINE.test(l));
+  return failing.length ? failing : trimmed.filter((l) => !REASON_LINE.test(l) && !SEVERITY_LINE.test(l) && !COUNT_LINE.test(l)).slice(-4);
+}
+
+/**
  * The note kept for a run. A failure: the job's own `Reason:` lines first and whole (up to {@link REASON_MAX}), then the
- * cause lines (or, with neither, the last four lines) in what room is left of {@link NOTE_MAX}. Otherwise the first
- * warning lines.
+ * cause lines in what room is left of {@link NOTE_MAX} — with a Reason line and no cause line, the job's failing lines
+ * ({@link failingLines}: `BAD quote … API key rejected (HTTP 401)`, a BAD chain's failing checks), with neither, the last
+ * four lines. Otherwise the first warning lines.
  */
 export function noteOf({status, lines, soft}) {
   if (status !== "fail") return clean(soft.slice(0, 3).join(" | ")).slice(0, NOTE_MAX);
   const trimmed = lines.map((l) => l.trim());
   const reasons = [...new Set(trimmed.filter((l) => REASON_LINE.test(l)).map(clean))];
   const cause = [...new Set(trimmed.filter((l) => CAUSE_LINE.test(l)))].slice(0, 4);
-  const rest = clean((cause.length ? cause : reasons.length ? [] : lines.slice(-4)).join(" | "));
+  const rest = clean((cause.length ? cause : reasons.length ? failingLines(lines) : lines.slice(-4)).join(" | "));
   if (!reasons.length) return rest.slice(0, NOTE_MAX);
   const head = cut(reasons.join(" | "), REASON_MAX);
   const room = NOTE_MAX - head.length - 3;
   return rest && room > 0 ? `${head} | ${rest.slice(0, room)}` : head;
+}
+
+/**
+ * The text the canary's retry wait is chosen from (retry-wait.mjs: a rate limit waits longer): the note, and for a run
+ * that prints `Reason:` every one of its failing lines as well — the note has room for the first few only, and a 429
+ * on the fifth corridor must still wait out the rate limit. A run without a Reason line: the note alone, as before.
+ */
+export function retryTextOf(run) {
+  const note = noteOf(run);
+  if (run.status !== "fail" || !run.lines.some((l) => REASON_LINE.test(l.trim()))) return note;
+  return [note, ...failingLines(run.lines).map(clean)].join(" | ");
 }
 
 /** A note cut to `max` for one Telegram or log line; a leading `Reason:` part stays whole (the rest becomes "…"). */
@@ -83,9 +117,15 @@ export function shortNote(note, max) {
 
 /**
  * `RPC_<chainId>` for every chain whose RPC variable (`names`: chain id → env name) is set: the override a verify-live
- * that reads `RPC_<chainId>` takes (0x). A chain whose variable is unset is left to the script's own public endpoint.
- * The values go only into the child's environment, never into a note or a log line.
+ * that reads `RPC_<chainId>=url[,url]` takes (0x). Ours comes first; the chain's public endpoint (`fallbacks`: chain id →
+ * URL) follows as the retry, so a run on a day our RPC is out of credits or rate-limited still reads the chain (the 0x
+ * job ran on public endpoints alone before 2026-11-26). A chain whose variable is unset is left to the script's own
+ * public endpoint. The values go only into the child's environment, never into a note or a log line.
  */
-export function rpcOverrides(env, names) {
-  return Object.fromEntries(Object.entries(names).filter(([, name]) => typeof env[name] === "string" && env[name] !== "").map(([id, name]) => [`RPC_${id}`, env[name]]));
+export function rpcOverrides(env, names, fallbacks = {}) {
+  return Object.fromEntries(Object.entries(names).filter(([, name]) => typeof env[name] === "string" && env[name] !== "").map(([id, name]) => {
+    const ours = env[name];
+    const fallback = fallbacks[id];
+    return [`RPC_${id}`, typeof fallback === "string" && fallback !== "" && fallback !== ours ? `${ours},${fallback}` : ours];
+  }));
 }

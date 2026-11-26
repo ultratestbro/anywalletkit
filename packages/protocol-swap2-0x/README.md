@@ -33,7 +33,7 @@ The SDK reads no environment. By convention apps and backends name the switch an
 
 Selling the native coin needs no approval and no signature: the call carries the amount as value. It too is dry-run from the account right before the broadcast and sent with the account's own gas estimate, never the quoted limit (the provider declares `ownGasEstimate`). A dry run that reverts refuses the swap (`simulation_failed`); one the account's RPC does not answer is asked once more and then refused as `upstream_unavailable`.
 
-**Monad charges the gas limit, not the gas used** (limit × price). That is one more reason every 0x call goes out with the account's own estimate rather than the quoted limit; a quote whose transaction asks for more than 6,000,000 gas is refused (`ZEROEX_MAX_GAS_LIMIT`). An EIP-7702-delegated account on Monad cannot go below 10 MON (Monad's reserve balance), so selling all of its MON does not go through; how a plain account fares on "sell all MON" has not been verified.
+**Monad charges the gas limit, not the gas used** (limit × price). That is one more reason every 0x call goes out with the account's own estimate rather than the quoted limit; a quote whose gas limit, as the module pads it (0x's `transaction.gas` × 1.2 + 20,000, room for the appended signature), comes to more than 6,000,000 is refused (`ZEROEX_MAX_GAS_LIMIT`): in 0x's own terms, a quote asking for more than 4,983,334 gas. An EIP-7702-delegated account on Monad cannot go below 10 MON (Monad's reserve balance), so selling all of its MON does not go through; how a plain account fares on "sell all MON" has not been verified.
 
 ## What is checked before anything is signed
 

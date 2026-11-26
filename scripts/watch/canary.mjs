@@ -11,7 +11,7 @@ import {spawn} from "node:child_process";
 import {readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync} from "node:fs";
 import {resolve, dirname} from "node:path";
 import {fileURLToPath} from "node:url";
-import {noteOf, rpcOverrides, runStatus, shortNote} from "./canary-status.mjs";
+import {noteOf, retryTextOf, rpcOverrides, runStatus, shortNote} from "./canary-status.mjs";
 import {fitLines} from "./html-text.mjs";
 import {retryWaitMs} from "./retry-wait.mjs";
 
@@ -90,10 +90,11 @@ if (existsSync(pkg("protocol-swap2-relay"))) jobs.push({id: "relay", module: "re
 // 0x: the registry (ERC-1967 proxy, owner, the Settlers it names are CREATE3 deployments with code), Permit2 and the wrapped
 // natives on every chain of its table — keyless, always; a chain no RPC answered on fails it. Our RPCs go in as the
 // script's RPC_<chainId> overrides where they are set (it reads no *_RPC_URL names; before, CI always ran it on its
-// public fallbacks). It ends a failed run with `Reason:` (every chain that is not ok) and, when a sale through the
-// Settler in force is refused today (a new 0x deployment on a pinned chain), `Severity: high`. Live quotes (local and
-// through createSwap2Handler) only with ZEROEX_API_KEY; without it the script says so in a neutral line.
-if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], env: rpcOverrides(env, RPC_ENV), timeoutS: 300});
+// public fallbacks), each followed by the chain's public endpoint as the retry, so our RPC running dry or rate-limited
+// does not fail the job on its own. It ends a failed run with `Reason:` (every chain that is not ok) and, when a sale
+// through the Settler in force is refused today (what is refused and why, per chain), `Severity: high`. Live quotes
+// (local and through createSwap2Handler) only with ZEROEX_API_KEY; without it the script says so in a neutral line.
+if (existsSync(pkg("protocol-swap2-0x"))) jobs.push({id: "zeroex", module: "zeroex", script: pkg("protocol-swap2-0x"), args: [], env: rpcOverrides(env, RPC_ENV, PUBLIC_RPC), timeoutS: 300});
 // Across: every pin on chain (SpokePool proxy, chainId, admin = HubPool, wrapped native, buffers, not paused, token
 // decimals, the HubPool's registry) and /suggested-fees on nine corridors on the pinned SpokePools — keyless, always.
 // Live quotes (local and through createSwap2Handler) only with ACROSS_API_KEY; without it a neutral line, exit 0.
@@ -116,7 +117,9 @@ function run(job) {
       // A failure note leads with the job's own `Reason:` line, whole (every chain that is not ok), then names the cause
       // (viem's Details / Status lines, the error line) rather than the stack tail; URLs are cut (canary-status.mjs).
       const note = noteOf({status, lines, soft});
-      done({...job, status, ms: Date.now() - t0, note, ...(severity ? {severity} : {})});
+      // What the retry wait is chosen from (not stored): the note, plus every failing line of a job that prints Reason.
+      const retryText = retryTextOf({status, lines, soft});
+      done({...job, status, ms: Date.now() - t0, note, retryText, ...(severity ? {severity} : {})});
     });
   });
 }
@@ -128,7 +131,7 @@ const queue = [...selected];
 async function runWithRetry(job) {
   const first = await run(job);
   if (first.status !== "fail" && first.status !== "timeout") return first;
-  await new Promise((r) => setTimeout(r, retryWaitMs(first.note)));
+  await new Promise((r) => setTimeout(r, retryWaitMs(first.retryText ?? first.note)));
   const second = await run(job);
   if (second.status === "fail" || second.status === "timeout") return second;
   console.error(`retry   ${job.id} passed on the second try — first: ${shortNote(first.note, 160)}`);

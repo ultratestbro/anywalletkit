@@ -20,6 +20,8 @@ export function pinStatus(reading: PinReading): PinStatus;
 export interface RunChain {
   id: number | string;
   tag: PinStatus["tag"] | "unreachable";
+  /** The pinStatus tag of the reading, when `tag` is "BAD" for another failed check (why a sale is refused). */
+  pin?: PinStatus["tag"];
   native?: boolean;
   token?: boolean;
 }
@@ -30,6 +32,7 @@ export interface RunQuote {
 }
 /**
  * The last lines of a run that did not pass: `Reason:` names every chain that is not ok, by verdict; `Severity: high`
- * when a sale through the Settler in force is refused today on a chain that answered. Both null on a clean run.
+ * when a sale through the Settler in force is refused today on a chain whose registry answered, naming what is refused
+ * (every sale / native-coin sales) and why, per chain. Both null on a clean run.
  */
 export function runSummary(run: {chains: RunChain[]; quotes?: RunQuote[]}): {reason: string | null; severity: string | null};
