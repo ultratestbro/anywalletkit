@@ -5,7 +5,7 @@ import {describe, expect, it} from "vitest";
 import {encodeAbiParameters, encodeFunctionData, getAddress, keccak256, parseAbi, parseAbiParameters, type Hex} from "viem";
 import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import {remotePinRefusal} from "@anywalletkit/protocol-swap2-core/validate";
-import {UNISWAP_V3, uniswapPins, uniswapVerifyQuote} from "../src/addresses.js";
+import {UNISWAP_V3, uniswapPins, uniswapV3VerifyQuote} from "../src/addresses.js";
 import {PERMIT2_ADDRESS, UNISWAP_V4, UR_COMMANDS, V4_ACTION_CONSTANTS, V4_ACTIONS} from "../src/v4/addresses.js";
 import {poolIdOf, type V4PoolKey} from "../src/v4/pool.js";
 import {
@@ -521,13 +521,22 @@ describe("transaction shape", () => {
   });
 });
 
+/** The pins a 0.4.11 app ships: SwapRouter02 as the only call target and spender, and the v3 check alone (U1 moved both
+ *  into `uniswapV3VerifyQuote` / the SwapRouter half of `uniswapPins`, so they are rebuilt here as 0.4.11 had them). */
+const V3_ONLY = (chain: string): readonly string[] => {
+  const id = Number(chain.slice(7));
+  return Object.prototype.hasOwnProperty.call(UNISWAP_V3, id) ? [UNISWAP_V3[id]!.router] : [];
+};
+const PINS_0411 = {callTargets: V3_ONLY, spenders: V3_ONLY, verifyQuote: uniswapV3VerifyQuote};
+
 describe("old 0.4.11 pins against a v4 quote", () => {
   it("the v3 verifier refuses it, and the v3 pins do not list the router or the SwapProxy", () => {
     const c = e1Case();
-    expect(uniswapVerifyQuote(c.params, c.quote)).toMatch(/not the SwapRouter/);
-    expect(uniswapPins.reasonOf!(uniswapVerifyQuote(c.params, c.quote)!)).toEqual({reason: "vault_mismatch"});
-    expect(uniswapPins.callTargets("eip155:143")).not.toContain(D143.universalRouter);
-    const stub = {name: "uniswap", remote: true, callTargets: uniswapPins.callTargets, spenders: uniswapPins.spenders, verifiesQuotes: true};
+    expect(PINS_0411.verifyQuote(c.params, c.quote)).toMatch(/not the SwapRouter/);
+    expect(uniswapPins.reasonOf!(PINS_0411.verifyQuote(c.params, c.quote)!)).toEqual({reason: "vault_mismatch"});
+    expect(PINS_0411.callTargets("eip155:143")).not.toContain(D143.universalRouter);
+    expect(PINS_0411.callTargets("eip155:143")).not.toContain(D143.swapProxy);
+    const stub = {name: "uniswap", remote: true, callTargets: PINS_0411.callTargets, spenders: PINS_0411.spenders, verifiesQuotes: true};
     expect(remotePinRefusal(stub, c.quote, "eip155:143")).toMatch(/did not pin as a call target/);
     const t = usdcToAusd();
     expect(remotePinRefusal(stub, t.quote, "eip155:143")).toMatch(/did not pin as a spender/);

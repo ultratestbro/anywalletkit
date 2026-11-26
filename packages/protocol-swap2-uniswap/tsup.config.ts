@@ -1,2 +1,2 @@
 import { defineConfig } from 'tsup'
-export default defineConfig({ entry: {"index": "./src/index.ts", "provider": "./src/provider.ts", "activity": "./src/activity.ts", "protocol": "./src/protocol.ts", "v4pools": "./src/v4pools/index.ts"}, format: ['esm', 'cjs'], dts: true, sourcemap: true, clean: true, target: 'es2022', platform: 'neutral', external: [/^@anywalletkit\//, 'viem'] })
+export default defineConfig({ entry: {"index": "./src/index.ts", "provider": "./src/provider.ts", "activity": "./src/activity.ts", "protocol": "./src/protocol.ts", "v4": "./src/v4/index.ts", "v4pools": "./src/v4pools/index.ts"}, format: ['esm', 'cjs'], dts: true, sourcemap: true, clean: true, target: 'es2022', platform: 'neutral', external: [/^@anywalletkit\//, 'viem'] })

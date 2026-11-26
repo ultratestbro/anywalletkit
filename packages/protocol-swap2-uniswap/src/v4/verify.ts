@@ -443,25 +443,35 @@ export interface V4RpcCall {
   params: unknown[];
 }
 
-/** The reads of the §6.5 row 15 deployment check, in order: `poolManager()` of the router, the quoter and the
- *  StateView, then the runtime code of the router and the SwapProxy (their codehashes are pinned). */
-export function v4DeploymentReads(d: UniswapV4Deployment): V4RpcCall[] {
-  const pm = encodeFunctionData({abi: V4_LINKAGE_ABI, functionName: "poolManager"});
-  const call = (to: string): V4RpcCall => ({method: "eth_call", params: [{to, data: pm}, "latest"]});
-  return [call(d.universalRouter), call(d.quoter), call(d.stateView), {method: "eth_getCode", params: [d.universalRouter, "latest"]}, {method: "eth_getCode", params: [d.swapProxy, "latest"]}];
+/** What a deployment check covers: by default the router, quoter, StateView and SwapProxy; `swapProxy: false` leaves
+ *  the SwapProxy out (native input never calls it, so its build is not a fact the native-input path depends on). */
+export interface V4DeploymentCheckOptions {
+  swapProxy?: boolean;
 }
 
-/** Why the answers to {@link v4DeploymentReads} do not describe the pinned deployment, or null. A missing answer is a
- *  failure, never a pass. */
-export function v4DeploymentProblem(d: UniswapV4Deployment, answers: readonly unknown[]): string | null {
-  if (answers.length !== 5) return "the deployment check got no answer";
+/** The reads of the §6.5 row 15 deployment check, in order: `poolManager()` of the router, the quoter and the
+ *  StateView, then the runtime code of the router and (unless `swapProxy: false`) the SwapProxy (their codehashes are
+ *  pinned). */
+export function v4DeploymentReads(d: UniswapV4Deployment, options: V4DeploymentCheckOptions = {}): V4RpcCall[] {
+  const pm = encodeFunctionData({abi: V4_LINKAGE_ABI, functionName: "poolManager"});
+  const call = (to: string): V4RpcCall => ({method: "eth_call", params: [{to, data: pm}, "latest"]});
+  const reads: V4RpcCall[] = [call(d.universalRouter), call(d.quoter), call(d.stateView), {method: "eth_getCode", params: [d.universalRouter, "latest"]}];
+  if (options.swapProxy !== false) reads.push({method: "eth_getCode", params: [d.swapProxy, "latest"]});
+  return reads;
+}
+
+/** Why the answers to {@link v4DeploymentReads} (with the same options) do not describe the pinned deployment, or null.
+ *  A missing answer is a failure, never a pass. */
+export function v4DeploymentProblem(d: UniswapV4Deployment, answers: readonly unknown[], options: V4DeploymentCheckOptions = {}): string | null {
+  const proxy = options.swapProxy !== false;
+  if (answers.length !== (proxy ? 5 : 4)) return "the deployment check got no answer";
   const addr = (r: unknown) => (typeof r === "string" && /^0x[0-9a-fA-F]{64}$/.test(r) ? getAddress(`0x${r.slice(-40)}`) : null);
   const pm = getAddress(d.poolManager);
   const names = ["Universal Router", "V4Quoter", "StateView"];
   for (let i = 0; i < 3; i++) if (addr(answers[i]) !== pm) return `the ${names[i]} does not report the pinned PoolManager`;
   const hash = (r: unknown) => (typeof r === "string" && HEX.test(r) && r.length > 2 ? lower(keccak256(r as Hex)) : null);
   if (hash(answers[3]) !== lower(d.routerCodehash)) return "the Universal Router's code is not the pinned 2.1.2 build";
-  if (hash(answers[4]) !== lower(d.swapProxyCodehash)) return "the SwapProxy's code is not the pinned build";
+  if (proxy && hash(answers[4]) !== lower(d.swapProxyCodehash)) return "the SwapProxy's code is not the pinned build";
   return null;
 }
 

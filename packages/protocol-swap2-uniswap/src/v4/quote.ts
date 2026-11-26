@@ -156,6 +156,30 @@ export function quoteCallData(route: V4Route, amountIn: bigint): Hex {
   });
 }
 
+/**
+ * The same V4Quoter calldata as {@link quoteCallData}, from the pool keys alone (preflight rebuilds the quoted route from
+ * `providerData.poolKeys`): hop i sells the running currency into its pool's other currency. Throws when a pool does not
+ * hold the running currency, or for more than two pools.
+ */
+export function quoteCallDataOfKeys(currencyIn: Hex, keys: readonly {currency0: Hex; currency1: Hex; fee: number; tickSpacing: number; hooks: Hex}[], amountIn: bigint): Hex {
+  if (keys.length < 1 || keys.length > 2) throw new Error("uniswap v4: a route is one or two pools");
+  let cur = lc(currencyIn);
+  const hops: V4Hop[] = keys.map((key) => {
+    const c0 = lc(key.currency0), c1 = lc(key.currency1);
+    if (cur !== c0 && cur !== c1) throw new Error("uniswap v4: the pools of the route are not continuous");
+    const zeroForOne = cur === c0;
+    cur = zeroForOne ? c1 : c0;
+    const pool: V4Pool = {key: {currency0: getAddress(key.currency0), currency1: getAddress(key.currency1), fee: key.fee, tickSpacing: key.tickSpacing, hooks: getAddress(key.hooks)}, id: "0x", state: {sqrtPriceX96: 0n, tick: 0, protocolFee: 0, lpFee: key.fee, liquidity: 0n}, source: "listed"};
+    return {pool, zeroForOne, currencyIn: zeroForOne ? pool.key.currency0 : pool.key.currency1, currencyOut: zeroForOne ? pool.key.currency1 : pool.key.currency0};
+  });
+  return quoteCallData({currencyIn: getAddress(currencyIn), currencyOut: hops[hops.length - 1]!.currencyOut, hops, label: "", poolFee: ""}, amountIn);
+}
+
+/** Decodes a V4Quoter answer strictly — exactly (uint256 amountOut, uint256 gasEstimate) — or throws `upstream_unavailable`. */
+export function decodeV4QuoteAnswer(data: Hex): {amountOut: bigint; gasEstimate: bigint} {
+  return decodeQuoteAnswer(data);
+}
+
 /** What a quoter revert means: "partial" (NotEnoughLiquidity, raw or wrapped), "dropped" (any other error), "empty" (no data). */
 export function classifyV4QuoteRevert(data: Hex): {kind: "partial" | "dropped" | "empty"; selector?: string} {
   let d = lc(data) as Hex;

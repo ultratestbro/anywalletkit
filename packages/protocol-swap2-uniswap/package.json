@@ -28,6 +28,11 @@
       "import": "./dist/protocol.js",
       "require": "./dist/protocol.cjs"
     },
+    "./v4": {
+      "types": "./dist/v4.d.ts",
+      "import": "./dist/v4.js",
+      "require": "./dist/v4.cjs"
+    },
     "./v4pools": {
       "types": "./dist/v4pools.d.ts",
       "import": "./dist/v4pools.js",
