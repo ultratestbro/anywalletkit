@@ -5,8 +5,11 @@ import {decodeAbiParameters, decodeFunctionData, encodeAbiParameters, encodeErro
 import {refusalOf} from "@anywalletkit/protocol-swap2-core/errors";
 import {MULTICALL3, V4_UNLISTED_GRID, discoverV4Pools, pairSetOf, type V4EthCall, type V4Pool} from "../src/v4/discover.js";
 import {V4_ERRORS, V4_QUOTER_ABI, buildV4Routes, classifyV4QuoteRevert, measureV4Impact, multicallBatch, quoteCallData, quoteV4Routes, v4ProbeImpactBps, v4SpotLossBps, v4SpotOut, type V4CallBatch, type V4Route} from "../src/v4/quote.js";
-import {V4_NATIVE, checkedHooklessKey, checkedMaxFeePips, poolIdOf} from "../src/v4/pool-key.js";
+import {V4_NATIVE as NATIVE_ADDRESS} from "../src/v4/addresses.js";
+import {checkedHooklessKey, checkedMaxFeePips, poolIdOf} from "../src/v4/pool.js";
 import type {V4ChainPools} from "../src/v4pools/types.js";
+
+const V4_NATIVE: Hex = NATIVE_ADDRESS;
 
 /**
  * Monad (143) recorded at one block (tests/fixtures/v4/monad-discover-quote.json, keys = to|blockTag|sha256(calldata)):
@@ -119,7 +122,7 @@ describe("v4 discovery + quotes, Monad recorded fixture", () => {
     expect(d.grid).toBe(true);
     expect(d.requests).toBe(1);
     expect(routes).toHaveLength(0);
-    expect(q).toEqual({best: null, partial: false, candidates: []});
+    expect(q).toEqual({best: null, partial: false, unexecutable: 0, candidates: []});
   });
 });
 
@@ -245,6 +248,41 @@ describe("v4 quotes: revert classification and strict answers", () => {
     await expect(quoteV4Routes({quoter: QUOTER, routes, amountIn: MON}, async () => { throw new Error("ECONNRESET"); })).rejects.toSatisfy((e: unknown) => refusalOf(e)?.reason === "upstream_unavailable");
     const tie = await quoteV4Routes({quoter: QUOTER, routes, amountIn: MON}, fixed([ok(5n), ok(5n)]));
     expect(tie.best!.route.poolFee).toBe("0.05%"); // equal output: the lower fee wins, deterministically
+  });
+  it("LIVE-1: with the chain's per-transaction gas bound, a call without revert data is read again alone at that bound", async () => {
+    const a = pool(), b = pool({}, {currency0: V4_NATIVE, currency1: AUSD, fee: 3000, tickSpacing: 60});
+    const routes = buildV4Routes({currencyIn: V4_NATIVE, currencyOut: AUSD, pools: [a, b], hubs: []});
+    const fixed = (outs: V4CallBatch extends (...a: never[]) => Promise<infer R> ? R : never): V4CallBatch => async () => outs;
+    const asked: {to: Hex; data: Hex}[][] = [];
+    const bound = (answer: (c: {to: Hex; data: Hex}) => {ok: true; data: Hex} | {ok: false; revert: Hex}) => ({cap: 30_000_000n, calls: async (cs: readonly {to: Hex; data: Hex}[]) => { asked.push([...cs]); return cs.map(answer); }});
+    // Still without data at the bound (the quoter's inner call starved even with every gas a transaction may have): the
+    // route can never be mined — out, counted — and the other route wins.
+    const gasBomb = await quoteV4Routes({quoter: QUOTER, routes, amountIn: MON, gasBound: bound(() => ({ok: false, revert: wrap("0x")}))}, fixed([{ok: false, revert: wrap("0x")}, ok(5n)]));
+    expect(gasBomb.best!.amountOut).toBe(5n);
+    expect(gasBomb.unexecutable).toBe(1);
+    expect(gasBomb.candidates.map((c) => c.outcome)).toEqual(["unexecutable", "quoted"]);
+    expect(asked.at(-1)).toEqual([{to: QUOTER, data: quoteCallData(routes[0]!, MON)}]); // only the empty one, straight to the quoter
+    // Raw "0x" at the bound too.
+    expect((await quoteV4Routes({quoter: QUOTER, routes, amountIn: MON, gasBound: bound(() => ({ok: false, revert: "0x"}))}, fixed([{ok: false, revert: "0x"}, ok(5n)]))).unexecutable).toBe(1);
+    // It answers at the bound (it only starved inside the aggregate): a candidate like any other — and it can win.
+    const answered = await quoteV4Routes({quoter: QUOTER, routes, amountIn: MON, gasBound: bound(() => ok(9n))}, fixed([{ok: false, revert: "0x"}, ok(5n)]));
+    expect(answered).toMatchObject({unexecutable: 0, best: {amountOut: 9n}});
+    expect(answered.best!.route).toBe(routes[0]);
+    // Revert data at the bound: classified as usual (a partial fill here), never "too much gas".
+    const partialAgain = await quoteV4Routes({quoter: QUOTER, routes, amountIn: MON, gasBound: bound(() => ({ok: false, revert: wrap(nel)}))}, fixed([{ok: false, revert: "0x"}, ok(5n)]));
+    expect(partialAgain).toMatchObject({unexecutable: 0, partial: true, best: {amountOut: 5n}});
+    // Every route too heavy: no best, and the count says why.
+    const none = await quoteV4Routes({quoter: QUOTER, routes, amountIn: MON, gasBound: bound(() => ({ok: false, revert: "0x"}))}, fixed([{ok: false, revert: "0x"}, {ok: false, revert: wrap("0x")}]));
+    expect(none).toMatchObject({best: null, partial: false, unexecutable: 2});
+    // The node does not answer the read at the bound: refused, never "too much gas".
+    const unanswered = {cap: 30_000_000n, calls: async () => { throw new Error("HTTP 503"); }};
+    await expect(quoteV4Routes({quoter: QUOTER, routes, amountIn: MON, gasBound: unanswered}, fixed([{ok: false, revert: "0x"}, ok(5n)]))).rejects.toSatisfy((e: unknown) => refusalOf(e)?.reason === "upstream_unavailable");
+    const short = {cap: 30_000_000n, calls: async () => []};
+    await expect(quoteV4Routes({quoter: QUOTER, routes, amountIn: MON, gasBound: short}, fixed([{ok: false, revert: "0x"}, ok(5n)]))).rejects.toSatisfy((e: unknown) => refusalOf(e)?.reason === "upstream_unavailable");
+    // Nothing is read again when no call came back empty.
+    asked.length = 0;
+    await quoteV4Routes({quoter: QUOTER, routes, amountIn: MON, gasBound: bound(() => ok(1n))}, fixed([ok(4n), ok(5n)]));
+    expect(asked).toEqual([]);
   });
   it("multicallBatch: an aggregate the node refuses for gas, or one whose sub-calls starved, is split down to single calls — nothing dropped", async () => {
     const calls = Array.from({length: 7}, (_, i) => ({to: QUOTER, data: `0x0000000${i}` as Hex}));

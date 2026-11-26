@@ -14,7 +14,7 @@ import {remotePinRefusal} from "@anywalletkit/protocol-swap2-core/validate";
 import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
 import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
 import {uniswapProvider, type UniswapProviderConfig} from "../src/provider.js";
-import {UNISWAP_V3, uniswapPins, uniswapV3VerifyQuote, uniswapVerifyQuote} from "../src/addresses.js";
+import {UNISWAP_V3, uniswapPins, uniswapPinsWith, uniswapV3VerifyQuote, uniswapVerifyQuote} from "../src/addresses.js";
 import {UNISWAP_V4} from "../src/v4/addresses.js";
 import {MULTICALL3} from "../src/v4/discover.js";
 import {poolIdOf} from "../src/v4/pool.js";
@@ -48,30 +48,31 @@ const MC3 = parseAbi([
 ]);
 const RESULTS = [{type: "tuple[]", components: [{name: "success", type: "bool"}, {name: "returnData", type: "bytes"}]}] as const;
 
-type Odd = (req: {method: string; to?: string; data?: string}) => object | undefined;
+type Odd = (req: {method: string; to?: string; data?: string; gas?: string}) => object | undefined;
 /** Serves both recordings (an answer `odd` returns instead, when it returns one); every read's block tag, every miss
  *  and every request are kept for the test to check. */
 function replay(odd?: Odd) {
   const tags = new Set<string>();
   const misses: string[] = [];
-  const seen: {method: string; to?: string; data?: string}[] = [];
+  const seen: {method: string; to?: string; data?: string; gas?: string}[] = [];
   const f = (async (_url: RequestInfo | URL, init?: RequestInit) => {
     const batch = JSON.parse(String(init?.body)) as {id: number; method: string; params: unknown[]}[];
     return new Response(JSON.stringify(batch.map((req) => {
       let key = req.method;
-      let to: string | undefined, data: string | undefined;
+      let to: string | undefined, data: string | undefined, gas: string | undefined;
       if (req.method === "eth_call") {
-        const [c, tag] = req.params as [{to: string; data: string}, string];
+        const [c, tag] = req.params as [{to: string; data: string; gas?: string}, string];
         to = c.to.toLowerCase();
         data = c.data.toLowerCase();
+        gas = c.gas;
         if (!DEPLOYMENT_CHECK.test(data.slice(0, 10))) tags.add(tag);
         key = `eth_call ${to} ${data}`;
       } else if (req.method === "eth_getCode") {
         to = String(req.params[0]).toLowerCase();
         key = `eth_getCode ${to}`;
       }
-      seen.push({method: req.method, ...(to ? {to} : {}), ...(data ? {data} : {})});
-      const instead = odd?.({method: req.method, ...(to ? {to} : {}), ...(data ? {data} : {})});
+      seen.push({method: req.method, ...(to ? {to} : {}), ...(data ? {data} : {}), ...(gas ? {gas} : {})});
+      const instead = odd?.({method: req.method, ...(to ? {to} : {}), ...(data ? {data} : {}), ...(gas ? {gas} : {})});
       if (instead) return {jsonrpc: "2.0", id: req.id, ...instead};
       const answer = CALLS[key];
       if (!answer) {
@@ -167,6 +168,57 @@ describe("Monad 62,000 MON → AUSD at block 125,409,523: v3 and v4 ranked toget
     const {q} = await quote(MON(62_000n), {v4: "native-in", v4MinEdgeBps: 10_000});
     expect(q?.providerData?.venue).toBe("v4");
   });
+
+  it("R1-6: 100 MON — v4 1.093251 against v3 0.871160 (+25.49%): an edge of 10000 or 2550 bps keeps v3, 2549 or 2000 lets v4 win", async () => {
+    // 1,093,251 × 10,000 = 10,932,510,000 against 871,160 × (10,000 + edge): 10,932,186,840 at 2549, 10,933,058,000 at 2550.
+    const v3 = await quote(MON(100n));
+    expect(v3.misses).toEqual([]);
+    expect(v3.q?.destAmount).toBe("871160");
+    for (const [edge, venue, out] of [[10_000, undefined, "871160"], [2_550, undefined, "871160"], [2_549, "v4", "1093251"], [2_000, "v4", "1093251"], [0, "v4", "1093251"]] as const) {
+      const {q, heard, misses} = await quote(MON(100n), {v4: "native-in", v4MinEdgeBps: edge});
+      expect(misses, `edge ${edge}`).toEqual([]);
+      expect(heard, `edge ${edge}`).toEqual([]);
+      expect([edge, q?.providerData?.venue, q?.destAmount]).toEqual([edge, venue, out]);
+      if (venue === undefined) expect(q!.txRequest!.to).toBe(UNISWAP_V3[143]!.router);
+    }
+  });
+
+  it("R1-6: an exact tie goes to v3 (v4 must pay strictly more); one raw unit more and v4 wins", async () => {
+    /** Every V4Quoter call (candidates and probe) answered as paying `out` for 60,000 gas. */
+    const paying = (out: bigint): Odd => (r) => {
+      if (r.to !== MULTICALL3.toLowerCase() || !r.data) return undefined;
+      const calls = decodeFunctionData({abi: MC3, data: r.data as Hex}).args[0];
+      if (!calls.every((c) => getAddress(c.target) === getAddress(D4.quoter))) return undefined;
+      const answer = encodeAbiParameters([{type: "uint256"}, {type: "uint256"}], [out, 60_000n]);
+      return {result: encodeAbiParameters(RESULTS, [calls.map(() => ({success: true, returnData: answer}))])};
+    };
+    const tie = await quote(MON(100n), {v4: "native-in"}, paying(871_160n));
+    expect(tie.heard).toEqual([]);
+    expect(tie.q).toMatchObject({destAmount: "871160", txRequest: {to: UNISWAP_V3[143]!.router}});
+    expect(tie.q!.providerData!.venue).toBeUndefined();
+    const more = await quote(MON(100n), {v4: "native-in"}, paying(871_161n));
+    expect(more.q).toMatchObject({destAmount: "871161", providerData: {venue: "v4"}});
+    // With an edge, the tie point moves: 871,160 × 1.0001 = 871,247.116 — 871,248 wins at 1 bp, 871,247 does not.
+    expect((await quote(MON(100n), {v4: "native-in", v4MinEdgeBps: 1}, paying(871_247n))).q?.providerData?.venue).toBeUndefined();
+    expect((await quote(MON(100n), {v4: "native-in", v4MinEdgeBps: 1}, paying(871_248n))).q?.providerData?.venue).toBe("v4");
+  });
+
+  it("R1-2: a server whose deadlineSeconds is 1200 builds the v4 deadline 600 s ahead — the shipped pins accept it", async () => {
+    vi.useFakeTimers({toFake: ["Date"]});
+    try {
+      vi.setSystemTime(new Date("2026-11-26T12:00:00Z"));
+      const {q} = await quote(MON(62_000n), {v4: "native-in", deadlineSeconds: 1200});
+      const d = decodeFunctionData({abi: parseAbi(["function execute(bytes commands, bytes[] inputs, uint256 deadline) payable"]), data: q!.txRequest!.data as Hex});
+      expect(d.args[2]).toBe(BigInt(Math.floor(Date.now() / 1000)) + 600n);
+      expect(uniswapVerifyQuote(params(MON(62_000n)), q!)).toBeNull();
+      // A device clock 90 s behind the server: refused by the default 60 s skew, accepted with clockSkewSeconds 120.
+      vi.setSystemTime(new Date(Date.parse("2026-11-26T12:00:00Z") - 90_000));
+      expect(uniswapVerifyQuote(params(MON(62_000n)), q!)).toMatch(/more than 600 s ahead/);
+      expect(uniswapPinsWith({clockSkewSeconds: 120}).verifyQuote!(params(MON(62_000n)), q!)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("a failed v4 read refuses the quote — never a quote from fewer pools (§5.3, decision 5)", () => {
@@ -207,16 +259,66 @@ describe("a failed v4 read refuses the quote — never a quote from fewer pools 
     expect(heard[0]![0]).toMatch(/reads as uninitialized/);
   });
 
-  it("a V4Quoter call that fails without revert data inside the aggregate: refused, not ranked out", async () => {
-    // Every quote aggregate answers each sub-call with no revert data (how a sub-call out of gas looks): the batcher splits
-    // the chunk down to single calls, and one that still fails that way refuses the quote.
-    const {q, heard} = await quote(MON(62_000n), {v4: "native-in"}, (r) => {
-      if (r.to !== MULTICALL3.toLowerCase() || isDiscovery(r)) return undefined;
-      const n = decodeFunctionData({abi: MC3, data: r.data as Hex}).args[0].length;
-      return {result: encodeAbiParameters(RESULTS, [Array.from({length: n}, () => ({success: false, returnData: "0x" as Hex}))])};
-    });
+  /** Every quote aggregate answers each sub-call with no revert data (how a sub-call out of gas looks): the batcher splits
+   *  the chunk down to single calls, which still come back that way — then each is read again alone at the bound. */
+  const starvedAggregates = (r: {to?: string; data?: string}) => {
+    if (r.to !== MULTICALL3.toLowerCase() || isDiscovery(r)) return undefined;
+    const n = decodeFunctionData({abi: MC3, data: r.data as Hex}).args[0].length;
+    return {result: encodeAbiParameters(RESULTS, [Array.from({length: n}, () => ({success: false, returnData: "0x" as Hex}))])};
+  };
+  const atBound = (r: {to?: string; gas?: string}) => r.to === D4.quoter.toLowerCase() && r.gas !== undefined;
+  /** What the recording says each V4Quoter call answered inside its aggregate (callData → outcome). */
+  const recordedSubCalls = (): Map<string, {success: boolean; returnData: Hex}> => {
+    const m = new Map<string, {success: boolean; returnData: Hex}>();
+    for (const [key, v] of Object.entries(CALLS)) {
+      if (!key.startsWith(`eth_call ${MULTICALL3.toLowerCase()} `) || typeof v.result !== "string") continue;
+      const calls = decodeFunctionData({abi: MC3, data: key.split(" ")[2] as Hex}).args[0];
+      if (!calls.every((c) => getAddress(c.target) === getAddress(D4.quoter))) continue;
+      const results = decodeAbiParameters(RESULTS, v.result as Hex)[0];
+      calls.forEach((c, i) => m.set(c.callData.toLowerCase(), results[i]!));
+    }
+    return m;
+  };
+  const UNEXPECTED_EMPTY = "0x6190b2b0" + encodeAbiParameters([{type: "bytes"}], ["0x"]).slice(2);
+
+  it("a V4Quoter call that fails without revert data inside the aggregate, and its read at the gas bound goes unanswered: refused, not ranked out", async () => {
+    const {q, heard, seen} = await quote(MON(62_000n), {v4: "native-in"}, (r) => starvedAggregates(r) ?? (atBound(r) ? {error: {code: -32603, message: "internal error"}} : undefined));
     expect(q).toBeNull();
-    expect(heard[0]![0]).toMatch(/without revert data/);
+    expect(heard[0]![1]).toEqual({reason: "upstream_unavailable"});
+    // The read at the bound went straight to the quoter with Monad's 30M per-transaction cap named.
+    expect(seen.filter(atBound).every((r) => r.gas === "0x1c9c380")).toBe(true);
+    expect(seen.some(atBound)).toBe(true);
+  }, 15_000);
+
+  it("LIVE-1: the read at the bound starves too (UnexpectedRevertBytes(\"\") with 30M gas): those routes can never be mined — out and counted, v3 still quotes", async () => {
+    const {q, heard} = await quote(MON(62_000n), {v4: "native-in"}, (r) => starvedAggregates(r) ?? (atBound(r) ? {error: {code: 3, message: "execution reverted", data: UNEXPECTED_EMPTY}} : undefined));
+    expect(heard).toEqual([]);
+    expect(q).toMatchObject({destAmount: "1130999", txRequest: {to: UNISWAP_V3[143]!.router}});
+    expect(Number(q!.providerData!.v4Unexecutable)).toBeGreaterThan(0);
+    // Top-level out of gas at the bound ("out of gas", no data) reads the same way.
+    const oog = await quote(MON(62_000n), {v4: "native-in"}, (r) => starvedAggregates(r) ?? (atBound(r) ? {error: {code: -32000, message: "out of gas"}} : undefined));
+    expect(oog.q).toMatchObject({destAmount: "1130999", providerData: {v4Unexecutable: q!.providerData!.v4Unexecutable}});
+  });
+
+  it("LIVE-1: the read at the bound answers (the call only starved inside the aggregate): ranked as usual — v4 still wins", async () => {
+    const sub = recordedSubCalls();
+    const {q, heard} = await quote(MON(62_000n), {v4: "native-in"}, (r) => {
+      const starved = starvedAggregates(r);
+      if (starved) return starved;
+      if (!atBound(r)) return undefined;
+      const o = sub.get(r.data!);
+      expect(o, "the recording holds every quoter call").toBeDefined();
+      return o!.success ? {result: o!.returnData} : {error: {code: 3, message: "execution reverted", data: o!.returnData}};
+    });
+    expect(heard).toEqual([]);
+    expect(q).toMatchObject({destAmount: "676608109", providerData: {venue: "v4", route: "v4 via USDC 0.05%/10 → 0.005%/1"}});
+    expect(q!.providerData!.v4Unexecutable).toBeUndefined();
+  });
+
+  it("LIVE-1: a node that does not give the call the bound (its own eth_call gas cap) refuses — never \"too much gas\"", async () => {
+    const {q, heard} = await quote(MON(62_000n), {v4: "native-in"}, (r) => starvedAggregates(r) ?? (atBound(r) ? {error: {code: -32000, message: "gas required exceeds allowance (8100000)"}} : undefined));
+    expect(q).toBeNull();
+    expect(heard[0]![0]).toMatch(/did not give a quoter call the chain's 30000000 gas/);
     expect(heard[0]![1]).toEqual({reason: "upstream_unavailable"});
   });
 

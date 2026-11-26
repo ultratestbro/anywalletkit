@@ -6,10 +6,16 @@ import {V4_POOLS_56} from "./56.js";
 import {V4_POOLS_130} from "./130.js";
 import {V4_POOLS_137} from "./137.js";
 import {V4_POOLS_143} from "./143.js";
+import {V4_POOLS_196} from "./196.js";
+import {V4_POOLS_480} from "./480.js";
 import {V4_POOLS_4326} from "./4326.js";
+import {V4_POOLS_4663} from "./4663.js";
+import {V4_POOLS_5042} from "./5042.js";
 import {V4_POOLS_8453} from "./8453.js";
 import {V4_POOLS_42161} from "./42161.js";
+import {V4_POOLS_42220} from "./42220.js";
 import {V4_POOLS_43114} from "./43114.js";
+import {V4_POOLS_57073} from "./57073.js";
 import {V4_POOLS_59144} from "./59144.js";
 import {V4_POOLS_99901} from "./99901.js";
 
@@ -23,10 +29,16 @@ export const UNISWAP_V4_POOLS: Readonly<Record<number, V4ChainPools>> = Object.f
   130: V4_POOLS_130,
   137: V4_POOLS_137,
   143: V4_POOLS_143,
+  196: V4_POOLS_196,
+  480: V4_POOLS_480,
   4326: V4_POOLS_4326,
+  4663: V4_POOLS_4663,
+  5042: V4_POOLS_5042,
   8453: V4_POOLS_8453,
   42161: V4_POOLS_42161,
+  42220: V4_POOLS_42220,
   43114: V4_POOLS_43114,
+  57073: V4_POOLS_57073,
   59144: V4_POOLS_59144,
   99901: V4_POOLS_99901,
 });

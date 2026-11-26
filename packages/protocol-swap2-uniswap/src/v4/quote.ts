@@ -2,7 +2,7 @@ import {decodeAbiParameters, decodeFunctionResult, encodeFunctionData, getAddres
 import {bigintToNumber} from "@anywalletkit/core";
 import {refusal, refusalOf, withReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {MULTICALL3, type V4BlockTag, type V4EthCall, type V4Pool} from "./discover.js";
-import {V4_NATIVE} from "./pool-key.js";
+import {V4_NATIVE} from "./addresses.js";
 
 /**
  * Uniswap v4 quotes on the V4Quoter (research §3.3): single-pool and two-pool exact-input candidates over the pools
@@ -12,7 +12,11 @@ import {V4_NATIVE} from "./pool-key.js";
  * `NotEnoughLiquidity(poolId)` — raw, or wrapped in `UnexpectedRevertBytes(bytes)` — is a partial fill: the candidate
  * is out, and if nothing fills the whole input the answer is `insufficient_liquidity`. Any other revert with data drops
  * the candidate. A failure without revert data (out of gas, a node that strips it) or a transport error is not a fact
- * about the pool: the quote refuses (`upstream_unavailable` / the caller's reason) instead of ranking fewer candidates.
+ * about the pool: the quote refuses (`upstream_unavailable` / the caller's reason) instead of ranking fewer candidates —
+ * unless the caller gives a {@link V4GasBound}: then such a call is read again alone, straight to the quoter, with the
+ * chain's per-transaction gas bound named, and one that still fails without revert data needs more gas than any
+ * transaction on the chain may have — it could never be mined (§6.5 row 17), so it is not a route ("unexecutable", counted
+ * on the result). Anything else that read again says (an answer, revert data, a transport error) is taken as it is.
  *
  * Pure over an injected {@link V4CallBatch} (a JSON-RPC batch with per-item revert data, or {@link multicallBatch}).
  */
@@ -76,7 +80,8 @@ export interface V4Route {
 
 export interface V4Candidate {
   route: V4Route;
-  outcome: "quoted" | "partial" | "dropped";
+  /** "unexecutable": it needs more gas than one transaction on the chain may have (see {@link V4GasBound}). */
+  outcome: "quoted" | "partial" | "dropped" | "unexecutable";
   amountOut?: bigint;
   gasEstimate?: bigint;
   /** The revert selector of a dropped or partial candidate. */
@@ -86,7 +91,21 @@ export interface V4QuoteResult {
   best: {route: V4Route; amountOut: bigint; gasEstimate: bigint} | null;
   /** A candidate could not fill the whole input. */
   partial: boolean;
+  /** Candidates left out because they need more gas than one transaction on the chain may have. */
+  unexecutable: number;
   candidates: V4Candidate[];
+}
+
+/**
+ * How a quoter call that failed without revert data is told apart from a node that did not answer (§6.5 row 17): `cap`,
+ * the most gas one transaction on the chain may have (its per-transaction cap), and `calls`, which runs each call alone,
+ * straight to the quoter, with exactly `cap` gas named, at the quote's block — one outcome per call (a revert is an
+ * outcome; a call the node did not answer, or answered under a gas cap of its own below `cap`, throws, classified).
+ * Given only for a chain whose per-transaction cap is known.
+ */
+export interface V4GasBound {
+  cap: bigint;
+  calls: (calls: readonly {to: Hex; data: Hex}[]) => Promise<readonly V4CallOutcome[]>;
 }
 
 const lc = (a: string) => a.toLowerCase();
@@ -213,22 +232,62 @@ function better(a: {route: V4Route; amountOut: bigint}, b: {route: V4Route; amou
   return a.route.label < b.route.label;
 }
 
+/**
+ * The best full fill among `candidates` whose every pool `allow`s (default: all) — more output, then fewer pools, then the
+ * lower fee sum, then the label — or null.
+ */
+export function bestV4Candidate(candidates: readonly V4Candidate[], allow: (pool: V4Pool) => boolean = () => true): V4QuoteResult["best"] {
+  let best: V4QuoteResult["best"] = null;
+  for (const c of candidates) {
+    if (c.outcome !== "quoted" || c.amountOut === undefined || c.gasEstimate === undefined || !c.route.hops.every((h) => allow(h.pool))) continue;
+    const x = {route: c.route, amountOut: c.amountOut, gasEstimate: c.gasEstimate};
+    if (!best || better(x, best)) best = x;
+  }
+  return best;
+}
+
+const asQuoterReadFailure = (e: unknown): Error => (refusalOf(e) ? (e as Error) : withReason(new Error(`uniswap v4: the quoter read failed (${e instanceof Error ? e.message : String(e)})`), "upstream_unavailable"));
+
 /** Quotes every route at `amountIn` and picks the best full fill (see the module comment for failure handling). */
-export async function quoteV4Routes(args: {quoter: Hex; routes: readonly V4Route[]; amountIn: bigint}, batch: V4CallBatch): Promise<V4QuoteResult> {
+export async function quoteV4Routes(args: {quoter: Hex; routes: readonly V4Route[]; amountIn: bigint; gasBound?: V4GasBound | undefined}, batch: V4CallBatch): Promise<V4QuoteResult> {
   const quoter = getAddress(args.quoter);
-  if (!args.routes.length) return {best: null, partial: false, candidates: []};
+  if (!args.routes.length) return {best: null, partial: false, unexecutable: 0, candidates: []};
   const calls = args.routes.map((r) => ({to: quoter, data: quoteCallData(r, args.amountIn)}));
-  let outcomes: readonly V4CallOutcome[];
+  let outcomes: V4CallOutcome[];
   try {
-    outcomes = await batch(calls);
+    outcomes = [...(await batch(calls))];
   } catch (e) {
-    throw refusalOf(e) ? e : withReason(new Error(`uniswap v4: the quoter read failed (${e instanceof Error ? e.message : String(e)})`), "upstream_unavailable");
+    throw asQuoterReadFailure(e);
   }
   if (outcomes.length !== calls.length) throw refusal("upstream_unavailable", `uniswap v4: ${outcomes.length} quoter answers for ${calls.length} calls — refusing`);
+  // A call without revert data: refused, unless the chain's per-transaction bound tells "too much gas for any
+  // transaction" (read again alone at the bound, still without data) from a node that did not answer.
+  const empty = outcomes.flatMap((o, i) => (!o.ok && classifyV4QuoteRevert(o.revert).kind === "empty" ? [i] : []));
+  const unexecutableAt = new Set<number>();
+  if (empty.length) {
+    const bound = args.gasBound;
+    if (!bound) throw refusal("upstream_unavailable", `uniswap v4: a quoter call failed without revert data (${args.routes[empty[0]!]!.label}) — refusing rather than ranking fewer routes`);
+    let again: readonly V4CallOutcome[];
+    try {
+      again = await bound.calls(empty.map((i) => calls[i]!));
+    } catch (e) {
+      throw asQuoterReadFailure(e);
+    }
+    if (again.length !== empty.length) throw refusal("upstream_unavailable", `uniswap v4: ${again.length} answers for ${empty.length} quoter calls read again — refusing`);
+    empty.forEach((i, j) => {
+      const o = again[j]!;
+      if (!o.ok && classifyV4QuoteRevert(o.revert).kind === "empty") unexecutableAt.add(i);
+      else outcomes[i] = o;
+    });
+  }
   const candidates: V4Candidate[] = [];
   let best: V4QuoteResult["best"] = null;
   let partial = false;
   args.routes.forEach((route, i) => {
+    if (unexecutableAt.has(i)) {
+      candidates.push({route, outcome: "unexecutable"});
+      return;
+    }
     const o = outcomes[i]!;
     if (!o.ok) {
       const c = classifyV4QuoteRevert(o.revert);
@@ -246,7 +305,7 @@ export async function quoteV4Routes(args: {quoter: Hex; routes: readonly V4Route
     const c = {route, amountOut, gasEstimate};
     if (!best || better(c, best)) best = c;
   });
-  return {best, partial, candidates};
+  return {best, partial, unexecutable: unexecutableAt.size, candidates};
 }
 
 /** An eth_call refused for gas (the node's eth_call cap or the block gas limit), by its message. */

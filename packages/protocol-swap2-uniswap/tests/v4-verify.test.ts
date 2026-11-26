@@ -236,6 +236,15 @@ describe("row 6 / S11 — deadline", () => {
     expect(verify(...nativeWith(urExecute("0x10", [nativeInput()], edge)))).toBeNull();
     expectRefused(...nativeWith(urExecute("0x10", [nativeInput()], nowS + 400n)), /more than 300 s ahead/, "policy_refused", {deadlineSeconds: 300, now: () => NOW_MS});
   });
+  it("clockSkewSeconds (R1-2): an app may allow more skew than the default 60 s, within 0..3600; the default is unchanged", () => {
+    // A 600 s deadline checked on a clock 90 s behind the server's lies 690 s ahead of it.
+    const late = nowS + 690n;
+    expectRefused(...nativeWith(urExecute("0x10", [nativeInput()], late)), /more than 600 s ahead/, "policy_refused");
+    expect(verify(...nativeWith(urExecute("0x10", [nativeInput()], late)), {clockSkewSeconds: 120})).toBeNull();
+    expectRefused(...nativeWith(urExecute("0x10", [nativeInput()], late + 31n)), /more than 600 s ahead/, "policy_refused", {clockSkewSeconds: 120});
+    expectRefused(...nativeWith(urExecute("0x10", [nativeInput()], nowS + 601n)), /more than 600 s ahead/, "policy_refused", {clockSkewSeconds: 0});
+    for (const bad of [-1, 3601, 1.5]) expect(verify(...nativeWith(urExecute("0x10", [nativeInput()], nowS + 300n)), {clockSkewSeconds: bad}), String(bad)).toMatch(/clockSkewSeconds must be/);
+  });
 });
 
 describe("row 7 / S7 — actions", () => {
@@ -329,9 +338,21 @@ describe("row 9 — pools: hookless, fee cap, tick spacing, provenance", () => {
     for (const [poolKey, re] of [[{...MON_AUSD_500_1, fee: 0x800000}, /dynamic/], [{...MON_AUSD_500_1, fee: 120_000}, /above the 10% cap/], [{...MON_AUSD_500_1, tickSpacing: 0}, /tick spacing/], [{...MON_AUSD_500_1, tickSpacing: 32_768}, /tick spacing/]] as const) {
       expectRefused(...nativeWith(urExecute("0x10", [nativeInput({swap: single({poolKey})})])), re, "policy_refused", {pools: {[MONAD]: [...POOLS[MONAD], poolKey]}});
     }
-    // A higher cap set by the app admits the 12% pool.
+    // The 10% cap of owner decision 5 can be lowered, never raised (SEC-U4-5): a cap above it is a setting error, so the
+    // 12% pool stays refused — listed or an integrator's extra pool alike.
     const k12 = {...MON_AUSD_500_1, fee: 120_000};
-    expect(verify(...nativeWith(urExecute("0x10", [nativeInput({swap: single({poolKey: k12})})])), {pools: {[MONAD]: [k12]}, maxFeePips: 200_000})).toBeNull();
+    expectRefused(...nativeWith(urExecute("0x10", [nativeInput({swap: single({poolKey: k12})})])), /v4MaxFeePips must be an integer in 1\.\.100000/, "policy_refused", {pools: {[MONAD]: [k12]}, maxFeePips: 200_000});
+    expectRefused(...nativeWith(urExecute("0x10", [nativeInput({swap: single({poolKey: k12})})])), /above the 10% cap/, "policy_refused", {pools: {[MONAD]: [k12]}});
+    // A lower cap is honoured.
+    expectRefused(...nativeWith(urExecute("0x10", [nativeInput({swap: single({poolKey: MON_AUSD_500_1})})])), /above the 0\.04% cap/, "policy_refused", {maxFeePips: 400});
+  });
+  it("SEC-U4-5: an integrator's 50%-fee extra pool with maxFeePips 1,000,000 is refused (the cap is 1..100,000)", () => {
+    const k50 = {...MON_AUSD_500_1, fee: 500_000};
+    const [params, quote] = nativeWith(urExecute("0x10", [nativeInput({swap: single({poolKey: k50})})]));
+    expect(verify(params, quote, {extraPools: {[MONAD]: [k50]}, maxFeePips: 1_000_000})).toMatch(/v4MaxFeePips must be an integer in 1\.\.100000/);
+    expect(uniswapV4ReasonOf(verify(params, quote, {extraPools: {[MONAD]: [k50]}, maxFeePips: 1_000_000})!)).toEqual({reason: "policy_refused"});
+    expect(verify(params, quote, {extraPools: {[MONAD]: [k50]}})).toMatch(/above the 10% cap/);
+    for (const bad of [0, 100_001, 1.5, Number.NaN]) expect(verify(params, quote, {extraPools: {[MONAD]: [k50]}, maxFeePips: bad}), String(bad)).toMatch(/v4MaxFeePips/);
   });
   it("a pool outside the list (a server-supplied key alone is no provenance), and no list at all", () => {
     const k: V4PoolKey = {...MON_AUSD_500_1, fee: 3000, tickSpacing: 60};
@@ -481,6 +502,22 @@ describe("rows 15–18 — deployment check, preflight, gas, impact", () => {
     expect(e.quote.txRequest!.to).toBe(eth.universalRouter);
     expect(verify(e.params, withTx(e, {gasLimit: "16777216"}), {pools: {1: [k]}})).toBeNull();
     expectRefused(e.params, withTx(e, {gasLimit: "16777217"}), /cap 16777216/, "policy_refused", {pools: {1: [k]}});
+  });
+  it("row 17 (R1-5 / SEC-U4-1): the provider's own cap table — Base, OP, BNB, Unichain, Linea at 2^24, Polygon at 2^25", () => {
+    // Before the fix the pins knew Ethereum and Monad only, so a backend's 20M-gas Base quote passed and the engine would
+    // approve the SwapProxy, then broadcast a transaction the node refuses (above EIP-7825's 2^24).
+    const BASE_USDC = getAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+    const cases: Array<[number, bigint]> = [[8453, 1n << 24n], [10, 1n << 24n], [56, 1n << 24n], [130, 1n << 24n], [59144, 1n << 24n], [480, 1n << 24n], [57073, 1n << 24n], [137, 1n << 25n]];
+    for (const [chainId, cap] of cases) {
+      const other = chainId === 8453 ? BASE_USDC : getAddress(`0x${"7".repeat(40)}`);
+      const k: V4PoolKey = {currency0: NATIVE, currency1: other, fee: 500, tickSpacing: 10, hooks: NATIVE};
+      const c = makeCase({chainId, pools: [k], currencyOut: other, sourceToken: chainId === 137 ? "POL" : chainId === 56 ? "BNB" : "ETH", amountIn: 10n ** 18n, amountOutMinimum: 1_000_000n});
+      const o = {pools: {[chainId]: [k]}};
+      expect(verify(c.params, withTx(c, {gasLimit: cap.toString()}), o), `chain ${chainId} at the cap`).toBeNull();
+      expectRefused(c.params, withTx(c, {gasLimit: (cap + 1n).toString()}), new RegExp(`above the chain's per-transaction cap ${cap}`), "policy_refused", o);
+    }
+    const base = makeCase({chainId: 8453, pools: [{currency0: NATIVE, currency1: BASE_USDC, fee: 500, tickSpacing: 10, hooks: NATIVE}], currencyOut: BASE_USDC, sourceToken: "ETH", amountIn: 10n ** 18n, amountOutMinimum: 1_000_000n});
+    expectRefused(base.params, withTx(base, {gasLimit: "20000000"}), /cap 16777216/, "policy_refused", {pools: {8453: [{currency0: NATIVE, currency1: BASE_USDC, fee: 500, tickSpacing: 10, hooks: NATIVE}]}});
   });
   it("row 18: impact is information unless the app sets maxPriceImpactBps", () => {
     const c = e1Case();

@@ -27,17 +27,25 @@ import {
   type UniswapV4Deployment,
 } from "./addresses.js";
 import {encodeV4Swap, V4_MAX_HOPS, v4PoolsOfPath} from "./encode.js";
-import {V4_DEFAULT_MAX_FEE_PIPS, V4_MAX_LP_FEE, isNativeCurrency, poolIdOf, sortCurrencies, v4PoolKeyProblem, type V4PoolKey} from "./pool.js";
+import {V4_MAX_LP_FEE, checkedMaxFeePips, isNativeCurrency, poolIdOf, sortCurrencies, v4PoolKeyProblem, type V4PoolKey} from "./pool.js";
+import {KNOWN_TX_GAS_CAP} from "../impact.js";
 
 /** Which v4 flows a check (or a provider) accepts: none, native input only, or native and token input. */
 export type UniswapV4Mode = "off" | "native-in" | "all";
 
 /** Seconds a v4 swap's deadline may lie ahead of now: the provider's `deadlineSeconds` default. */
 export const V4_DEFAULT_DEADLINE_SECONDS = 600;
-/** Clock skew allowed between the side that built the quote and the side that checks it (the deadline's upper bound). */
+/** Clock skew allowed by default between the side that built the quote and the side that checks it (the deadline's
+ *  upper bound); `clockSkewSeconds` sets another. */
 export const V4_CLOCK_SKEW_SECONDS = 60;
-/** Known per-transaction gas caps: Ethereum's EIP-7825 (2^24) and Monad's 30M. A limit above can never be mined. */
-export const V4_KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = Object.freeze({1: 16_777_216n, 143: 30_000_000n});
+/** The most clock skew a check may allow (`clockSkewSeconds`): an hour. */
+export const V4_MAX_CLOCK_SKEW_SECONDS = 3_600;
+/**
+ * The per-transaction gas caps row 17 holds a quote's gas limit to: the provider's own table (`KNOWN_TX_GAS_CAP`,
+ * src/impact.ts — 2^24 on Ethereum, OP, BNB, Unichain, World Chain, Base, Ink, Linea and Arc, 2^25 on Polygon, 30M on
+ * Monad), one table for the build and the check. A limit above can never be mined.
+ */
+export const V4_KNOWN_TX_GAS_CAP: Readonly<Record<number, bigint>> = KNOWN_TX_GAS_CAP;
 /** Catalog symbols a two-hop route may pass through, besides the native coin and the wrapped native (§6.5 row 8). */
 export const V4_HOP_SYMBOLS = ["USDC", "USDT", "USDT0"] as const;
 
@@ -52,10 +60,15 @@ export interface UniswapV4VerifyOptions {
   pools?: Readonly<Record<number, readonly V4PoolKey[]>>;
   /** The integrator's own pools (`v4ExtraPools`): hookless only, PoolId recomputed. */
   extraPools?: Readonly<Record<number, readonly V4PoolKey[]>>;
-  /** Highest pool fee accepted, in pips (`v4MaxFeePips`, default 100,000 = 10%). */
+  /** Highest pool fee accepted, in pips (`v4MaxFeePips`: an integer 1..100,000, default 100,000 = 10%; the cap of owner
+   *  decision 5 can be lowered, never raised — every pool, `extraPools` included, is held to it). */
   maxFeePips?: number;
-  /** The provider's `deadlineSeconds` (default 600). */
+  /** How far ahead the swap's deadline may be, in seconds (default 600: the provider builds every v4 deadline at most
+   *  600 s ahead, whatever its `deadlineSeconds`). */
   deadlineSeconds?: number;
+  /** Clock skew allowed on top of `deadlineSeconds` between the side that built the quote and this one (an integer
+   *  0..3600; default {@link V4_CLOCK_SKEW_SECONDS}). */
+  clockSkewSeconds?: number;
   /** Per chain, the currencies a two-hop route may pass through (replaces {@link v4HopTokens}' default set). */
   hopTokens?: Readonly<Record<number, readonly string[]>>;
   /** Opt-in (§7.2): refuse a quote whose `providerData.priceImpactBps` is at or above this, or missing. Unset: impact is
@@ -304,10 +317,16 @@ export function uniswapV4VerifyQuote(params: QuoteParams, quote: Quote, options:
 
 function check(params: QuoteParams, quote: Quote, options: UniswapV4VerifyOptions): string | null {
   const mode = options.v4 ?? "all";
-  const maxFee = options.maxFeePips ?? V4_DEFAULT_MAX_FEE_PIPS;
+  let maxFee: number;
+  try {
+    maxFee = checkedMaxFeePips(options.maxFeePips); // owner decision 5: 1..100,000, lowered but never raised
+  } catch {
+    return notes.note("v4MaxFeePips must be an integer in 1..100000", "policy_refused");
+  }
   const deadlineS = options.deadlineSeconds ?? V4_DEFAULT_DEADLINE_SECONDS;
-  if (!Number.isInteger(maxFee) || maxFee <= 0 || maxFee > V4_MAX_LP_FEE) return notes.note("v4MaxFeePips must be an integer in 1..1000000", "policy_refused");
+  const skewS = options.clockSkewSeconds ?? V4_CLOCK_SKEW_SECONDS;
   if (!Number.isInteger(deadlineS) || deadlineS <= 0) return notes.note("deadlineSeconds must be a positive integer", "policy_refused");
+  if (!Number.isInteger(skewS) || skewS < 0 || skewS > V4_MAX_CLOCK_SKEW_SECONDS) return notes.note(`clockSkewSeconds must be an integer in 0..${V4_MAX_CLOCK_SKEW_SECONDS}`, "policy_refused");
 
   // Row 1: the chain, pinned and enabled.
   const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
@@ -374,7 +393,7 @@ function check(params: QuoteParams, quote: Quote, options: UniswapV4VerifyOption
   // Row 6 / S11: the deadline.
   const nowS = BigInt(Math.floor((options.now ?? Date.now)() / 1000));
   if (s.deadline <= nowS) return notes.note("the swap's deadline has passed", "quote_expired");
-  if (s.deadline > nowS + BigInt(deadlineS + V4_CLOCK_SKEW_SECONDS)) return notes.note(`the swap's deadline is more than ${deadlineS} s ahead`, "policy_refused");
+  if (s.deadline > nowS + BigInt(deadlineS + skewS)) return notes.note(`the swap's deadline is more than ${deadlineS} s ahead`, "policy_refused");
 
   // Row 8: the route's currencies.
   if (s.currencyIn !== currencyIn) return notes.note(isNativeCurrency(currencyIn) ? "the swap sells another currency than the native coin (never the wrapped token in its place)" : "the swap sells another currency than the request's input", "policy_refused");
@@ -420,7 +439,7 @@ function check(params: QuoteParams, quote: Quote, options: UniswapV4VerifyOption
   // Row 17: a gas limit the chain can never mine.
   if (tx.gasLimit !== undefined) {
     if (!/^[0-9]+$/.test(tx.gasLimit) || BigInt(tx.gasLimit) <= 0n) return notes.note("the quote's gas limit is not a positive integer", "policy_refused");
-    const cap = own(V4_KNOWN_TX_GAS_CAP, id);
+    const cap = own(KNOWN_TX_GAS_CAP, id);
     if (cap !== undefined && BigInt(tx.gasLimit) > cap) return notes.note(`the quote's gas limit ${tx.gasLimit} is above the chain's per-transaction cap ${cap}`, "policy_refused");
   }
   // Row 18: impact is information unless the app set a limit.

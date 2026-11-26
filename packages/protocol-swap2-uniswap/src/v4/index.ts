@@ -7,4 +7,3 @@ export * from "./verify.js";
 export * from "./listed.js";
 export {MULTICALL3, V4_UNLISTED_GRID, V4_MAX_HUBS, discoverV4Pools, isLive, pairSetOf, type V4BlockTag, type V4DiscoverParams, type V4Discovery, type V4EthCall, type V4Pool, type V4PoolState} from "./discover.js";
 export {V4_ERRORS, V4_QUOTER_ABI, buildV4Routes, classifyV4QuoteRevert, decodeV4QuoteAnswer, measureV4Impact, multicallBatch, quoteCallData, quoteCallDataOfKeys, quoteV4Routes, v4ProbeImpactBps, v4SpotLossBps, v4SpotOut, type V4CallBatch, type V4CallOutcome, type V4Candidate, type V4Hop, type V4QuoteResult, type V4Route} from "./quote.js";
-export {V4_MAX_FEE_PIPS, V4_MAX_TICK, V4_MIN_TICK, checkedHooklessKey, checkedMaxFeePips, pairKeyOf, type V4Key} from "./pool-key.js";

@@ -9,13 +9,14 @@ import {encodeAbiParameters, encodeErrorResult, getAddress, parseAbi, type Hex} 
 import {bigintToNumber} from '@anywalletkit/core'
 import {parseActivityFixture, type ActivityFixtureJson} from '@anywalletkit/conformance'
 import {uniswapProvider} from '@anywalletkit/protocol-swap2-uniswap/provider'
-import {UNISWAP_V3, UNISWAP_V4, describeUniswapActivity, uniswapPins, uniswapVerifyQuote, poolIdOf} from '@anywalletkit/protocol-swap2-uniswap'
+import {UNISWAP_V3, UNISWAP_V4, describeUniswapActivity, uniswapPins, uniswapPinsWith, uniswapRemoteProvider, uniswapVerifyQuote, poolIdOf} from '@anywalletkit/protocol-swap2-uniswap'
 import {classifyV4QuoteRevert, decodeV4SwapCall, notEnoughLiquidityPoolId, v4SpotLossBps, type V4Route} from '@anywalletkit/protocol-swap2-uniswap/v4'
 import v3Recording from '../../packages/protocol-swap2-uniswap/fixtures/rpc/monad-125409523.json'
 import v4Recording from '../../packages/protocol-swap2-uniswap/fixtures/rpc/monad-125409523-v4.json'
 import e1 from '../../packages/protocol-swap2-uniswap/fixtures/v4/monad-e1.json'
 import v4Activity from '../../packages/protocol-swap2-uniswap/fixtures/activity/unichain-v4-native-in.json'
 import tokenRecording from '../../packages/protocol-swap2-uniswap/fixtures/rpc/monad-125499326-token.json'
+import live1Recording from '../../packages/protocol-swap2-uniswap/fixtures/rpc/monad-125520066-live1.json'
 import proxyActivity from '../../packages/protocol-swap2-uniswap/fixtures/activity/ethereum-v4-swapproxy-a.json'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -70,6 +71,27 @@ function tokenNode() {
   return {f, misses, methods}
 }
 
+/** The LIVE-1 recording's node (keys: method, target, calldata and the gas named — the re-reads at the cap name 30M). */
+function live1Node() {
+  const calls = (live1Recording as {calls: Record<string, object>}).calls
+  const misses: string[] = []
+  const f = async (_url: unknown, init?: {body?: unknown}) => {
+    const batch = JSON.parse(String(init?.body)) as {id: number; method: string; params: unknown[]}[]
+    const body = batch.map((req) => {
+      let key = req.method
+      if (req.method === 'eth_call') {
+        const c = req.params[0] as {to: string; data: string; gas?: string}
+        key = `eth_call ${c.to.toLowerCase()} ${c.data.toLowerCase()}${c.gas ? ` gas=${BigInt(c.gas).toString()}` : ''}`
+      } else if (req.method === 'eth_getCode') key = `eth_getCode ${String(req.params[0]).toLowerCase()}`
+      const a = calls[key]
+      if (!a) misses.push(key.slice(0, 60))
+      return {jsonrpc: '2.0', id: req.id, ...(a ?? {error: {code: -32603, message: 'not in the recording'}})}
+    })
+    return {ok: true, status: 200, headers: {get: () => null}, json: async () => body}
+  }
+  return {f, misses}
+}
+
 export async function smokeUniswap(check: Check): Promise<void> {
   const g = globalThis as {fetch?: unknown}
   const offline = g.fetch
@@ -98,9 +120,23 @@ export async function smokeUniswap(check: Check): Promise<void> {
     check('uniswap: the SwapProxy call decodes strictly (router = the pinned UR, token USDC, amount = the input, TAKE to the holder)', !!proxyDecoded && proxyDecoded.ok && proxyDecoded.swap.flow === 'swap-proxy' && proxyDecoded.swap.proxyRouter === getAddress(d4.universalRouter) && proxyDecoded.swap.proxyAmount === 700_000_000n && proxyDecoded.swap.take.recipient === getAddress(holder), proxyDecoded && !proxyDecoded.ok ? proxyDecoded.text : '')
     const tokenPins = tq ? uniswapVerifyQuote(tokenParams, tq) : 'no quote'
     check('uniswap: the SwapProxy quote passes the shipped pins, and the SwapProxy is a pinned spender', tokenPins === null && uniswapPins.spenders('eip155:143').includes(d4.swapProxy), tokenPins ?? '')
+
+    // Review round 1, LIVE-1: a candidate past Monad's 30M per-transaction cap is read again at the cap and ranked out.
+    const ln = live1Node()
+    g.fetch = ln.f
+    const live1Params = {sourceChain: 'eip155:143', destChain: 'eip155:143', sourceToken: 'AUSD', destToken: NATIVE, amountIn: '2000000000', destAddress: ME, refundAddress: ME}
+    const lq = await uniswapProvider({rpcUrls: {143: ['https://monad.fixture']}, v4: 'all'}).getQuote(live1Params)
+    check('uniswap: LIVE-1 — 2,000 AUSD → MON quotes on v4 (182,815.6 MON), 4 candidates past the 30M cap ranked out', lq?.destAmount === '182815619388841801516424' && lq.providerData?.v4Unexecutable === '4' && lq.txRequest?.to === d4.swapProxy, `${lq?.destAmount} ${lq?.providerData?.v4Unexecutable} misses ${ln.misses.join(',')}`)
+    const live1Pins = lq ? uniswapVerifyQuote(live1Params, lq) : 'no quote'
+    check('uniswap: LIVE-1 — that quote passes the shipped pins', live1Pins === null, live1Pins ?? '')
   } finally {
     g.fetch = offline
   }
+
+  // Review round 1: the remote stub declares ownGasEstimate; uniswapPins is uniswapPinsWith().
+  const stub = uniswapRemoteProvider({baseUrl: 'https://backend.example/api/swap2'})
+  check('uniswap: uniswapRemoteProvider declares ownGasEstimate and offers Monad', stub.ownGasEstimate === true && stub.supportsChain?.('eip155:143') === true && stub.supportsChain?.('eip155:999') === false)
+  check('uniswap: uniswapPinsWith() names the shipped call targets', [1, 143, 8453, 42220, 5042].every((id) => JSON.stringify(uniswapPinsWith().callTargets(`eip155:${id}`)) === JSON.stringify(uniswapPins.callTargets(`eip155:${id}`))))
 
   // The 2.0 layout executes on chain but is refused here; the 2.1.x one decodes.
   const wrong = decodeV4SwapCall(e1.calldata_2_0)

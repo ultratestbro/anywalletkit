@@ -36,6 +36,15 @@ describe("UNISWAP_V4 table (pins.json + pins-evidence.json, 2026-11-25)", () => 
     expect(new Set(Object.values(UNISWAP_V4).map((d) => d.routerCodehash)).size).toBe(CATALOG_V4.length);
   });
 
+  it("R1-7 / LIVE-5: every row pins Permit2's per-chain codehash (pins-evidence.json, 2026-11-25), compared by verify:live", () => {
+    for (const [id, d] of Object.entries(UNISWAP_V4)) expect(d.permit2Codehash, id).toMatch(/^0x[0-9a-f]{64}$/);
+    // Per chain (the EIP-712 domain separator is an immutable): never one value for all.
+    expect(new Set(Object.values(UNISWAP_V4).map((d) => d.permit2Codehash)).size).toBe(CATALOG_V4.length);
+    expect(UNISWAP_V4[1]!.permit2Codehash).toBe("0xc67d1657868aa5146eaf24fb879fb1fdec3d2d493b3683a61c9c2f4fb2851131");
+    expect(UNISWAP_V4[143]!.permit2Codehash).toBe("0x332f9ca0fbd282f4a9b16f5332870dc98addc5172dd5e48ab6fa7c9be3d10fa0");
+    expect(UNISWAP_V4[8453]!.permit2Codehash).toBe("0xa67739abc3ede9dbdc0491636c67d6a14ac07fab9030c3f509b1eb7b11dff8ed");
+  });
+
   it("anchors: Monad (the trigger case), and the per-chain flags of decision 6", () => {
     const m = UNISWAP_V4[143]!;
     expect(m).toMatchObject({

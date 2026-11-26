@@ -4,7 +4,8 @@ import type {Quote, QuoteParams, RemotePins} from "@anywalletkit/protocol-swap2-
 import {refusalNotes} from "@anywalletkit/protocol-swap2-core/errors";
 import {UNISWAP_V4, uniswapV4DeploymentOf} from "./v4/addresses.js";
 import {UNISWAP_V4_POOL_KEYS} from "./v4/listed.js";
-import {uniswapV4ReasonOf, uniswapV4VerifyQuote} from "./v4/verify.js";
+import {V4_MAX_FEE_PIPS, checkedHooklessKey, type V4PoolKey} from "./v4/pool.js";
+import {V4_MAX_CLOCK_SKEW_SECONDS, uniswapV4ReasonOf, uniswapV4VerifyQuote} from "./v4/verify.js";
 
 /**
  * Uniswap v3 deployments this module trusts: the UniswapV3Factory, QuoterV2 and
@@ -151,37 +152,99 @@ export function uniswapV3VerifyQuote(params: QuoteParams, quote: Quote): string 
   return null;
 }
 
+/** What an app's Uniswap pins hold a remote quote to, besides the shipped tables ({@link uniswapPinsWith}). */
+export interface UniswapPinsOptions {
+  /**
+   * The integrator's own v4 pools per chain — the same `v4ExtraPools` the server's provider has: hookless, LP fee ≤ 10%,
+   * PoolId recomputed (a bad key throws here). A route through them passes these pins, and on a chain without a shipped
+   * list they put the chain's Universal Router (native input) and SwapProxy (token input) among the call targets and
+   * spenders. Pools the server's unlisted-token grid finds per request cannot be shared this way; a server keeps them
+   * out of the ranking against v3 by default (`v4RankedPools`).
+   */
+  v4ExtraPools?: Readonly<Record<number, readonly V4PoolKey[]>>;
+  /**
+   * Clock skew allowed between the server that built a v4 quote and this device, on top of the 600 s a v4 deadline may
+   * lie ahead (an integer 0..3600, default 60). The server builds every v4 deadline at most 600 s ahead.
+   */
+  clockSkewSeconds?: number;
+}
+
 /**
  * A Uniswap quote's call, opened on the client against the app's own request: a call to the chain's pinned Universal
  * Router 2.1.2 (native input) or to its pinned SwapProxy (token input, forwarding to that router) is a v4 swap, checked
  * by {@link uniswapV4VerifyQuote} — every pool hookless and in the shipped per-chain list, the whole §6.5 check list with
  * S1–S14 for the SwapProxy (UNISWAP-V4-RESEARCH §6.5); anything else goes to the v3 check ({@link uniswapV3VerifyQuote}),
- * which refuses every target but the chain's SwapRouter02. The reason it fails, or null.
+ * which refuses every target but the chain's SwapRouter02. The reason it fails, or null. The check of {@link uniswapPins};
+ * `uniswapPinsWith(options).verifyQuote` is the same with the app's own `v4ExtraPools` and clock skew.
  */
 export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
-  const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
-  const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
-  const to = quote.txRequest?.to;
-  if (d4 && typeof to === "string" && /^0x[0-9a-fA-F]{40}$/.test(to) && (getAddress(to) === getAddress(d4.universalRouter) || getAddress(to) === getAddress(d4.swapProxy))) {
-    return uniswapV4VerifyQuote(params, quote, {v4: "all", pools: UNISWAP_V4_POOL_KEYS});
-  }
-  return uniswapV3VerifyQuote(params, quote);
+  return SHIPPED.verifyQuote!(params, quote);
 }
 
 /**
- * The contracts a Uniswap swap calls and approves on a chain — the SwapRouter02 of the shipped {@link UNISWAP_V3} table;
- * the Universal Router 2.1.2 of {@link UNISWAP_V4} where a native-coin input can be quoted on v4 (it is called with value,
- * never approved); and the chain's SwapProxy where a token input can be (called, and approved for exactly the input) —
- * and {@link uniswapVerifyQuote}: the app's pins for `remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})` (scan
- * 2026-10-27 modules, F9; scan 2026-10-28, F1). Spenders: SwapRouter02 and the SwapProxy, never the Universal Router,
- * Permit2 or the PoolManager. `reasonOf` classifies the texts `uniswapVerifyQuote` returned.
+ * An app's pins for `remoteProvider({name: "uniswap", baseUrl, ...pins})` (or {@link uniswapRemoteProvider}), with its own
+ * `v4ExtraPools` and clock skew — {@link uniswapPins} is `uniswapPinsWith()`. The contracts a Uniswap swap calls and
+ * approves on a chain: the SwapRouter02 of the shipped {@link UNISWAP_V3} table; the Universal Router 2.1.2 of
+ * {@link UNISWAP_V4} where a native-coin input can be quoted on v4 (it is called with value, never approved); and the
+ * chain's SwapProxy where a token input can be (called, and approved for exactly the input) — v4 only on a quotable
+ * chain with a pool list these pins can check routes against (the shipped one, or `options.v4ExtraPools`). Spenders:
+ * SwapRouter02 and the SwapProxy, never the Universal Router, Permit2 or the PoolManager (scan 2026-10-27 modules, F9;
+ * scan 2026-10-28, F1). `verifyQuote` dispatches on `tx.to` as {@link uniswapVerifyQuote} does; `reasonOf` classifies
+ * every text it returns.
  */
-export const uniswapPins: RemotePins = Object.freeze({
-  callTargets: (chain: string): readonly string[] => [...uniswapRouterFor(chain), ...uniswapUniversalRouterFor(chain), ...uniswapSwapProxyFor(chain)],
-  spenders: (chain: string): readonly string[] => [...uniswapRouterFor(chain), ...uniswapSwapProxyFor(chain)],
-  verifyQuote: uniswapVerifyQuote,
-  reasonOf: (refusal: string) => notes.reasonOf(refusal) ?? uniswapV4ReasonOf(refusal),
-});
+export function uniswapPinsWith(options: UniswapPinsOptions = {}): RemotePins {
+  const extra: Record<number, readonly V4PoolKey[]> = {};
+  for (const [id, keys] of Object.entries(options.v4ExtraPools ?? {})) {
+    if (!/^[0-9]+$/.test(id) || !Array.isArray(keys)) throw new Error(`uniswap: v4ExtraPools[${id}] is not a list of pool keys`);
+    extra[Number(id)] = Object.freeze(keys.map((k: V4PoolKey) => Object.freeze(checkedHooklessKey(k, V4_MAX_FEE_PIPS))));
+  }
+  Object.freeze(extra);
+  const skew = options.clockSkewSeconds;
+  if (skew !== undefined && !(Number.isInteger(skew) && skew >= 0 && skew <= V4_MAX_CLOCK_SKEW_SECONDS)) throw new Error(`uniswap: clockSkewSeconds must be an integer 0..${V4_MAX_CLOCK_SKEW_SECONDS}`);
+  const v4Options = {v4: "all" as const, pools: UNISWAP_V4_POOL_KEYS, extraPools: extra, ...(skew !== undefined ? {clockSkewSeconds: skew} : {})};
+  /** The chain's v4 deployment where these pins can check a v4 route: quotable, with the shipped list or extra pools. */
+  const v4Of = (chain: string) => {
+    const id = chainIdOf(chain);
+    const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
+    const listed = Object.prototype.hasOwnProperty.call(UNISWAP_V4_POOL_KEYS, id) || (Object.prototype.hasOwnProperty.call(extra, id) && extra[id]!.length > 0);
+    return d4 && d4.quotable !== false && listed ? d4 : undefined;
+  };
+  /** The pinned Universal Router where v4 quotes a native input: the native coin not an ERC-20. */
+  const universalRouterFor = (chain: string): readonly string[] => {
+    const d4 = v4Of(chain);
+    return d4 && d4.nativeWrap !== false ? [d4.universalRouter] : [];
+  };
+  /** The chain's pinned SwapProxy where v4 quotes a token input (the address is per chain). */
+  const swapProxyFor = (chain: string): readonly string[] => {
+    const d4 = v4Of(chain);
+    return d4 ? [d4.swapProxy] : [];
+  };
+  return Object.freeze({
+    callTargets: (chain: string): readonly string[] => [...uniswapRouterFor(chain), ...universalRouterFor(chain), ...swapProxyFor(chain)],
+    spenders: (chain: string): readonly string[] => [...uniswapRouterFor(chain), ...swapProxyFor(chain)],
+    verifyQuote(params: QuoteParams, quote: Quote): string | null {
+      const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
+      const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
+      const to = quote.txRequest?.to;
+      if (d4 && typeof to === "string" && /^0x[0-9a-fA-F]{40}$/.test(to) && (getAddress(to) === getAddress(d4.universalRouter) || getAddress(to) === getAddress(d4.swapProxy))) {
+        return uniswapV4VerifyQuote(params, quote, v4Options);
+      }
+      return uniswapV3VerifyQuote(params, quote);
+    },
+    reasonOf: (refusal: string) => notes.reasonOf(refusal) ?? uniswapV4ReasonOf(refusal),
+  });
+}
+
+/** The pins every app ships: the shipped tables and pool lists, nothing of the app's own. */
+const SHIPPED = uniswapPinsWith();
+
+/**
+ * The app's pins for `remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})`: {@link uniswapPinsWith} with no
+ * options — SwapRouter02, and the Universal Router 2.1.2 / SwapProxy where v4 quotes on a shipped pool list; the check
+ * {@link uniswapVerifyQuote}. An app that shares `v4ExtraPools` with its server, or allows more clock skew, uses
+ * `uniswapPinsWith(…)` instead; {@link uniswapRemoteProvider} also declares `ownGasEstimate`.
+ */
+export const uniswapPins: RemotePins = SHIPPED;
 function chainIdOf(chain: string): number {
   return /^eip155:[0-9]+$/.test(chain) ? Number(chain.slice(7)) : NaN;
 }
@@ -189,18 +252,4 @@ function uniswapRouterFor(chain: string): readonly string[] {
   const id = chainIdOf(chain);
   const d = Object.prototype.hasOwnProperty.call(UNISWAP_V3, id) ? UNISWAP_V3[id] : undefined;
   return d ? [d.router] : [];
-}
-/** The pinned Universal Router where v4 quotes a native input: quotable, the native coin not an ERC-20, a shipped pool list. */
-function uniswapUniversalRouterFor(chain: string): readonly string[] {
-  const id = chainIdOf(chain);
-  const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
-  if (!d4 || d4.quotable === false || d4.nativeWrap === false || !Object.prototype.hasOwnProperty.call(UNISWAP_V4_POOL_KEYS, id)) return [];
-  return [d4.universalRouter];
-}
-/** The chain's pinned SwapProxy where v4 quotes a token input: quotable, a shipped pool list (the address is per chain). */
-function uniswapSwapProxyFor(chain: string): readonly string[] {
-  const id = chainIdOf(chain);
-  const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
-  if (!d4 || d4.quotable === false || !Object.prototype.hasOwnProperty.call(UNISWAP_V4_POOL_KEYS, id)) return [];
-  return [d4.swapProxy];
 }

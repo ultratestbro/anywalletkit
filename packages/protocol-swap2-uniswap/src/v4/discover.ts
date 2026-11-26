@@ -1,7 +1,7 @@
 import {decodeAbiParameters, decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {refusal, refusalOf, withReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {V4ChainPools, V4PoolKey} from "../v4pools/types.js";
-import {V4_MAX_FEE_PIPS, V4_MAX_TICK, V4_MIN_TICK, checkedHooklessKey, checkedMaxFeePips, pairKeyOf, poolIdOf, type V4Key} from "./pool-key.js";
+import {V4_MAX_FEE_PIPS, V4_MAX_TICK, V4_MIN_TICK, checkedHooklessKey, checkedMaxFeePips, pairKeyOf, poolIdOf, type V4Key} from "./pool.js";
 
 /**
  * Uniswap v4 pool discovery (UNISWAP-V4-RESEARCH §5.3, decision 5): the chain's pinned hookless pools for the pair set,

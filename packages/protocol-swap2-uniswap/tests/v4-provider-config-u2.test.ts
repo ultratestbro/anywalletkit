@@ -26,13 +26,19 @@ describe('where v4 "all" is offered', () => {
       return a;
     };
   };
-  it("the v4-only chains with a shipped list, never HyperEVM; Arc (native = USDC) only with the integrator's own pools, for token → token", () => {
+  it("the v4-only chains with a shipped list, never HyperEVM; Arc (native = USDC) for token → token; a chain without a list only with the integrator's own pools", () => {
     const s = supported({v4: "all"});
     expect([4326, 99901, 143, 8453].map(s)).toEqual([true, true, true, true]);
     expect(s(999)).toBe(false);
-    expect(s(5042)).toBe(false);
-    expect(supported({v4: "all", v4ExtraPools: {5042: [ARC_USDC_POOL]}})(5042)).toBe(true);
-    expect(supported({v4: "native-in", v4ExtraPools: {5042: [ARC_USDC_POOL]}})(5042)).toBe(false); // native-in needs a native coin that is not an ERC-20
+    // LIVE-2: Arc ships a list (token → token pools only: its native coin is the USDC ERC-20).
+    expect(s(5042)).toBe(true);
+    expect(supported({v4: "native-in"})(5042)).toBe(false); // native-in needs a native coin that is not an ERC-20
+    // A pinned chain with no shipped list (an integrator's own deployment row): served only with its own pools.
+    const rpcUrls = {...ALL_RPC, 777777: ["https://rpc.777777.test"]};
+    const v4Deployments = {...UNISWAP_V4, 777777: UNISWAP_V4[5042]!};
+    expect(supported({v4: "all", rpcUrls, v4Deployments})(777777)).toBe(false);
+    expect(supported({v4: "all", rpcUrls, v4Deployments, v4ExtraPools: {777777: [ARC_USDC_POOL]}})(777777)).toBe(true);
+    expect(supported({v4: "native-in", rpcUrls, v4Deployments, v4ExtraPools: {777777: [ARC_USDC_POOL]}})(777777)).toBe(false);
   });
   it("the flows: native in → token on both modes; token → token and token → native on \"all\" only; native legs never where the native coin is an ERC-20", () => {
     const base = UNISWAP_V4[8453]!, arc = UNISWAP_V4[5042]!;

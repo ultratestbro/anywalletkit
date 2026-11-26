@@ -3,6 +3,7 @@ export * from "./provider.js";
 export {UniswapSwap2Protocol} from "./protocol.js";
 export {UniswapSwap2Protocol as default} from "./protocol.js";
 export * from "./activity.js";
+export {uniswapRemoteProvider, type UniswapRemoteOptions, type UniswapRemoteProvider} from "./remote.js";
 export type { UniswapSwap2Config } from "./protocol.js"
 // Uniswap v4 (UNISWAP-V4-RESEARCH §5.4); every building block is in the `./v4` subpath.
 export {UNISWAP_V4, UR_COMMANDS, V4_ACTIONS, UNISWAP_UR_SELECTORS, UNISWAP_SWAP_PROXY_SELECTORS, type UniswapV4Deployment} from "./v4/addresses.js";

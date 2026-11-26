@@ -1,7 +1,9 @@
 // node --test scripts/watch/watch-2026-11-26-evm-initialize.test.mjs — the stateful `evm-initialize` source (Uniswap v4 pool
 // list, UNISWAP-V4-RESEARCH §5.3):
 //   - evm-initialize.mjs: PoolId, the strict Initialize decoder, the list's rules, aggregate3 encode / strict decode;
-//   - runInitializeSource: the first run takes a baseline at the head; later runs scan from lastBlock + 1, report a new
+//   - runInitializeSource: the first run scans from the block the pinned list was built at (R1-4 / SEC-U4-4) and is compared
+//     against the empty reading there, so a pool initialized between the list build and the first run is reported (a list
+//     without `block` starts at the head); later runs scan from lastBlock + 1, report a new
 //     hookless catalog pool under the fee cap (and again when it turns live), ignore hooked / fee-trap / non-catalog / listed
 //     pools, report a listed pool once it reads dead three runs in a row, cap the calls per run and say it is behind;
 //     a failed read fails the run (nothing advances);
@@ -56,7 +58,9 @@ function chain({logs = [], live = {}, head = 1000, failCall = false} = {}) {
   return st;
 }
 const LISTED = {currency0: ZERO, currency1: AUSD, fee: 500, tickSpacing: 1};
-const LIST = {tokens: [ZERO, AUSD, USDC], feeCap: 100000, pools: [{...LISTED, id: poolIdOf(LISTED)}]};
+const LIST_BARE = {tokens: [ZERO, AUSD, USDC], feeCap: 100000, pools: [{...LISTED, id: poolIdOf(LISTED)}]};
+/** The list as the build writes it: with the block it was built at. */
+const LIST = {...LIST_BARE, block: 0};
 const SRC = {chainId: 143, poolManager: PM, stateView: SV, window: 100, confirm: 10};
 
 test("PoolId, the Initialize decoder and the list's rules match the build script", () => {
@@ -87,12 +91,15 @@ test("aggregate3: calldata layout and a strict answer decoder (failed sub-call, 
   assert.throws(() => decodeAggregate3("0x", [32]), /not ABI words/);
 });
 
-test("runs: baseline at the head, then new pools from lastBlock + 1; only hookless catalog pools under the cap count", async () => {
+test("runs: the first run scans from the list's block, then new pools from lastBlock + 1; only hookless catalog pools under the cap count", async () => {
   const c = chain({head: 1000});
+  const LIST = {...LIST_BARE, block: 900};
   const r0 = await runInitializeSource(SRC, {call: c.call, list: LIST});
-  assert.equal(r0.meta.lastBlock, 990, "first run: baseline at head − confirm, nothing scanned");
-  assert.equal(c.calls.filter(([m]) => m === "eth_getLogs").length, 0);
+  assert.equal(r0.meta.lastBlock, 990, "first run: indexed up to head − confirm");
+  const first = c.calls.filter(([m]) => m === "eth_getLogs");
+  assert.equal(first[0][1][0].fromBlock, "0x" + (901).toString(16), "first run: from the block the list was built at + 1, not the head");
   assert.deepEqual(JSON.parse(r0.value), {dead: [], pending: []});
+  assert.deepEqual(JSON.parse(r0.baseline.value), {dead: [], pending: []}, "compared against the empty reading at the list's block");
 
   const fresh = {currency0: ZERO, currency1: USDC, fee: 3000, tickSpacing: 60};
   c.logs.push(
@@ -107,7 +114,7 @@ test("runs: baseline at the head, then new pools from lastBlock + 1; only hookle
   c.live[poolIdOf(LISTED)] = true;
   const r1 = await runInitializeSource(SRC, {call: c.call, prev: r0.meta, list: LIST});
   assert.equal(r1.meta.lastBlock, 1090);
-  const gl = c.calls.filter(([m]) => m === "eth_getLogs");
+  const gl = c.calls.filter(([m]) => m === "eth_getLogs").slice(first.length);
   assert.equal(gl[0][1][0].fromBlock, "0x" + (991).toString(16), "scans from lastBlock + 1");
   assert.deepEqual(gl[0][1][0].topics.slice(0, 2), [INITIALIZE_TOPIC, null]);
   assert.deepEqual(r1.meta.pending.map((p) => [p.id, p.live]), [[poolIdOf(fresh), false]]);
@@ -125,6 +132,34 @@ test("runs: baseline at the head, then new pools from lastBlock + 1; only hookle
   const relisted = {...LIST, pools: [...LIST.pools, {...fresh, id: poolIdOf(fresh)}]};
   const r4 = await runInitializeSource(SRC, {call: c.call, prev: r3.meta, list: relisted});
   assert.deepEqual(r4.meta.pending, [], "a rebuilt list takes the pool out of the unlisted set");
+});
+
+test("R1-4 / SEC-U4-4: a pool initialized between the list build and the first watch run is reported on that first run", async () => {
+  // list.block 100, head 10,000, a qualifying hookless pool (catalog tokens, fee 77/7) initialized at block 5,000.
+  const gap = {currency0: ZERO, currency1: USDC, fee: 77, tickSpacing: 7};
+  const c = chain({head: 10_000, logs: [rawLog(gap, 5_000)], live: {[poolIdOf(gap)]: true}});
+  const src = {...SRC, window: 10_000};
+  const r1 = await runInitializeSource(src, {call: c.call, list: {...LIST_BARE, block: 100}});
+  const logs = c.calls.filter(([m]) => m === "eth_getLogs");
+  assert.equal(logs[0][1][0].fromBlock, "0x65", "from list.block + 1 = 101");
+  assert.deepEqual(r1.meta.pending.map((p) => [p.id, p.block, p.live]), [[poolIdOf(gap), 5_000, true]]);
+  assert.notEqual(r1.value, r1.baseline.value, "a change against the first-run baseline");
+  assert.match(describeInitialize(r1.baseline.meta, r1.meta), /new hookless pool .* 77\/7 .* at block 5000 — live: rebuild the list \+ release/);
+  // The next run continues from lastBlock + 1 and does not report it again.
+  c.head = 12_000;
+  const r2 = await runInitializeSource(src, {call: c.call, prev: r1.meta, list: {...LIST_BARE, block: 100}});
+  assert.equal(r2.value, r1.value);
+  assert.equal(r2.baseline, undefined, "only a first run names a baseline");
+  // A long catch-up is bounded by maxCalls and says it is behind.
+  const far = chain({head: 50_000, logs: [rawLog(gap, 40_000)]});
+  const capped = await runInitializeSource({...src, maxCalls: 2}, {call: far.call, list: {...LIST_BARE, block: 100}});
+  assert.equal(capped.meta.lastBlock, 20_100);
+  assert.match(capped.problems[0], /behind/);
+  // A list without `block` (built before 0.5.0 wrote one) starts at the head, as before.
+  const bare = chain({head: 1000});
+  const b0 = await runInitializeSource(SRC, {call: bare.call, list: LIST_BARE});
+  assert.equal(b0.meta.lastBlock, 990);
+  assert.equal(bare.calls.filter(([m]) => m === "eth_getLogs").length, 0);
 });
 
 test("a listed pool is reported after three dead runs in a row, and once it is live again", async () => {
@@ -161,13 +196,13 @@ test("a failed read fails the run; a capped run says it is behind; a refused win
 });
 
 // ── end to end through watch.mjs ───────────────────────────────────────────
-function sandbox(rpcUrl) {
+function sandbox(rpcUrl, list = LIST_BARE) {
   const root = mkdtempSync(join(tmpdir(), "watch-1126-"));
   mkdirSync(join(root, "scripts/watch"), {recursive: true});
   for (const f of ["watch.mjs", "html-text.mjs", "pins.mjs", "evm-call.mjs", "zcash-branch.mjs", "evm-initialize.mjs"]) copyFileSync(join(here, f), join(root, "scripts/watch", f));
   const pkg = join(root, "packages/protocol-swap2-uniswap");
   mkdirSync(join(pkg, "dist"), {recursive: true});
-  writeFileSync(join(pkg, "dist/v4pools.js"), `export const UNISWAP_V4_POOLS = ${JSON.stringify({1: LIST})};\n`);
+  writeFileSync(join(pkg, "dist/v4pools.js"), `export const UNISWAP_V4_POOLS = ${JSON.stringify({1: list})};\n`);
   writeFileSync(join(pkg, "watch.json"), JSON.stringify({module: "@anywalletkit/protocol-swap2-uniswap", sources: [
     {id: "v4-pools-ethereum", type: "evm-initialize", chainId: 1, poolManager: PM, stateView: SV, pools: {from: "dist/v4pools.js", export: "UNISWAP_V4_POOLS"}, window: 100, confirm: 10, label: "Uniswap v4 pools · test"},
   ]}));
@@ -222,6 +257,36 @@ test("watch.mjs: the evm-initialize state carries over, the digest names a new p
     const down = await run(root, srv.url);
     assert.match(down.out, /1 unreachable/);
     assert.equal(stateOf(root).meta.lastBlock, 2090, "a failed run does not advance the index");
+  } finally {
+    srv.close();
+  }
+});
+
+test("watch.mjs (R1-4): the first run reports a pool initialized after the list was built — on a new source and on a re-pointed one", async () => {
+  const gap = {currency0: ZERO, currency1: USDC, fee: 500, tickSpacing: 10};
+  const c = chain({head: 2000, logs: [rawLog(gap, 1500)], live: {[poolIdOf(LISTED)]: true, [poolIdOf(gap)]: true}});
+  const srv = await serve(c);
+  try {
+    const root = sandbox(srv.url, {...LIST_BARE, block: 1200});
+    const first = await run(root, srv.url);
+    assert.equal(first.code, 0, first.err);
+    assert.match(first.out, /1 changed/);
+    assert.match(first.out, /Uniswap v4 pools · test.*new hookless pool .* 500\/10 .* at block 1500 — live: rebuild the list \+ release/);
+    assert.equal(stateOf(root).meta.lastBlock, 1990);
+    const quiet = await run(root, srv.url);
+    assert.match(quiet.out, /0 changed/, "reported once");
+    // Re-point the source (another StateView): the stored reading belongs to the old target, so the source starts again
+    // from the list's block — and the pool, still unlisted, is reported again for the new target.
+    const manifest = join(root, "packages/protocol-swap2-uniswap/watch.json");
+    const m = JSON.parse(readFileSync(manifest, "utf8"));
+    const other = "0x0000000000000000000000000000000000000abc";
+    m.sources[0].stateView = other;
+    writeFileSync(manifest, JSON.stringify(m));
+    writeFileSync(join(root, "packages/protocol-swap2-uniswap/dist/v4pools.js"), `export const UNISWAP_V4_POOLS = ${JSON.stringify({1: {...LIST_BARE, block: 1200, stateView: other}})};\n`);
+    const repointed = await run(root, srv.url);
+    assert.equal(repointed.code, 0, repointed.err);
+    assert.match(repointed.out, /Re-pointed/);
+    assert.match(repointed.out, /new hookless pool .* 500\/10 .* at block 1500/);
   } finally {
     srv.close();
   }

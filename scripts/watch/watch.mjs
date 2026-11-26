@@ -426,6 +426,9 @@ for (const m of manifests) {
       }
       const why = prev && prev.value !== r.value ? rebaseline(s, prev, r) : null;
       if (why) { console.error(`baseline ${slug(m.module)} · ${s.id}: ${why}`); prev = undefined; }
+      // A stateful source without a reading to continue from names the one it started at (evm-initialize: the empty set at
+      // the block its pinned list was built at), so what it found on the way is reported, never swallowed by the baseline.
+      if (!prev && r.baseline) prev = {type: s.type, target, value: r.baseline.value, meta: r.baseline.meta};
       const now = new Date().toISOString();
       const changed = !!prev && prev.value !== r.value;
       // A failed pin / branch check is reported on every run until it is fixed, not only on the day it appears.

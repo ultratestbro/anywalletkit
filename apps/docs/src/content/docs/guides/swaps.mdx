@@ -71,12 +71,22 @@ uniswapProvider({rpcUrls, v4: "all", maxPriceImpactBps: 500}) // or "native-in";
 ```
 
 - Hookless pools only (no hook allowlist), LP fee ≤ 10% (`v4MaxFeePips`). A failed pool or quote read refuses the
-  quote (`rate_limited` / `upstream_unavailable`) instead of quoting from fewer pools.
+  quote (`rate_limited` / `upstream_unavailable`) instead of quoting from fewer pools. A candidate that needs more gas
+  than one transaction on the chain may have (read again at that cap, straight to the quoter) is ranked out and counted
+  (`providerData.v4Unexecutable`), never the whole quote refused.
 - With `"native-in"`, token input and native output stay on v3.
-- Behind `remoteProvider`: turn v4 on in the server only after every app it serves ships `uniswapPins` from 0.5.0 or
-  later. Older pins name SwapRouter02 only, drop the Universal Router or SwapProxy quote, and lose Uniswap on that pair.
-- The provider declares `ownGasEstimate`: the engine sends each Uniswap call with the account's own estimate (Monad
-  charges the gas limit, not the gas used).
+- Behind a backend: use `uniswapRemoteProvider({baseUrl})` in the app — the stub with the shipped pins that also
+  declares `ownGasEstimate` (a bare `remoteProvider({...uniswapPins})` broadcasts the backend's quoted gas limit). Turn
+  v4 on in the server only after every app it serves ships the pins from 0.5.0 or later: older pins name SwapRouter02
+  only, drop the Universal Router or SwapProxy quote, and lose Uniswap on that pair.
+- Pool provenance: an app's pins accept only pools from the shipped list (or the `v4ExtraPools` it pins itself with
+  `uniswapPinsWith({v4ExtraPools})`). By default (`v4RankedPools: "listed"`) the server never lets a route through an
+  unlisted-token grid pool or an extra pool displace the v3 route; `"extra"` ranks extra pools the apps share, `"all"`
+  is for a provider running in the app itself.
+- A v4 deadline is at most 600 s ahead whatever `deadlineSeconds` says (the bound the pins hold it to, with 60 s of
+  clock skew; `uniswapPinsWith({clockSkewSeconds})` allows more).
+- The local provider declares `ownGasEstimate`: the engine sends each Uniswap call with the account's own estimate
+  (Monad charges the gas limit, not the gas used).
 
 On Monad, 62,000 MON → AUSD pays about 1 AUSD on v3 and about 670 AUSD on v4 (the hookless MON → USDC → AUSD route).
 

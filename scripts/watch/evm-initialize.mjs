@@ -12,6 +12,10 @@
 // reports a new pool once (and again when it turns live: rebuild + release), and a listed pool once it has been dead for
 // three runs (a removal candidate, never removed automatically). Any failed read fails the source: the previous state is
 // kept and the same blocks are scanned again next run.
+// The first run (no stored reading, or one discarded because the source was re-pointed or changed type) scans from the
+// block the pinned list was built at (`list.block + 1`; `maxCalls` and the "behind" problem bound and report a long
+// catch-up), and returns `baseline` — the empty reading it is compared against — so a pool initialized between the list
+// build and the first watch run is reported like any later one (R1-4 / SEC-U4-4). A list without `block` starts at the head.
 //
 //   node --test scripts/watch/watch-2026-11-26-evm-initialize.test.mjs
 import {keccak256} from "./evm-call.mjs";
@@ -169,12 +173,14 @@ export async function runInitializeSource(s, {call, logsCall = call, prev, list}
   const headState = Number(BigInt(await call("eth_blockNumber", [])));
   const headLogs = logsCall === call ? headState : Number(BigInt(await logsCall("eth_blockNumber", [])));
   const target = Math.min(headState, headLogs) - confirm;
-  const from = prev?.lastBlock != null ? prev.lastBlock + 1 : target + 1;
+  // No stored reading: from the block the pinned list was built at, so nothing initialized since the build is missed.
+  const listBlock = Number.isSafeInteger(list.block) && list.block >= 0 ? list.block : undefined;
+  const from = prev?.lastBlock != null ? prev.lastBlock + 1 : (listBlock ?? target) + 1;
 
   // New pools since the last run.
   const topicList = [...tokens].sort().map((t) => "0x" + t.slice(2).padStart(64, "0"));
   const seen = new Map(Object.entries(prev?.seen ?? {}));
-  let scannedTo = Math.max(from - 1, prev?.lastBlock ?? target), calls = 0;
+  let scannedTo = from - 1, calls = 0;
   if (from <= target) {
     const r = await scanLogs(logsCall, {poolManager: s.poolManager, topics: [INITIALIZE_TOPIC, null, topicList, topicList], from, to: target, window, maxCalls});
     scannedTo = r.scannedTo;
@@ -206,7 +212,9 @@ export async function runInitializeSource(s, {call, logsCall = call, prev, list}
   const behind = target - scannedTo;
   const meta = {lastBlock: scannedTo, readAt: target, calls, listed: listedKeys.size, seen: Object.fromEntries(seen), deadRuns, pending, dead, ...(behind > 0 ? {behind} : {})};
   const problems = behind > 0 ? [`Initialize index ${behind} blocks behind block ${target} (${calls} eth_getLogs this run; catching up)`] : [];
-  return {value: canonicalValue(pending, dead), meta, problems};
+  // A first run is compared against the empty reading at the list's block: what it found since the build is a change.
+  const baseline = prev ? undefined : {value: canonicalValue([], []), meta: {lastBlock: from - 1, pending: [], dead: [], baseline: true}};
+  return {value: canonicalValue(pending, dead), meta, problems, ...(baseline ? {baseline} : {})};
 }
 
 /** The digest line for a change between two stored readings. */

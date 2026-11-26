@@ -1510,6 +1510,32 @@
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Monad"
     },
     {
+      "id": "v4-pools-x-layer",
+      "type": "evm-initialize",
+      "chainId": 196,
+      "poolManager": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "stateView": "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
+      "pools": {
+        "from": "dist/v4pools.js",
+        "export": "UNISWAP_V4_POOLS"
+      },
+      "window": 10000,
+      "label": "Uniswap v4 hookless pools (Initialize + pinned list) · X Layer"
+    },
+    {
+      "id": "v4-pools-world-chain",
+      "type": "evm-initialize",
+      "chainId": 480,
+      "poolManager": "0xb1860D529182ac3BC1F51Fa2ABd56662b7D13f33",
+      "stateView": "0x51D394718bc09297262e368c1A481217FdEB71eb",
+      "pools": {
+        "from": "dist/v4pools.js",
+        "export": "UNISWAP_V4_POOLS"
+      },
+      "window": 10000,
+      "label": "Uniswap v4 hookless pools (Initialize + pinned list) · World Chain"
+    },
+    {
       "id": "v4-pools-megaeth",
       "type": "evm-initialize",
       "chainId": 4326,
@@ -1522,6 +1548,32 @@
       "logsRpc": "https://mainnet.megaeth.com/rpc",
       "window": 1000000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · MegaETH"
+    },
+    {
+      "id": "v4-pools-robinhood-chain",
+      "type": "evm-initialize",
+      "chainId": 4663,
+      "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "stateView": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+      "pools": {
+        "from": "dist/v4pools.js",
+        "export": "UNISWAP_V4_POOLS"
+      },
+      "window": 10000,
+      "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Robinhood Chain"
+    },
+    {
+      "id": "v4-pools-arc",
+      "type": "evm-initialize",
+      "chainId": 5042,
+      "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+      "stateView": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+      "pools": {
+        "from": "dist/v4pools.js",
+        "export": "UNISWAP_V4_POOLS"
+      },
+      "window": 10000,
+      "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Arc"
     },
     {
       "id": "v4-pools-base",
@@ -1551,6 +1603,19 @@
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Arbitrum"
     },
     {
+      "id": "v4-pools-celo",
+      "type": "evm-initialize",
+      "chainId": 42220,
+      "poolManager": "0x288dc841A52FCA2707c6947B3A777c5E56cd87BC",
+      "stateView": "0xbc21f8720BABf4b20d195eE5C6e99c52b76F2bfb",
+      "pools": {
+        "from": "dist/v4pools.js",
+        "export": "UNISWAP_V4_POOLS"
+      },
+      "window": 5000,
+      "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Celo"
+    },
+    {
       "id": "v4-pools-avalanche",
       "type": "evm-initialize",
       "chainId": 43114,
@@ -1562,6 +1627,19 @@
       },
       "window": 50000,
       "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Avalanche"
+    },
+    {
+      "id": "v4-pools-ink",
+      "type": "evm-initialize",
+      "chainId": 57073,
+      "poolManager": "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
+      "stateView": "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
+      "pools": {
+        "from": "dist/v4pools.js",
+        "export": "UNISWAP_V4_POOLS"
+      },
+      "window": 10000,
+      "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Ink"
     },
     {
       "id": "v4-pools-linea",

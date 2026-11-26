@@ -22,11 +22,16 @@ Nothing to change in code unless you opt in; read the rollout note if you serve 
   See [Swaps → Uniswap v4](/guides/swaps/#uniswap-v4).
 - **Rollout:** bump the app's pins first, then set `v4: "native-in"` (later `"all"`) on the server. An app on 0.4.x pins
   drops a Universal Router or SwapProxy quote and loses Uniswap on that pair while the server has v4 on.
+- **Behind a backend, use `uniswapRemoteProvider({baseUrl})`** instead of `remoteProvider({name: "uniswap", baseUrl,
+  ...uniswapPins})`: the same pins, plus `ownGasEstimate`, so the engine sends the account's own gas estimate rather
+  than the backend's quoted limit. An app that shares `v4ExtraPools` with its server pins them with
+  `uniswapPinsWith({v4ExtraPools})` (the server then sets `v4RankedPools: "extra"`).
 - **`maxPriceImpactBps` (opt-in):** refuses a quote that loses that many bps or more to price impact (the larger of the
   1/1000 probe and the spot value loss at one block) as `insufficient_liquidity`; unset, impact stays information.
 - **Always on:** a swap whose gas need is above the chain's per-transaction cap or block gas limit is refused; per-item
   RPC errors are retried and refused as `rate_limited` / `upstream_unavailable`, never read as "no pool". The provider
-  declares `ownGasEstimate`, so the engine sends each Uniswap call with the account's own gas estimate.
+  (and `uniswapRemoteProvider`) declares `ownGasEstimate`, so the engine sends each Uniswap call with the account's own
+  gas estimate.
 
 ## 2026-11-23: CoW Protocol, gas in the router's value, Zcash shielded recipients
 
