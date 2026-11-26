@@ -2,12 +2,14 @@
  * Activity recognition for Uniswap: a call into the chain's SwapRouter02 (the deployment table, or the caller's
  * override) with one of the router's swap entry points → `swap`, "Swapped A → B" from the owner's net transfers,
  * "Uniswap v3 · <chain>"; and a call into the chain's pinned Universal Router 2.1.2 — `execute(commands, inputs,
- * deadline)` whose commands are exactly `V4_SWAP` (0x10), as this module builds it — "Uniswap v4 · <chain>"; and a call
- * into the chain's pinned SwapProxy — `execute(router, token, amount, commands, inputs, deadline)` whose `router` is the
- * pinned Universal Router and whose commands are exactly `V4_SWAP` (a token input, as this module builds it) — "Uniswap
- * v4 · <chain>" too. Every other Universal Router or SwapProxy call (an Across deposit, a position call, a plan of several
- * commands, the no-deadline entry point, a SwapProxy forwarding to another router) is left to other modules: it is not
- * a swap this module made.
+ * deadline)` whose commands are exactly `V4_SWAP` (0x10), the command shape this module builds — "Uniswap v4 · <chain>";
+ * and a call into the chain's pinned SwapProxy — `execute(router, token, amount, commands, inputs, deadline)` whose
+ * `router` is the pinned Universal Router and whose commands are exactly `V4_SWAP` (a token input) — "Uniswap v4 ·
+ * <chain>" too. Every other Universal Router or SwapProxy call (an Across deposit, a position call, a plan of several
+ * commands, the no-deadline entry point, a SwapProxy forwarding to another router) is left to other modules. The
+ * `V4_SWAP` input's actions are not opened (review FUNDS-1): any call of that command shape is claimed, whatever its
+ * actions do, and its title comes from the owner's net transfers — as any SwapRouter02 swap entry point is on v3. This
+ * labels history; no check before signing reads it (that is `uniswapVerifyQuote`).
  */
 import {decodeFunctionData, type Hex} from "viem";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";

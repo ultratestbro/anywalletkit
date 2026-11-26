@@ -60,7 +60,8 @@ app, and each provider also works on its own without the router.
 
 `@anywalletkit/protocol-swap2-uniswap` quotes Uniswap v3 by default. `v4: "native-in"` adds Uniswap v4 for a native-coin
 input: the chain's pinned hookless v4 pools (a generated list shipped with the package, plus your own `v4ExtraPools`)
-are quoted on the V4Quoter at the same block as v3, and the larger output wins; the swap runs through the pinned
+are quoted on the V4Quoter beside v3 (at one pinned block when `maxPriceImpactBps` is set, else each read at
+`latest`), and the larger output wins; the swap runs through the pinned
 Universal Router 2.1.2 with the coin as `value`, no approval. `v4: "all"` adds token input (into a token or the native
 coin) the same way, through Uniswap's SwapProxy: the token is approved to the chain's pinned SwapProxy for exactly the
 input, and the provider simulates that approval and the exact swap from the sender before it returns the quote
@@ -75,7 +76,9 @@ uniswapProvider({rpcUrls, v4: "all", maxPriceImpactBps: 500}) // or "native-in";
 - Hookless pools only (no hook allowlist), LP fee ≤ 10% (`v4MaxFeePips`). A failed pool or quote read refuses the
   quote (`rate_limited` / `upstream_unavailable`) instead of quoting from fewer pools. A candidate that needs more gas
   than one transaction on the chain may have (read again at that cap, straight to the quoter) is ranked out and counted
-  (`providerData.v4Unexecutable`), never the whole quote refused.
+  (`providerData.v4Unexecutable`) where the module knows the chain's per-transaction or execution cap (Ethereum, OP,
+  BNB, Unichain, World Chain, Base, Ink, Linea, Arc, Polygon, Monad, Arbitrum, Robinhood Chain); elsewhere (Avalanche,
+  Celo, X Layer, MegaETH, Elysium) such a call still refuses the quote.
 - With `"native-in"`, token input and native output stay on v3.
 - With v4 on, a recipient the chain's v4 pins name as a sink (a router sentinel, the zero address, a pinned Uniswap v4
   contract) is refused as `recipient_mismatch` for every venue: output paid there would be stranded.
@@ -112,7 +115,8 @@ uniswapRemoteProvider({baseUrl: "/api/v2/swap2", multiQuotes: true}) // the app'
 ```
 
 Behind a backend, set `venueRoutes: "both"` on the server first: `/quote` keeps answering with the winner (now naming
-its route), so apps without `multiQuotes` keep one Uniswap row; apps then turn on `multiQuotes` for the two rows.
+its route), so apps without `multiQuotes` keep one Uniswap row; apps then turn on `multiQuotes` for the two rows. A
+`multiQuotes` app against a server without `"both"` gets no Uniswap quote at all (no row, and no executable quote).
 
 ### Curve
 

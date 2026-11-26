@@ -319,8 +319,10 @@ export interface UniswapProviderConfig {
    * Batches then carry at most 10 calls and wait for their turn on their endpoint, counted at the moment each batch
    * went; turns go to the quote that began first (its later reads before newer quotes' first ones), then first come first
    * served. A batch that would wait more than 4 s, or go later than 5 s after its quote began, is sent to the next
-   * endpoint instead, and with none left refused as `rate_limited`: a quote is refused by then rather than run past the
-   * router's 8 s. Unset (the default): no limit, every batch goes at once as in 0.4.11 — what the node rate-limits is
+   * endpoint instead, and with none left refused as `rate_limited`: nothing of a quote is sent later than 5 s after it
+   * began. A batch sent still has up to 12 s per endpoint to answer, so a quote settles within the router's 8 s only when
+   * the endpoint answers its last pass within about 3 s; the deployment checks, which quotes share, wait at most 4 s a
+   * batch. Unset (the default): no limit, every batch goes at once as in 0.4.11 — what the node rate-limits is
    * retried, then refused.
    */
   rpcCallsPerSecond?: number;
@@ -358,8 +360,9 @@ export interface UniswapProviderConfig {
    * without this option.
    *
    * `"both"` (needs `v4: "native-in"` or `"all"`; with v4 off the provider throws when it is made): the provider also
-   * implements `getQuotes`, which returns up to two candidates from one ranking pass (the reads of a `"best"` quote, at
-   * the same block, plus the losing venue's own probe and checks) — `routeId: "v3"`, the best v3 route, and
+   * implements `getQuotes`, which returns up to two candidates from one ranking pass (the reads of a `"best"` quote — at
+   * one pinned block with `maxPriceImpactBps`, else each at "latest" — plus the losing venue's own probe and checks) —
+   * `routeId: "v3"`, the best v3 route, and
    * `routeId: "v4"`, the best v4 route — each built and
    * checked exactly as it would be had it won: the impact gate (`maxPriceImpactBps`), the gas bound, the module's own
    * strict v4 check and the token-input simulation apply to each one. One venue refusing never drops the other; with
@@ -405,7 +408,8 @@ export interface UniswapProviderConfig {
    * Called when v4 is set aside on a quote that still goes out (§6.5 row 15, "refuse + alert"): the chain's v4 deployment
    * does not match its pins (the router's code or linkage, or with `v4: "all"` the SwapProxy's — `reason:
    * "vault_mismatch"`; v4, or its token input, is off on that chain for the quote, v3 untouched), or the best v4 route's
-   * build was refused for a reason of the build and the quote fell back to another route (the build's reason). Also
+   * build was refused for a reason of the build and the quote fell back to another route (the build's reason; the text
+   * says what the fallback came to: another v4 route, v3 quoted, or v3 refused too). Also
    * called on a deployment mismatch that leaves the chain without a route (the quote's `onRefusal` hears that refusal
    * too). With `venueRoutes: "both"`, also when one venue's candidate is left out because its reads failed (the node's
    * reason: `rate_limited`, `upstream_unavailable`, `stale_node`, `key_rejected`, or unclassified as
@@ -1965,8 +1969,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // read as "no pool").
       const gated = maxImpact !== undefined;
       const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
-      // v4 reads go out alongside the v3 ones, at the same block; any of them failing refuses the quote (never a
-      // smaller candidate set). Handled here so a v3 failure first leaves no unhandled rejection behind.
+      // v4 reads go out alongside the v3 ones, with the same block tag (one pinned block when gated; else "latest", which
+      // separate requests may answer from different blocks); any of them failing refuses the quote (never a smaller
+      // candidate set). Handled here so a v3 failure first leaves no unhandled rejection behind.
       const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal, turns) : undefined;
       v4Run?.catch(() => {});
       // With v4 on, the v3 reads go out alongside v4's and are retried the same way (a 429 under the doubled load is

@@ -289,15 +289,18 @@ function poolIds(list: readonly V4PoolKey[] | undefined): ReadonlySet<string> {
 const own = <T>(rec: Readonly<Record<number, T>> | undefined, id: number): T | undefined =>
   rec && Object.prototype.hasOwnProperty.call(rec, id) ? rec[id] : undefined;
 
-/** Addresses a swap must never pay: the router sentinels, the zero address and the pinned contracts (output paid to
- *  them is stranded or anyone's to sweep). */
+/** Addresses a swap must never pay: the router sentinels, the zero address and the chain's pinned Uniswap v4
+ *  contracts (output paid to them is stranded, or left in the Universal Router for anyone to sweep). The chain's v3
+ *  contracts are not in the set (review FUNDS-2): a recipient is the app's own request, which the pins bind TAKE to,
+ *  and on v3 0.4.11's check accepted one as well. */
 function forbiddenRecipients(d: UniswapV4Deployment): ReadonlySet<string> {
   return new Set([V4_NATIVE, V4_ACTION_CONSTANTS.MSG_SENDER, V4_ACTION_CONSTANTS.ADDRESS_THIS, d.universalRouter, d.swapProxy, d.poolManager, d.positionManager, d.quoter, d.stateView, d.permit2].map((a) => getAddress(a)));
 }
 
 /**
  * Whether `address` is one the chain's v4 deployment names as a sink — a router sentinel, the zero address, a pinned
- * Uniswap v4 contract: a swap that pays it strands the output (or leaves it for anyone to sweep from the router),
+ * Uniswap v4 contract (not the chain's v3 contracts): a swap that pays it strands the output (or leaves it for anyone
+ * to sweep from the Universal Router),
  * whichever venue builds the swap. The provider refuses such a recipient for every venue once v4 is on for the chain,
  * and the app's pins refuse a v3 quote paying it on a chain with v4 pins (review LIVE3-2: the module's own v4 check
  * refused it while the provider still quoted v3 paying the Universal Router).

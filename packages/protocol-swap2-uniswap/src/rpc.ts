@@ -4,7 +4,7 @@ import {httpRefusal, refusal, refusalOf, withReason, type Swap2RefusalReason} fr
 /**
  * JSON-RPC for the Uniswap provider: batches with endpoint failover, and a per-item answer that tells a revert (the
  * call ran and the contract said no: an answer) from a call the node did not answer (a rate limit, a node error, an
- * item left out). Before 0.4.12 every per-item error read as `null`, so a `-32007 "50/second request limit reached"` on
+ * item left out). Before 0.5.0 every per-item error read as `null`, so a `-32007 "50/second request limit reached"` on
  * the best pool's quote made that pool silently "not a candidate" and a worse route won (UNISWAP-V4-RESEARCH §2.2, M1).
  */
 

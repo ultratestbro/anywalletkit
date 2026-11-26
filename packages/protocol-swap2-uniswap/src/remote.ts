@@ -18,8 +18,9 @@ export interface UniswapRemoteOptions extends UniswapPinsOptions, Pick<RemotePro
   /**
    * Ask the backend for both Uniswap venues as separate candidates (its `/quotes` action): a Uniswap v3 and a Uniswap v4
    * row, `routeId` "v3" / "v4", each checked here by the pins against the venue it names. Turn it on only once the
-   * backend's provider runs with `venueRoutes: "both"` (a backend without it answers `/quotes` with an error and this
-   * stub then shows no Uniswap candidate). Default off: one quote per pair through `/quote`, as before.
+   * backend's provider runs with `venueRoutes: "both"`: against a backend without it this stub gets no Uniswap quote at
+   * all — `/quotes` answers with an error (no candidate is shown), and the `/quote` answer of a live request names no
+   * `routeId`, which the stub and the router refuse. Default off: one quote per pair through `/quote`, as before.
    */
   multiQuotes?: boolean;
 }

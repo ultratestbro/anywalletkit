@@ -56,10 +56,11 @@ uniswapProvider({ rpcUrls, v4: "native-in" }) // native input on v4
 uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token or the native coin) through the SwapProxy
 ```
 
-- **What it quotes.** With `v4: "native-in"`, a native-coin input into an ERC-20 is quoted on v3 and on v4, at the same
-  block, and the larger output wins (`v4MinEdgeBps`, default 0, makes v4 beat v3 by more than that many bps). With
-  `v4: "all"`, a catalog-token input into a token or into the native coin is ranked the same way. `maxPriceImpactBps`
-  gates the winner, v3 or v4, with the same two measures.
+- **What it quotes.** With `v4: "native-in"`, a native-coin input into an ERC-20 is quoted on v3 and on v4 — at one
+  pinned block when `maxPriceImpactBps` is set, else each read at `latest` (separate requests, which on a fast chain can
+  land on different blocks) — and the larger output wins (`v4MinEdgeBps`, default 0, makes v4 beat v3 by more than
+  that many bps). With `v4: "all"`, a catalog-token input into a token or into the native coin is ranked the same
+  way. `maxPriceImpactBps` gates the winner, v3 or v4, with the same two measures.
 - **The call.** The same `V4_SWAP` input every time — actions `[SWAP_EXACT_IN_SINGLE | SWAP_EXACT_IN, SETTLE, TAKE]` in
   the 2.1.x layout, `SETTLE(input, amountIn, false)`, `TAKE(output, recipient, 0)` (`address(0)` for a native output,
   paid by the PoolManager straight to the recipient). A native input calls `UniversalRouter.execute(0x10, [V4_SWAP],
@@ -84,11 +85,12 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   (decision 5: on Monad one `-32007` on the allowance read used to return v3's 1.13 AUSD for 700 USDC, v4 paying 700.08). `providerData.simulated` says how (`"approve+swap"`,
   `"swap"` when the allowance already stood, `"approve+swap (allowance override)"`, `"approve+swap (executor
   override)"`, or `"none"` on a quote without a sender — a price quote nothing is approved on).
-- **v4 on never costs a pair its v3 route.** A v4 build refused for a reason of the build falls back instead of
-  refusing the quote: when the best v4 route's own pools fail its simulated swap (`V4TooLittleReceived`,
-  `CurrencyNotSettled`…), its encoding or the module's own check refuses it, the next v4 candidate is built (at most 3);
-  when what every v4 build shares fails — the endpoint cannot simulate the approval and the swap (a method or a state
-  override it does not take, an answer in another shape), the approval or the token's pull into the SwapProxy fails —
+- **A v4 build that fails never costs a pair its v3 route.** (A v4 read that went unanswered does: it refuses the
+  quote, below.) A v4 build refused for a reason of the build falls back instead of refusing the quote: when the best
+  v4 route's own pools fail its simulated swap (`V4TooLittleReceived`, `CurrencyNotSettled`…), its encoding or the
+  module's own check refuses it, the next v4 candidate is built (at most 3); when what every v4 build shares fails —
+  the endpoint cannot simulate the approval and the swap (a method or a state override it does not take, an answer in
+  another shape), the approval or the token's pull into the SwapProxy fails —
   the quote goes straight to v3, and with no v3 route the best route's reason refuses it. A read that went unanswered
   is no such fact: it refuses the quote (above). The trade's own verdicts still refuse the quote outright (no route could pass them): the impact gate, a
   minimum that rounds to 0, the caller's floor, a wallet holding less than the input, a recipient that cannot take
@@ -129,7 +131,8 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
 - **Chains.** v4 is pinned on 19 chains (`UNISWAP_V4`) and quoted where there is a pool list: shipped (18 chains:
   every pinned one but HyperEVM), or your `v4ExtraPools`. HyperEVM is pinned `quotable: false` (no live pool); on Arc
   and Celo the native coin is an ERC-20, so native input and output are refused there (token → token through the
-  SwapProxy is not). The research rates MegaETH, Celo, Linea and World Chain as adding nothing over v3 today; their
+  SwapProxy is not). The research rates Celo, Linea and World Chain as adding nothing over v3 today, and finds no
+  core-pair depth on MegaETH, where v4 is the only Uniswap venue this module quotes (no v3 is pinned there); their
   lists ship anyway (decision 6: pins for every catalog v4 chain, v4 default off), so a server can turn v4 on there
   without a release. Before the first v4 quote on
   a chain the provider reads `poolManager()` of the router, the V4Quoter and the StateView, the router's codehash and,
@@ -147,12 +150,10 @@ uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token o
   `simulation_failed`), and no answer refuses. A node refusing the dry-run because the sender holds less than it sends
   ("insufficient funds for transfer", Monad's `-32003`, reth's `OutOfFunds`) is read as that answer — `simulation_failed`
   naming the balance, at once — never as "no RPC answered" after the retries.
-- **Gas.** The provider — and `uniswapRemoteProvider`, an app's stub for it — declares `ownGasEstimate`: the engine
-  sends every Uniswap call (v3 too) with the account's own estimate of that exact call, dry-run right before broadcast —
-  never the quoted limit. Monad charges the gas limit, not the gas used: a v3 quote there carried 16.3M for 62,000 MON,
-  the v4 route needs about 200k. (A bare `remoteProvider({...uniswapPins})` stub has no `ownGasEstimate`: it sends the
-  backend's limit.) The quote still carries its bounded `gasLimit` (quoter gas + 150k for the router, + 140k for the
-  SwapProxy and the token's pull), as information and for the gas bound below; the pins refuse a quoted limit above the
+- **Gas.** A v4 quote carries its bounded `gasLimit` (quoter gas + 150k for the router, + 140k for the SwapProxy and
+  the token's pull), as information and for the gas bound below; the engine sends the account's own estimate instead
+  (`ownGasEstimate`, which is on with v4 off too: "Gas limit and RPC errors" below — Monad charges the gas limit, not
+  the gas used, and the v4 route there needs about 200k). The pins refuse a quoted limit above the
   chain's per-transaction cap (`KNOWN_TX_GAS_CAP`, the provider's own table: 2²⁴ on Ethereum, OP, BNB, Unichain, World
   Chain, Base, Ink, Linea and Arc, 2²⁵ on Polygon, 30M on Monad).
 - **`providerData`** of a v4 quote: `venue: "v4"`, `route` (e.g. "v4 via USDC 0.05%/10 → 0.005%/1"), `poolFee`, `router`,
@@ -228,7 +229,8 @@ uniswapRemoteProvider({ baseUrl: "/api/v2/swap2", multiQuotes: true })
   `maxPriceImpactBps` on each venue's own best route, the minimum and the caller's floor, the gas bound, the module's
   own strict v4 check, the token-input simulation before any approval, the fallback to the next v4 route when the best
   one's build is refused (at most 3). Within the `v4RankedPools` provenance rule (below), each equals what that venue
-  alone returns at the same block (v4 off for v3, no v3 deployment for v4) — checked live on Monad, Robinhood Chain,
+  alone returns from the same chain state (v4 off for v3, no v3 deployment for v4; with `maxPriceImpactBps` the pass
+  reads at one pinned block, else each read at `latest`) — checked live at one pinned block on Monad, Robinhood Chain,
   Base and Unichain. Where v3 has a route, the v4 candidate is the best route over ranked pools, so it can differ from
   a v4-alone quote through a grid, extra or newer-list pool, or be missing where that is v4's only route. The v3
   candidate is v3's best route the chain can carry, picked as in a `"best"` pass (LIVE-VR-3, "Gas limit and RPC
@@ -277,8 +279,10 @@ uniswapRemoteProvider({ baseUrl: "/api/v2/swap2", multiQuotes: true })
   stands. An app in `"both"` mode executes the row the user (or its own policy) picked with `using("uniswap", routeId)`.
 - **Rollout.** A server sets `venueRoutes: "both"` first (once v4 is on for its apps): `/quote` answers as before, the
   winner now naming its route, so apps without `multiQuotes` keep one Uniswap row. Then apps opt in with
-  `uniswapRemoteProvider({ baseUrl, multiQuotes: true })`. A `multiQuotes` app against a server without `"both"` has its
-  `/quotes` refused and shows no Uniswap row.
+  `uniswapRemoteProvider({ baseUrl, multiQuotes: true })`. A `multiQuotes` app against a server without `"both"` gets no
+  Uniswap quote at all: its `/quotes` is refused (no row), and the `/quote` answer of a live request
+  names no `routeId`, which the stub and the router refuse (`swap2(options)` and `using("uniswap")`
+  lose Uniswap too). So the server goes first.
 
 ## Price impact: information, or a refusal you opt into
 
@@ -298,7 +302,7 @@ uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
 - Every candidate is ranked as always (a route over the chain's gas cap never displaces one under
   it, see below); only the best route the chain can carry is gated, and a refused quote never falls
   back to a lower-output candidate. (A v4 route that cannot be built or simulated is not a refused
-  quote: the next route is built and gated in turn — see "v4 on never costs a pair its v3 route".)
+  quote: the next route is built and gated in turn — see "A v4 build that fails never costs a pair its v3 route".)
 - All reads of the quote are pinned to one block, with transient RPC errors retried.
 - The measure is the larger of the probe and the spot value loss against the pools' `slot0()` mid
   prices, fees included (`providerData.valueLossBps`), rounded down to a whole bp; the pools' floor
@@ -320,14 +324,21 @@ uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
   bring it to the limit; its price impact alone is under it (limit 1%; best route direct 1%)". Both
   start "loses X% of the value to price impact".
 - `preflightDeposit` does not apply it: the signed minimum governs there.
-- On the app's side `uniswapV4VerifyQuote(params, quote, {maxPriceImpactBps})` gates the same G: the
-  larger of the quote's `priceImpactBps` and `valueLossBps` (a gated quote whose probe could not run
-  carries spot alone); neither, or one that does not read as bps, refuses as `upstream_unavailable`.
+- On the app's side, for a v4 quote only, `uniswapV4VerifyQuote(params, quote, {maxPriceImpactBps,
+  pools: UNISWAP_V4_POOL_KEYS, extraPools})` gates the same G: the larger of the quote's
+  `priceImpactBps` and `valueLossBps` (a gated quote whose probe could not run carries spot alone);
+  neither, or one that does not read as bps, refuses as `upstream_unavailable`. The pool list is
+  required (without `pools` every v4 quote is refused: "no pinned Uniswap v4 pool list"; `extraPools`
+  are the `v4ExtraPools` the app pins). The shipped pins (`uniswapPins`, `uniswapPinsWith`,
+  `uniswapRemoteProvider`) apply no impact gate, and there is no app-side gate for a v3 quote.
 
 Unset, impact is never a refusal, and a healthy RPC sees 0.4.11's requests, sent as 0.4.11 sent them
 (every batch at once, no queue shared by concurrent quotes), plus one `eth_getBlockByNumber` per chain
-every 10 minutes (`tests/unset-byte-identical.test.ts`). Two things are always on and do change
-outcomes against 0.4.11: the gas bound and the RPC error handling below.
+every 10 minutes (`tests/unset-byte-identical.test.ts`). Three things are always on, with `v4` off
+too, and do change outcomes against 0.4.11: the gas bound and the RPC error handling below, and
+`ownGasEstimate` (below), with which the engine sends each Uniswap call with the account's own
+estimate instead of the quoted gasLimit. Activity also recognizes v4 swaps whatever `v4` says
+("Activity").
 
 ## Gas limit and RPC errors
 
@@ -391,6 +402,14 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   floor) comes at once when the route fits the read in hand. A `venueRoutes: "both"` pass bounds
   its v3 row and its v4 row by the same read, and each row is the route its venue alone would
   return.
+- **`ownGasEstimate` (always on, `v4` off too).** The provider — and `uniswapRemoteProvider`, an app's
+  stub for it — declares `ownGasEstimate`: the engine sends every Uniswap call, v3's and v4's, with the
+  account's own estimate of that exact call, dry-run from the account right before broadcast — never
+  the quoted gasLimit, which stays on the quote as information and for the gas bound. A dry run that
+  reverts refuses the swap (`simulation_failed`), and one the RPC does not answer is asked once more,
+  then refused (`upstream_unavailable`), where 0.4.11 broadcast with the quoted limit. Monad charges
+  the whole limit, not the gas used: a v3 quote there carries 16.3M for 62,000 MON. (A bare
+  `remoteProvider({...uniswapPins})` stub has no `ownGasEstimate`: it sends the backend's limit.)
 - **RPC errors.** A per-item JSON-RPC error that is a revert (code 3; "execution reverted" and other
   EVM errors, out of gas included; revert data whose message names no rate limit or node fault)
   means no candidate, as before. A rate limit (`-32005`, `-32007`, `429`, or its text), a node error
@@ -398,7 +417,7 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   answering `null`, an error the node sent without an id, a candidate quote in a shape QuoterV2
   never answers — a number, bytes that do not decode, and with `maxPriceImpactBps` an empty `0x`) is
   retried, then refused as `rate_limited` / `upstream_unavailable`. It is never read as "no pool"
-  (before 0.4.12, a rate-limited best pool silently lost to a worse route). The retries wait
+  (before 0.5.0, a rate-limited best pool silently lost to a worse route). The retries wait
   300–600 ms, then 1–1.5 s, at random. Batches carry at most 10 calls and go out at once, as in
   0.4.11; each gets 12 s per endpoint, also when the caller passes its own signal. URLs are taken out
   of node and transport error text, and so is every spelling of the configured endpoints — one given
@@ -410,8 +429,11 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   batches of at most 10. A batch waits for its turn: the quote that began first goes first (its later
   reads before newer quotes' first ones, so a burst serves the quotes it can), then first come first
   served. One that would wait more than 4 s, or go later than 5 s after its quote began, goes to the
-  next endpoint instead, or with none left is refused as `rate_limited` — a quote is refused by then
-  rather than run into the router's 8 s, signal or not. 13 is the least that carries the largest quote (51 calls in five passes
+  next endpoint instead, or with none left is refused as `rate_limited`: nothing of a quote is sent
+  later than 5 s after it began. A batch sent still has up to 12 s per endpoint to answer, so a quote
+  settles within the router's 8 s only when the endpoint answers its last pass within about 3 s; and
+  the v3 and v4 deployment checks, which quotes share, wait at most 4 s a batch rather than by the
+  quote's 5 s. 13 is the least that carries the largest quote (51 calls in five passes
   one after another) on an idle endpoint answering within 0.5 s; a lower value is refused when the
   provider is built. With `v4` on, a quote's v4 reads (discovery, quoter aggregates, probe, the
   token-input check) go by the same turns and bound, and the floor is 34: the largest v4 quote (a
@@ -427,11 +449,13 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes a call into the chain's pinned Universal Router 2.1.2 —
-`execute(bytes,bytes[],uint256)` `0x3593564c` whose commands are exactly `V4_SWAP` (`0x10`), the shape this module
-builds — as a `swap` with subtitle `Uniswap v4 · <chain>`, and a call into the chain's pinned SwapProxy —
+`execute(bytes,bytes[],uint256)` `0x3593564c` whose commands are exactly `V4_SWAP` (`0x10`), the command shape this
+module builds — as a `swap` with subtitle `Uniswap v4 · <chain>`, and a call into the chain's pinned SwapProxy —
 `execute(address,address,uint256,bytes,bytes[],uint256)` `0x2894adf9` whose `router` is the pinned Universal Router and
 whose commands are exactly `V4_SWAP` — the same; every other router or SwapProxy call (a plan with more commands, the
-no-deadline entry point, an Across deposit, a SwapProxy forwarding elsewhere) stays unclaimed. Fixtures: public Unichain
+no-deadline entry point, an Across deposit, a SwapProxy forwarding elsewhere) stays unclaimed. The `V4_SWAP` actions are
+not opened: any such call is claimed whatever its actions do, and its title comes from the owner's net transfers, as
+for a SwapRouter02 call on v3. It is history, never a check before signing (that is `uniswapVerifyQuote`). Fixtures: public Unichain
 transactions (ETH → token, and token → ETH paid by the PoolManager) and Ethereum SwapProxy swaps (UNI ⇄ AAVE),
 negatives `0x0010` (v3 + v4) on Unichain, `0x0a10` (Permit2 + v4) on Monad, and SwapProxy plans `0x00070c` and
 `0x0c100b04` on Ethereum.
