@@ -14,7 +14,15 @@ import {describeUniswapActivity} from "./activity.js";
 import {UNISWAP_V3, uniswapPinsWith, type UniswapPinsOptions} from "./addresses.js";
 import {UNISWAP_V4} from "./v4/addresses.js";
 
-export interface UniswapRemoteOptions extends UniswapPinsOptions, Pick<RemoteProviderOptions, "baseUrl" | "enabled" | "fetchImpl" | "headers" | "timeoutMs" | "allowInsecureBaseUrl"> {}
+export interface UniswapRemoteOptions extends UniswapPinsOptions, Pick<RemoteProviderOptions, "baseUrl" | "enabled" | "fetchImpl" | "headers" | "timeoutMs" | "allowInsecureBaseUrl"> {
+  /**
+   * Ask the backend for both Uniswap venues as separate candidates (its `/quotes` action): a Uniswap v3 and a Uniswap v4
+   * row, `routeId` "v3" / "v4", each checked here by the pins against the venue it names. Turn it on only once the
+   * backend's provider runs with `venueRoutes: "both"` (a backend without it answers `/quotes` with an error and this
+   * stub then shows no Uniswap candidate). Default off: one quote per pair through `/quote`, as before.
+   */
+  multiQuotes?: boolean;
+}
 
 /** What {@link uniswapRemoteProvider} returns: a remote swap2 provider that declares `ownGasEstimate`. */
 export type UniswapRemoteProvider = CrossChainProvider & {readonly ownGasEstimate: true};
@@ -27,6 +35,8 @@ export type UniswapRemoteProvider = CrossChainProvider & {readonly ownGasEstimat
  *
  * ```ts
  * const uniswap = uniswapRemoteProvider({baseUrl: "/api/v2/swap2"});
+ * // Uniswap v3 and v4 as two rows (the backend's provider runs with venueRoutes: "both"):
+ * const both = uniswapRemoteProvider({baseUrl: "/api/v2/swap2", multiQuotes: true});
  * ```
  */
 export function uniswapRemoteProvider(options: UniswapRemoteOptions): UniswapRemoteProvider {
@@ -46,6 +56,7 @@ export function uniswapRemoteProvider(options: UniswapRemoteOptions): UniswapRem
     spenders: pins.spenders,
     verifyQuote: pins.verifyQuote!,
     reasonOf: pins.reasonOf!,
+    ...(options.multiQuotes === true ? {multiQuotes: true} : {}),
     ...(options.enabled ? {enabled: options.enabled} : {}),
     ...(options.fetchImpl ? {fetchImpl: options.fetchImpl} : {}),
     ...(options.headers ? {headers: options.headers} : {}),

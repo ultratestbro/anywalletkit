@@ -175,8 +175,10 @@ export interface UniswapPinsOptions {
  * Router 2.1.2 (native input) or to its pinned SwapProxy (token input, forwarding to that router) is a v4 swap, checked
  * by {@link uniswapV4VerifyQuote} — every pool hookless and in the shipped per-chain list, the whole §6.5 check list with
  * S1–S14 for the SwapProxy (UNISWAP-V4-RESEARCH §6.5); anything else goes to the v3 check ({@link uniswapV3VerifyQuote}),
- * which refuses every target but the chain's SwapRouter02. The reason it fails, or null. The check of {@link uniswapPins};
- * `uniswapPinsWith(options).verifyQuote` is the same with the app's own `v4ExtraPools` and clock skew.
+ * which refuses every target but the chain's SwapRouter02. A quote naming its route (`routeId: "v3"` / `"v4"`, from a
+ * provider with `venueRoutes: "both"`) gets only that venue's check, and a call to the other venue's contract is
+ * refused. The reason it fails, or null. The check of {@link uniswapPins}; `uniswapPinsWith(options).verifyQuote` is the
+ * same with the app's own `v4ExtraPools` and clock skew.
  */
 export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   return SHIPPED.verifyQuote!(params, quote);
@@ -191,7 +193,10 @@ export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | 
  * chain with a pool list these pins can check routes against (the shipped one, or `options.v4ExtraPools`). Spenders:
  * SwapRouter02 and the SwapProxy, never the Universal Router, Permit2 or the PoolManager (scan 2026-10-27 modules, F9;
  * scan 2026-10-28, F1). `verifyQuote` dispatches on `tx.to` as {@link uniswapVerifyQuote} does; `reasonOf` classifies
- * every text it returns.
+ * every text it returns. A quote that names its route (`routeId`, from a provider with `venueRoutes: "both"`) is held to
+ * that venue: `"v3"` to the v3 check alone (a Universal Router or SwapProxy call refused), `"v4"` to the v4 check alone
+ * (a call to anything but the pinned Universal Router or SwapProxy refused); any other `routeId`, or one other than the
+ * request's, is refused. Without a `routeId`, the dispatch on `tx.to` is unchanged.
  */
 export function uniswapPinsWith(options: UniswapPinsOptions = {}): RemotePins {
   const extra = checkedV4ExtraPools(options.v4ExtraPools);
@@ -222,9 +227,16 @@ export function uniswapPinsWith(options: UniswapPinsOptions = {}): RemotePins {
       const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
       const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
       const to = quote.txRequest?.to;
-      if (d4 && typeof to === "string" && /^0x[0-9a-fA-F]{40}$/.test(to) && (getAddress(to) === getAddress(d4.universalRouter) || getAddress(to) === getAddress(d4.swapProxy))) {
-        return uniswapV4VerifyQuote(params, quote, v4Options);
-      }
+      const v4Target = d4 !== undefined && typeof to === "string" && /^0x[0-9a-fA-F]{40}$/.test(to) && (getAddress(to) === getAddress(d4.universalRouter) || getAddress(to) === getAddress(d4.swapProxy));
+      // A quote naming its route (a provider with `venueRoutes: "both"`) is held to that venue's check alone: "v3" never
+      // passes as a Universal Router or SwapProxy call, "v4" never as a SwapRouter02 one — the row the app shows is the
+      // venue the calldata runs on, not a label the backend picked.
+      const route = quote.routeId;
+      if (route !== undefined && route !== "v3" && route !== "v4") return notes.note(`the quote names an unknown Uniswap route '${String(route).slice(0, 40)}' (the routes are "v3" and "v4")`, "policy_refused");
+      if (params.routeId !== undefined && params.routeId !== route) return notes.note(`the quote is the '${route ?? "unnamed"}' route, not the '${String(params.routeId).slice(0, 40)}' route asked for`, "policy_refused");
+      if (route === "v4" && !v4Target) return notes.note(`the 'v4' route calls ${typeof to === "string" ? to : "nothing"}, not the chain's pinned Universal Router 2.1.2 or SwapProxy`, "vault_mismatch");
+      if (route === "v3" && v4Target) return notes.note(`the 'v3' route calls the chain's Uniswap v4 ${getAddress(to) === getAddress(d4.universalRouter) ? "Universal Router" : "SwapProxy"} (${to}), not the SwapRouter`, "vault_mismatch");
+      if (v4Target) return uniswapV4VerifyQuote(params, quote, v4Options);
       // A v3 quote on a chain with v4 pins never pays one of the v4 sinks (a router sentinel, the zero address, a pinned
       // Uniswap v4 contract): the v4 check refuses that recipient, and v3 output paid there is stranded just the same
       // (review LIVE3-2).

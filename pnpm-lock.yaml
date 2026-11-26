@@ -1808,6 +1808,9 @@ importers:
       '@anywalletkit/core':
         specifier: workspace:*
         version: link:../core
+      '@anywalletkit/protocol-swap2-router':
+        specifier: workspace:*
+        version: link:../protocol-swap2-router
       '@types/node':
         specifier: ^22
         version: 22.20.5
