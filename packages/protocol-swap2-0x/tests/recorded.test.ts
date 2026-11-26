@@ -1,5 +1,6 @@
 /**
- * Real 0x answers through every check the device runs (fixtures/quotes, recorded 2026-11-15 on the first seven chains; Monad is owed):
+ * Real 0x answers through every check the device runs (fixtures/quotes: recorded 2026-11-15 on the first seven chains, pin
+ * era 2026-11-15, and 2026-11-26 on all eight, pin era 2026-11-25 — where 0x quoted the registry's previous Settler on every chain):
  * the provider's parser, the Settler check, the Permit2 rebuild against 0x's own hash, the engine's quote validation,
  * the remote-mode verifiers, build and preflight, and a full swap through the engine. A future change in 0x's answer
  * shape, or a check that is too strict for what 0x really sends, fails here instead of in production. Each recording is
@@ -36,19 +37,21 @@ async function quoted(f: RecordedQuote, over: Partial<QuoteParams> = {}) {
 const ctxOf = (f: RecordedQuote) => ({chains: chainsOf(f), settlers: () => [f.registry.current, ...(f.registry.prev ? [f.registry.prev] : [])], nowMs: f.request.nowMs});
 
 describe("the recordings", () => {
-  it("cover every chain of the table but the ones listed as unrecorded, token and native sales, live quotes and indicative prices", () => {
+  it("cover every chain of every era, the table in force included: a token sale, a native sale and an indicative price each", () => {
     const all = RECORDED.map(loadRecorded);
-    const table = Object.keys(ZEROEX_CHAINS).map(Number);
-    // the chains with no recording are exactly fixtures/pin-eras.json unrecordedChains (Monad, owed: ZEROEX_API_KEY)
-    expect(table.filter((id) => !all.some((f) => chainIdOf(f) === id))).toEqual(UNRECORDED_CHAINS);
-    const recorded = table.filter((id) => !UNRECORDED_CHAINS.includes(id));
-    expect(recorded).toEqual([1, 10, 56, 137, 8453, 42161, 43114]);
-    expect(new Set(all.map(chainIdOf))).toEqual(new Set(recorded));
-    for (const id of recorded) {
-      const on = all.filter((f) => chainIdOf(f) === id && !f.refusal);
-      expect(on.some((f) => !f.request.dry && !nativeSale(f)), `token sale on ${id}`).toBe(true);
-      expect(on.some((f) => !f.request.dry && nativeSale(f)), `native sale on ${id}`).toBe(true);
-      expect(on.some((f) => f.request.dry), `indicative price on ${id}`).toBe(true);
+    // the table in force is the newest era's: every one of its chains (Monad too) has real 0x answers in that era
+    expect(Object.keys(eraPins(CURRENT_PIN_ERA)).map(Number).sort((a, b) => a - b)).toEqual(Object.keys(ZEROEX_CHAINS).map(Number).sort((a, b) => a - b));
+    expect(new Set(all.filter((f) => f.pinEra === CURRENT_PIN_ERA).map(chainIdOf))).toEqual(new Set(Object.keys(ZEROEX_CHAINS).map(Number)));
+    for (const era of PIN_ERAS) {
+      const inEra = all.filter((f) => f.pinEra === era);
+      // a recording names a chain of its own era's table only
+      for (const f of inEra) expect(eraPins(era)[chainIdOf(f)], `${f.name}: chain ${chainIdOf(f)} is not in era ${era}`).toBeDefined();
+      for (const id of Object.keys(eraPins(era)).map(Number)) {
+        const on = inEra.filter((f) => chainIdOf(f) === id && !f.refusal);
+        expect(on.some((f) => !f.request.dry && !nativeSale(f)), `${era}: token sale on ${id}`).toBe(true);
+        expect(on.some((f) => !f.request.dry && nativeSale(f)), `${era}: native sale on ${id}`).toBe(true);
+        expect(on.some((f) => f.request.dry), `${era}: indicative price on ${id}`).toBe(true);
+      }
     }
   });
   it("name, as the Settlers in force, only addresses the 0x registry deploys to (CREATE3, computed offline)", () => {
@@ -71,24 +74,23 @@ describe("the recordings", () => {
       }
     }
   });
-  it("only the era in force may be listed as unrecorded: its recording is owed before the next pin raise", () => {
-    // An era is recordable only while 0x still quotes its Settlers and the registry still names its pins. Listing a
-    // superseded era as unrecorded would let the shipped table go without a real 0x answer for good.
-    for (const era of UNRECORDED_PIN_ERAS) expect(era, `${era} is unrecorded but no longer the era in force: record it (ZEROEX_API_KEY) before raising the pins again`).toBe(CURRENT_PIN_ERA);
-  });
-  it("only a chain that first appears in the era in force may be listed as unrecorded: its first recording is owed before the next pin raise", () => {
-    // Like an unrecorded era: a chain is recordable only while 0x quotes the Settlers its pins name. A chain that was
-    // already in an earlier era and still has no recording would ship without a real 0x answer for good.
-    expect(UNRECORDED_CHAINS).toEqual([143]);
+  it("no era and no chain is listed as unrecorded — and only the era in force, or a chain first in it, ever could be", () => {
+    // Both lists are held empty: every era, and every chain of the table, has its recordings (above). An era is
+    // recordable only while 0x still quotes its Settlers and the registry still names its pins, so were the lists ever
+    // used again, a superseded era (or a chain already in an earlier era) listed there would ship without a real 0x
+    // answer for good.
+    expect(UNRECORDED_PIN_ERAS).toEqual([]);
+    expect(UNRECORDED_CHAINS).toEqual([]);
+    for (const era of UNRECORDED_PIN_ERAS) expect(era, `${era} is unrecorded but no longer the era in force`).toBe(CURRENT_PIN_ERA);
     for (const id of UNRECORDED_CHAINS) {
       expect(eraPins(CURRENT_PIN_ERA)[id], `${id} is listed as unrecorded but is not in the era in force`).toBeDefined();
-      for (const era of PIN_ERAS.slice(0, -1)) expect(eraPins(era)[id], `${id} is listed as unrecorded but was already in ${era}: record it (ZEROEX_API_KEY)`).toBeUndefined();
+      for (const era of PIN_ERAS.slice(0, -1)) expect(eraPins(era)[id], `${id} is listed as unrecorded but was already in ${era}`).toBeUndefined();
     }
   });
-  it("every era is recorded on each of its chains, except the eras listed as unrecorded (owed: they need ZEROEX_API_KEY)", () => {
+  it("every era is recorded, on each of its chains", () => {
     const all = RECORDED.map(loadRecorded);
-    expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era))).toEqual(UNRECORDED_PIN_ERAS);
-    for (const era of PIN_ERAS.filter((e) => !UNRECORDED_PIN_ERAS.includes(e))) {
+    expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era))).toEqual([]);
+    for (const era of PIN_ERAS) {
       for (const id of Object.keys(eraPins(era)).map(Number)) expect(all.some((f) => f.pinEra === era && chainIdOf(f) === id), `${era} chain ${id}`).toBe(true);
     }
   });
@@ -178,7 +180,11 @@ describe.each(RECORDED)("%s", (name) => {
       const text = zeroExVerifyQuote({...params, destAddress: other}, quote!, ctxOf(f));
       expect(text).toMatch(/not the recipient of this swap/);
       expect(zeroExVerifyQuote({...params, minAmountOut: (BigInt(f.response.minBuyAmount) + 1n).toString()}, quote!, ctxOf(f))).toMatch(/below the caller's floor/);
-      expect(zeroExVerifyQuote(params, quote!, {...ctxOf(f), settlers: () => [f.registry.prev ?? other].filter((s) => s.toLowerCase() !== quote!.txRequest!.to!.toLowerCase())})).toMatch(/is not a 0x Settler from the on-chain registry/);
+      // The registry's other Settler (current or previous, whichever 0x did not quote), else a foreign address: resolved,
+      // but not the target. A recording that 0x sent to the previous Settler is held to the current one alone here.
+      const to = quote!.txRequest!.to!.toLowerCase();
+      const notTheTarget = [f.registry.current, f.registry.prev, other].filter((s): s is string => !!s && s.toLowerCase() !== to);
+      expect(zeroExVerifyQuote(params, quote!, {...ctxOf(f), settlers: () => [notTheTarget[0]!]})).toMatch(/is not a 0x Settler from the on-chain registry/);
     });
   }
 });
@@ -240,5 +246,74 @@ describe("through the engine and the server, on real answers", () => {
     expect(tx.to).toBe(getAddress(f.response.transaction.to));
     expect(tx.permit2Transfer === undefined).toBe(nativeSale(f));
     expect(refusalOf(await app.buildDeposit({...q!, txRequest: {...q!.txRequest!, data: `${q!.txRequest!.data!}00`}}).catch((e: unknown) => e))).toBeDefined();
+  });
+});
+
+describe("pin era 2026-11-25, recorded 2026-11-26: 0x quoted the registry's previous Settler on every chain", () => {
+  const era = RECORDED.map(loadRecorded).filter((f) => f.pinEra === "2026-11-25");
+  const live = era.filter((f) => !f.request.dry);
+
+  it("all eight chains, each live answer sent to prev(2) — the era's pinned previous deployment, which the registry still named", () => {
+    expect(new Set(era.map(chainIdOf))).toEqual(new Set([1, 10, 56, 137, 143, 8453, 42161, 43114]));
+    expect(live.length).toBeGreaterThanOrEqual(17);
+    for (const f of live) {
+      const c = chainOf(f);
+      expect(f.registry.prev, f.name).not.toBeNull();
+      expect(f.response.transaction.to.toLowerCase(), f.name).toBe(f.registry.prev!.toLowerCase());
+      expect(zeroExSettlerNonce(chainIdOf(f), f.response.transaction.to, c.registry, c.newestLiveNonce), f.name).toBe(c.previousLiveNonce);
+    }
+  });
+
+  it.each(live.map((f) => f.name))("%s: refused once the registry stops naming that Settler, and on a table whose previous pin has moved past it", async (name) => {
+    const f = loadRecorded(name);
+    vi.setSystemTime(f.request.nowMs);
+    const run = async (o: {registry?: {current?: string | null; prev?: string | null}; chains?: ReturnType<typeof chainsConfigOf>}) => {
+      vi.stubGlobal("fetch", recordedFetch(f, o.registry ? {registry: o.registry} : {}));
+      const heard: [string, string | undefined][] = [];
+      const q = await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: o.chains ?? chainsConfigOf(f)}).getQuote(paramsOf(f, {onRefusal: (t, info) => heard.push([t, info?.reason])}));
+      return {q, heard};
+    };
+    // the registry no longer names a previous Settler: the quoted one is no 0x Settler the app resolved
+    const dropped = await run({registry: {prev: null}});
+    expect(dropped.q).toBeNull();
+    expect(dropped.heard).toEqual([[`zeroex: the transaction target ${f.response.transaction.to} is not a 0x Settler from the on-chain registry`, "vault_mismatch"]]);
+    // the pins raised past it (previous = newest): the registry's own answer no longer passes the resolver
+    const id = chainIdOf(f);
+    const c = chainOf(f);
+    const raised = await run({chains: {...chainsConfigOf(f), [id]: {...c, previousLiveNonce: c.newestLiveNonce}}});
+    expect(raised.q).toBeNull();
+    expect(raised.heard).toHaveLength(1);
+    expect(raised.heard[0]![1]).toBe("vault_mismatch");
+    // and with the recorded registry and the era's table it passes (the replay above), the value going to that Settler
+    const ok = await run({});
+    expect(ok.heard).toEqual([]);
+    expect(ok.q!.txRequest!.to!.toLowerCase()).toBe(f.registry.prev!.toLowerCase());
+  });
+
+  it("Monad 1,000,000 MON → AUSD: 0x asked for 6,140,730 gas, a padded 7,388,876 — inside Monad's 15,000,000 cap, refused under the 6,000,000 every other chain keeps", async () => {
+    const f = loadRecorded("monad-mon-ausd-1m.2026-11-25");
+    expect(f.response.transaction.gas).toBe("6140730");
+    const {quote, refusals} = await quoted(f);
+    expect(refusals).toEqual([]);
+    expect(quote!.txRequest!.gasLimit).toBe("7388876");
+    expect(zeroExVerifyQuote(paramsOf(f), quote!, ctxOf(f))).toBeNull();
+    // a Monad entry of the integrator's own without `maxGasLimit`: the default cap, and this real answer is refused
+    const {maxGasLimit: _drop, ...plain} = ZEROEX_CHAINS[143]!;
+    vi.stubGlobal("fetch", recordedFetch(f));
+    const heard: [string, string | undefined][] = [];
+    const capped = await zeroExProvider({apiKey: getKey, rpcUrls: rpcOf(f), chains: {...chainsConfigOf(f), 143: plain}}).getQuote(paramsOf(f, {onRefusal: (t, info) => heard.push([t, info?.reason])}));
+    expect(capped).toBeNull();
+    expect(heard).toEqual([["zeroex: the transaction asks for more gas than any 0x swap needs (its gas limit must be 1 to 6000000 on chain 143)", "policy_refused"]]);
+    expect(zeroExVerifyQuote(paramsOf(f), quote!, {...ctxOf(f), chains: {...chainsOf(f), 143: Object.freeze(plain)}})).toBe("the transaction asks for more gas than any 0x swap needs (its gas limit must be 1 to 6000000 on chain 143)");
+  });
+
+  it("Monad 62,000 MON → AUSD: 0x asked for 3,970,462 gas, a padded 4,784,554 — under either cap; its /price agrees within the slippage", async () => {
+    const f = loadRecorded("monad-mon-ausd-62k.2026-11-25");
+    const price = loadRecorded("monad-mon-ausd-62k-price.2026-11-25");
+    expect(f.response.transaction.gas).toBe("3970462");
+    const {quote, refusals} = await quoted(f);
+    expect(refusals).toEqual([]);
+    expect(quote!.txRequest!.gasLimit).toBe("4784554");
+    expect(BigInt(price.response.buyAmount)).toBeGreaterThan(BigInt(f.response.minBuyAmount));
   });
 });

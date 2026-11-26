@@ -50,12 +50,13 @@ describe("1. the resolver accepts only a pinned, deployed Settler", () => {
   });
 
   // Each recording is held to the pins of the era it was recorded in (fixtures/pin-eras.json), and the newest era is
-  // the table in force. Raising a pin in src/chains.ts without adding its era fails here. So does an era that has no
-  // recording but is not listed as unrecorded, and an era listed as unrecorded that has recordings.
+  // the table in force. Raising a pin in src/chains.ts without adding its era fails here, and so does an era without
+  // recordings: every era is recorded (none is listed as unrecorded, tests/recorded.test.ts).
   it("every recorded registry answer is covered by the pins of its era, margin untouched — a newer live deployment fails this and verify:live", () => {
     expect(eraChains(CURRENT_PIN_ERA)).toEqual(ZEROEX_CHAINS);
     const all = RECORDED.map(loadRecorded);
-    expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era)), "eras with no recording = fixtures/pin-eras.json unrecorded").toEqual(UNRECORDED_PIN_ERAS);
+    expect(UNRECORDED_PIN_ERAS).toEqual([]);
+    expect(PIN_ERAS.filter((era) => !all.some((f) => f.pinEra === era)), "every era has recordings").toEqual([]);
     for (const name of RECORDED) {
       const f = loadRecorded(name);
       const c = chainsOf(f)[chainIdOf(f)]!;

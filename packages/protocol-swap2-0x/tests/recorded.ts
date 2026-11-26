@@ -1,7 +1,9 @@
 /**
- * Real 0x answers (fixtures/quotes/*.json), recorded from api.0x.org on 2026-11-15 with a throwaway taker that holds
- * nothing: the response body exactly as 0x sent it, the request rebuilt from the recorded query, the clock of the
- * quote, what the Settler registry answered on that chain, and the pin era it was recorded in. No key, no headers.
+ * Real 0x answers (fixtures/quotes/*.json), recorded from api.0x.org with a throwaway taker that holds nothing: on
+ * 2026-11-15 on the first seven chains (pin era 2026-11-15; `<name>.json`) and on 2026-11-26 on all eight (pin era
+ * 2026-11-25, Monad's first; `<name>.2026-11-25.json`). Each holds the response body exactly as 0x sent it, the request
+ * rebuilt from the recorded query, the clock of the quote, what the Settler registry answered on that chain, and the
+ * pin era it was recorded in. No key, no headers.
  *
  * Pin eras (fixtures/pin-eras.json): the chain table's Settler pins as src/chains.ts held them over time. A recording is
  * replayed with the table of its own era ({@link chainsOf}, {@link chainsConfigOf}) — the registry it recorded is that
@@ -27,9 +29,9 @@ const pinEras = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/pin-e
 export const PIN_ERAS: readonly string[] = Object.keys(pinEras.eras);
 /** The newest era: the one src/chains.ts must be. */
 export const CURRENT_PIN_ERA: string = PIN_ERAS.at(-1)!;
-/** Eras with no recording yet (owed: re-recording needs ZEROEX_API_KEY). */
+/** Eras listed as having no recording yet: none (tests/recorded.test.ts holds the list empty). */
 export const UNRECORDED_PIN_ERAS: readonly string[] = pinEras.unrecorded;
-/** Chains of the table with no recording in any era yet (owed: their first recordings need ZEROEX_API_KEY). */
+/** Chains listed as having no recording in any era yet: none (held empty too). */
 export const UNRECORDED_CHAINS: readonly number[] = pinEras.unrecordedChains;
 /** An era's pins, chain id → [newestLiveNonce, previousLiveNonce]. */
 export function eraPins(era: string): Readonly<Record<number, readonly [number, number]>> {

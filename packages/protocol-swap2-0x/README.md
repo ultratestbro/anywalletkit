@@ -170,6 +170,8 @@ ZEROEX_LIVE=1 ZEROEX_API_KEY=… pnpm test    # also live quotes from api.0x.org
 pnpm verify:live                            # registry, Settlers (code, the pinned current / previous pair), Permit2 on all eight chains; with ZEROEX_API_KEY also live corridors
 ```
 
+The recordings in `fixtures/quotes` are real 0x answers, one set per pin era (`fixtures/pin-eras.json`): 2026-11-15 on the first seven chains, 2026-11-25 on all eight (recorded 2026-11-26, when 0x still quoted the previous Settler everywhere). Each replays with its own era's chain table and registry answer, and every era must be recorded on every one of its chains — a native-coin sale, a token sale and an indicative price — so a pin raise lands with its recordings.
+
 `verify:live` reads public RPCs (`RPC_<chainId>=url[,url]` overrides one: the first URL, then the retry). A chain no RPC answers fails the run: its pins are unchecked. A failed run ends with `FAILED (n)` and a `Reason:` line that names every chain that is not ok, by verdict (`Reason: NEW on 1, 8453; unreachable on 143`), preceded by `Severity: high` when a sale through the Settler in force is refused today (a new deployment on a pinned chain refuses native-coin sales from the day it lands). Without `ZEROEX_API_KEY` the live corridors (including Monad MON → AUSD and USDC → MON) are skipped with a neutral line.
 
 ## License
