@@ -3,8 +3,8 @@ import type {Swap2Account, Swap2EngineConfig} from "@anywalletkit/protocol-swap2
 import {evmRef, isEvm} from "@anywalletkit/protocol-swap2-core/util";
 import {UNISWAP_V3} from "./addresses.js";
 import {uniswapProvider, type UniswapProviderConfig} from "./provider.js";
-import {UNISWAP_V4, uniswapV4DeploymentOf} from "./v4/addresses.js";
-import {UNISWAP_V4_POOLS} from "./v4pools/index.js";
+import {UNISWAP_V4} from "./v4/addresses.js";
+import {v4ServedDeployment} from "./v4/serve.js";
 
 export interface UniswapSwap2Config extends Swap2EngineConfig, UniswapProviderConfig {}
 
@@ -19,17 +19,12 @@ export class UniswapSwap2Protocol extends SingleProviderSwap2 {
     this.provider = uniswapProvider(config);
     this._rpcUrls = config.rpcUrls ?? {};
     this._deployments = config.deployments ?? UNISWAP_V3;
-    // The chains the provider quotes v4 on (see UniswapProviderConfig.v4): a pinned, quotable deployment whose native coin
-    // is not an ERC-20, with a pool list — shipped, or the integrator's own.
-    const v4On = (config.v4 ?? "off") !== "off";
+    // The chains the provider quotes v4 on (see UniswapProviderConfig.v4): the provider's own rule — a pinned, quotable
+    // deployment with a pool list (shipped, or the integrator's own); for "native-in", one whose native coin is not an ERC-20.
+    const mode = config.v4 ?? "off";
     const v4Deployments = config.v4Deployments ?? UNISWAP_V4;
     const extra = config.v4ExtraPools ?? {};
-    this._v4 = (id) => {
-      if (!v4On) return false;
-      const d4 = uniswapV4DeploymentOf(id, v4Deployments);
-      if (!d4 || d4.quotable === false || d4.nativeWrap === false || !d4.weth) return false;
-      return Object.prototype.hasOwnProperty.call(UNISWAP_V4_POOLS, id) || !!(Object.prototype.hasOwnProperty.call(extra, id) && extra[id]?.length);
-    };
+    this._v4 = (id) => v4ServedDeployment(id, mode, v4Deployments, extra) !== undefined;
   }
   protected override chainSupported(caip2: string): boolean {
     return isEvm(caip2) && (!!this._deployments[evmRef(caip2)] || this._v4(evmRef(caip2))) && !!this._rpcUrls[evmRef(caip2)]?.length;

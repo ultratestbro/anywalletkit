@@ -15,11 +15,13 @@ your app does.
 Nothing to change in code unless you opt in; read the rollout note if you serve Uniswap through `remoteProvider`.
 
 - **protocol-swap2-uniswap (minor):** `v4: "native-in"` quotes a native-coin input on the chain's pinned hookless v4
-  pools as well and executes the better of v3 and v4; the default `"off"` keeps every quote as before. `uniswapPins`
-  now lists the Universal Router 2.1.2 as a call target and `uniswapVerifyQuote` checks its calls
-  (`uniswapV4VerifyQuote`); the v3 check alone is `uniswapV3VerifyQuote`. See [Swaps → Uniswap v4](/guides/swaps/#uniswap-v4).
-- **Rollout:** bump the app's pins first, then set `v4: "native-in"` on the server. An app on 0.4.x pins drops a
-  Universal Router quote and loses Uniswap on that pair while the server has v4 on.
+  pools as well and executes the better of v3 and v4; `v4: "all"` does the same for a token input, through Uniswap's
+  SwapProxy (simulated with its approval before the quote); the default `"off"` keeps every quote as before.
+  `uniswapPins` now lists the Universal Router 2.1.2 as a call target and the SwapProxy as a call target and a spender,
+  and `uniswapVerifyQuote` checks their calls (`uniswapV4VerifyQuote`); the v3 check alone is `uniswapV3VerifyQuote`.
+  See [Swaps → Uniswap v4](/guides/swaps/#uniswap-v4).
+- **Rollout:** bump the app's pins first, then set `v4: "native-in"` (later `"all"`) on the server. An app on 0.4.x pins
+  drops a Universal Router or SwapProxy quote and loses Uniswap on that pair while the server has v4 on.
 - **`maxPriceImpactBps` (opt-in):** refuses a quote that loses that many bps or more to price impact (the larger of the
   1/1000 probe and the spot value loss at one block) as `insufficient_liquidity`; unset, impact stays information.
 - **Always on:** a swap whose gas need is above the chain's per-transaction cap or block gas limit is refused; per-item

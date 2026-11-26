@@ -1,21 +1,22 @@
 import {decodeFunctionResult, encodeFunctionData, encodePacked, getAddress, parseAbi, type Hex} from "viem";
 import {describeUniswapActivity} from "./activity.js";
-import {ccAsset, ccAssetByToken} from "@anywalletkit/swap2-assets";
+import {ccAsset, ccAssetByToken, resolveAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
 import {refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
-import {uniswapRpc, type RpcCall} from "./rpc.js";
+import {isUnsupportedMethod, uniswapRpc, type RpcCall, type RpcSlot} from "./rpc.js";
 import {boundGasLimit, gasBoundsOf, hopsOf, impactRefusalText, probeImpactBps, spotValueLossBps, validMaxImpactBps} from "./impact.js";
 import {UNISWAP_V4, uniswapV4DeploymentOf, type UniswapV4Deployment} from "./v4/addresses.js";
 import {UNISWAP_V4_POOLS} from "./v4pools/index.js";
+import {v4ServedDeployment, v4ServesFlow} from "./v4/serve.js";
 import {UNISWAP_V4_POOL_KEYS} from "./v4/listed.js";
 import {discoverV4Pools, type V4BlockTag, type V4EthCall} from "./v4/discover.js";
 import {buildV4Routes, decodeV4QuoteAnswer, multicallBatch, quoteCallDataOfKeys, quoteV4Routes, v4ProbeImpactBps, v4SpotLossBps, type V4CallBatch, type V4QuoteResult} from "./v4/quote.js";
 import {V4_MAX_FEE_PIPS, V4_NATIVE, checkedHooklessKey, checkedMaxFeePips} from "./v4/pool-key.js";
 import {encodeV4Swap} from "./v4/encode.js";
-import {uniswapV4ReasonOf, uniswapV4VerifyQuote, v4DeploymentProblem, v4DeploymentReads, v4HopTokens, v4PreflightCall, type UniswapV4Mode} from "./v4/verify.js";
+import {uniswapV4ReasonOf, uniswapV4VerifyQuote, v4DeploymentProblem, v4DeploymentReads, v4HopTokens, v4PreflightCall, v4StorageOverride, type UniswapV4Mode} from "./v4/verify.js";
 import {classifyV4Revert} from "./v4/errors.js";
 import type {V4PoolKey} from "./v4/pool.js";
 
@@ -32,12 +33,16 @@ import type {V4PoolKey} from "./v4/pool.js";
  * Same-chain only. ERC-20 sources approve exactly the input to the router
  * (`approvalAddress`); the engine handles that leg.
  *
- * Uniswap v4 (opt-in, `v4: "native-in"`; UNISWAP-V4-RESEARCH §5): a native-coin input is also quoted on the chain's
+ * Uniswap v4 (opt-in, `v4: "native-in"` or `"all"`; UNISWAP-V4-RESEARCH §5): the input is also quoted on the chain's
  * pinned hookless v4 pools (the shipped per-chain list, read through Multicall3 on the pinned StateView, plus the V4Quoter)
- * and executed through the pinned Universal Router 2.1.2 — `execute(0x10, [V4_SWAP([swap, SETTLE, TAKE])], deadline)`
- * with `value = amountIn`, the exact input settled and the whole output taken to the recipient. v3 and v4 candidates are
- * ranked together by output; the impact gate (`maxPriceImpactBps`) applies to the winner. Off by default: with v4 off
- * every quote is the v3 quote 0.4.x returned.
+ * and executed through the pinned Universal Router 2.1.2 — `execute(0x10, [V4_SWAP([swap, SETTLE, TAKE])], deadline)`:
+ * the exact input settled, the whole output taken to the recipient. A native-coin input calls the router with
+ * `value = amountIn`; a token input (`"all"`) goes through Uniswap's SwapProxy — `SwapProxy.execute(pinned router, token,
+ * amountIn, 0x10, [same input], deadline)` with `value = 0` and an exact approval of the SwapProxy — and may end in the
+ * native coin (`TAKE(address(0), recipient, 0)`, paid by the PoolManager). v3 and v4 candidates are ranked together by
+ * output; the impact gate (`maxPriceImpactBps`) applies to the winner. A token input is simulated with its approval from
+ * the sender before the quote is returned (no approval is ever asked for a swap that would revert). Off by default: with
+ * v4 off every quote is the v3 quote 0.4.x returned.
  */
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -73,6 +78,51 @@ const BLOCK_GAS_WAIT_MS = 1_500;
  * bound, which refuses a swap that could never be mined.
  */
 const V4_ROUTER_GAS = 150_000n;
+/**
+ * What the SwapProxy adds on top of a router call (token input): the proxy call, the token's `transferFrom` of the input
+ * into the router (cold allowance and balance slots) and the router settling that ERC-20 with the PoolManager instead of
+ * native value. Measured live on 2026-11-26 as the account's own `eth_estimateGas` of the exact call less the quoter's
+ * pool gas: Monad 700 USDC → AUSD 229,698 (estimate 278,580), → MON 192,186 (257,666); Base 1,000 USDC → ETH 123,055
+ * (162,027) — all under the 290,000 the router and the proxy are given together.
+ */
+const V4_PROXY_GAS = 140_000n;
+/**
+ * Gas named on the v4 reads (the Multicall3 aggregates of StateView and V4Quoter calls) where a chain's RPCs give an
+ * `eth_call` without `gas` less than one transaction may spend. Monad: 8.1M by default on all four endpoints (measured
+ * 2026-11-26), against its 30M per-transaction cap — inside an aggregate a two-hop quote through a sparse pool (USDC →
+ * USDT0 → AUSD, 18.4M gas) starved even on its own and refused the whole quote, while with 30M named it answers.
+ * Elsewhere the default (600M on the tested nodes) already exceeds every per-transaction cap.
+ */
+const V4_READ_GAS: Readonly<Record<number, bigint>> = Object.freeze({143: 30_000_000n});
+/** How long a chain whose RPC does not serve `eth_simulateV1` is remembered so (ms): later quotes go straight to the
+ *  fallbacks; then it is asked again (an endpoint may start serving it). */
+const NO_SIMULATE_V1_TTL_MS = 10 * 60_000;
+/** Most storage keys tried as a token's allowance slot (from its access list), and most slots kept. */
+const MAX_SLOT_CANDIDATES = 16;
+const MAX_CACHED_SLOTS = 256;
+
+/** The ERC-20 reads and the approval the SwapProxy flow simulates. */
+const ERC20_ABI = parseAbi([
+  "function balanceOf(address owner) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+]);
+/**
+ * The executor installed as the sender's code by a state override when no allowance slot verifies (§6.6, the general
+ * fallback): with calldata it `DELEGATECALL`s the chain's Multicall3 (so `aggregate3`'s calls run with `msg.sender` = the
+ * sender); with none it accepts the value sent and stops — the native output the PoolManager pays the sender. (Multicall3's
+ * own code has no `receive`: installed directly it made every token → native simulation revert `NativeTransferFailed`,
+ * live on Base and Monad 2026-11-26.) 61 bytes, written here from the opcodes:
+ * `CALLDATASIZE ISZERO PUSH1 59 JUMPI · CALLDATACOPY(0, 0, size) · DELEGATECALL(gas, Multicall3, 0, size, 0, 0) ·
+ * RETURNDATACOPY(0, 0, rsize) · success ? RETURN(0, rsize) : REVERT(0, rsize) · 59: STOP`.
+ */
+const EXECUTOR_CODE: Hex = "0x3615603b573660006000376000600036600073ca11bde05977b3631167028862be2a173976ca115af43d600060003e6036573d6000fd5b3d6000f35b00";
+/** Multicall3's `aggregate3`, run in the sender's context by {@link EXECUTOR_CODE}. */
+const MC3_ABI = parseAbi([
+  "struct Call3 { address target; bool allowFailure; bytes callData; }",
+  "struct Result { bool success; bytes returnData; }",
+  "function aggregate3(Call3[] calls) payable returns (Result[] returnData)",
+]);
 
 const QUOTER_ABI = parseAbi([
   "function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
@@ -162,15 +212,20 @@ export interface UniswapProviderConfig {
    * Uniswap v4 (UNISWAP-V4-RESEARCH §5). "off" (the default): v3 only, every quote exactly as before. "native-in": a
    * native-coin input is also quoted on the chain's pinned v4 deployment — hookless pools only (an empty hook allowlist),
    * from the shipped per-chain list (`./v4pools`) plus `v4ExtraPools`, fee ≤ `v4MaxFeePips` — and executed through the
-   * pinned Universal Router 2.1.2 with `value = amountIn` and no approval; v3 and v4 are ranked together by output. A chain
-   * is quoted on v4 only with a pool list (shipped or `v4ExtraPools`), never where the pins say `quotable: false`
-   * (HyperEVM) or where the native coin is an ERC-20 (Celo, Arc). A failed discovery or quote read refuses the quote
+   * pinned Universal Router 2.1.2 with `value = amountIn` and no approval. "all": also a token input (into a token or the
+   * native coin), through Uniswap's SwapProxy — the source token (catalog tokens only) approved to the chain's pinned
+   * SwapProxy for exactly the input, `value = 0`; with the sender known (an execution quote) the approval and the swap are
+   * simulated together before the quote is returned (`eth_simulateV1`; where the RPC does not serve it, as on Monad, the
+   * swap is `eth_call`ed with the allowance set by a state override, or run by an executor installed as the sender's code
+   * — never skipped; nothing simulable refuses). v3 and v4 are ranked together by output. A chain is quoted on v4 only
+   * with a pool list (shipped or `v4ExtraPools`), never where the pins say `quotable: false` (HyperEVM); a native leg
+   * never where the native coin is an ERC-20 (Celo, Arc). A failed discovery or quote read refuses the quote
    * (`rate_limited` / `upstream_unavailable`); it never quotes from fewer pools. A v4 deployment that does not match its
-   * pins on chain switches v4 off on that chain, never v3.
+   * pins on chain (the router or, for token input, the SwapProxy) switches that v4 flow off on that chain, never v3.
    *
-   * Rollout: apps on pins before 0.5.0 drop a Universal Router quote (their `uniswapPins` call targets are SwapRouter02
-   * only), and one refused quote is Uniswap lost on that pair — a server turns v4 on only once every app it serves has
-   * bumped. "all" (token input through Uniswap's SwapProxy) is not built in this release and is refused.
+   * Rollout: apps on pins before 0.5.0 drop a Universal Router or SwapProxy quote (their `uniswapPins` call targets and
+   * spenders are SwapRouter02 only), and one refused quote is Uniswap lost on that pair — a server turns v4 on only once
+   * every app it serves has bumped.
    */
   v4?: UniswapV4Mode;
   /** Override the v4 deployments (tests, new chains). Still verified on chain before use (linkage and router codehash). */
@@ -190,6 +245,12 @@ interface BlockGasRead {
   done: boolean;
   limit?: bigint;
   read: Promise<void>;
+}
+
+/** What one v4 deployment check found: the router flow (native input) and the SwapProxy flow (token input) usable. */
+interface V4DeploymentState {
+  native: boolean;
+  token: boolean;
 }
 
 interface Route {
@@ -217,8 +278,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const blockGas = new Map<number, BlockGasRead>();
   const net = uniswapRpc(config.rpcUrls, perSecond === undefined ? {} : {callsPerSecond: perSecond});
   const v4Mode: UniswapV4Mode = config.v4 ?? "off";
-  if (v4Mode === "all") throw new Error('uniswap: v4 "all" (token input through the SwapProxy) is not built in this release — use "native-in"');
-  if (v4Mode !== "off" && v4Mode !== "native-in") throw new Error('uniswap: v4 must be "off" or "native-in"');
+  if (v4Mode !== "off" && v4Mode !== "native-in" && v4Mode !== "all") throw new Error('uniswap: v4 must be "off", "native-in" or "all"');
   const v4Deployments = config.v4Deployments ?? UNISWAP_V4;
   const v4MaxFee = checkedMaxFeePips(config.v4MaxFeePips);
   const v4MinEdge = config.v4MinEdgeBps ?? 0;
@@ -229,17 +289,15 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     if (!Array.isArray(keys)) throw new Error(`uniswap: v4ExtraPools[${id}] is not a list of pool keys`);
     v4Extra[Number(id)] = Object.freeze(keys.map((k: V4PoolKey) => Object.freeze(checkedHooklessKey(k, V4_MAX_FEE_PIPS))));
   }
-  const v4Verified = new Map<number, Promise<boolean>>();
+  const v4Verified = new Map<number, Promise<V4DeploymentState>>();
+  /** Chains whose RPC answered `eth_simulateV1` with "not served", until when (ms). */
+  const noSimulateV1 = new Map<number, number>();
+  /** A token's verified `allowance[owner][spender]` storage slot (the Monad fallback). */
+  const allowanceSlots = new Map<string, Hex>();
 
-  /** The chain's v4 deployment when this provider quotes v4 there (see `v4`), else undefined. */
-  const v4Of = (id: number): UniswapV4Deployment | undefined => {
-    if (v4Mode === "off") return undefined;
-    const d4 = uniswapV4DeploymentOf(id, v4Deployments);
-    if (!d4 || d4.quotable === false || d4.nativeWrap === false || !d4.weth) return undefined;
-    // Pool provenance (§6.5 row 9): only where the app can check the pools — the shipped list or the integrator's own.
-    if (!ownKey(UNISWAP_V4_POOLS, id) && !ownKey(v4Extra, id)?.length) return undefined;
-    return d4;
-  };
+  /** The chain's v4 deployment when this provider quotes v4 there (see `v4`), else undefined. Pool provenance (§6.5
+   *  row 9): only where the app can check the pools — the shipped list or the integrator's own. */
+  const v4Of = (id: number): UniswapV4Deployment | undefined => v4ServedDeployment(id, v4Mode, v4Deployments, v4Extra);
 
   const chainIdOf = (caip2: string): number | null => {
     if (!isEvm(caip2)) return null;
@@ -404,18 +462,22 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   /**
    * The chain's v4 pins still describe one deployment (§6.5 row 15, once per chain while it holds): `poolManager()` of
    * the Universal Router, the V4Quoter and the StateView is the pinned PoolManager, and the router's runtime code hashes to
-   * the pinned 2.1.2 build. False on a mismatch — v4 is then off on that chain for this quote (v3 is not touched) and the
-   * check runs again on the next one; a read the node did not answer throws, classified.
+   * the pinned 2.1.2 build; with `v4: "all"` the SwapProxy's runtime code hashes to its pinned build too. A mismatch turns
+   * that flow off on that chain for this quote — the router's, both v4 flows; the SwapProxy's, token input only; v3 is
+   * not touched — and the check runs again on the next one; a read the node did not answer throws, classified.
    */
-  function verifyV4Deployment(chainId: number, d4: UniswapV4Deployment): Promise<boolean> {
+  function verifyV4Deployment(chainId: number, d4: UniswapV4Deployment): Promise<V4DeploymentState> {
     let p = v4Verified.get(chainId);
     if (!p) {
+      const proxy = v4Mode === "all";
       p = (async () => {
-        const answers = await rpc(chainId, v4DeploymentReads(d4, {swapProxy: false}), "items");
-        return v4DeploymentProblem(d4, answers, {swapProxy: false}) === null;
+        const answers = await rpc(chainId, v4DeploymentReads(d4, {swapProxy: proxy}), "items");
+        const native = v4DeploymentProblem(d4, answers.slice(0, 4), {swapProxy: false}) === null;
+        return {native, token: proxy && native && v4DeploymentProblem(d4, answers, {swapProxy: true}) === null};
       })();
       const self = p;
-      p.then((ok) => { if (!ok && v4Verified.get(chainId) === self) v4Verified.delete(chainId); }, () => { if (v4Verified.get(chainId) === self) v4Verified.delete(chainId); });
+      const forget = () => { if (v4Verified.get(chainId) === self) v4Verified.delete(chainId); };
+      p.then((ok) => { if (!ok.native || (proxy && !ok.token)) forget(); }, forget);
       v4Verified.set(chainId, p);
     }
     return p;
@@ -427,7 +489,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * with the node's text, so the quote batcher can split it.
    */
   const v4EthCall = (chainId: number, signal?: AbortSignal): V4EthCall => async (c, tag) => {
-    const [s] = await net.slots(chainId, [call(c.to, c.data, tag)], "all", signal);
+    const gas = ownKey(V4_READ_GAS, chainId);
+    const read: RpcCall = {method: "eth_call", params: [{to: c.to, data: c.data, ...(gas !== undefined ? {gas: `0x${gas.toString(16)}`} : {})}, tag]};
+    const [s] = await net.slots(chainId, [read], "all", signal);
     if (!s) throw refusal("upstream_unavailable", `uniswap v4: no RPC answered on chain ${chainId}`);
     if ("failed" in s) throw s.failed;
     if (!s.ok) throw withReason(new Error(`uniswap v4: a read reverted on chain ${chainId} (${s.revert.message.slice(0, 160)})`), "upstream_unavailable");
@@ -439,18 +503,20 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const symbolOf = (chainId: number, currency: Hex): string => ccAssetByToken(`eip155:${chainId}`, /^0x0{40}$/.test(currency) ? "" : currency)?.symbol ?? getAddress(currency);
 
   /**
-   * The v4 candidates for a native input into `currencyOut` at `block`: the listed (and extra) pools of the pair set —
-   * direct, and through each hop currency the verifier accepts — read in one Multicall3 aggregate; the unlisted-token
-   * grid only for a currency the list does not know; every route on the V4Quoter. Any failed read throws (classified).
+   * The v4 candidates for `currencyIn` (address(0) = the native coin) into `currencyOut` at `block`: the listed (and
+   * extra) pools of the pair set — direct, and through each hop currency the verifier accepts — read in one Multicall3
+   * aggregate; the unlisted-token grid only for a currency the list does not know; every route on the V4Quoter. Any
+   * failed read throws (classified).
    */
-  async function quoteV4(chainId: number, d4: UniswapV4Deployment, currencyOut: Hex, amountIn: bigint, block: V4BlockTag, signal?: AbortSignal): Promise<V4QuoteResult & {batch: V4CallBatch; gridPools: V4PoolKey[]}> {
+  async function quoteV4(chainId: number, d4: UniswapV4Deployment, currencyIn: Hex, currencyOut: Hex, amountIn: bigint, block: V4BlockTag, signal?: AbortSignal): Promise<V4QuoteResult & {batch: V4CallBatch; gridPools: V4PoolKey[]}> {
     const ethCall = v4EthCall(chainId, signal);
+    const into = getAddress(currencyIn);
     const out = getAddress(currencyOut);
-    const hubs = [...v4HopTokens(chainId, d4)].filter((h) => h !== getAddress(V4_NATIVE) && h !== out) as Hex[];
+    const hubs = [...v4HopTokens(chainId, d4)].filter((h) => h !== into && h !== out) as Hex[];
     const discovery = await discoverV4Pools({
-      stateView: d4.stateView, currencyIn: V4_NATIVE, currencyOut: out, hubs, list: ownKey(UNISWAP_V4_POOLS, chainId), extraPools: ownKey(v4Extra, chainId), maxFeePips: v4MaxFee, blockTag: block,
+      stateView: d4.stateView, currencyIn: into, currencyOut: out, hubs, list: ownKey(UNISWAP_V4_POOLS, chainId), extraPools: ownKey(v4Extra, chainId), maxFeePips: v4MaxFee, blockTag: block,
     }, ethCall);
-    const routes = buildV4Routes({currencyIn: V4_NATIVE, currencyOut: out, pools: discovery.pools, hubs, hubName: (h) => symbolOf(chainId, h)});
+    const routes = buildV4Routes({currencyIn: into, currencyOut: out, pools: discovery.pools, hubs, hubName: (h) => symbolOf(chainId, h)});
     const batch = multicallBatch(ethCall, block);
     const q = await quoteV4Routes({quoter: d4.quoter, routes, amountIn}, batch);
     return {...q, batch, gridPools: discovery.pools.filter((p) => p.source === "grid").map((p) => p.key)};
@@ -459,14 +525,20 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   /**
    * Right before signing a v4 swap: the same route re-quoted on the V4Quoter (a partial fill or an output under the
    * signed minimum refuses it), then an `eth_call` of the exact transaction from the quote's sender at `latest` (§6.6:
-   * native input needs no approval, so a plain call covers it; a revert is decoded and mapped). No answer refuses —
-   * never a pass.
+   * native input needs no approval, so a plain call covers it; a token input runs after the engine's approval, so the
+   * SwapProxy's `transferFrom` spends the real allowance; a revert is decoded and mapped). No answer refuses — never a
+   * pass.
    */
   async function preflightV4(chainId: number, quote: Quote, tx: UnsignedTx | undefined): Promise<void> {
     const pd = quote.providerData ?? {};
     const d4 = v4Mode === "off" ? undefined : uniswapV4DeploymentOf(chainId, v4Deployments);
     if (!d4) throw refusal("policy_refused", "uniswap: a Uniswap v4 quote, but v4 is off here — refresh the quote");
     if (!pd.amountIn || !pd.minOut || !pd.poolKeys || !/^[0-9]+$/.test(pd.amountIn) || !/^[0-9]+$/.test(pd.minOut)) throw refusal("policy_refused", "uniswap: the v4 quote carries no route to check — refresh and try again");
+    // The input currency names the flow: address(0) calls the router with value; a token goes through the SwapProxy.
+    const currencyIn = pd.currencyIn ?? "";
+    if (!/^0x[0-9a-fA-F]{40}$/.test(currencyIn)) throw refusal("policy_refused", "uniswap: the v4 quote names no input currency — refresh the quote");
+    const nativeIn = /^0x0{40}$/.test(currencyIn);
+    if (!nativeIn && v4Mode !== "all") throw refusal("policy_refused", "uniswap: a Uniswap v4 token-input quote, but v4 token input is off here — refresh the quote");
     let keys: V4PoolKey[];
     try {
       const raw = JSON.parse(pd.poolKeys) as unknown;
@@ -476,13 +548,14 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       throw refusal("policy_refused", `uniswap: the v4 quote's pools do not parse (${e instanceof Error ? e.message : String(e)}) — refresh the quote`);
     }
     const t = tx ?? {to: quote.txRequest?.to ?? "", data: quote.txRequest?.data, value: quote.txRequest?.value ?? "0"};
-    if (!t.to || !/^0x[0-9a-fA-F]{40}$/.test(t.to) || getAddress(t.to) !== getAddress(d4.universalRouter)) throw refusal("vault_mismatch", `uniswap: the v4 swap calls ${t.to || "nothing"}, not the pinned Universal Router on chain ${chainId}`);
+    const target = nativeIn ? d4.universalRouter : d4.swapProxy;
+    if (!t.to || !/^0x[0-9a-fA-F]{40}$/.test(t.to) || getAddress(t.to) !== getAddress(target)) throw refusal("vault_mismatch", `uniswap: the v4 swap calls ${t.to || "nothing"}, not the pinned ${nativeIn ? "Universal Router" : "SwapProxy"} on chain ${chainId}`);
     if (!t.data || !/^0x[0-9a-fA-F]*$/.test(t.data) || !/^[0-9]+$/.test(String(t.value ?? "0"))) throw refusal("policy_refused", "uniswap: the v4 swap carries no calldata or value to check");
     if (!pd.sender || !/^0x[0-9a-fA-F]{40}$/.test(pd.sender)) throw refusal("policy_refused", "uniswap: the v4 quote names no sender to dry-run the swap from — refresh the quote");
 
     let quoteData: Hex;
     try {
-      quoteData = quoteCallDataOfKeys(V4_NATIVE, keys, BigInt(pd.amountIn));
+      quoteData = quoteCallDataOfKeys(getAddress(currencyIn), keys, BigInt(pd.amountIn));
     } catch (e) {
       throw refusal("policy_refused", `uniswap: the v4 quote's route does not hold together (${e instanceof Error ? e.message : String(e)})`);
     }
@@ -507,6 +580,161 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const c = classifyV4Revert(r.revert.data);
       throw refusal(c.reason, `uniswap: ${c.text} (the swap was dry-run from ${getAddress(pd.sender)}). Nothing was sent; refresh the quote.`);
     }
+  }
+
+  /** A uint256 answer (a balance, an allowance), or undefined when the node answered in another shape. */
+  const uintWord = (r: unknown): bigint | undefined => (typeof r === "string" && /^0x[0-9a-fA-F]{64}$/.test(r) ? BigInt(r) : undefined);
+  /** The caller's abort is never read as an RPC fact (a fallback, a refusal reason): it is thrown as it came. */
+  const rethrowAbort = (e: unknown, signal?: AbortSignal): void => { if (signal?.aborted) throw e; };
+
+  /**
+   * A v4 token input, before the quote goes out — so before any approval is asked for (UNISWAP-V4-RESEARCH §6.6,
+   * decision 9): the exact SwapProxy call is simulated from the sender together with its approval.
+   * - The sender's balance of the input and its allowance to the SwapProxy are read first. A balance under the input
+   *   refuses: the swap would revert after the user paid for the approval.
+   * - An allowance that already covers the input: the exact call is `eth_call`ed from the sender at latest.
+   * - Otherwise `eth_simulateV1` runs `[approve(0) when an allowance stands, approve(amountIn), swap]` as one block.
+   * - Where the RPC does not serve `eth_simulateV1` (Monad, every RPC): the token's `allowance[sender][SwapProxy]` slot —
+   *   from `eth_createAccessList`, verified by reading the allowance back under the override — is set to the input by a
+   *   `stateDiff`, and the exact call is `eth_call`ed from the bare account (its real code kept: EIP-7702 and smart
+   *   accounts unchanged). With no slot that verifies, a small executor ({@link EXECUTOR_CODE}) is installed as the
+   *   sender's code by an override and runs approve → swap through Multicall3 in one `eth_call`, `msg.sender` = the
+   *   sender, the native output accepted.
+   * - Nothing simulable refuses: the check is never skipped. A revert is decoded and mapped as the preflight's is.
+   * Returns how the swap was simulated (`providerData.simulated`).
+   */
+  async function v4TokenSwapCheck(chainId: number, d4: UniswapV4Deployment, sender: Hex, token: Hex, amount: bigint, tx: {to: Hex; data: Hex}, signal?: AbortSignal): Promise<string> {
+    const spender = getAddress(d4.swapProxy);
+    const allowanceData = encodeFunctionData({abi: ERC20_ABI, functionName: "allowance", args: [sender, spender]});
+    const approveData = (n: bigint) => encodeFunctionData({abi: ERC20_ABI, functionName: "approve", args: [spender, n]});
+    const noted = (what: string) => `uniswap: ${what}. Nothing was approved; refresh the quote.`;
+    const reverted = (data: unknown, how: string): never => {
+      const c = classifyV4Revert(data);
+      throw refusal(c.reason, noted(`${c.text} (the approval and the swap were simulated ${how} from ${sender})`));
+    };
+    const value = (s: RpcSlot | undefined, what: string): bigint => {
+      if (!s || "failed" in s) throw s && "failed" in s ? s.failed : refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId}`);
+      if (!s.ok) throw refusal("upstream_unavailable", `uniswap: the input token's ${what} read reverted on chain ${chainId} — refusing`);
+      const v = uintWord(s.result);
+      if (v === undefined) throw refusal("upstream_unavailable", `uniswap: the RPC on chain ${chainId} answered the input token's ${what} in another shape — refusing`);
+      return v;
+    };
+    /** An eth_call that must succeed: a revert is mapped, no answer refuses. */
+    const mustRun = (s: RpcSlot | undefined, how: string): void => {
+      if (!s || "failed" in s) throw s && "failed" in s ? s.failed : refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId}`);
+      if (!s.ok) reverted(s.revert.data, how);
+    };
+    const swapCall = (stateOverride?: Record<string, unknown>) => v4PreflightCall({to: tx.to, data: tx.data, value: "0"}, sender, stateOverride ? {stateOverride} : {});
+
+    const [b, a] = await net.slots(chainId, [call(token, encodeFunctionData({abi: ERC20_ABI, functionName: "balanceOf", args: [sender]})), call(token, allowanceData)], "all", signal);
+    const balance = value(b, "balance");
+    const allowance = value(a, "allowance");
+    if (balance < amount) throw refusal("simulation_failed", noted(`the wallet holds ${balance} of the input, less than the ${amount} it sells — the swap would revert`));
+    if (allowance >= amount) {
+      const [r] = await net.slots(chainId, [swapCall()], "items", signal);
+      mustRun(r, "(the allowance already in place)");
+      return "swap";
+    }
+
+    // eth_simulateV1: the approval and the swap as one simulated block.
+    const until = noSimulateV1.get(chainId);
+    if (until === undefined || Date.now() >= until) {
+      noSimulateV1.delete(chainId);
+      const step = (data: Hex, to: Hex) => ({from: sender, to, data, value: "0x0"});
+      const calls = [...(allowance > 0n ? [step(approveData(0n), token)] : []), step(approveData(amount), token), step(tx.data, tx.to)];
+      const sim: RpcCall = {method: "eth_simulateV1", params: [{blockStateCalls: [{calls}], validation: false}, "latest"]};
+      const once = (policy: "none" | "items") => net.slots(chainId, [sim], policy, signal).then(([x]) => x, (e: unknown): RpcSlot => {
+        rethrowAbort(e, signal);
+        return {ok: false, failed: e instanceof Error ? e : new Error(String(e))};
+      });
+      let s = await once("none");
+      if (s && "failed" in s && !isUnsupportedMethod(s)) s = await once("items"); // a transient failure is retried
+      if (s?.ok) {
+        type SimCall = {status?: unknown; returnData?: unknown; error?: {data?: unknown}};
+        const out = Array.isArray(s.result) ? (s.result[0] as {calls?: unknown} | undefined)?.calls : undefined;
+        if (!Array.isArray(out) || out.length !== calls.length || out.some((c) => !c || typeof c !== "object")) {
+          throw refusal("upstream_unavailable", noted(`the approve + swap simulation on chain ${chainId} came back in another shape`));
+        }
+        const steps = out as SimCall[];
+        if (steps.slice(0, -1).some((c) => c.status !== "0x1")) throw refusal("simulation_failed", noted("the input token's approval of the SwapProxy fails in simulation"));
+        const swap = steps[steps.length - 1]!;
+        if (swap.status === "0x1") return "approve+swap";
+        if (swap.status !== "0x0") throw refusal("upstream_unavailable", noted(`the approve + swap simulation on chain ${chainId} came back in another shape`));
+        return reverted(typeof swap.returnData === "string" && swap.returnData.length > 2 ? swap.returnData : swap.error?.data, "with eth_simulateV1");
+      }
+      if (isUnsupportedMethod(s)) noSimulateV1.set(chainId, Date.now() + NO_SIMULATE_V1_TTL_MS);
+      // Any other failure falls through to the fallbacks too: they are simulations as well, never a skip.
+    }
+
+    // No eth_simulateV1: the allowance slot by stateDiff, the account's own code kept.
+    const slot = await allowanceSlotOf(chainId, token, sender, spender, allowanceData, amount, signal);
+    if (slot) {
+      const [r] = await net.slots(chainId, [swapCall(v4StorageOverride(token, slot, amount))], "items", signal);
+      mustRun(r, "with the allowance set by a state override");
+      return "approve+swap (allowance override)";
+    }
+
+    // Last: the executor as the sender's code, approve → swap through Multicall3 in one eth_call.
+    const plan = encodeFunctionData({abi: MC3_ABI, functionName: "aggregate3", args: [[
+      ...(allowance > 0n ? [{target: token, allowFailure: false, callData: approveData(0n)}] : []),
+      {target: token, allowFailure: false, callData: approveData(amount)},
+      {target: tx.to, allowFailure: true, callData: tx.data},
+    ]]});
+    const [r] = await net.slots(chainId, [{method: "eth_call", params: [{from: sender, to: sender, data: plan, value: "0x0"}, "latest", {[sender]: {code: EXECUTOR_CODE}}]}], "items", signal);
+    if (!r || "failed" in r) throw r && "failed" in r ? r.failed : refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId}`);
+    if (!r.ok) throw refusal("simulation_failed", noted("the input token's approval of the SwapProxy fails in simulation"));
+    let results: readonly {success: boolean; returnData: Hex}[];
+    try {
+      results = decodeFunctionResult({abi: MC3_ABI, functionName: "aggregate3", data: r.result as Hex});
+    } catch {
+      throw refusal("upstream_unavailable", noted(`the approve + swap simulation on chain ${chainId} came back in another shape`));
+    }
+    const last = results[results.length - 1];
+    if (!last || results.length !== (allowance > 0n ? 3 : 2)) throw refusal("upstream_unavailable", noted(`the approve + swap simulation on chain ${chainId} came back in another shape`));
+    if (!last.success) return reverted(last.returnData, "by an executor installed as the account's code");
+    return "approve+swap (executor override)";
+  }
+
+  /**
+   * The storage slot of `token`'s `allowance[owner][spender]`, verified: the keys `eth_createAccessList` names for the
+   * token's own storage while reading the allowance, each set to `amount` by a `stateDiff`, the one that makes the
+   * allowance read back exactly `amount` (cached). Null when none does (a token whose allowance is not one plain word),
+   * or when the node does not serve the access list.
+   */
+  async function allowanceSlotOf(chainId: number, token: Hex, owner: Hex, spender: Hex, data: Hex, amount: bigint, signal?: AbortSignal): Promise<Hex | null> {
+    const key = `${chainId}:${token}:${owner}:${spender}`.toLowerCase();
+    const hit = allowanceSlots.get(key);
+    if (hit) return hit;
+    const list1: RpcCall = {method: "eth_createAccessList", params: [{from: owner, to: token, data}, "latest"]};
+    let [al] = await net.slots(chainId, [list1], "none", signal).catch((e: unknown): RpcSlot[] => {
+      rethrowAbort(e, signal);
+      return [{ok: false, failed: e instanceof Error ? e : new Error(String(e))}];
+    });
+    if (al && "failed" in al && !isUnsupportedMethod(al)) [al] = await net.slots(chainId, [list1], "items", signal); // a transient failure is retried
+    if (!al || "failed" in al) {
+      if (isUnsupportedMethod(al)) return null;
+      throw al && "failed" in al ? al.failed : refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId}`);
+    }
+    if (!al.ok) return null;
+    const list = (al.result as {accessList?: unknown} | null)?.accessList;
+    const keys = new Set<string>();
+    for (const e of Array.isArray(list) ? list : []) {
+      const entry = e as {address?: unknown; storageKeys?: unknown};
+      if (typeof entry.address !== "string" || entry.address.toLowerCase() !== token.toLowerCase() || !Array.isArray(entry.storageKeys)) continue;
+      for (const k of entry.storageKeys) if (typeof k === "string" && /^0x[0-9a-fA-F]{64}$/.test(k)) keys.add(k.toLowerCase());
+    }
+    const candidates = [...keys].slice(0, MAX_SLOT_CANDIDATES) as Hex[];
+    if (!candidates.length) return null;
+    const answers = await net.slots(chainId, candidates.map((k) => ({method: "eth_call", params: [{to: token, data}, "latest", v4StorageOverride(token, k, amount)]})), "items", signal);
+    const at = answers.findIndex((s) => s.ok && uintWord(s.result) === amount);
+    if (at < 0) {
+      const failed = answers.find((s): s is Extract<RpcSlot, {failed: Error}> => "failed" in s);
+      if (failed && !isUnsupportedMethod(failed)) throw failed.failed; // the node did not answer: never read as "no slot"
+      return null;
+    }
+    if (allowanceSlots.size >= MAX_CACHED_SLOTS) allowanceSlots.delete(allowanceSlots.keys().next().value!);
+    allowanceSlots.set(key, candidates[at]!);
+    return candidates[at]!;
   }
 
   return {
@@ -543,8 +771,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       const nativeIn = !src.contract;
       const nativeOut = /^0x0+$/.test(params.destToken);
       if (!d3) {
-        if (!nativeIn) return refuse("Uniswap v4 takes a native-coin input only on this chain (it has no Uniswap v3 deployment)", "unsupported_pair");
-        if (nativeOut) return refuse("native in and out is not a swap", "unsupported_pair");
+        if (v4Mode !== "all" && !nativeIn) return refuse("Uniswap v4 takes a native-coin input only on this chain (it has no Uniswap v3 deployment)", "unsupported_pair");
+        if (nativeIn && nativeOut) return refuse("native in and out is not a swap", "unsupported_pair");
+        if (!v4ServesFlow(d4!, v4Mode, nativeIn, nativeOut)) return refuse("this chain's native coin is an ERC-20 — swap that instead", "unsupported_pair");
       } else if ((nativeIn || nativeOut) && d.nativeWrap === false) return refuse("this chain's router has no wrapped native — swap the coin's ERC-20 instead", "unsupported_pair");
       if (!nativeOut && !/^0x[0-9a-fA-F]{40}$/.test(params.destToken)) return refuse("destination token must be an EVM address", "unsupported_pair");
       if (!/^0x[0-9a-fA-F]{40}$/.test(params.destAddress)) return refuse("recipient must be an EVM address", "recipient_mismatch");
@@ -555,19 +784,27 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         return refuse("amount is not an integer");
       }
       if (amountIn <= 0n) return refuse("amount must be positive");
-      const wrapped = d3 ? d3.weth : d4!.weth!;
+      // A native leg reaches here only where a wrapped native exists (v3's, or a v4 chain serving native flows).
+      const wrapped = (d3 ? d3.weth : d4?.weth) ?? ZERO;
       const tokenIn = getAddress(nativeIn ? wrapped : src.contract!);
       const tokenOut = getAddress(nativeOut ? wrapped : params.destToken);
       if (tokenIn === tokenOut) return refuse(nativeIn || nativeOut ? "that is a wrap/unwrap, not a swap" : "same token in and out", "unsupported_pair");
-      // v4 quotes a native input into an ERC-20 (U1: token input and native output stay on v3).
-      const v4In = d4 !== undefined && nativeIn && !nativeOut ? d4 : undefined;
+      // v4 quotes a native input into an ERC-20 ("native-in" and "all"), and with "all" a catalog token input into a
+      // token or the native coin (the SwapProxy only carries catalog tokens: one with transfer callbacks could re-enter
+      // the router while the input rests in it unlocked, UNISWAP-V4-RESEARCH §2 R2).
+      const v4In = d4 !== undefined && v4ServesFlow(d4, v4Mode, nativeIn, nativeOut) && (nativeIn || !!resolveAsset(params.sourceChain, params.sourceToken)) ? d4 : undefined;
+      const currencyIn4 = nativeIn ? (V4_NATIVE as Hex) : tokenIn;
+      const currencyOut4 = nativeOut ? (V4_NATIVE as Hex) : tokenOut;
+      if (!d3 && !v4In) return refuse("the Uniswap v4 SwapProxy takes catalog tokens only (this chain has no Uniswap v3 deployment)", "unsupported_pair");
 
       /**
-       * The v4 winner as a quote: the impact measures (and the gate, when set), the minimum, the Universal Router call,
-       * the gas bound, and this module's own strict check of what it built (UNISWAP-V4-RESEARCH §6.5, "on the server after
-       * build") — a build its own verifier refuses is never returned.
+       * The v4 winner as a quote: the impact measures (and the gate, when set), the minimum, the router call (directly
+       * for a native input, through the SwapProxy for a token), the gas bound, and this module's own strict check of what
+       * it built (UNISWAP-V4-RESEARCH §6.5, "on the server after build") — a build its own verifier refuses is never
+       * returned. A token input with a known sender is then simulated with its approval (`v4TokenSwapCheck`): a swap that
+       * would revert is refused before anyone is asked to approve it.
        */
-      const finishV4 = async (chainId: number, d4: UniswapV4Deployment, v4: NonNullable<Awaited<ReturnType<typeof quoteV4>>>, currencyOut: Hex, amountIn: bigint, gated: boolean, gasRead: BlockGasRead, signal?: AbortSignal): Promise<Quote | null> => {
+      const finishV4 = async (chainId: number, d4: UniswapV4Deployment, v4: NonNullable<Awaited<ReturnType<typeof quoteV4>>>, currencyIn: Hex, currencyOut: Hex, amountIn: bigint, gated: boolean, gasRead: BlockGasRead, signal?: AbortSignal): Promise<Quote | null> => {
         const {route, amountOut: out, gasEstimate: gas} = v4.best!;
         // The same two measures as v3: the 1/1000 probe on the same route (`priceImpactBps`, fees excluded) and the
         // value lost against the pools' mid prices read at the discovery block (fees included). The probe's transient
@@ -600,17 +837,19 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const keys = route.hops.map((h) => h.pool.key);
         let enc: ReturnType<typeof encodeV4Swap>;
         try {
-          enc = encodeV4Swap({chainId, currencyIn: V4_NATIVE, currencyOut, pools: keys, amountIn, amountOutMinimum: minOut, recipient, deadline}, v4Deployments);
+          enc = encodeV4Swap({chainId, currencyIn, currencyOut, pools: keys, amountIn, amountOutMinimum: minOut, recipient, deadline}, v4Deployments);
         } catch (e) {
           return refuse(e instanceof Error ? e.message.replace(/^uniswap v4: /, "") : String(e), "policy_refused");
         }
 
-        // Quoter gas covers the pools only; the router call (intrinsic, calldata, unlock, SETTLE, TAKE) rides on top. The
-        // same bound as v3: a need above the chain's per-transaction cap or block gas limit can never be mined.
+        // Quoter gas covers the pools only; the router call (intrinsic, calldata, unlock, SETTLE, TAKE) rides on top, and
+        // for a token input the SwapProxy and its transferFrom into the router. The same bound as v3: a need above the
+        // chain's per-transaction cap or block gas limit can never be mined.
         const pools = BigInt(route.hops.length);
+        const overhead = V4_ROUTER_GAS + (enc.flow === "swap-proxy" ? V4_PROXY_GAS : 0n);
         let gasLimit: bigint | undefined;
         if (gas >= MIN_POOL_GAS * pools) {
-          const bounded = boundGasLimit(gas + V4_ROUTER_GAS, (gas * 3n) / 2n + V4_ROUTER_GAS, gasBoundsOf(chainId, await blockGasLimit(gasRead, signal)));
+          const bounded = boundGasLimit(gas + overhead, (gas * 3n) / 2n + overhead, gasBoundsOf(chainId, await blockGasLimit(gasRead, signal)));
           if ("refuse" in bounded) {
             return refuse(`the swap needs ${bounded.refuse.need} gas, more than chain ${chainId} takes in one transaction (${bounded.refuse.cap}) — its pools are too thin for this amount`, "insufficient_liquidity");
           }
@@ -628,6 +867,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             value: enc.value.toString(),
             chainId,
             ...(gasLimit !== undefined ? {gasLimit: gasLimit.toString()} : {}),
+            ...(enc.approvalAddress !== undefined ? {approvalAddress: enc.approvalAddress} : {}),
           },
           sourceAmount: amountIn.toString(),
           destAmount: out.toString(),
@@ -641,7 +881,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             route: route.label,
             poolFee: route.poolFee,
             router: enc.router,
-            currencyIn: V4_NATIVE,
+            currencyIn: getAddress(currencyIn),
             currencyOut,
             amountIn: amountIn.toString(),
             minOut: minOut.toString(),
@@ -660,6 +900,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           deployments: v4Deployments, v4: v4Mode, pools: UNISWAP_V4_POOL_KEYS, extraPools: {[chainId]: [...own, ...v4.gridPools]}, maxFeePips: v4MaxFee, deadlineSeconds: deadlineS,
         });
         if (problem) return refuse(`the v4 swap fails this module's own check — ${problem}`, uniswapV4ReasonOf(problem) ?? "policy_refused");
+        if (enc.flow === "swap-proxy") {
+          // Before any approval: the exact call with its approval, simulated from the sender. A quote without a sender (a
+          // price quote: nothing will be approved on it) says so; preflightDeposit dry-runs it again before signing.
+          quote.providerData!.simulated = sender === undefined ? "none" : await v4TokenSwapCheck(chainId, d4, sender, getAddress(currencyIn), amountIn, {to: enc.to, data: enc.data}, signal);
+        }
         return quote;
       };
 
@@ -667,7 +912,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         let v4Ready = false;
         if (v4In) {
           const [, ok] = await Promise.all([d3 ? verifyDeployment(chainId) : undefined, verifyV4Deployment(chainId, v4In)]);
-          v4Ready = ok;
+          v4Ready = nativeIn ? ok.native : ok.token;
           if (!v4Ready && !d3) return refuse(`the Uniswap v4 deployment on chain ${chainId} does not match its pins — refusing`, "vault_mismatch");
         } else {
           await verifyDeployment(chainId);
@@ -680,7 +925,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const block = gated ? await pinBlock(chainId, signal) : "latest";
         // v4 reads go out alongside the v3 ones, at the same block; any of them failing refuses the quote (never a
         // smaller candidate set). Handled here so a v3 failure first leaves no unhandled rejection behind.
-        const v4Run = v4Ready ? quoteV4(chainId, v4In!, tokenOut, amountIn, block as V4BlockTag, signal) : undefined;
+        const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal) : undefined;
         v4Run?.catch(() => {});
         let best: {route: Route; out: bigint; gas: bigint} | null = null;
         let partial = false;
@@ -723,7 +968,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         // the winner only.
         const v3Best = best as {route: Route; out: bigint; gas: bigint} | null;
         if (v4?.best && (v3Best === null || v4.best.amountOut * 10_000n > v3Best.out * BigInt(10_000 + v4MinEdge))) {
-          return await finishV4(chainId, v4In!, v4, tokenOut, amountIn, gated, gasRead, signal);
+          return await finishV4(chainId, v4In!, v4, currencyIn4, currencyOut4, amountIn, gated, gasRead, signal);
         }
         if (v4) partial = partial || v4.partial;
         if (!best) return refuse(partial ? PARTIAL_FILL : v4 ? (d3 ? "no Uniswap v3 or v4 pool route for this pair and amount" : "no Uniswap v4 pool route for this pair and amount") : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");

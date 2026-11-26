@@ -4,8 +4,8 @@
 
 Uniswap same-chain swaps as a swap2 module, straight from the contracts: v3 (QuoterV2 quotes, SwapRouter02
 `multicall(deadline, …)` execution, on the deployments in `src/addresses.ts`) and, opt-in, v4 (V4Quoter quotes on
-pinned hookless pools, Universal Router 2.1.2 execution, on the deployments in `src/v4/addresses.ts`), ranked together
-by output. Every deployment is verified on chain before use. Standalone through `UniswapSwap2Protocol`, or as one
+pinned hookless pools, Universal Router 2.1.2 execution — directly for a native input, through Uniswap's SwapProxy for
+a token input — on the deployments in `src/v4/addresses.ts`), ranked together by output. Every deployment is verified on chain before use. Standalone through `UniswapSwap2Protocol`, or as one
 provider of the router.
 
 ## Install
@@ -21,8 +21,9 @@ On npm: [@anywalletkit/protocol-swap2-uniswap](https://www.npmjs.com/package/@an
 
 When the provider runs on your server, spread its pins into the app's stub:
 `remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})`. The engine then lets the EVM route call only the
-SwapRouter in `UNISWAP_V3` and the Universal Router 2.1.2 in `UNISWAP_V4` (on the chains where v4 quotes a native input),
-and approve only the SwapRouter — never an address the backend names; without the pins the stub gets no EVM calldata
+SwapRouter in `UNISWAP_V3`, the Universal Router 2.1.2 in `UNISWAP_V4` (on the chains where v4 quotes a native input)
+and the chain's pinned SwapProxy (where v4 quotes a token input), and approve only the SwapRouter and the SwapProxy —
+never the Universal Router, Permit2 or an address the backend names; without the pins the stub gets no EVM calldata
 route (fail closed). The pins carry `verifyQuote: uniswapVerifyQuote`, which opens the call on the device:
 
 - to the SwapRouter: one `multicall(deadline, legs)` whose legs are exactly one `exactInputSingle` / `exactInput` (at
@@ -30,23 +31,40 @@ route (fail closed). The pins carry `verifyQuote: uniswapVerifyQuote`, which ope
   `refundNativeInput`), selling exactly the input of the source token for the destination token with the quote's
   minimum, paid to the recipient. `pull`, `sweepToken` and every other router call are refused
   (`uniswapV3VerifyQuote`).
-- to the Universal Router: `uniswapV4VerifyQuote` (below), native input only.
+- to the Universal Router (native input) or the SwapProxy (token input): `uniswapV4VerifyQuote` (below).
 
 ## Uniswap v4 (opt-in)
 
 ```ts
-uniswapProvider({ rpcUrls, v4: "native-in" })
+uniswapProvider({ rpcUrls, v4: "native-in" }) // native input on v4
+uniswapProvider({ rpcUrls, v4: "all" })       // and token input (into a token or the native coin) through the SwapProxy
 ```
 
 - **What it quotes.** With `v4: "native-in"`, a native-coin input into an ERC-20 is quoted on v3 and on v4, at the same
-  block, and the larger output wins (`v4MinEdgeBps`, default 0, makes v4 beat v3 by more than that many bps). Token input
-  and native output stay on v3 in this release; `"all"` (token input through Uniswap's SwapProxy) is refused when the
-  provider is made. `maxPriceImpactBps` gates the winner, v3 or v4, with the same two measures.
-- **The call.** `UniversalRouter.execute(0x10, [V4_SWAP], deadline)` on the chain's pinned router 2.1.2 — actions
-  `[SWAP_EXACT_IN_SINGLE | SWAP_EXACT_IN, SETTLE, TAKE]` in the 2.1.x layout, `SETTLE(native, amountIn, false)`,
-  `TAKE(output, recipient, 0)` — with `value = amountIn` and no approval. The exact SETTLE turns a partial fill into a
-  revert instead of input left in the router for anyone to sweep. The provider checks its own build with
-  `uniswapV4VerifyQuote` before returning it.
+  block, and the larger output wins (`v4MinEdgeBps`, default 0, makes v4 beat v3 by more than that many bps). With
+  `v4: "all"`, a catalog-token input into a token or into the native coin is ranked the same way. `maxPriceImpactBps`
+  gates the winner, v3 or v4, with the same two measures.
+- **The call.** The same `V4_SWAP` input every time — actions `[SWAP_EXACT_IN_SINGLE | SWAP_EXACT_IN, SETTLE, TAKE]` in
+  the 2.1.x layout, `SETTLE(input, amountIn, false)`, `TAKE(output, recipient, 0)` (`address(0)` for a native output,
+  paid by the PoolManager straight to the recipient). A native input calls `UniversalRouter.execute(0x10, [V4_SWAP],
+  deadline)` on the chain's pinned router 2.1.2 with `value = amountIn` and no approval. A token input calls the chain's
+  pinned SwapProxy — `SwapProxy.execute(pinned router, token, amountIn, 0x10, [V4_SWAP], deadline)`, `value = 0`,
+  `approvalAddress = SwapProxy` (the engine approves exactly the input, and revokes it if the swap does not go out; the
+  swap spends it to 0). The SwapProxy pulls exactly `amount` from its caller into the router and calls it; it is 34
+  lines, no owner, no storage, one codehash on every chain (address per chain: Tempo's differs). The exact SETTLE turns
+  a partial fill into a revert instead of input left in the router for anyone to sweep. The provider checks its own
+  build with `uniswapV4VerifyQuote` before returning it.
+- **Token input is simulated before the approval.** With the sender known (an execution quote: the engine passes its
+  account), the provider reads the sender's balance and allowance to the SwapProxy and simulates the approval and the
+  exact swap together before it returns the quote: `eth_simulateV1` of `[approve(SwapProxy, amountIn), swap]`; where
+  the RPC does not serve it (Monad, every RPC), an `eth_call` of the exact swap from the bare account with the token's
+  `allowance[sender][SwapProxy]` slot set by `stateDiff` (the slot from `eth_createAccessList`, verified by reading the
+  allowance back; the account's own code kept); with no slot that verifies, a 61-byte executor installed as the
+  account's code by an override runs approve → swap through Multicall3. A revert is decoded and mapped as in the
+  preflight; a balance under the input, an unanswered read or nothing simulable refuses — the check is never skipped,
+  so nobody approves a swap that would revert. `providerData.simulated` says how (`"approve+swap"`, `"swap"` when the
+  allowance already stood, `"approve+swap (allowance override)"`, `"approve+swap (executor override)"`, or `"none"` on a
+  quote without a sender — a price quote nothing is approved on).
 - **Pools: hookless only.** The hook allowlist is empty (hooks can take a swap's whole slippage, price the quoter and the
   router differently, or revert); dynamic fees are therefore out too; the LP fee is at most `v4MaxFeePips` (default
   100,000 = 10%). The candidates are the chain's pinned list (`@anywalletkit/protocol-swap2-uniswap/v4pools`, generated
@@ -61,27 +79,38 @@ uniswapProvider({ rpcUrls, v4: "native-in" })
   Monad pool to HTTP 429 reported a route 14% worse).
 - **Chains.** v4 is pinned on 19 chains (`UNISWAP_V4`) and quoted where there is a pool list: shipped, or your
   `v4ExtraPools`. HyperEVM is pinned `quotable: false` (no live pool); on Arc and Celo the native coin is an ERC-20, so
-  native input is refused there. Before the first v4 quote on a chain the provider reads `poolManager()` of the router,
-  the V4Quoter and the StateView and the router's codehash: a mismatch turns v4 off on that chain, never v3.
-- **Preflight.** Right before signing, the route is re-quoted on the V4Quoter (a partial fill or less than the signed
-  minimum refuses it) and the exact transaction is `eth_call`ed from the quote's sender (`QuoteParams.sender`, kept as
-  `providerData.sender`): a revert is decoded and mapped (`V4TooLittleReceived` → `price_check_failed`,
-  `CurrencyNotSettled` / `NotEnoughLiquidity` → `insufficient_liquidity`, an expired deadline → `quote_expired`), and no
-  answer refuses.
+  native input and output are refused there (token → token through the SwapProxy is not). Before the first v4 quote on
+  a chain the provider reads `poolManager()` of the router, the V4Quoter and the StateView, the router's codehash and,
+  with `"all"`, the SwapProxy's: a router mismatch turns v4 off on that chain, a SwapProxy mismatch token input only,
+  never v3. On Monad the v4 reads name 30M gas (its RPCs give an `eth_call` 8.1M by default, which starved a two-hop
+  quote inside a Multicall3 aggregate).
+- **Preflight.** Right before signing (for a token input, after the approval), the route is re-quoted on the V4Quoter
+  (a partial fill or less than the signed minimum refuses it) and the exact transaction is `eth_call`ed from the quote's
+  sender (`QuoteParams.sender`, kept as `providerData.sender`): a revert is decoded and mapped (`V4TooLittleReceived` →
+  `price_check_failed`, `CurrencyNotSettled` / `NotEnoughLiquidity` → `insufficient_liquidity`, `NativeTransferFailed`
+  → `recipient_mismatch`, an expired deadline → `quote_expired`, a token's own `TRANSFER_FROM_FAILED` →
+  `simulation_failed`), and no answer refuses.
 - **Gas.** The provider declares `ownGasEstimate`: the engine sends every Uniswap call (v3 too) with the account's own
   estimate of that exact call, dry-run right before broadcast — never the quoted limit. Monad charges the gas limit, not
   the gas used: a v3 quote there carried 16.3M for 62,000 MON, the v4 route needs about 200k. The quote still carries
-  its bounded `gasLimit` (quoter gas + 150k for the router), as information and for the gas bound below.
+  its bounded `gasLimit` (quoter gas + 150k for the router, + 140k for the SwapProxy and the token's pull), as
+  information and for the gas bound below.
 - **`providerData`** of a v4 quote: `venue: "v4"`, `route` (e.g. "v4 via USDC 0.05%/10 → 0.005%/1"), `poolFee`, `router`,
-  `currencyIn`, `currencyOut`, `amountIn`, `minOut`, `poolKeys` (JSON), `path`, `priceImpactBps` (`valueLossBps` when
-  gated), `sender`. A v3 quote has no `venue`, as before.
-- **Rollout.** A 0.4.x app's `uniswapPins` names SwapRouter02 only: it drops a Universal Router quote, and since a stub
-  gets one quote per pair, that app loses Uniswap on the pair. So: release; apps bump to ≥ 0.5.0 pins; only then does
-  the server set `v4: "native-in"`. With `v4: "off"` the server keeps serving v3 to every app. A route through a pool
+  `currencyIn` (`address(0)` for the native coin), `currencyOut`, `amountIn`, `minOut`, `poolKeys` (JSON), `path`,
+  `priceImpactBps` (`valueLossBps` when gated), `sender`, and for a token input `simulated`. A v3 quote has no `venue`,
+  as before.
+- **Rollout.** A 0.4.x app's `uniswapPins` names SwapRouter02 only: it drops a Universal Router or SwapProxy quote, and
+  since a stub gets one quote per pair, that app loses Uniswap on the pair. So: release; apps bump to ≥ 0.5.0 pins;
+  only then does the server set `v4: "native-in"`, later `"all"`. With `v4: "off"` the server keeps serving v3 to every
+  app, and with `"native-in"` token input stays on v3. A route through a pool
   that only the unlisted-token grid found is not in the shipped list, so an app's pins refuse it: give both sides the
   same `v4ExtraPools` for such a pool.
 - **Monad, the case behind this (cp0x):** 62,000 MON → AUSD. v3 alone pays 1.13 AUSD (impact 99.8%); v4 pays 676.61 AUSD
   at block 125,409,523 via MON → USDC (0.05%/10) → AUSD (0.005%/1), G = 23 bps, and passes `maxPriceImpactBps: 500`.
+- **Token input, recorded:** Monad 700 USDC → AUSD at block 125,499,326: v4 through the SwapProxy pays 700.075685 AUSD
+  on the hookless AUSD/USDC 0.005%/1 pool, simulated with the allowance set by `stateDiff`. Live on 2026-11-26 the
+  approve + swap from a funded holder paid exactly the quote (≥ the minimum) on Monad (→ AUSD and → MON) and Base
+  (1,000 USDC → ETH), the SwapProxy allowance back to 0 and the router's and the SwapProxy's balances unchanged.
 
 ## Price impact: information, or a refusal you opt into
 
@@ -168,9 +197,13 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
 
 `describeActivity(tx, ctx)` recognizes a call into the chain's pinned Universal Router 2.1.2 —
 `execute(bytes,bytes[],uint256)` `0x3593564c` whose commands are exactly `V4_SWAP` (`0x10`), the shape this module
-builds — as a `swap` with subtitle `Uniswap v4 · <chain>`; every other router call (a plan with more commands, the
-no-deadline entry point, an Across deposit) stays unclaimed. Fixtures: public Unichain transactions (ETH → token, and
-token → ETH paid by the PoolManager), negatives `0x0010` (v3 + v4) on Unichain and `0x0a10` (Permit2 + v4) on Monad.
+builds — as a `swap` with subtitle `Uniswap v4 · <chain>`, and a call into the chain's pinned SwapProxy —
+`execute(address,address,uint256,bytes,bytes[],uint256)` `0x2894adf9` whose `router` is the pinned Universal Router and
+whose commands are exactly `V4_SWAP` — the same; every other router or SwapProxy call (a plan with more commands, the
+no-deadline entry point, an Across deposit, a SwapProxy forwarding elsewhere) stays unclaimed. Fixtures: public Unichain
+transactions (ETH → token, and token → ETH paid by the PoolManager) and Ethereum SwapProxy swaps (UNI ⇄ AAVE),
+negatives `0x0010` (v3 + v4) on Unichain, `0x0a10` (Permit2 + v4) on Monad, and SwapProxy plans `0x00070c` and
+`0x0c100b04` on Ethereum.
 
 It also recognizes a call into the chain's SwapRouter02
 (the deployment table, or the `deployments` override you passed) with one of

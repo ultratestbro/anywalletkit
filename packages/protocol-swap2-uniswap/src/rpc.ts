@@ -24,7 +24,8 @@ export interface RpcItemError {
 export type RpcSlot =
   | {readonly ok: true; readonly result: unknown}
   | {readonly ok: false; readonly revert: RpcItemError}
-  | {readonly ok: false; readonly failed: Error};
+  /** No answer after the retries; `error` is the node's JSON-RPC error object when it sent one for this call. */
+  | {readonly ok: false; readonly failed: Error; readonly error?: RpcItemError};
 
 /**
  * What is retried:
@@ -79,6 +80,21 @@ export function rpcErrorKind(error: RpcItemError): "revert" | Extract<Swap2Refus
   if (RATE_LIMIT_TEXT.test(error.message)) return "rate_limited";
   if (typeof error.data === "string" && /^0x[0-9a-fA-F]{8,}$/.test(error.data) && !NODE_FAULT_TEXT.test(error.message)) return "revert";
   return "upstream_unavailable";
+}
+
+/** JSON-RPC codes for a method the node does not serve: EIP-1474 "method not found", QuickNode's "not supported". */
+const UNSUPPORTED_METHOD_CODES: ReadonlySet<number> = new Set([-32601, -32604]);
+const UNSUPPORTED_METHOD_TEXT = /method\b.*\b(?:not found|not supported|does not exist|not available|not allowed|not enabled|unsupported)|\b(?:unsupported|unknown) method\b|request method is not supported/i;
+
+/**
+ * A call the node answered with "this method is not served here" (`-32601`, `-32604`, or that text): a fact about the
+ * endpoint, not a failed attempt — `eth_simulateV1` on Monad answers so on every RPC (UNISWAP-V4-RESEARCH §6.6). Any
+ * other failure (a rate limit, a node error, an HTTP failure, no answer) is not.
+ */
+export function isUnsupportedMethod(slot: RpcSlot | undefined): boolean {
+  if (!slot || !("failed" in slot) || !slot.error) return false;
+  const e = slot.error;
+  return (typeof e.code === "number" && UNSUPPORTED_METHOD_CODES.has(e.code)) || UNSUPPORTED_METHOD_TEXT.test(e.message);
 }
 
 function itemError(raw: unknown): RpcItemError {
@@ -252,7 +268,9 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
           }
           const e = itemError(r.error);
           const kind = rpcErrorKind(e);
-          out[r.id] = kind === "revert" ? {ok: false, revert: e} : {ok: false, failed: refusal(kind, `uniswap: no RPC answered on chain ${chainId} (${describe(e)})`)};
+          // The node's own error rides along (`error`): a caller can tell a method the node does not serve (eth_simulateV1
+          // on Monad) from a call it failed to answer.
+          out[r.id] = kind === "revert" ? {ok: false, revert: e} : {ok: false, failed: refusal(kind, `uniswap: no RPC answered on chain ${chainId} (${describe(e)})`), error: e};
         }
         const unanswered = (): RpcSlot => {
           if (idless === undefined) return {ok: false, failed: refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node left a call unanswered)`)};

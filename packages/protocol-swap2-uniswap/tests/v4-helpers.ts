@@ -104,6 +104,9 @@ export const pathSwap = (p: {currencyIn?: `0x${string}`; pools?: readonly V4Pool
 export const settle = (currency: `0x${string}` = NATIVE, amount: bigint = 100n * 10n ** 18n, payerIsUser = false): Hex => encodeAbiParameters(V4_SETTLE_ABI, [currency, amount, payerIsUser]);
 export const take = (currency: `0x${string}` = AUSD, recipient: `0x${string}` = RECIPIENT, amount = 0n): Hex => encodeAbiParameters(V4_TAKE_ABI, [currency, recipient, amount]);
 export const v4Input = (actions: readonly number[], params: readonly Hex[]): Hex => encodeAbiParameters(V4_SWAP_INPUT_ABI, [actionsHex(actions), params]);
+/** The honest native-in V4 input (E1: 100 MON → AUSD), with parts replaced for a hostile vector. */
+export const nativeInputOf = (o: {take?: Hex; settle?: Hex; swap?: Hex; actions?: number[]} = {}): Hex =>
+  v4Input(o.actions ?? [0x06, 0x0b, 0x0e], [o.swap ?? single(), o.settle ?? settle(), o.take ?? take()]);
 export const urExecute = (commands: Hex, inputs: readonly Hex[], deadline: bigint = E1_DEADLINE): Hex => encodeFunctionData({abi: UR_ABI, functionName: "execute", args: [commands, inputs, deadline]});
 export const proxyExecute = (router: `0x${string}`, token: `0x${string}`, amount: bigint, commands: Hex, inputs: readonly Hex[], deadline: bigint = E1_DEADLINE): Hex =>
   encodeFunctionData({abi: SWAP_PROXY_ABI, functionName: "execute", args: [router, token, amount, commands, inputs, deadline]});

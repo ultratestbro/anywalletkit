@@ -146,5 +146,7 @@ export function classifyV4Revert(data: unknown): V4RevertClass {
   if (has("PoolNotInitialized")) return {reason: "no_route", text: "the pool is not initialised", error};
   if (has("PriceLimitAlreadyExceeded")) return {reason: "insufficient_liquidity", text: "the pool is parked at its price bound", error};
   if (has("SwapAmountCannotBeZero")) return {reason: "amount_too_small", text: "a hop of the route swaps zero (the amount is too small for this route)", error};
-  return {reason: "simulation_failed", text: `the swap reverts in simulation (${error})`, error};
+  // A token's own Error(string) — `TRANSFER_FROM_FAILED` from the SwapProxy's transferFrom — is named with its message.
+  const said = inner.name === "Error" && typeof inner.args[0] === "string" ? `: ${inner.args[0].replace(/[^\x20-\x7e]/g, "").slice(0, 80)}` : "";
+  return {reason: "simulation_failed", text: `the swap reverts in simulation (${error}${said})`, error};
 }

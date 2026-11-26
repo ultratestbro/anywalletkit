@@ -28,6 +28,6 @@
   "conformance": "0.x",
   "repo": "https://github.com/ultratestbro/anywalletkit",
   "path": "packages/protocol-swap2-uniswap",
-  "description": "Uniswap v3 + v4 same-chain swaps from the contracts only (QuoterV2 + SwapRouter02; v4, opt-in, native input on pinned hookless pools through Universal Router 2.1.2): no API key, no frontend, addresses verified on-chain.",
+  "description": "Uniswap v3 + v4 same-chain swaps from the contracts only (QuoterV2 + SwapRouter02; v4, opt-in, on pinned hookless pools through Universal Router 2.1.2 — native input directly, token input through Uniswap's SwapProxy): no API key, no frontend, addresses verified on-chain.",
   "addedAt": "2026-10-12"
 }

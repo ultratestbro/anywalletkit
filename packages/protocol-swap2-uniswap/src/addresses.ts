@@ -153,30 +153,32 @@ export function uniswapV3VerifyQuote(params: QuoteParams, quote: Quote): string 
 
 /**
  * A Uniswap quote's call, opened on the client against the app's own request: a call to the chain's pinned Universal
- * Router 2.1.2 is a v4 swap, checked by {@link uniswapV4VerifyQuote} — native input only in this release, every pool
- * hookless and in the shipped per-chain list (UNISWAP-V4-RESEARCH §6.5); anything else goes to the v3 check
- * ({@link uniswapV3VerifyQuote}), which refuses every target but the chain's SwapRouter02. The reason it fails, or null.
+ * Router 2.1.2 (native input) or to its pinned SwapProxy (token input, forwarding to that router) is a v4 swap, checked
+ * by {@link uniswapV4VerifyQuote} — every pool hookless and in the shipped per-chain list, the whole §6.5 check list with
+ * S1–S14 for the SwapProxy (UNISWAP-V4-RESEARCH §6.5); anything else goes to the v3 check ({@link uniswapV3VerifyQuote}),
+ * which refuses every target but the chain's SwapRouter02. The reason it fails, or null.
  */
 export function uniswapVerifyQuote(params: QuoteParams, quote: Quote): string | null {
   const id = /^eip155:[0-9]+$/.test(params.sourceChain) ? Number(params.sourceChain.slice(7)) : NaN;
   const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
   const to = quote.txRequest?.to;
-  if (d4 && typeof to === "string" && /^0x[0-9a-fA-F]{40}$/.test(to) && getAddress(to) === getAddress(d4.universalRouter)) {
-    return uniswapV4VerifyQuote(params, quote, {v4: "native-in", pools: UNISWAP_V4_POOL_KEYS});
+  if (d4 && typeof to === "string" && /^0x[0-9a-fA-F]{40}$/.test(to) && (getAddress(to) === getAddress(d4.universalRouter) || getAddress(to) === getAddress(d4.swapProxy))) {
+    return uniswapV4VerifyQuote(params, quote, {v4: "all", pools: UNISWAP_V4_POOL_KEYS});
   }
   return uniswapV3VerifyQuote(params, quote);
 }
 
 /**
- * The contracts a Uniswap swap calls and approves on a chain — the SwapRouter02 of the shipped {@link UNISWAP_V3} table,
- * and the Universal Router 2.1.2 of {@link UNISWAP_V4} where a native-coin input can be quoted on v4 (it is called with
- * value, never approved) — and {@link uniswapVerifyQuote}: the app's pins for `remoteProvider({name: "uniswap", baseUrl,
- * ...uniswapPins})` (scan 2026-10-27 modules, F9; scan 2026-10-28, F1). `reasonOf` classifies the texts
- * `uniswapVerifyQuote` returned.
+ * The contracts a Uniswap swap calls and approves on a chain — the SwapRouter02 of the shipped {@link UNISWAP_V3} table;
+ * the Universal Router 2.1.2 of {@link UNISWAP_V4} where a native-coin input can be quoted on v4 (it is called with value,
+ * never approved); and the chain's SwapProxy where a token input can be (called, and approved for exactly the input) —
+ * and {@link uniswapVerifyQuote}: the app's pins for `remoteProvider({name: "uniswap", baseUrl, ...uniswapPins})` (scan
+ * 2026-10-27 modules, F9; scan 2026-10-28, F1). Spenders: SwapRouter02 and the SwapProxy, never the Universal Router,
+ * Permit2 or the PoolManager. `reasonOf` classifies the texts `uniswapVerifyQuote` returned.
  */
 export const uniswapPins: RemotePins = Object.freeze({
-  callTargets: (chain: string): readonly string[] => [...uniswapRouterFor(chain), ...uniswapUniversalRouterFor(chain)],
-  spenders: (chain: string): readonly string[] => uniswapRouterFor(chain),
+  callTargets: (chain: string): readonly string[] => [...uniswapRouterFor(chain), ...uniswapUniversalRouterFor(chain), ...uniswapSwapProxyFor(chain)],
+  spenders: (chain: string): readonly string[] => [...uniswapRouterFor(chain), ...uniswapSwapProxyFor(chain)],
   verifyQuote: uniswapVerifyQuote,
   reasonOf: (refusal: string) => notes.reasonOf(refusal) ?? uniswapV4ReasonOf(refusal),
 });
@@ -194,4 +196,11 @@ function uniswapUniversalRouterFor(chain: string): readonly string[] {
   const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
   if (!d4 || d4.quotable === false || d4.nativeWrap === false || !Object.prototype.hasOwnProperty.call(UNISWAP_V4_POOL_KEYS, id)) return [];
   return [d4.universalRouter];
+}
+/** The chain's pinned SwapProxy where v4 quotes a token input: quotable, a shipped pool list (the address is per chain). */
+function uniswapSwapProxyFor(chain: string): readonly string[] {
+  const id = chainIdOf(chain);
+  const d4 = uniswapV4DeploymentOf(id, UNISWAP_V4);
+  if (!d4 || d4.quotable === false || !Object.prototype.hasOwnProperty.call(UNISWAP_V4_POOL_KEYS, id)) return [];
+  return [d4.swapProxy];
 }

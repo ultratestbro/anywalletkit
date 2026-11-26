@@ -18,12 +18,12 @@ const ALL_RPC = Object.fromEntries([1, 10, 56, 130, 137, 143, 196, 480, 999, 432
 
 describe("v4 options are checked when the provider is made", () => {
   const make = (c: Partial<UniswapProviderConfig>) => () => uniswapProvider({rpcUrls: RPC, ...c});
-  it('"off" (the default) and "native-in" are accepted; "all" is not built in this release', () => {
+  it('"off" (the default), "native-in" and (U2) "all" are accepted; anything else throws', () => {
     expect(make({})).not.toThrow();
     expect(make({v4: "off"})).not.toThrow();
     expect(make({v4: "native-in"})).not.toThrow();
-    expect(make({v4: "all"})).toThrow(/"all" \(token input through the SwapProxy\) is not built in this release/);
-    expect(make({v4: "everything" as never})).toThrow(/v4 must be "off" or "native-in"/);
+    expect(make({v4: "all"})).not.toThrow();
+    expect(make({v4: "everything" as never})).toThrow(/v4 must be "off", "native-in" or "all"/);
   });
   it("v4MaxFeePips is an integer 1..100000 (the 10% cap can be lowered, never raised); v4MinEdgeBps 0..10000", () => {
     for (const bad of [0, 100_001, 1.5, -1]) expect(make({v4MaxFeePips: bad})).toThrow(/v4MaxFeePips must be an integer in 1\.\.100000/);

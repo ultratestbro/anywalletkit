@@ -20,11 +20,13 @@
 //   (16777216)"; where KNOWN_TX_GAS_CAP lists the chain the two must agree; where it does not, a 2^24 or 2^25 allowance
 //   below the block's is a cap the table misses) and the block's own reserve (an OP-stack L1-info deposit must be covered
 //   by KNOWN_BLOCK_GAS_RESERVE, and a listed chain must still open its blocks with one).
-// - corridors, through the built provider with v4 "native-in" and maxPriceImpactBps 500 (cp0x's setting): Monad 1 / 100 /
-//   62,000 MON → AUSD (a v4 quote under the limit, or the refusal — never a quote at or above it; 1 MON must quote) and
-//   AUSD → MON (token input: v3 in this release); Unichain 1 ETH → USDC. Each quote is checked by the shipped pins
-//   (`uniswapPins.verifyQuote`), and the Monad 62,000 corridor is also run in remote mode (createSwap2Handler +
-//   remoteProvider({...uniswapPins})).
+// - corridors, through the built provider with v4 "all" and maxPriceImpactBps 500 (cp0x's setting): Monad 1 / 100 /
+//   62,000 MON → AUSD (a v4 quote under the limit, or the refusal — never a quote at or above it; 1 MON must quote),
+//   AUSD → MON and 700 USDC → AUSD (token input: v3, or v4 through the SwapProxy); Unichain 1 ETH → USDC; Base 1,000
+//   USDC → ETH (token input, native output). Each quote is checked by the shipped pins (`uniswapPins.verifyQuote`), and
+//   the Monad 62,000 MON and 700 USDC corridors are also run in remote mode (createSwap2Handler +
+//   remoteProvider({...uniswapPins})). The corridors name no sender (dummy actor only), so a SwapProxy quote here carries
+//   `simulated: "none"`: the approve + swap simulation needs a funded account.
 // Every chain is a step: an unreachable chain, or an answer in another shape, is a FAIL with a "Reason:" line, and the
 // run exits 1 with a final "Reason:" line naming every chain that is not ok. RPC_<chainId>=url[,url] in the environment
 // replaces the public RPCs below; URLs are never printed.
@@ -261,16 +263,18 @@ const CORRIDORS = {
     { sourceToken: 'MON', destToken: '0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a', amountIn: 10n ** 18n, label: '1 MON → AUSD', mustQuote: true },
     { sourceToken: 'MON', destToken: '0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a', amountIn: 100n * 10n ** 18n, label: '100 MON → AUSD' },
     { sourceToken: 'MON', destToken: '0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a', amountIn: 62_000n * 10n ** 18n, label: '62,000 MON → AUSD', remote: true },
-    { sourceToken: 'AUSD', destToken: NATIVE, amountIn: 100_000_000n, label: '100 AUSD → MON (token input: v3 in this release)' },
+    { sourceToken: 'AUSD', destToken: NATIVE, amountIn: 100_000_000n, label: '100 AUSD → MON (token input)' },
+    { sourceToken: 'USDC', destToken: '0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a', amountIn: 700_000_000n, label: '700 USDC → AUSD (token input)', mustQuote: true, remote: true },
   ],
   130: [{ sourceToken: 'ETH', destToken: '0x078D782b760474a361dDA0AF3839290b0EF57AD6', amountIn: 10n ** 18n, label: '1 ETH → USDC', mustQuote: true }],
+  8453: [{ sourceToken: 'USDC', destToken: NATIVE, amountIn: 1_000_000_000n, label: '1,000 USDC → ETH (token input, native output)', mustQuote: true }],
 }
 
 async function corridorFacts(id, urls, problems, notes) {
   for (const c of CORRIDORS[id] ?? []) {
     const params = { sourceChain: `eip155:${id}`, destChain: `eip155:${id}`, sourceToken: c.sourceToken, destToken: c.destToken, amountIn: c.amountIn.toString(), destAddress: ACTOR, refundAddress: ACTOR }
     const heard = []
-    const p = uniswapProvider({ rpcUrls: { [id]: urls }, v4: 'native-in', maxPriceImpactBps: LIMIT })
+    const p = uniswapProvider({ rpcUrls: { [id]: urls }, v4: 'all', maxPriceImpactBps: LIMIT })
     const q = await p.getQuote({ ...params, onRefusal: (t, i) => heard.push(`${t}${i?.reason ? ` [${i.reason}]` : ''}`) })
     if (!q) {
       const text = heard.join('; ') || 'no quote and no reason'
@@ -284,7 +288,8 @@ async function corridorFacts(id, urls, problems, notes) {
     if (g >= LIMIT) problems.push(`${c.label}: a quote at G = ${g} ≥ ${LIMIT}`)
     const pins = uniswapPins.verifyQuote(params, q)
     if (pins) problems.push(`${c.label}: the shipped pins refuse the quote — ${pins}`)
-    notes.push(`${c.label}: ${q.destAmount} on ${pd.venue ?? 'v3'} (${pd.route}, G ${g})`)
+    if (pd.venue === 'v4' && q.txRequest?.approvalAddress !== undefined && (q.txRequest.approvalAddress !== UNISWAP_V4[id]?.swapProxy || q.txRequest.to !== UNISWAP_V4[id]?.swapProxy || q.txRequest.value !== '0')) problems.push(`${c.label}: a v4 token-input quote that is not a value-free SwapProxy call approving the SwapProxy`)
+    notes.push(`${c.label}: ${q.destAmount} on ${pd.venue ?? 'v3'}${pd.venue === 'v4' && q.txRequest?.approvalAddress ? ' via the SwapProxy' : ''} (${pd.route}, G ${g})`)
     if (c.remote) {
       const handle = createSwap2Handler({ providers: [p], sealSecret: 'verify-live-seal-secret-32-bytes-at-least', guard: () => {}, subject: () => 'verify-live' })
       const fetchImpl = async (url, init) => { const res = await handle(String(url).split('/').pop(), JSON.parse(String(init.body)), 'verify-live'); return new Response(JSON.stringify(res.body), { status: res.status, headers: { 'content-type': 'application/json' } }) }

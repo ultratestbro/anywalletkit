@@ -45,7 +45,7 @@ app, and each provider also works on its own without the router.
 | `cctp` | Circle burn-and-mint | USDC between EVM chains, no slippage. Two routes: `fast` (Circle's fee, about 1 bps; seconds to minutes) and `standard` (free; waits for the source's finality: 15–19 min from Ethereum and its L2s, hours from Linea) |
 | `usdt0` | Tether's LayerZero OFT | USDT / USDT0 between 16 EVM chains in one transaction; the direct USDT path into HyperEVM; USDT from Ethereum / Arbitrum / Celo into TON through the Legacy Mesh (destinations only); Tron opt-in (`meshDestinations`): its LayerZero fee is above the engine's native-fee ceiling today |
 | `stargate` | Stargate V2 Taxi (LayerZero) | USDC, USDT and ETH between 15 EVM chains from the pools, no API key; delivery and paid recovery checked against the chain. Opt-in `compose` route swaps into another ERC-20 on Ethereum. Off until `enabled: true` ([below](#stargate)) |
-| `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key. Uniswap v4 (native input on pinned hookless pools, ranked with v3) is opt-in ([below](#uniswap-v4)) |
+| `uniswap`, `balancer` | On-chain DEX | Same-chain, priced from the contracts, no API key. Uniswap v4 (pinned hookless pools, ranked with v3; native input, and token input through Uniswap's SwapProxy) is opt-in ([below](#uniswap-v4)) |
 | `curve` | On-chain DEX (Curve Router NG) | Same-chain stablecoin, ETH ↔ LST and crvUSD swaps from the contracts over a pinned pool allowlist; no API, no key, no fee ([below](#curve)) |
 | `cow` | Intents (CoW Protocol orders) | Same-chain swaps on Ethereum, Base and Arbitrum that solvers fill: no gas coin needed for a token swap (EIP-712 order, EIP-2612 permit where the token has one), native coin through eth-flow; orders can be cancelled; no key, off by default ([below](#cow-protocol)) |
 | `wrap` | WETH9 | Native ↔ wrapped native, 1:1 |
@@ -60,17 +60,21 @@ app, and each provider also works on its own without the router.
 `@anywalletkit/protocol-swap2-uniswap` quotes Uniswap v3 by default. `v4: "native-in"` adds Uniswap v4 for a native-coin
 input: the chain's pinned hookless v4 pools (a generated list shipped with the package, plus your own `v4ExtraPools`)
 are quoted on the V4Quoter at the same block as v3, and the larger output wins; the swap runs through the pinned
-Universal Router 2.1.2 with the coin as `value`, no approval.
+Universal Router 2.1.2 with the coin as `value`, no approval. `v4: "all"` adds token input (into a token or the native
+coin) the same way, through Uniswap's SwapProxy: the token is approved to the chain's pinned SwapProxy for exactly the
+input, and the provider simulates that approval and the exact swap from the sender before it returns the quote
+(`eth_simulateV1`, or on Monad an `eth_call` with the allowance set by a state override) — nothing is approved for a
+swap that would revert.
 
 ```ts
-uniswapProvider({rpcUrls, v4: "native-in", maxPriceImpactBps: 500}) // the gate is optional; it applies to the winner
+uniswapProvider({rpcUrls, v4: "all", maxPriceImpactBps: 500}) // or "native-in"; the gate is optional and applies to the winner
 ```
 
 - Hookless pools only (no hook allowlist), LP fee ≤ 10% (`v4MaxFeePips`). A failed pool or quote read refuses the
   quote (`rate_limited` / `upstream_unavailable`) instead of quoting from fewer pools.
-- Token input and native output stay on v3 in this release; `v4: "all"` is refused.
+- With `"native-in"`, token input and native output stay on v3.
 - Behind `remoteProvider`: turn v4 on in the server only after every app it serves ships `uniswapPins` from 0.5.0 or
-  later. Older pins name SwapRouter02 only, drop the Universal Router quote, and lose Uniswap on that pair.
+  later. Older pins name SwapRouter02 only, drop the Universal Router or SwapProxy quote, and lose Uniswap on that pair.
 - The provider declares `ownGasEstimate`: the engine sends each Uniswap call with the account's own estimate (Monad
   charges the gas limit, not the gas used).
 
