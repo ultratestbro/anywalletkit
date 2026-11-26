@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-kyberswap",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "KyberSwap Aggregator same-chain swaps for Any Wallet Kit: exact-input routes on 18 EVM chains, settled through MetaAggregationRouterV2, with the encoded transaction decoded strictly and checked against the request before signing.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",
