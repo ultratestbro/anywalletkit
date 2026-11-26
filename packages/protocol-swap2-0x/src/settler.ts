@@ -400,9 +400,10 @@ export interface ZeroExTransaction {
  * The most gas a 0x swap may be given on a chain whose table entry sets no cap of its own: the padded limit (0x's gas ×
  * 1.2 + 20,000). Unused gas is refunded, but a reverting route burns up to the limit, so a quote that asks for a block's
  * worth is refused. Settler swaps on the first seven chains sit well under 2 million, and they keep this cap. Monad sets
- * its own ({@link ZeroExChain.maxGasLimit}: 15,000,000): the same swap there takes 7–10 times as much, and under this
- * cap 0x sales of MON from about $10,000 were refused on 2026-11-26 (see the README). The engine never sends the quoted
- * limit (`ownGasEstimate`: the account's own estimate after a dry run), so a cap only decides which quotes are refused.
+ * its own ({@link ZeroExChain.maxGasLimit}: 15,000,000): its gas grows with the size of the sale, to millions on large
+ * MON sales, and under this cap 0x sales of MON from about $10,000 were refused on 2026-11-26 (see the README). The
+ * engine never sends the quoted limit (`ownGasEstimate`: the account's own estimate after a dry run), so a cap only
+ * decides which quotes are refused.
  */
 export const ZEROEX_MAX_GAS_LIMIT = 6_000_000n;
 

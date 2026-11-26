@@ -1,11 +1,12 @@
 /**
- * The gas cap per chain (owner decision 2026-11-26). Monad bills the gas limit and its Settler swaps take 7–10 times
- * the gas of the same swap on Base, so under one 6,000,000 cap for every chain 0x sales of MON from about $10,000 were
- * refused. Monad's table entry now carries its own cap, 15,000,000 (`maxGasLimit`); every other chain keeps
- * `ZEROEX_MAX_GAS_LIMIT`, 6,000,000. The cap is on the padded limit (0x's `transaction.gas` × 1.2 + 20,000) and holds
- * wherever a quoted gas limit is checked: the provider, the remote verifiers, `checkZeroExTransaction` and the
- * preflight. A chain table entry may set a cap of its own only as a bigint from 1 to 30,000,000 (Monad's
- * per-transaction gas limit): config can raise a chain's cap, never remove the bound.
+ * The gas cap per chain (owner decision 2026-11-26). Monad bills the gas limit and its gas grows with the size of the
+ * sale (about 1.6 times Base's on a $25 swap, 6,140,730 for 1,000,000 MON → AUSD in the recordings), so under one
+ * 6,000,000 cap for every chain 0x sales of MON from about $10,000 were refused. Monad's table entry now carries its
+ * own cap, 15,000,000 (`maxGasLimit`); every other chain keeps `ZEROEX_MAX_GAS_LIMIT`, 6,000,000. The cap is on the
+ * padded limit (0x's `transaction.gas` × 1.2 + 20,000) and holds wherever a quoted gas limit is checked: the provider,
+ * the remote verifiers, `checkZeroExTransaction` and the preflight. A chain table entry may set a cap of its own only
+ * as a bigint from 1 to 30,000,000 (Monad's per-transaction gas limit): config can raise a chain's cap, never remove
+ * the bound.
  */
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {refusalOf} from "@anywalletkit/protocol-swap2-core/errors";
@@ -160,6 +161,20 @@ describe("the provider pads 0x's gas and holds it to the chain's cap", () => {
     const over = await monadQuote("12483335");
     expect(over.q).toBeNull();
     expect(over.heard).toEqual([[text(MONAD, 15_000_000n), "policy_refused"]]);
+  });
+
+  // Review 2026-11-26 (SEC-1), as the README now says it: the cap holds the padded limit of 0x's stated gas, read as a
+  // decimal string. A quote that states none that way carries no gas limit — nothing for the cap to hold, and nothing
+  // the engine would send (it sends the account's own estimate, `ownGasEstimate`). Unchanged behaviour, pinned here.
+  it("Monad: 0x asking for 12,483,334 (padded exactly 15,000,000) passes; a gas that is not a decimal string, or zero, leaves the quote with no gas limit", async () => {
+    const top = await monadQuote("12483334");
+    expect(top.heard).toEqual([]);
+    expect(top.q!.txRequest!.gasLimit).toBe("15000000");
+    for (const gas of ["0xBEBC20", "0", "12483335.0", " 12483335"]) {
+      const {q, heard} = await monadQuote(gas);
+      expect(heard, gas).toEqual([]);
+      expect(q!.txRequest, gas).not.toHaveProperty("gasLimit");
+    }
   });
 
   it("Monad with an entry of the integrator's own that sets no cap: 6,000,000 again (0x asking for 5,025,000 is refused)", async () => {

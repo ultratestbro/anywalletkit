@@ -7,6 +7,8 @@
  * replayed with the chain table of the pin era it was recorded in (tests/recorded.ts, fixtures/pin-eras.json).
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
+import {readFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
 import {getAddress} from "viem";
 import {refusalOf} from "@anywalletkit/protocol-swap2-core/errors";
 import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
@@ -17,7 +19,7 @@ import {ZEROEX_CHAINS, ZEROEX_PERMIT2} from "../src/chains.js";
 import {ZeroExSwap2Protocol} from "../src/protocol.js";
 import {zeroExProvider} from "../src/provider.js";
 import {zeroExRemoteProvider, zeroExVerifyBuild, zeroExVerifyQuote} from "../src/remote.js";
-import {SETTLER_NATIVE_CHECK_SELECTOR, SETTLER_PERMIT_ACTIONS, checkZeroExTransaction, createSettlerResolver, decodeSettlerExecute, zeroExSettlerNonce} from "../src/settler.js";
+import {SETTLER_NATIVE_CHECK_SELECTOR, SETTLER_PERMIT_ACTIONS, ZEROEX_MAX_GAS_LIMIT, checkZeroExTransaction, createSettlerResolver, decodeSettlerExecute, zeroExSettlerNonce} from "../src/settler.js";
 import {getKey} from "./fixtures.js";
 import {CURRENT_PIN_ERA, PIN_ERAS, RECORDED, UNRECORDED_CHAINS, UNRECORDED_PIN_ERAS, chainIdOf, chainOf, chainsConfigOf, chainsOf, eraChains, eraPins, loadRecorded, nativeSale, paramsOf, recordedFetch, recordedQuery, rpcOf, type RecordedQuote, type Seen} from "./recorded.js";
 
@@ -74,18 +76,39 @@ describe("the recordings", () => {
       }
     }
   });
-  it("no era and no chain is listed as unrecorded — and only the era in force, or a chain first in it, ever could be", () => {
+  it("no era and no chain may be listed as unrecorded, the era in force included: every pin raise lands with keyed recordings", () => {
     // Both lists are held empty: every era, and every chain of the table, has its recordings (above). An era is
-    // recordable only while 0x still quotes its Settlers and the registry still names its pins, so were the lists ever
-    // used again, a superseded era (or a chain already in an earlier era) listed there would ship without a real 0x
-    // answer for good.
+    // recordable only while 0x still quotes its Settlers and the registry still names its pins, so a pin raise (a new
+    // era) or a new chain lands together with its real 0x answers, which need ZEROEX_API_KEY. There is no exemption,
+    // not even for the era in force (until 44019b07 the era in force could be listed and recorded later).
     expect(UNRECORDED_PIN_ERAS).toEqual([]);
     expect(UNRECORDED_CHAINS).toEqual([]);
-    for (const era of UNRECORDED_PIN_ERAS) expect(era, `${era} is unrecorded but no longer the era in force`).toBe(CURRENT_PIN_ERA);
-    for (const id of UNRECORDED_CHAINS) {
-      expect(eraPins(CURRENT_PIN_ERA)[id], `${id} is listed as unrecorded but is not in the era in force`).toBeDefined();
-      for (const era of PIN_ERAS.slice(0, -1)) expect(eraPins(era)[id], `${id} is listed as unrecorded but was already in ${era}`).toBeUndefined();
-    }
+  });
+  it("fixtures/pin-eras.json says what these tests hold: no era or chain may be listed as unrecorded, a pin raise needs keyed recordings", () => {
+    const {note} = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/pin-eras.json", import.meta.url)), "utf8")) as {note: string};
+    expect(note).toMatch(/No era and no chain may be listed in unrecorded or unrecordedChains, not even the era in force/);
+    expect(note).toMatch(/every pin raise needs keyed recordings/);
+    expect(note).not.toMatch(/only the era in force could be|only one that first appears in the era in force could be/);
+  });
+  // Review 2026-11-26 (C3): the category guards above pass with any one recording of a kind, so losing the verify:live
+  // corridor (100 MON → AUSD) or one of two Monad /price answers went unnoticed. Each era's set is pinned by name.
+  it("are exactly the recorded set of each era, by name", () => {
+    const byEra = (era: string) => RECORDED.filter((name) => loadRecorded(name).pinEra === era).sort();
+    expect(byEra("2026-11-15")).toEqual([
+      "arbitrum-eth-usdc", "arbitrum-usdc-eth", "arbitrum-usdc-eth-price", "avalanche-avax-usdc", "avalanche-usdc-avax", "avalanche-usdc-avax-price", "avalanche-usdc-joe-huge",
+      "base-dai-usdc", "base-eth-usdc", "base-eth-usdc-price", "base-usdc-eth", "base-usdc-eth-badsource", "base-usdc-eth-price", "base-usdc-eth-recipient",
+      "bsc-bnb-usdt", "bsc-usdt-babydoge-tax", "bsc-usdt-bnb", "bsc-usdt-bnb-price", "bsc-usdt-usdc-sim",
+      "ethereum-eth-usdc", "ethereum-usdc-eth-price", "ethereum-usdc-usdt", "optimism-eth-usdc", "optimism-usdc-eth-price", "optimism-usdc-op",
+      "polygon-pol-usdc", "polygon-usdc-pol", "polygon-usdc-pol-price",
+    ].sort());
+    expect(byEra("2026-11-25")).toEqual([
+      "arbitrum-eth-usdc", "arbitrum-usdc-eth", "arbitrum-usdc-eth-price", "avalanche-avax-usdc", "avalanche-usdc-avax", "avalanche-usdc-avax-price",
+      "base-eth-usdc", "base-usdc-eth", "base-usdc-eth-price", "bsc-bnb-usdt", "bsc-usdt-bnb", "bsc-usdt-bnb-price",
+      "ethereum-eth-usdc", "ethereum-usdc-eth-price", "ethereum-usdc-usdt",
+      "monad-mon-ausd", "monad-mon-ausd-1m", "monad-mon-ausd-62k", "monad-mon-ausd-62k-price", "monad-usdc-mon", "monad-usdc-mon-price",
+      "optimism-eth-usdc", "optimism-usdc-eth-price", "optimism-usdc-op", "polygon-pol-usdc", "polygon-usdc-pol", "polygon-usdc-pol-price",
+    ].map((n) => `${n}.2026-11-25`).sort());
+    expect(RECORDED).toHaveLength(28 + 27);
   });
   it("every era is recorded, on each of its chains", () => {
     const all = RECORDED.map(loadRecorded);
@@ -255,7 +278,7 @@ describe("pin era 2026-11-25, recorded 2026-11-26: 0x quoted the registry's prev
 
   it("all eight chains, each live answer sent to prev(2) — the era's pinned previous deployment, which the registry still named", () => {
     expect(new Set(era.map(chainIdOf))).toEqual(new Set([1, 10, 56, 137, 143, 8453, 42161, 43114]));
-    expect(live.length).toBeGreaterThanOrEqual(17);
+    expect(live.length).toBe(18);
     for (const f of live) {
       const c = chainOf(f);
       expect(f.registry.prev, f.name).not.toBeNull();
@@ -305,6 +328,44 @@ describe("pin era 2026-11-25, recorded 2026-11-26: 0x quoted the registry's prev
     expect(capped).toBeNull();
     expect(heard).toEqual([["zeroex: the transaction asks for more gas than any 0x swap needs (its gas limit must be 1 to 6000000 on chain 143)", "policy_refused"]]);
     expect(zeroExVerifyQuote(paramsOf(f), quote!, {...ctxOf(f), chains: {...chainsOf(f), 143: Object.freeze(plain)}})).toBe("the transaction asks for more gas than any 0x swap needs (its gas limit must be 1 to 6000000 on chain 143)");
+  });
+
+  // Review 2026-11-26 (C3): the two Monad corridors verify:live quotes (scripts/verify-live.mjs) are replayed by name,
+  // so losing either recording fails here and not only the count above.
+  it.each([
+    ["monad-mon-ausd.2026-11-25", `["Monad MON → AUSD (native)", 143, NATIVE, 18, "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a", "100000000000000000000"]`, "453247", "563896"],
+    ["monad-usdc-mon.2026-11-25", `["Monad USDC → MON (Permit2)", 143, "0x754704Bc059F8C67012fEd69BC8A327a5aafb603", 6, NATIVE, "25000000"]`, "435460", "542552"],
+  ])("%s, a verify:live corridor: the same request, quoted to prev(2), under either cap", async (name, corridor, gas, padded) => {
+    const script = readFileSync(fileURLToPath(new URL("../scripts/verify-live.mjs", import.meta.url)), "utf8");
+    expect(script).toContain(corridor);
+    const f = loadRecorded(name);
+    const [, , source, decimals, dest, amount] = JSON.parse(corridor.replace(/NATIVE/g, `"0x${"0".repeat(40)}"`)) as [string, number, string, number, string, string];
+    expect({sourceChain: f.request.sourceChain, sourceToken: f.request.sourceToken, destToken: f.request.destToken, amountIn: f.request.amountIn, slippageBps: f.request.slippageBps, dry: f.request.dry}).toEqual({sourceChain: "eip155:143", sourceToken: source, destToken: dest, amountIn: amount, slippageBps: 50, dry: false});
+    expect(f.request.sourceDecimals).toBe(nativeSale(f) ? undefined : decimals);
+    expect(f.response.transaction.gas).toBe(gas);
+    const {quote, refusals} = await quoted(f);
+    expect(refusals).toEqual([]);
+    expect(quote!.txRequest!.to!.toLowerCase()).toBe(f.registry.prev!.toLowerCase());
+    expect(quote!.txRequest!.gasLimit).toBe(padded);
+    expect(BigInt(padded)).toBeLessThan(ZEROEX_MAX_GAS_LIMIT);
+  });
+
+  // Review 2026-11-26 (C4): the README's Monad gas paragraph cites these recordings. Monad's gas grows with the size of
+  // the sale (0x splits a large one across many pools), not by one fixed multiple of Base's: about 1.6 times Base's for
+  // the same $1–25 swap, millions only on large MON sales.
+  it("Monad's gas, as the README cites it: about 1.6 times Base's on small swaps, growing with the sale (3.97 million at 62,000 MON, 6.14 million at 1,000,000)", () => {
+    const gasOf = (name: string) => Number(loadRecorded(name).response.transaction.gas);
+    const fills = (name: string) => (loadRecorded(name).response.route.fills as unknown[]).length;
+    const small = gasOf("monad-usdc-mon.2026-11-25") / gasOf("base-usdc-eth.2026-11-25"); // 25 USDC → the native coin, on each
+    expect([gasOf("monad-usdc-mon.2026-11-25"), gasOf("base-usdc-eth.2026-11-25"), gasOf("monad-mon-ausd.2026-11-25"), gasOf("base-eth-usdc.2026-11-25")]).toEqual([435_460, 269_610, 453_247, 274_827]);
+    expect(small).toBeGreaterThan(1.5);
+    expect(small).toBeLessThan(1.7);
+    expect(gasOf("monad-mon-ausd.2026-11-25") / gasOf("base-eth-usdc.2026-11-25")).toBeLessThan(1.7);
+    expect([gasOf("monad-mon-ausd-62k.2026-11-25"), gasOf("monad-mon-ausd-1m.2026-11-25")]).toEqual([3_970_462, 6_140_730]);
+    expect([fills("monad-mon-ausd.2026-11-25"), fills("monad-mon-ausd-62k.2026-11-25"), fills("monad-mon-ausd-1m.2026-11-25")]).toEqual([2, 10, 11]);
+    const readme = readFileSync(fileURLToPath(new URL("../README.md", import.meta.url)), "utf8");
+    for (const figure of ["435,460", "269,610", "3,970,462", "6,140,730"]) expect(readme, figure).toContain(figure);
+    expect(readme).not.toMatch(/7–10 times|1\.48 million/);
   });
 
   it("Monad 62,000 MON → AUSD: 0x asked for 3,970,462 gas, a padded 4,784,554 — under either cap; its /price agrees within the slippage", async () => {

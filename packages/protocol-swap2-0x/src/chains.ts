@@ -78,8 +78,9 @@ const chain = (name: string, wrappedNative: string, newestLiveNonce: number, pre
  * as current and previous when pinned (2026-11-25, after 0x's 2026-11-24 Settler release; `pnpm verify:live`: both
  * have code). Monad (143) joined in 0.2.0 from the same reads: deployment 12, made on 2026-11-24, and 11; its wrapped
  * native is WMON, the one 0x names as `wnative` there. Monad is also the one chain with a gas cap of its own,
- * 15,000,000 (every other chain keeps `ZEROEX_MAX_GAS_LIMIT`, 6,000,000): the same swap there takes 7–10 times the gas
- * it takes on Base, so under one 6,000,000 cap 0x sales of MON from about $10,000 were refused (README). The engine
+ * 15,000,000 (every other chain keeps `ZEROEX_MAX_GAS_LIMIT`, 6,000,000): its gas grows with the size of the sale, 0x
+ * splitting a large one across many pools (about 1.6 times Base's on a $25 swap, 6,140,730 for 1,000,000 MON → AUSD on
+ * 2026-11-26), so under one 6,000,000 cap 0x sales of MON from about $10,000 were refused (README). The engine
  * never sends the quoted limit, so the cap only decides which quotes are refused.
  */
 export const ZEROEX_CHAINS: Readonly<Record<number, ZeroExChain>> = Object.freeze({
