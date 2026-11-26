@@ -7,7 +7,7 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
 import {bigintToNumber} from "@anywalletkit/core";
 import {MIN_CALLS_PER_SECOND, MIN_CALLS_PER_SECOND_V4, QUOTE_WAIT_MAX_MS, isUnsupportedMethod, shortOfFunds, uniswapRpc, type RpcCall, type RpcSlot, type SlotOptions} from "./rpc.js";
-import {KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, hopsOf, impactRefusalText, probeImpactBps, spotImpactNetOfFeesBps, spotValueLossBps, validMaxImpactBps} from "./impact.js";
+import {KNOWN_EXECUTION_GAS_CAP, KNOWN_TX_GAS_CAP, boundGasLimit, gasBoundsOf, gasCapsOf, hopsOf, impactRefusalText, probeImpactBps, spotImpactNetOfFeesBps, spotValueLossBps, validMaxImpactBps, type GasBounds} from "./impact.js";
 import {UNISWAP_V4, V4_NATIVE, uniswapV4DeploymentOf, type UniswapV4Deployment} from "./v4/addresses.js";
 import {UNISWAP_V4_POOLS} from "./v4pools/index.js";
 import {v4ServedDeployment, v4ServesFlow} from "./v4/serve.js";
@@ -295,9 +295,10 @@ export interface UniswapProviderConfig {
    * refused for impact, which rides on the quote as information (`providerData.priceImpactBps`, when the probe could be
    * measured) — the wallet warns and the user decides.
    *
-   * When set: every candidate is ranked as always and only the best route is gated (a lower-output candidate is never
-   * the better offer); every read of the quote is pinned to one block; the measure is the larger of the 1/1000 probe
-   * (`priceImpactBps`, fees excluded, transient RPC errors retried) and the spot value loss against the pools'
+   * When set: every candidate is ranked as always (a route one transaction on the chain cannot carry never displaces one
+   * that can) and only the best route is gated (a lower-output candidate is never the better offer); every read of the
+   * quote is pinned to one block; the measure is the larger of the 1/1000 probe (`priceImpactBps`, fees excluded,
+   * transient RPC errors retried) and the spot value loss against the pools'
    * `slot0()` mid prices (fees included, `providerData.valueLossBps`). The fees count: a limit at or under the route's
    * pool fee (100 on a 1% pool, 60 on two 0.3% pools) refuses that route however deep its pools are — the text then
    * names the fees ("loses 1.0% of the value to price impact and pool fees — the route's fees (1%) bring it to the
@@ -477,6 +478,23 @@ interface Route {
   path?: Hex;
 }
 
+/** A full fill the quoter priced: its route, output and gas figure, and its place in the candidate list (`at`). */
+interface V3Candidate {
+  route: Route;
+  out: bigint;
+  gas: bigint;
+  at: number;
+}
+
+/** Better first: more output, then the candidate list's own order (the first listed wins a tie, as it always has). */
+const byOutput = (a: V3Candidate, b: V3Candidate): number => (a.out > b.out ? -1 : a.out < b.out ? 1 : a.at - b.at);
+
+/** The pools a route crosses: one for `exactInputSingle`, one per `fee, token` step (23 bytes) of an `exactInput` path. */
+const poolsOf = (route: Route): bigint => (route.single ? 1n : BigInt((route.path!.length - 42) / 46));
+
+/** The quoter's figure measures the swap (MIN_POOL_GAS a pool or more): a gas limit is derived from it, and bounded. */
+const measuresGas = (c: {route: Route; gas: bigint}): boolean => c.gas >= MIN_POOL_GAS * poolsOf(c.route);
+
 export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvider {
   const deployments = config.deployments ?? UNISWAP_V3;
   const slippageDefault = config.defaultSlippageBps ?? DEFAULT_SLIPPAGE_BPS;
@@ -609,9 +627,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * then undefined (the known caps alone), the read going on.
    */
   function blockGasLimit(entry: BlockGasRead, signal?: AbortSignal): Promise<bigint | undefined> {
-    const last = entry.last !== undefined && Date.now() - entry.lastAt! <= BLOCK_GAS_STALE_MS ? entry.last : undefined;
-    if (entry.done) return Promise.resolve(entry.limit ?? last);
-    if (last !== undefined) return Promise.resolve(last);
+    const inHand = blockGasInHand(entry);
+    if (entry.done || inHand !== undefined) return Promise.resolve(inHand);
     const left = entry.waitUntil - Date.now();
     if (left <= 0 || signal?.aborted) return Promise.resolve(undefined);
     return new Promise((resolve) => {
@@ -627,6 +644,24 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       signal?.addEventListener?.("abort", finish, {once: true});
       void entry.read.then(finish);
     });
+  }
+
+  /**
+   * What blockGasLimit answers at once, without waiting: the read's answer when it is in; else the newest good answer
+   * before it (still fresh); else undefined (the known caps alone).
+   */
+  function blockGasInHand(entry: BlockGasRead): bigint | undefined {
+    const last = entry.last !== undefined && Date.now() - entry.lastAt! <= BLOCK_GAS_STALE_MS ? entry.last : undefined;
+    return entry.done ? entry.limit ?? last : last;
+  }
+
+  /**
+   * The bounds a quote's gas step goes by whenever it comes, known now: the read's own answer once it is in (it stays
+   * the same for the quote); while the read is pending, or when it failed and an older answer stands in, only the caps
+   * no block read can loosen (gasCapsOf).
+   */
+  function sureGasBounds(chainId: number, entry: BlockGasRead): GasBounds {
+    return entry.done && (entry.limit !== undefined || entry.last === undefined) ? gasBoundsOf(chainId, entry.limit) : gasCapsOf(chainId);
   }
 
   /** Every candidate route for tokenIn → tokenOut on this chain. */
@@ -1137,6 +1172,38 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       }
     };
 
+    // LIVE-VR-3: a v3 route's gas need against the chain's bounds: the quoter's figure, the router's 120k and this
+    // request's unwrap and refund legs. A figure under MIN_POOL_GAS a pool measures nothing: no limit is derived from it,
+    // so such a route fits any bounds (the wallet's own estimate decides).
+    const refund = nativeIn && refundNative;
+    const extra3 = (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n);
+    const gasBound3 = (g: bigint, b: GasBounds) => boundGasLimit(g + 120_000n + extra3, (g * 3n) / 2n + 120_000n + extra3, b);
+
+    /**
+     * LIVE-VR-3: the gas bounds one pass's v3 routes go by — one set for every one of them, so the route picked and the
+     * route bounded are judged by the same block read. `take` takes them once, when first needed, with the wait
+     * the gas step always had (blockGasLimit: the read in hand at once, else at most until the first read's 1.5 s and
+     * never past the caller's abort); every later call, and every route after, goes by the same answer. Before they are
+     * taken: `sure`, what they are known to be whatever the node answers (sureGasBounds: the read's own answer once it is
+     * in, else the caps no block read can loosen), and `inHand`, what `take` would answer at once (blockGasInHand).
+     */
+    const passBounds = (gasRead: BlockGasRead) => {
+      let bounds: GasBounds | undefined;
+      let limit: Promise<bigint | undefined> | undefined;
+      return {
+        taken: (): GasBounds | undefined => bounds,
+        take: async (): Promise<GasBounds> => {
+          if (bounds !== undefined) return bounds;
+          limit ??= blockGasLimit(gasRead, signal);
+          const l = await limit;
+          return (bounds ??= gasBoundsOf(chainId, l));
+        },
+        sure: (): GasBounds => bounds ?? sureGasBounds(chainId, gasRead),
+        inHand: (): GasBounds => bounds ?? gasBoundsOf(chainId, blockGasInHand(gasRead)),
+      };
+    };
+    type PassBounds = ReturnType<typeof passBounds>;
+
     /**
      * One v4 candidate as a quote: the impact measures (and the gate, when set), the minimum, the router call (directly
      * for a native input, through the SwapProxy for a token), the gas bound, and this module's own strict check of what
@@ -1276,18 +1343,17 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       return {quote};
     };
 
-    /** A v3 route the QuoterV2 priced for the whole input: its output and the quoter's gas figure. */
-    type V3Best = {route: Route; out: bigint; gas: bigint};
     /** A pass's v4 reads, answered: the candidates, the batcher they were read with, the grid pools discovery found. */
     type V4Read = Awaited<ReturnType<typeof quoteV4>>;
     type V4Refused = Extract<V4Build, {refused: string}>;
     type V4Ranked = NonNullable<V4QuoteResult["best"]>;
 
     /**
-     * Every v3 candidate route on the QuoterV2 at `block`, in one batch: the best full fill, and whether a candidate ran
-     * its pool dry (a partial fill). Under "all" a call the node did not answer is retried, then thrown (classified).
+     * Every v3 candidate route on the QuoterV2 at `block`, in one batch: the full fills ranked by output (a tie goes to the
+     * candidate listed first, as the best always went), and whether a candidate ran its pool dry (a partial fill). Under
+     * "all" a call the node did not answer is retried, then thrown (classified).
      */
-    const readV3 = async (block: string, policy: "items" | "all"): Promise<{best: V3Best | null; partial: boolean}> => {
+    const readV3 = async (block: string, policy: "items" | "all"): Promise<{ranked: V3Candidate[]; partial: boolean}> => {
       const candidates = routes(chainId, params.sourceChain, tokenIn, tokenOut);
       const gated = maxImpact !== undefined;
       /**
@@ -1322,7 +1388,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         signal,
         {...turns, accept},
       );
-      let best: V3Best | null = null;
+      const ranked: V3Candidate[] = [];
       let partial = false;
       for (let i = 0; i < results.length; i++) {
         const raw = results[i];
@@ -1332,17 +1398,18 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           partial = true;
           continue;
         }
-        if (!best || q.out > best.out) best = {route: candidates[i]!, out: q.out, gas: q.gas};
+        ranked.push({route: candidates[i]!, out: q.out, gas: q.gas, at: i});
       }
-      return {best, partial};
+      return {ranked: ranked.sort(byOutput), partial};
     };
 
     /**
-     * The v3 quote for its best route at `block`: the impact measures (and the gate, when set), the minimum, the router
-     * call and the gas bound. A refusal is returned (the trade's verdict for this venue); a read that failed throws.
-     * `v4Unexecutable`: the v4 candidates ranked out for gas, carried as information ("best" passes only).
+     * One v3 candidate as a quote at `block`: the impact measures (and the gate, when set), the minimum, the router call
+     * and the gas bound, by the pass's bounds (`pb`). A refusal is returned — that candidate's; the pass's walk decides
+     * whether it is the venue's (LIVE-VR-3) —; a read that failed throws. `v4Unexecutable`: the v4 candidates ranked out
+     * for gas, carried as information ("best" passes only), counted once the gas step is done.
      */
-    const buildV3 = async (pick: V3Best, block: string, gasRead: BlockGasRead, v4Unexecutable: number): Promise<VenueAnswer> => {
+    const buildV3 = async (pick: V3Candidate, block: string, pb: PassBounds, v4Unexecutable: () => number): Promise<VenueAnswer> => {
       const no3 = (refused: string, info: Swap2RefusalReason | Swap2RefusalInfo): VenueAnswer => ({refused, info});
       const {route, out, gas} = pick;
 
@@ -1377,9 +1444,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           }
         }
       } else {
-        // maxPriceImpactBps (cp0x ask 1b): ranked first, so only the best route is gated — a lower-output candidate
-        // is never the better offer (a venue-routes pass gates each venue's own best route, the row the app shows for
-        // it). The measure is the larger of the probe and the spot value loss: the probe alone
+        // maxPriceImpactBps (cp0x ask 1b): ranked first, so only the best route the chain can carry is gated — a
+        // lower-output candidate is never the better offer (a venue-routes pass gates each venue's own best route, the
+        // row the app shows for it). The measure is the larger of the probe and the spot value loss: the probe alone
         // can be absent (tiny amounts, a failed read) or blind (a pool parked past an empty range reads 342 bps while
         // the trade loses 98.7%, UNISWAP-V4-RESEARCH §7.2). So spot must be measured: when its reads fail the quote is
         // refused (fail closed) — at the limit already on the probe alone, else as the RPC's failure; an unmeasured
@@ -1417,7 +1484,6 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // sweep. refundETH() pays it back to the sender in the same transaction (nothing to send on a full fill). Opt-in
       // (`refundNativeInput`) until every pinned client accepts the leg; the preflight partial-fill check and the
       // minimum already make an unspent remainder revert rather than stay behind.
-      const refund = nativeIn && refundNative;
       if (refund) legs.push(encodeFunctionData({abi: ROUTER_ABI, functionName: "refundETH"}));
       const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineS);
       const data = encodeFunctionData({abi: ROUTER_ABI, functionName: "multicall", args: [deadline, legs]});
@@ -1429,17 +1495,18 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       // above the per-transaction cap, the block gas limit (less what the block spends first: OP-stack's 1M-gas
       // L1-info deposit) or Nitro's execution cap can never complete, so it is
       // refused; a padded limit above the gasLimit cap is clamped to it — never below the need (Monad charges the
-      // whole limit even when the swap reverts).
-      const pools = route.single ? 1n : BigInt((route.path!.length - 42) / 46);
-      const extra = (nativeOut ? 40_000n : 0n) + (refund ? 10_000n : 0n);
+      // whole limit even when the swap reverts). The bounds are the pass's own (`pb`): taken here, with the wait they
+      // always had, unless the ranking took them already; a route refused here gives way to the next one they let
+      // through (LIVE-VR-3, `walk`).
       let gasLimit: bigint | undefined;
-      if (gas >= MIN_POOL_GAS * pools) {
-        const bounded = boundGasLimit(gas + 120_000n + extra, (gas * 3n) / 2n + 120_000n + extra, gasBoundsOf(chainId, await blockGasLimit(gasRead, signal)));
+      if (measuresGas(pick)) {
+        const bounded = gasBound3(gas, await pb.take());
         if ("refuse" in bounded) {
           return no3(`the swap needs ${bounded.refuse.need} gas, more than chain ${chainId} takes in one transaction (${bounded.refuse.cap}) — its pools are too thin for this amount`, "insufficient_liquidity");
         }
         gasLimit = bounded.gasLimit;
       }
+      const unexecutable = v4Unexecutable();
 
       return {quote: {
         provider: "uniswap",
@@ -1472,9 +1539,44 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
           ...(route.single ? {fee: String(route.single.fee)} : {path: route.path!}),
           ...(priceImpactBps !== undefined ? {priceImpactBps: String(priceImpactBps)} : {}),
           ...(valueLossBps !== undefined ? {valueLossBps: String(valueLossBps)} : {}),
-          ...(v4Unexecutable > 0 ? {v4Unexecutable: String(v4Unexecutable)} : {}),
+          ...(unexecutable > 0 ? {v4Unexecutable: String(unexecutable)} : {}),
         },
       }};
+    };
+
+    /**
+     * LIVE-VR-3 (0.4.12): v3's answer from its candidates ranked by output (`ranked`, never empty), each judged by the
+     * pass's one set of gas bounds (`pb`). A route whose gas need is above what one transaction on the chain may carry can
+     * never be mined, so it never displaces a route that can (as Uniswap v4's candidates are ranked).
+     * - A best by output that the bounds refuse whatever the node answers (the chain's caps, or the block read already
+     *   in: `pb.sure`) is ranked out before anything is measured: the bounds are taken and the first candidate they let
+     *   through goes on. With none, the best goes on and is refused as before.
+     * - Otherwise the best goes on exactly as before: the same reads at the same moments, the bounds taken at its gas
+     *   step. When that step refuses it, the first candidate after it the same bounds let through goes on instead. A
+     *   refusal before the gas step (the impact gate or measure, the minimum, the floor) stands, at once, when the best
+     *   fits the block gas limit in hand (`pb.inHand`); else the bounds are taken, and it stands when they let the best
+     *   through.
+     * Only a later candidate the chain's caps let through can ever stand in for the best: with none, nothing waits for
+     * the bounds and the best goes on as before (its gas step takes them, as it always did). A route that goes on in
+     * place of the best is final: its refusal is v3's. With v4 off this is the whole quote, as 0.4.12 quotes it.
+     */
+    const v3Walk = async (ranked: readonly V3Candidate[], block: string, pb: PassBounds, v4Unexecutable: () => number): Promise<VenueAnswer> => {
+      const finish = (c: V3Candidate): Promise<VenueAnswer> => buildV3(c, block, pb, v4Unexecutable);
+      const fits = (c: V3Candidate, b: GasBounds): boolean => !measuresGas(c) || !("refuse" in gasBound3(c.gas, b));
+      const best = ranked[0]!;
+      const after = ranked.slice(1);
+      const insteadPossible = after.some((c) => fits(c, gasCapsOf(chainId)));
+      if (insteadPossible && measuresGas(best) && !fits(best, pb.sure())) {
+        const b = await pb.take();
+        const next = after.find((c) => fits(c, b));
+        if (next) return finish(next);
+      }
+      const first = await finish(best);
+      if ("quote" in first || !insteadPossible || !measuresGas(best)) return first;
+      if (pb.taken() === undefined && fits(best, pb.inHand())) return first;
+      const b = await pb.take();
+      const next = fits(best, b) ? undefined : after.find((c) => fits(c, b));
+      return next ? finish(next) : first;
     };
 
     /**
@@ -1608,11 +1710,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const needV3 = v3Known && (wantV3 || v4Ready);
         if (!needV3 && !v4Ready) return out;
         const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
+        const pb = passBounds(gasRead); // one set of gas bounds for the pass's v3 routes (LIVE-VR-3)
         const gated = maxImpact !== undefined;
         const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
         const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal, turns) : undefined;
         v4Run?.catch(() => {});
-        let v3: {best: V3Best | null; partial: boolean} | undefined;
+        let v3: {ranked: V3Candidate[]; partial: boolean} | undefined;
         if (needV3) {
           try {
             v3 = await readV3(block, "all");
@@ -1629,11 +1732,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
             out.v4 = venueFailed(e);
           }
         }
-        const v3Route = d3 !== undefined && (v3 === undefined || v3.best !== null);
+        const v3Route = d3 !== undefined && (v3 === undefined || v3.ranked.length > 0);
         const [a3, a4] = await Promise.all([
           wantV3 && !out.v3 && v3
-            ? v3.best
-              ? buildV3(v3.best, block, gasRead, 0).catch(venueFailed)
+            ? v3.ranked.length
+              ? v3Walk(v3.ranked, block, pb, () => 0).catch(venueFailed)
               : Promise.resolve(v3.partial ? venueNo(PARTIAL_FILL, "insufficient_liquidity") : venueNo("no Uniswap v3 pool route for this pair and amount", "no_route"))
             : undefined,
           wantV4 && !out.v4 && v4 ? v4Candidate(v4, v3Route, gated, gasRead, v3Unread).catch(venueFailed) : undefined,
@@ -1690,6 +1793,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         await verifyDeployment(chainId);
       }
       const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
+      const pb = passBounds(gasRead); // one set of gas bounds for the quote's v3 routes (LIVE-VR-3)
       // maxPriceImpactBps set: the candidates, the probe and the mid prices are all read at one block, with retries.
       // Unset: at "latest", as 0.4.11 read them (a call the node did not answer is retried, then refused — never
       // read as "no pool").
@@ -1701,8 +1805,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       v4Run?.catch(() => {});
       // With v4 on, the v3 reads go out alongside v4's and are retried the same way (a 429 under the doubled load is
       // not a missing route); with it off, as 0.4.11 read them.
-      const v3Read = d3 ? await readV3(block, gated || v4Run ? "all" : "items") : {best: null, partial: false};
-      const best = v3Read.best;
+      const v3Read = d3 ? await readV3(block, gated || v4Run ? "all" : "items") : {ranked: [] as V3Candidate[], partial: false};
+      const best = v3Read.ranked[0] ?? null;
       let partial = v3Read.partial;
       const v4 = v4Run ? await v4Run : undefined;
       // Ranked together by output (v4MinEdgeBps: v4 must pay more than that much over v3); the gate applies to the
@@ -1736,7 +1840,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         if (tooMuchGas) return refuse(`every Uniswap ${d3 ? "v3 and v4 route" : "v4 route"} for this pair and amount is out: the v4 ones need more gas than one transaction on chain ${chainId} may have (${String(gasCap)}) — its pools are too thin for this amount`, "insufficient_liquidity");
         return refuse(partial ? PARTIAL_FILL : v4 ? (d3 ? "no Uniswap v3 or v4 pool route for this pair and amount" : "no Uniswap v4 pool route for this pair and amount") : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
       }
-      const built3 = await buildV3(best, block, gasRead, v4 !== undefined ? v4.unexecutable + gasOut : 0);
+      // LIVE-VR-3: v3's best route the chain can carry (`v3Walk`); with v4 off, the whole quote as 0.4.12 quotes it.
+      const built3 = await v3Walk(v3Read.ranked, block, pb, () => (v4 !== undefined ? v4.unexecutable + gasOut : 0));
       return "quote" in built3 ? built3.quote : refuse(built3.refused, built3.info);
     } catch (e) {
       return refuse(e instanceof Error ? e.message.replace(/^uniswap: /, "") : String(e), refusalOf(e));

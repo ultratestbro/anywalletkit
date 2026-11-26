@@ -224,10 +224,10 @@ uniswapRemoteProvider({ baseUrl: "/api/v2/swap2", multiQuotes: true })
   alone returns at the same block (v4 off for v3, no v3 deployment for v4) — checked live on Monad, Robinhood Chain,
   Base and Unichain. Where v3 has a route, the v4 candidate is the best route over ranked pools, so it can differ from
   a v4-alone quote through a grid, extra or newer-list pool, or be missing where that is v4's only route. The v3
-  candidate is v3's highest-output route, picked before the gas bound as in a `"best"` pass: where that route needs
-  more gas than the chain takes in one transaction, the v3 row is refused (`insufficient_liquidity`), even if a
-  lower-output v3 route could be mined. v4 ranks such routes out first (`v4Unexecutable`); v3 does not yet, in either
-  mode.
+  candidate is v3's best route the chain can carry, picked as in a `"best"` pass (LIVE-VR-3, "Gas limit and RPC
+  errors" below): a v3 route whose need is above the chain's gas cap is ranked out, so the v3 row is the lower-output
+  route that can be mined, and it is refused (`insufficient_liquidity`) only where no v3 route fits; a picked
+  `routeId: "v3"` quotes the same route. v4 ranks such routes out too (`v4Unexecutable`).
 - **One venue refusing never drops the other.** A v4 read rate-limited, a v4 deployment that does not match its pins,
   every v4 simulation reverting, a wallet short of the input for the v4 simulation, the gate refusing v3's thin pool:
   the other candidate still stands. With both refused, `getQuotes` returns `[]` and `onRefusal` hears one refusal that
@@ -265,9 +265,9 @@ uniswapRemoteProvider({ baseUrl: "/api/v2/swap2", multiQuotes: true })
   approval keeps its route.
 - **Execute the row that was picked.** A live request without a `routeId` (`swap2(options)` with no `using`) is the
   `"best"` pass: one quote, ranked by output as without the option. It need not be the row the router tagged `best`,
-  and it can refuse where a row was shown — for example where v3's highest-output route needs more gas than the chain
-  allows: that pass refuses on v3's gas bound while the v4 row stands. An app in `"both"` mode executes the row the
-  user (or its own policy) picked with `using("uniswap", routeId)`.
+  and it can refuse where a row was shown — for example where the winner's pools fail `maxPriceImpactBps`: that pass
+  refuses on the winner's loss (a refused quote never falls back) while the other venue's row, gated on its own,
+  stands. An app in `"both"` mode executes the row the user (or its own policy) picked with `using("uniswap", routeId)`.
 - **Rollout.** A server sets `venueRoutes: "both"` first (once v4 is on for its apps): `/quote` answers as before, the
   winner now naming its route, so apps without `multiQuotes` keep one Uniswap row. Then apps opt in with
   `uniswapRemoteProvider({ baseUrl, multiQuotes: true })`. A `multiQuotes` app against a server without `"both"` has its
@@ -288,10 +288,10 @@ never wants to offer such a route (a web swap page might set 500):
 uniswapProvider({ rpcUrls, maxPriceImpactBps: 500 })
 ```
 
-- Every candidate is ranked as always; only the best route is gated, and a refused quote never
-  falls back to a lower-output candidate. (A v4 route that cannot be built or simulated is not a
-  refused quote: the next route is built and gated in turn — see "v4 on never costs a pair its v3
-  route".)
+- Every candidate is ranked as always (a route over the chain's gas cap never displaces one under
+  it, see below); only the best route the chain can carry is gated, and a refused quote never falls
+  back to a lower-output candidate. (A v4 route that cannot be built or simulated is not a refused
+  quote: the next route is built and gated in turn — see "v4 on never costs a pair its v3 route".)
 - All reads of the quote are pinned to one block, with transient RPC errors retried.
 - The measure is the larger of the probe and the spot value loss against the pools' `slot0()` mid
   prices, fees included (`providerData.valueLossBps`), rounded down to a whole bp; the pools' floor
@@ -326,9 +326,11 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
 
 - **Gas (always on).** The swap's need is its bare need (quoter gas + 120k router overhead +
   unwrap/refund) plus 5%: EIP-150 forwards 63/64 of the gas into each call, and the pool's swap runs
-  two calls deep (live, swaps ran in 2.1% to 3.5% over the bare need). A need above the chain's cap
-  can never complete and is refused as `insufficient_liquidity`; a padded limit above the cap is
-  clamped to it, never below the need. Monad charges the whole limit, so it is never lowered below
+  two calls deep (live, swaps ran in 2.1% to 3.5% over the bare need). A route whose need is above
+  the chain's cap can never complete: it is ranked out before the best route is picked, so a
+  lower-output route the chain can carry is quoted instead, and only when no candidate fits is the
+  best by output refused as `insufficient_liquidity`; a padded limit above the cap is clamped to it,
+  never below the need. Monad charges the whole limit, so it is never lowered below
   the need. The cap is `min(per-transaction cap, block gas limit − the block's own reserve)`:
 
   | Chains | Per-transaction cap |
@@ -360,6 +362,17 @@ outcomes against 0.4.11: the gas bound and the RPC error handling below.
   alone, and the read fills the cache when it lands. Once a read is in, a quote never waits for the
   next: while a re-read is pending or has failed, the last answer stands, for up to an hour after it
   was read.
+  One block read goes for the whole quote: the route picked and the route bounded are judged by the
+  same one. A best route by output that the caps above refuse whatever the node answers (or the
+  block read already in) is ranked out before it is measured, and the first route under it that
+  fits goes on. Any other best route goes on as before — the same requests at the same moments, its
+  block read taken at its gas step with the wait above — and when that step refuses it, the next
+  route the same read lets through is measured and quoted instead (more requests only where the
+  quote was refused before). A refusal before the gas step (the impact gate, the minimum, the
+  floor) stands at once when the best route fits the block gas limit in hand; when it does not, the
+  quote takes its block read first (waiting only while a chain's first read is out). A quote that
+  ranks out its best route while a chain's first read is out waits for it, at most 1.5 s, before it
+  measures the next.
 - **RPC errors.** A per-item JSON-RPC error that is a revert (code 3; "execution reverted" and other
   EVM errors, out of gas included; revert data whose message names no rate limit or node fault)
   means no candidate, as before. A rate limit (`-32005`, `-32007`, `429`, or its text), a node error

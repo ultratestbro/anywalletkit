@@ -206,6 +206,17 @@ export function gasBoundsOf(chainId: number, blockGasLimit: bigint | undefined):
 }
 
 /**
+ * The chain's bounds that no block read can loosen: its per-transaction cap and its execution cap (KNOWN_TX_GAS_CAP,
+ * KNOWN_EXECUTION_GAS_CAP). gasBoundsOf for any block gas limit, or none, is at least as tight, so a need these refuse
+ * is refused whatever the node answers.
+ */
+export function gasCapsOf(chainId: number): GasBounds {
+  const limit = own(KNOWN_TX_GAS_CAP, chainId);
+  const execution = own(KNOWN_EXECUTION_GAS_CAP, chainId);
+  return {...(limit !== undefined ? {limit} : {}), ...(execution !== undefined ? {execution} : {})};
+}
+
+/**
  * The share of the bare need (quoter gas + router overhead + unwrap/refund) a transaction is taken to need, in percent.
  * EIP-150 forwards at most 63/64 of the gas left into a call, and the pool's swap runs two calls deep (the multicall's
  * delegatecall, then `pool.swap`): (64/63)² ≈ 1.032 before the router's own work. Live, the least gas a swap ran in was
