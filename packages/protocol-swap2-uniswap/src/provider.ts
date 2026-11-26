@@ -1778,7 +1778,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
 
     /** A refusal as a venue's answer. */
     const venueNo = (refused: string, info?: Swap2RefusalReason | Swap2RefusalInfo): VenueRefusal => ({refused, ...(info !== undefined ? {info} : {})});
-    const venueFailed = (e: unknown): VenueRefusal => venueNo(e instanceof Error ? e.message.replace(/^uniswap: /, "") : String(e), refusalOf(e));
+    /** A venue's failed read as its answer: the text without "uniswap: " — or "uniswap v4: ", which the v4 reads begin
+     *  with: the venue is named where the answer is shown ("v4: …" in getQuotes, the picked route), never twice. */
+    const venueFailed = (e: unknown): VenueRefusal => venueNo(e instanceof Error ? e.message.replace(/^uniswap(?: v4)?: /, "") : String(e), refusalOf(e));
 
     /**
      * The v4 candidate of a venue-routes pass: the best route the chain can mine and the provenance rule lets stand
@@ -1998,7 +2000,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       }
       return refuse(partial ? PARTIAL_FILL : v4 ? (d3 ? "no Uniswap v3 or v4 pool route for this pair and amount" : "no Uniswap v4 pool route for this pair and amount") : "no Uniswap v3 pool route for this pair and amount", partial ? "insufficient_liquidity" : "no_route");
     } catch (e) {
-      return refuse(e instanceof Error ? e.message.replace(/^uniswap: /, "") : String(e), refusalOf(e));
+      // A v4 read's text begins "uniswap v4: …": refused as "uniswap: v4: …", the venue named once (review QUOTES-4).
+      return refuse(e instanceof Error ? e.message.replace(/^uniswap: /, "").replace(/^uniswap v4: /, "v4: ") : String(e), refusalOf(e));
     }
   }
 
