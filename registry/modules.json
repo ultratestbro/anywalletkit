@@ -1,7 +1,7 @@
 {
   "$schema": "./modules.schema.json",
-  "generatedAt": "2026-11-23",
-  "count": 35,
+  "generatedAt": "2026-11-26",
+  "count": 36,
   "modules": [
     {
       "name": "@anywalletkit/protocol-approvals-evm",
@@ -456,6 +456,39 @@
       "path": "packages/protocol-swap2-jupiter",
       "description": "Jupiter same-chain Solana swaps via Swap API V2 /build (Metis routing, no Jupiter fee); every instruction vetted and the swap arguments decoded before the account's serialized-transaction guard signs.",
       "addedAt": "2026-10-23"
+    },
+    {
+      "name": "@anywalletkit/protocol-swap2-kyberswap",
+      "type": "swap2",
+      "chains": [
+        "eip155:1",
+        "eip155:10",
+        "eip155:130",
+        "eip155:137",
+        "eip155:143",
+        "eip155:146",
+        "eip155:42161",
+        "eip155:43114",
+        "eip155:4326",
+        "eip155:4663",
+        "eip155:5042",
+        "eip155:56",
+        "eip155:59144",
+        "eip155:80094",
+        "eip155:8453",
+        "eip155:9745",
+        "eip155:999",
+        "eip155:99901"
+      ],
+      "tier": "core",
+      "maintainers": [
+        "@ultratestbro"
+      ],
+      "conformance": "0.x",
+      "repo": "https://github.com/ultratestbro/anywalletkit",
+      "path": "packages/protocol-swap2-kyberswap",
+      "description": "KyberSwap Aggregator same-chain swaps: keyless public API (or the gateway with a key), settled through MetaAggregationRouterV2 only; the build's calldata decoded strictly and re-encoded byte for byte, router, executor, tokens, amounts, receiver, minimum, fee receivers and flags checked against the request, simulated before signing. No integrator fee.",
+      "addedAt": "2026-11-24"
     },
     {
       "name": "@anywalletkit/protocol-swap2-lifi",

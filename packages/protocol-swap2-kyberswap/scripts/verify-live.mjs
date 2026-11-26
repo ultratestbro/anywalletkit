@@ -4,7 +4,7 @@
 //  1. On every chain in KYBER_CHAINS over a public RPC (RPC_<chainId> overrides): MetaAggregationRouterV2 and the
 //     executor have code; the router build matches the pin (`generic` has swapGeneric and the whitelist, `lite` has
 //     neither); swap() is present; the owner is printed (EOA or contract).
-//  2. Keyless, through the provider: for each chain a stablecoin → native (or stable → stable where native swaps are
+//  2. Keyless (or with KYBERSWAP_API_KEY from the environment, never printed, through the keyed gateway), through the provider: for each chain a stablecoin → native (or stable → stable where native swaps are
 //     off) execution quote — routes + build, the calldata checked by checkKyberTransaction, a native-input build also
 //     simulated with a balance override — then the same back; each quote held to the request by kyberVerifyQuote.
 //     Requests are paced (the public API allows 3 per second per IP).
@@ -57,9 +57,11 @@ if (!args.includes("--no-chain")) {
 }
 
 if (!args.includes("--no-quotes")) {
-  console.log("2. quotes and builds (keyless)");
+  // KYBERSWAP_API_KEY (environment only, never printed): the same checks through KyberSwap's keyed API gateway.
+  const apiKey = process.env.KYBERSWAP_API_KEY || undefined;
+  console.log(`2. quotes and builds (${apiKey ? "API key, api.kyberswap.com/swap" : "keyless"})`);
   const rpcUrls = Object.fromEntries(ids.map((id) => [id, [rpcFor(id)]]));
-  const kyber = kyberswapProvider({rpcUrls, clientId: "anywalletkit-verify"});
+  const kyber = kyberswapProvider({rpcUrls, clientId: "anywalletkit-verify", ...(apiKey ? {apiKey} : {})});
   const stableOf = (assets) => ["USDC", "USDT0", "USDT", "USDC.e"].map((s) => assets.find((a) => a.symbol === s && a.contract)).find(Boolean);
   for (const id of ids) {
     const caip2 = `eip155:${id}`, assets = CC_SOURCE_CHAINS.find((c) => c.caip2 === caip2)?.assets ?? [];
