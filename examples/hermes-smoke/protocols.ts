@@ -37,6 +37,9 @@ import { fyndProvider } from '@anywalletkit/protocol-swap2-fynd/provider'
 import { FyndSwap2Protocol } from '@anywalletkit/protocol-swap2-fynd/protocol'
 import { FYND_CHAINS, TYCHO_ROUTER_ABI, checkFyndTransaction } from '@anywalletkit/protocol-swap2-fynd/router'
 import { FYND_PREVIOUS_ROUTERS } from '@anywalletkit/protocol-swap2-fynd/activity'
+import { kyberswapProvider } from '@anywalletkit/protocol-swap2-kyberswap/provider'
+import { KyberswapSwap2Protocol } from '@anywalletkit/protocol-swap2-kyberswap/protocol'
+import { KYBER_EXECUTOR, KYBER_NATIVE, KYBER_ROUTER_ABI, KYBER_ROUTER_V2, KYBER_ROUTER_V3, checkKyberTransaction, kyberMinimum } from '@anywalletkit/protocol-swap2-kyberswap/router'
 import { zeroExProvider } from '@anywalletkit/protocol-swap2-0x/provider'
 import { ZeroExSwap2Protocol } from '@anywalletkit/protocol-swap2-0x/protocol'
 import { SETTLER_NATIVE_CHECK_SELECTOR, checkZeroExTransaction, decodeSettlerExecute, zeroExSettlerAddress, zeroExSettlerNonce } from '@anywalletkit/protocol-swap2-0x/settler'
@@ -134,7 +137,7 @@ export async function smokeProtocols(check: Check): Promise<void> {
   // TON is a hand-suspended 1Click corridor (HOT bridge dark since 2026-10-16) and LI.FI has no Bitcoin, so
   // Bitcoin can only have come from the near-intents provider.
   check('router: capabilities come from the passed providers', chains.includes('eip155:1') && chains.includes('bitcoin:mainnet'), chains.join(','))
-  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['symbiosis', SymbiosisSwap2Protocol], ['jupiter', JupiterSwap2Protocol], ['fynd', FyndSwap2Protocol], ['zeroex', ZeroExSwap2Protocol]] as const) {
+  for (const [name, P] of [['near-intents', NearIntentsSwap2Protocol], ['lifi', LifiSwap2Protocol], ['thorchain', ThorchainSwap2Protocol], ['omniston', OmnistonSwap2Protocol], ['cctp', CctpSwap2Protocol], ['usdt0', Usdt0Swap2Protocol], ['chainflip', ChainflipSwap2Protocol], ['symbiosis', SymbiosisSwap2Protocol], ['jupiter', JupiterSwap2Protocol], ['fynd', FyndSwap2Protocol], ['kyberswap', KyberswapSwap2Protocol], ['zeroex', ZeroExSwap2Protocol]] as const) {
     const p = new (P as never as new (a: unknown, c: unknown) => { getSupportedChains(): Promise<unknown>; quoteSwap2(o: unknown): Promise<unknown> })(evm, swap2Cfg)
     check(`${name}: constructs`, typeof p.quoteSwap2 === 'function')
     await tolerates(check, `${name}: getSupportedChains`, () => p.getSupportedChains())
@@ -467,6 +470,26 @@ export async function smokeProtocols(check: Check): Promise<void> {
   let fyndArcNativeRefused = false
   try { checkFyndTransaction({ to: FYND_CHAINS[5042]!.router, value: 0n, data: fyndData }, { ...fyndExpected, chainId: 5042, tokenOut: '0x0000000000000000000000000000000000000000' }) } catch (e) { fyndArcNativeRefused = /native coin on Arc/.test(e instanceof Error ? e.message : '') }
   check('fynd: Arc and Elysium routers pinned; Arc native coin refused', FYND_CHAINS[5042]!.router === '0x52A1BC20F2B78461D7a03c32f6c7388D4587980f' && FYND_CHAINS[99901]!.router === '0x643577F3b0cB8CE1b1b73C6E872b907aCACD2662' && fynd.supportsChain!('eip155:99901') && !fynd.supportsChain!('eip155:9745') && fyndArcNativeRefused)
+  {
+    // KyberSwap MetaAggregationRouterV2: strict decode + byte-for-byte re-encode of swap(SwapExecutionParams) under Hermes.
+    const kyber = kyberswapProvider({})
+    const usdc = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', weth = '0x4200000000000000000000000000000000000006', dead = '0x000000000000000000000000000000000000dEaD'
+    check('kyberswap: same-chain on Base and HyperEVM, never across chains or native ↔ wrapped', kyber.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:8453', token: weth })
+      && kyber.supportsChain!('eip155:999') && !kyber.supportsRoute({ chain: 'eip155:8453', token: 'USDC' }, { chain: 'eip155:1', token: 'USDC' })
+      && !kyber.supportsRoute({ chain: 'eip155:8453', token: 'ETH' }, { chain: 'eip155:8453', token: weth }) && kyber.ownGasEstimate === true)
+    const min = kyberMinimum(4n * 10n ** 17n, 50)
+    const desc = { srcToken: usdc, dstToken: weth, srcReceivers: ['0x1e40450f8e21bb68490d7d91ab422888cd5a60f1'], srcAmounts: [10n ** 9n], feeReceivers: [] as string[], feeAmounts: [] as bigint[], dstReceiver: dead, amount: 10n ** 9n, minReturnAmount: min, flags: 0x200n, permit: '0x' }
+    const enc = (d: typeof desc, callTarget: string = KYBER_EXECUTOR) => encodeFunctionData({ abi: KYBER_ROUTER_ABI, functionName: 'swap', args: [{ callTarget, approveTarget: '0x0000000000000000000000000000000000000000', targetData: '0xdeadbeef', desc: d, clientData: '0x7b7d' } as never] })
+    const expected = { chainId: 8453, tokenIn: usdc, tokenOut: weth, amountIn: 10n ** 9n, receiver: dead, minAmountOut: min }
+    check('kyberswap: checks the router calldata (decode + canonical re-encode)', checkKyberTransaction({ to: KYBER_ROUTER_V2, value: 0n, data: enc(desc) }, expected).minReturnAmount === min)
+    const refusedBy = (data: string, to: string = KYBER_ROUTER_V2, over: Partial<typeof expected> = {}, value = 0n) => { try { checkKyberTransaction({ to, value, data }, { ...expected, ...over }); return '' } catch (e) { return e instanceof Error ? e.message : 'x' } }
+    check('kyberswap: refuses an injected fee receiver and fee flags', /fee receiver|flags/.test(refusedBy(enc({ ...desc, feeReceivers: [dead], feeAmounts: [30n], flags: 0x2c0n }))))
+    check('kyberswap: refuses another receiver, a foreign executor and trailing bytes', /pays/.test(refusedBy(enc({ ...desc, dstReceiver: '0x1111111111111111111111111111111111111111' })))
+      && /executor/.test(refusedBy(enc(desc, dead))) && /canonical/.test(refusedBy(`${enc(desc)}00`)))
+    check('kyberswap: refuses router V3 and swapGeneric', /V3 not supported/.test(refusedBy(enc(desc), KYBER_ROUTER_V3)) && /swapGeneric/.test(refusedBy(`0x59e50fed${enc(desc).slice(10)}`)))
+    check('kyberswap: native input needs an empty split and value = amount; Arc native refused', /must not split/.test(refusedBy(enc({ ...desc, srcToken: KYBER_NATIVE }), KYBER_ROUTER_V2, { tokenIn: '0x0000000000000000000000000000000000000000' }, 10n ** 9n))
+      && /native coin on Arc/.test(refusedBy(enc(desc), KYBER_ROUTER_V2, { chainId: 5042, tokenOut: '0x0000000000000000000000000000000000000000' })))
+  }
   {
     // 0x Settler: the word-level execute decoder and the pre-signing check run under Hermes (bigint words, checksums).
     const dead = '0x000000000000000000000000000000000000dEaD'

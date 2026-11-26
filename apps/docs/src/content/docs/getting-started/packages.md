@@ -61,6 +61,7 @@ inside the router.
 | `@anywalletkit/protocol-swap2-fynd` | Fynd (Propeller Heads) same-chain swaps on 9 EVM chains, settled through TychoRouterV3 — Fynd outputs are under the Fynd License |
 | `@anywalletkit/protocol-swap2-relay` | Relay — EVM → EVM through the RelayDepository on 29 chains; the order is hashed and checked on the device, the deposit built locally; no key |
 | `@anywalletkit/protocol-swap2-0x` | 0x Swap API v2 same-chain swaps on 8 EVM chains (Monad since 0.2.0) through Permit2; the Settler comes from 0x's on-chain registry and every signed payload is checked on the device |
+| `@anywalletkit/protocol-swap2-kyberswap` | KyberSwap Aggregator — same-chain swaps on 18 EVM chains, no integrator fee; the build is decoded and checked on the device and simulated before any approval; keyless or an API key on your server |
 | `@anywalletkit/protocol-swap2-across` | Across — EVM → EVM bridging of the same asset between 17 chains through a plain SpokePool deposit built and verified on the device; priced from Across API V5 against Across's relayer fee; API key on your server (`acrossRemoteProvider` in the app) |
 | `@anywalletkit/protocol-swap2-cow` | CoW Protocol — same-chain swaps as signed orders on Ethereum, Base and Arbitrum: gasless for tokens (EIP-712 order, EIP-2612 permit), native coin through eth-flow; no key, off by default |
 | `@anywalletkit/protocol-swap2-wrap` | Native ↔ wrapped native (ETH ↔ WETH and others) |

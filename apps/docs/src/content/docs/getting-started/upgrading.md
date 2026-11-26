@@ -10,6 +10,15 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## 2026-11-26: KyberSwap
+
+Nothing to change in code unless you opt in.
+
+- **New: `@anywalletkit/protocol-swap2-kyberswap`**: KyberSwap Aggregator same-chain swaps on 18 EVM chains, no
+  integrator fee. Keyless, or with an API key kept on your server (`kyberswapProvider({apiKey, rpcUrls})`, and
+  `remoteProvider({name: 'kyberswap', baseUrl, ...kyberPins})` in the app). Every build is decoded and checked on the
+  device, and simulated before any approval. See [Swaps → KyberSwap](/guides/swaps/#kyberswap).
+
 ## 2026-11-23: CoW Protocol, gas in the router's value, Zcash shielded recipients
 
 Nothing to change in code unless you opt in.
