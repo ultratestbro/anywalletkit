@@ -438,6 +438,12 @@ cannot fit in the next permitted batch or indexed passenger bytes are incomplete
 See [TokenMessaging](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/messaging/TokenMessaging.sol)
 and [Bus events](https://github.com/stargate-protocol/stargate-v2/blob/414f47412123d7737520c6ba331c1376ec874a88/packages/stg-evm-v2/src/libs/Bus.sol).
 
+## Gas estimate
+
+Quotes carry no `gasEstimate`: a quote is read on-chain (`quoteOFT` / `quoteSend`), which names no source-transaction
+gas (`sourceGas: null`, `approvalGas: null`), and no Stargate or LayerZero API answer is read for one. The quote has no
+`txRequest.gasLimit`; the wallet estimates the transaction.
+
 ## Integration boundaries and remaining work
 
 ### Wallet history

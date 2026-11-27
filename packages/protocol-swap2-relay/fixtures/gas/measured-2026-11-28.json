@@ -1,0 +1,125 @@
+{
+ "measured": "2026-11-28",
+ "source": "read-only: POST https://api.relay.link/quote/v2 through the built relayProvider (keyless), each deposit simulated right after it was quoted at the latest block (eth_simulateV1 gasUsed, eth_estimateGas) with a state override on the sender (native balance; for USDC its FiatToken balance slot 9 and allowance slot 10 to the depository); receipts of the test wallet's two public Arbitrum deposits (fixtures/activity). Values copied from the answers and the node results; nothing signed or sent.",
+ "sender": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+ "quotes": [
+  {
+   "name": "base-eth>arb-eth",
+   "depositGas": "32713",
+   "maxFeePerGas": "6600000",
+   "feesGasAmount": "216446944292",
+   "approveGas": null,
+   "quoteGasLimit": "90000",
+   "simulatedGasUsed": 24812,
+   "estimateGas": 25152
+  },
+  {
+   "name": "arb-eth>base-eth",
+   "depositGas": "32793",
+   "maxFeePerGas": "22015400",
+   "feesGasAmount": "721951012200",
+   "approveGas": null,
+   "quoteGasLimit": "90000",
+   "simulatedGasUsed": 24824,
+   "estimateGas": 25226
+  },
+  {
+   "name": "op-eth>base-eth",
+   "depositGas": "32713",
+   "maxFeePerGas": "9344",
+   "feesGasAmount": "1059181420",
+   "approveGas": null,
+   "quoteGasLimit": "90000",
+   "simulatedGasUsed": 24824,
+   "estimateGas": 25164
+  },
+  {
+   "name": "eth-eth>base-eth",
+   "depositGas": "32713",
+   "maxFeePerGas": "136139144",
+   "feesGasAmount": "4453519817672",
+   "approveGas": null,
+   "quoteGasLimit": "90000",
+   "simulatedGasUsed": 24824,
+   "estimateGas": 25164
+  },
+  {
+   "name": "bsc-bnb>arb-eth",
+   "depositGas": "32713",
+   "maxFeePerGas": "69000000",
+   "feesGasAmount": "2257197000000",
+   "approveGas": null,
+   "quoteGasLimit": "90000",
+   "simulatedGasUsed": 24824,
+   "estimateGas": 25164
+  },
+  {
+   "name": "linea-eth>base-eth",
+   "depositGas": "32721",
+   "maxFeePerGas": "610589316",
+   "feesGasAmount": "19979093008836",
+   "approveGas": null,
+   "quoteGasLimit": "90000",
+   "simulatedGasUsed": 24830,
+   "estimateGas": 25170
+  },
+  {
+   "name": "base-usdc>arb-usdc",
+   "depositGas": "76194",
+   "maxFeePerGas": "6736250",
+   "feesGasAmount": "513932855680",
+   "approveGas": "73112",
+   "quoteGasLimit": "180000",
+   "simulatedGasUsed": 58550,
+   "estimateGas": 59365
+  },
+  {
+   "name": "arb-usdc>base-usdc",
+   "depositGas": "76297",
+   "maxFeePerGas": "22035200",
+   "feesGasAmount": "1681219654400",
+   "approveGas": "73190",
+   "quoteGasLimit": "180000",
+   "simulatedGasUsed": 58562,
+   "estimateGas": 59456
+  },
+  {
+   "name": "eth-usdc>base-usdc",
+   "depositGas": "76352",
+   "maxFeePerGas": "147043063",
+   "feesGasAmount": "11227031946176",
+   "approveGas": "73269",
+   "quoteGasLimit": "180000",
+   "simulatedGasUsed": 58683,
+   "estimateGas": 59499
+  },
+  {
+   "name": "op-usdc>base-usdc",
+   "depositGas": "76194",
+   "maxFeePerGas": "9331",
+   "feesGasAmount": "1632012109",
+   "approveGas": "73112",
+   "quoteGasLimit": "180000",
+   "simulatedGasUsed": 58562,
+   "estimateGas": 59377
+  }
+ ],
+ "receipts": [
+  {
+   "chain": 42161,
+   "hash": "0xcd7742661f2a500c0f610aa18912682744a2ce81b105a82918ac2b161fc385e1",
+   "gasUsed": 24961,
+   "gasUsedForL1": 137,
+   "txGas": 31675,
+   "selector": "0x49290c1c"
+  },
+  {
+   "chain": 42161,
+   "hash": "0x935747a9b95715d13ba38217b2b3ba523168f1a4591947ddc6640190f7768893",
+   "gasUsed": 53916,
+   "gasUsedForL1": 166,
+   "txGas": 108243,
+   "selector": "0xe8017952"
+  }
+ ]
+}

@@ -171,6 +171,12 @@ const q = await usdt0Provider({rpcUrls}).getQuote({
 (decoded back, with the preflight), follows four real delivered transfers to `completed`, and checks the default
 provider (Tron not offered, no RPC call; TON quoted) and each sealed fee against the engine's ceiling.
 
+## Gas estimate
+
+Quotes carry no `gasEstimate`: a quote is two `eth_call`s (`quoteOFT`, `quoteSend`) that name no source-transaction
+gas, and no USDT0 or LayerZero API answer is read for one. `txRequest.gasLimit` is a fixed bound of 450 000 (a
+direct `send` used ~330 000 on Arbitrum and the Ethereum adapter, 2026-10-20 receipts), not an estimate.
+
 ## Tests
 
 `pnpm test` — provider tests over a fake JSON-RPC + fake LayerZero Scan

@@ -171,6 +171,12 @@ token's maximum, is refused before a quote is asked for. On 2026-11-10 that was
 Slippage is the caller's `slippageBps`, else the config's, else
 `suggestSlippage` from swap2-core for the pair. It is sent to the API as is.
 
+## Gas estimate
+
+Quotes carry no `gasEstimate`: Symbiosis's swap answer has no gas field (its EVM `tx` is `chainId`, `to`, `data`,
+`value`), so there is no figure to take. EVM quotes carry no `txRequest.gasLimit` either (the wallet estimates); a
+Tron quote's `gasLimit` is Symbiosis's fee limit in sun, not gas.
+
 ## Status
 
 `trackIntent` reads `GET /v2/tx/{chainId}/{hash}` (`SYMBIOSIS_STATUS`):

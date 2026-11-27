@@ -108,6 +108,16 @@ Read on 2026-11-10 from `GET https://api.relay.link/chains` and on chain; `pnpm 
 - A caller may ask for up to 50 % slippage (`slippageBps` 5000); more is refused.
 - `trackIntent` is not checked against the chains: a `completed` is Relay's statement, not a verified fill.
 
+## Gas estimate
+
+Quotes carry no `gasEstimate`: Relay gives no figure for the gas a deposit uses. The deposit step's `gas` (not
+described in Relay's API reference) is a gas limit with a 30 % margin — `eth_estimateGas` × 1.3 — and `fees.gas` is
+that figure priced at `maxFeePerGas`. Measured 2026-11-28 (`fixtures/gas/measured-2026-11-28.json`, ten live quotes,
+each deposit simulated right after it was quoted): `depositNative` uses 24 812–24 830 gas on six chains against
+Relay's 32 713–32 793, `depositErc20` of USDC 58 550–58 683 on four chains against 76 194–76 352 (1.30–1.32×); the
+test wallet's two Arbitrum deposits used 24 961 and 53 916. The quote's `txRequest.gasLimit` is unchanged (twice
+Relay's figure, at least 90 000 native / 180 000 ERC-20).
+
 ## Checks
 
 ```

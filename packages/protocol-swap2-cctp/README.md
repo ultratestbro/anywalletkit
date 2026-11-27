@@ -111,6 +111,12 @@ EVM routes.
   is not Circle's (BSC, Gnosis USDC.e) are refused. Solana (domain 5) is not
   executed here yet: the engine runs calldata on EVM only.
 
+## Gas estimate
+
+Quotes carry no `gasEstimate`: `depositForBurn` is built on the device and Circle's API (fees, attestations) names
+no gas for it. `txRequest.gasLimit` is a fixed bound of 200 000 (a `depositForBurn` runs ~110 000–150 000), not an
+estimate.
+
 ## Tests
 
 `pnpm test` — provider tests over a fake Circle API + fake JSON-RPC (fee

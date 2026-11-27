@@ -164,6 +164,13 @@ Not pinned: Scroll (deposits paused on chain), BNB Chain (Across moves its 18-de
 - `/suggested-fees` is Across's legacy relayer-fee quote; without it the pinned floor prices only the studied chains.
 - A quote's minimum is its output: a relayer pays exactly `outputAmount`, so `toTokenAmountMin` equals `toTokenAmount`. The engine quotes again when it executes, so pass `minAmountOut` a few bps under the quote (`suggestSlippage` gives at least 5): with the quoted minimum itself, a new price a few base units lower refuses the swap (`tx-output-amount`). On 2026-11-15 a 1.9 USDC Base → Arbitrum quote came back 15 base units lower (0.8 bps) at execution.
 
+## Gas estimate
+
+Quotes carry no `gasEstimate`: no Across answer states the gas of the deposit this module builds. V5's `gasEstimates`
+and `nextActions[].estimatedOriginGas` price V5's own route (its origin execution step at a flat 325 000 / 375 000
+gas, then approve / send at a flat 70 000 / 100 000 for a token or 23 416–25 016 for a native send, `fixtures/api/quotes`), not a SpokePool `deposit`, and
+`/suggested-fees` names no origin gas. The quote has no `txRequest.gasLimit` either: the wallet estimates the deposit.
+
 ## Checks
 
 ```
