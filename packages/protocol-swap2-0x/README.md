@@ -99,6 +99,20 @@ It is empty when the registry cannot be read, so the permit is then described as
 
 0x also keeps positive slippage (the part of a fill above the quoted amount): it is not a line in the answer's fees but the calldata's `POSITIVE_SLIPPAGE` action, which sends the surplus above the quoted amount to 0x. The quoted amount and the minimum are what the checks hold the swap to.
 
+## Gas: `gasEstimate`
+
+Every quote whose answer states gas carries `gasEstimate` with `gasEstimateSource: "venue"`: 0x's `transaction.gas` on a live quote, its `gas` on an indicative price, read as decimal digits exactly as the gas limit and the network fee read them (absent, zero or another notation: no estimate). It is for comparing routes (see protocol-swap2-core, "Gas: `gasEstimate` vs `gasLimit`"). Nothing else changes: a live quote's `txRequest.gasLimit` is still that figure × 1.2 + 20,000 and still held to the chain's cap (6,000,000; Monad 15,000,000), the estimate is never above it, and every call still goes out with the account's own estimate (`ownGasEstimate`). It counts the swap call only: a token sale's Permit2 approval, when one is sent, is priced separately by the router.
+
+**How it compares with the gas used.** 0x documents this figure as the gas limit to send with, and it runs high. Measured 2026-11-28: 13 live quotes for a throwaway taker on Ethereum, Base, Arbitrum, Optimism, Polygon and BNB Smart Chain, each transaction run with `eth_simulateV1` right after the quote, at the chain's gas price with the module's gas limit (nothing signed or sent). A native sale was given its value by a balance override; a token sale its balance and Permit2 allowance by storage overrides, the engine's signature suffix with a dummy 65-byte signature, and an ERC-1271 stand-in on the taker so Permit2 accepts it (about 3,000 gas cheaper than the `ecrecover` an ordinary account's signature costs). Two reverted (a Metric v2 route on Arbitrum, a token sale on BNB Smart Chain); of the other 11:
+
+| | Gas used ÷ 0x's `gas` | Gas used − 0x's `gas` |
+|---|---|---|
+| 11 quotes | 0.41–0.95, median 0.74 | −457,917 … −44,428, median −115,378 |
+| 6 native sales | 0.69–0.88, median 0.72 | median −100,139 |
+| 5 token sales | 0.41–0.95, median 0.74 | median −168,196 |
+
+0x's figure was above the gas used every time (the call used about three quarters of it at the median); the padded limit was never more than 78 % used. The module passes the figure on as 0x states it rather than scaling it by these numbers. The taker held none of the output, so writing its first balance is in the figures; on Arbitrum they are L2 execution gas without the L1 data component, which the router leaves out too. On Monad what is charged is the limit the account sends (its own estimate), not the gas used.
+
 ## Configure
 
 ```ts

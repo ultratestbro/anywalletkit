@@ -1,0 +1,88 @@
+{
+  "note": "Gas used by CoWSwapEthFlow.createOrder (0x322bba21 on 0xbA3cB449bD2B4ADddBc894D8697F5170800EAdeC), measured 2026-11-28, read-only: receipts of two real createOrder transactions (eth_getTransactionReceipt; on Arbitrum gasUsed includes gasUsedForL1, the L1 data component) and eth_simulateV1 of fresh createOrder calls from a throwaway account (balance override, the chain gas price, a 150000 gas limit; nothing sent). ETH_FLOW_CREATE_GAS_USED is the median of the L2 figures.",
+  "receipts": [
+    {
+      "chainId": 8453,
+      "hash": "0x151338d763ef774bbb77694c85267412aaea845195c9fc0d56448cff9b98e07b",
+      "source": "this module, mainnet-report.json (eth-flow case, 2026-11-23)",
+      "status": "0x1",
+      "gasUsed": "56228",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 42161,
+      "hash": "0xca63919ffcd119401fa4d64113c9dc09f797fe2869b6b11946c78ed883f7b4e0",
+      "source": "fixtures/activity/arbitrum-eth-flow-create-order.json (public)",
+      "status": "0x1",
+      "gasUsed": "56692",
+      "gasUsedForL1": "428",
+      "l2Gas": "56264",
+      "calldataBytes": 292
+    }
+  ],
+  "simulated": [
+    {
+      "chainId": 1,
+      "sellAmount": "100000000000000000",
+      "status": "0x1",
+      "gasUsed": "56228",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 1,
+      "sellAmount": "200000000000000",
+      "status": "0x1",
+      "gasUsed": "56216",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 1,
+      "sellAmount": "5000000000000000000",
+      "status": "0x1",
+      "gasUsed": "56240",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 8453,
+      "sellAmount": "100000000000000000",
+      "status": "0x1",
+      "gasUsed": "56228",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 8453,
+      "sellAmount": "200000000000000",
+      "status": "0x1",
+      "gasUsed": "56216",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 8453,
+      "sellAmount": "5000000000000000000",
+      "status": "0x1",
+      "gasUsed": "56240",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 42161,
+      "sellAmount": "100000000000000000",
+      "status": "0x1",
+      "gasUsed": "56228",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 42161,
+      "sellAmount": "200000000000000",
+      "status": "0x1",
+      "gasUsed": "56216",
+      "calldataBytes": 292
+    },
+    {
+      "chainId": 42161,
+      "sellAmount": "5000000000000000000",
+      "status": "0x1",
+      "gasUsed": "56228",
+      "calldataBytes": 292
+    }
+  ]
+}

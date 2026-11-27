@@ -1,5 +1,6 @@
 import {describe, expect, it} from "vitest";
 import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import {gasEstimateProblem} from "@anywalletkit/protocol-swap2-core/validate";
 import {ZEROEX_CHAINS} from "../src/chains.js";
 import {zeroExProvider} from "../src/provider.js";
 import {zeroExVerifyBuild, zeroExVerifyQuote} from "../src/remote.js";
@@ -33,6 +34,10 @@ describe.skipIf(!live)("live: 0x quotes pass every device check", () => {
       const q = await provider.getQuote(params);
       expect(reasons).toEqual([]);
       expect(q).not.toBeNull();
+      // 0x's own gas figure, from the venue, within the padded limit
+      expect(q!.gasEstimateSource).toBe("venue");
+      expect(gasEstimateProblem(q!, params.sourceChain)).toBeNull();
+      expect(BigInt(q!.gasEstimate!) <= BigInt(q!.txRequest!.gasLimit!)).toBe(true);
       const settlers = await resolver.resolve(chainId, {fresh: true});
       expect(zeroExSettlerNonce(chainId, q!.txRequest!.to!)).not.toBeNull();
       const ctx = {chains: ZEROEX_CHAINS, settlers: () => settlers};

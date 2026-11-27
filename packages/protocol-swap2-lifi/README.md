@@ -95,6 +95,29 @@ route for a request (`ROUTE_SLIPPAGE_UNSUPPORTED`) or has route-wide slippage sw
 (`ROUTE_SLIPPAGE_UNAVAILABLE`), it is asked again in its default scope, held to the same floor. That
 happens while quoting, so the quote the user reviews is the per-step one, with its own minimum.
 
+## Gas estimate (`gasEstimate`)
+
+An EVM-source quote carries `gasEstimate` with `gasEstimateSource: "venue"`: the `estimate` of the single `SEND`
+entry in LI.FI's `estimate.gasCosts` ("Estimated units of gas the transaction consumes" in LI.FI's API reference) —
+the whole Diamond call LI.FI returns (fee collection, source swaps and the bridge or swap call), without the
+approval (an `APPROVE` entry is never counted) and without LI.FI's headroom. It is taken only when the answer reports
+that LI.FI simulated the transaction (`stepSimulation: {status: "success", gasSource: "simulation"}`; the other
+documented source, `"tool"`, is a per-tool table, and then the quote carries no estimate), and never above the
+transaction's gas limit. `txRequest.gasLimit` is unchanged: LI.FI's `limit` for the same entry, which is the estimate
+× 1.3 on Ethereum, Avalanche, Linea and Unichain, × 1.5 on BSC and Polygon, plus a fixed allowance on Base, OP and
+Arbitrum (up to 15× the estimate on Arbitrum). A dry quote priced for a placeholder keeps the estimate of its route.
+Solana sources and answers without gas costs carry none (`lifiGasEstimate` is the rule), and neither do Monad sources
+(`LIFI_GAS_LIMIT_BILLED_CHAINS`): Monad charges a transaction its whole gas limit, and a LI.FI transaction goes out with
+LI.FI's limit, so there the limit is what the user pays and the estimate would understate it.
+
+How far it is from the gas the transaction uses — 13 live quotes of 2026-11-28 (`tests/fixtures-live-2026-11-28-gas.json`:
+Across, LayerSwap, NEAR Intents, Polymer CCTP, SushiSwap and Fly, from Ethereum, Base, OP, Arbitrum, BSC and Polygon),
+each transaction simulated right after it was quoted (`eth_simulateV1` at the latest block, a state override on the
+sender's balance and allowance): LI.FI's figure is **12–26 % above the simulated gas used** (median +19.5 %; a
+near-constant gap per tool: 32 694 NEAR Intents, 35 494 LayerSwap and Across, 37 409–53 359 Polymer CCTP, 43 894
+SushiSwap, 96 492 Fly) and within −11 % … +5 % of `eth_estimateGas` of the same call. It overstates rather than
+understates, so a LI.FI route is not ranked cheaper than it runs.
+
 ## Behind `remoteProvider`
 
 When the provider runs on your server, spread its pins into the app's stub:

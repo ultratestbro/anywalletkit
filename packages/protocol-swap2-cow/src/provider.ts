@@ -14,6 +14,7 @@ import {
   encodeCreateOrder,
   encodeInvalidateOrder,
   encodeOrdersRead,
+  ethFlowGasEstimate,
   ethFlowOrderId,
   packEthFlowData,
   unpackEthFlowData,
@@ -520,10 +521,14 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
               data = {...data, buyAmount: next.toString()};
             }
           }
+          // The user's own createOrder transaction: the gas it uses, measured (ETH_FLOW_CREATE_GAS_USED) — only on the
+          // chains and the eth-flow contract it was measured on.
+          const gasEstimate = ethFlowGasEstimate(d);
           return {
             ...common(q, BigInt(data.buyAmount), "ethflow", {appData: plain.hash}),
             intentId: `e:${d.chainId}:${packEthFlowData(data)}`,
             txRequest: {to: d.ethFlow, data: encodeCreateOrder(data), value: params.amountIn, chainId: d.chainId, gasLimit: ETH_FLOW_CREATE_GAS.toString()},
+            ...(gasEstimate !== undefined ? {gasEstimate, gasEstimateSource: "model" as const} : {}),
           };
         }
 
@@ -586,6 +591,9 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
           ...common(q, floor, "order", {appData: plain.hash, permit: permit ? "offered" : "none", ...(permit ? {} : {approvalAddress: getAddress(d.vaultRelayer)})}),
           intentId,
           gasless: true,
+          // The user sends no swap transaction: its gas is 0 by construction. An approval, when one is needed, is not in it.
+          gasEstimate: "0",
+          gasEstimateSource: "model",
         };
       } catch (e) {
         // The orderbook's classified refusals (rate_limited with its wait, upstream_unavailable) reach the router.

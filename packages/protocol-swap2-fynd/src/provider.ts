@@ -123,6 +123,32 @@ function routerRevert(e: unknown): {name: string; args: readonly unknown[]} | nu
 }
 
 const uint = (v: unknown): bigint | null => (typeof v === "string" && /^\d+$/.test(v) ? BigInt(v) : null);
+
+/**
+ * Gas the router uses beyond Fynd's own `gas_estimate`, added to it for `Quote.gasEstimate`: 0, as measured.
+ *
+ * Fynd's order-level `gas_estimate` is not the sum of its pools' estimates: it already carries Fynd's model of the
+ * router around them (2 300–439 701 above that sum in the recordings). Measured 2026-11-28 (fixtures/quotes: 20 live
+ * hosted-API quotes on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain, each transaction run
+ * with `eth_simulateV1` right after the quote, at the chain's gas price and with this module's gas limit, from a
+ * throwaway sender funded by a state override, a token input approved in the same simulated block), the gas used came
+ * to 0.71–1.54 × `gas_estimate` (median 0.99), and the gas used minus `gas_estimate` to a median of −2 633
+ * (−152 010 … +73 820). 19 more quotes simulated from real holders of the input gave a median of −37 474. A positive
+ * constant would overstate the median route, so none is added. `txRequest.gasLimit` keeps its headroom
+ * (`gas_estimate × 1.3 + 80 000`, of which at most 82 % was used).
+ */
+export const FYND_GAS_ESTIMATE_OVERHEAD = 0n;
+
+/**
+ * A quote's `gasEstimate`: Fynd's `gas_estimate` plus {@link FYND_GAS_ESTIMATE_OVERHEAD}, as canonical digits; undefined
+ * when Fynd states none, zero, or a figure past the contract's ten digits (no figure is made up).
+ */
+export function fyndGasEstimate(gasEstimate: unknown): string | undefined {
+  const gas = uint(gasEstimate);
+  if (gas === null || gas === 0n) return undefined;
+  const total = gas + FYND_GAS_ESTIMATE_OVERHEAD;
+  return total < 10_000_000_000n ? total.toString() : undefined;
+}
 /** A protocol name from the API as it may appear in a refusal or the quote: at most 40 characters (scan 2026-10-27 modules, F34). */
 const protocolName = (p: string): string => (p.length > 40 ? `${p.slice(0, 40)}…` : p);
 /** Hex or an address, compared without case (length first: the client's side may be a megabyte). */
@@ -326,6 +352,8 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
         }
       }
       const gas = uint(q.gas_estimate) ?? 0n;
+      // Gas used, for comparing routes: Fynd's own estimate, without the limit's headroom (FYND_GAS_ESTIMATE_OVERHEAD).
+      const gasEstimate = fyndGasEstimate(q.gas_estimate);
       const protocols = allProtocols.slice(0, 6).map(protocolName);
       return {
         provider: "fynd",
@@ -337,10 +365,11 @@ export function fyndProvider(config: FyndProviderConfig): CrossChainProvider {
           data: tx.data,
           value: value.toString(),
           chainId,
-          // the router's own overhead on top of Fynd's route estimate
+          // headroom on top of Fynd's estimate: the bound the transaction is sent with
           gasLimit: ((gas * 13n) / 10n + 80_000n).toString(),
           ...(tokenIn === ZERO ? {} : {approvalAddress: getAddress(tx.to)}),
         },
+        ...(gasEstimate !== undefined ? {gasEstimate, gasEstimateSource: "venue" as const} : {}),
         sourceAmount: amountIn.toString(),
         // what the receiver gets at the quoted price: gross minus the router fee
         destAmount: (gross - routerFee).toString(),

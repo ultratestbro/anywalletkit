@@ -261,6 +261,17 @@ function routerFor(chain: string): readonly string[] {
 }
 
 /**
+ * The provider's `exactAllowanceOnly` (protocol-swap2-core): true on the chains whose router is the `generic` build —
+ * `swapGeneric` behind an owner-managed executor whitelist, so the router's owner (a single key on all but Linea) could
+ * make it spend an allowance left on it. The engine then approves exactly the input and revokes it when the swap does
+ * not spend it, whatever the app's `allowanceReuse` / `revokeUnspentApproval` say. False on the `lite` chains; true
+ * for a chain this module does not know (fail closed).
+ */
+export function kyberExactAllowanceOnly(chain: string): boolean {
+  return kyberChain(chainIdOf(chain))?.build !== "lite";
+}
+
+/**
  * The router a KyberSwap swap calls and approves, and {@link kyberVerifyQuote}: the app's side of
  * `remoteProvider({name: "kyberswap", baseUrl, ...kyberPins})`, so a backend's quote is checked against the pinned
  * router and the app's own request, never against itself.
@@ -268,6 +279,7 @@ function routerFor(chain: string): readonly string[] {
 export const kyberPins: RemotePins = Object.freeze({
   callTargets: routerFor,
   spenders: routerFor,
+  exactAllowanceOnly: kyberExactAllowanceOnly,
   verifyQuote: kyberVerifyQuote,
   reasonOf: (refusal: string) => notes.reasonOf(refusal),
 });

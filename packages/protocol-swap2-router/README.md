@@ -49,7 +49,7 @@ const routes = await swap2.quoteSwap2Routes(options, {
   // a "searching…" hint while `pending` is non-empty.
   onUpdate: (routes, pending) => render(routes, pending),
 });
-// routes[i] = {provider, routeId?, quote, netValueUsd, relativeValue, tags: ["best"] | ["fastest"] | …}
+// routes[i] = {provider, routeId?, quote, netValueUsd, gasUsd, gasEstimate?, gasEstimateSource?, relativeValue, tags: ["best"] | ["fastest"] | …}
 await swap2.using(picked.provider, picked.routeId).swap2({...options, minAmountOut: picked.quote.toTokenAmountMin});
 ```
 
@@ -67,8 +67,11 @@ Execution calls `getQuote` once per provider with `dry: false`; it never creates
 quotes for every candidate. A selected `routeId` must be returned unchanged, even if
 the provider's default or cheapest mode changed. A quote that expires during approval
 is refreshed using the same provider, route and caller floor; failure stops the swap
-and attempts to revoke the engine-created allowance. The selected route is included
-in `reviewExecution`. Providers without `getQuotes` and callers using only
+and attempts to revoke the engine-created allowance (or leaves it, with
+`revokeUnspentApproval: false`). The selected route is included
+in `reviewExecution`. The engine's approval options (`allowanceReuse`, `revokeUnspentApproval`; see
+protocol-swap2-core's "Approvals") go on this config like any engine option, carry over to
+`using(provider, routeId)`, and can be set for one execution as `swap2(options, {allowanceReuse: "sufficient"})`. Providers without `getQuotes` and callers using only
 `using(provider)` retain the existing API; choosing a particular candidate requires
 passing its `routeId`.
 
@@ -92,11 +95,32 @@ does not validate a transaction's behavior.
    `evmSourceGas({prices, rpcUrl})` counts the venue's `txRequest.gasLimit` (capped at 3M; 250k when it names
    none) for a calldata route, a transfer (21k native, 65k ERC-20) for a deposit-address route, nothing for a
    gasless one, plus 50k for an ERC-20 approval of the route's spender unless `params.sender`'s allowance
-   already covers the amount; at the chain's `eth_gasPrice` (cached 15 s) and the native coin's price. It is
-   an estimate from the quote, not a dry run (a dry quote has no funded sender to run it from), and leaves out
-   an L2's L1 data fee. Each quote is asked once as it arrives (3 s at most); when any quote of the auction
-   has no answer, gas comes off no quote, so the comparison stays like for like. `RankedQuote.gasUsd` and
+   already covers the amount; at the chain's `eth_gasPrice` (cached 15 s) and the native coin's price. It is an
+   estimate from the quote, not a dry run (a dry quote has no funded sender to run it from), and leaves out an
+   L2's L1 data fee. Each quote is asked once as it arrives (3 s at most); when any quote of the auction has no
+   answer, gas comes off no quote, so the comparison stays like for like. `RankedQuote.gasUsd` and
    `Swap2Route.gasUsd` say what was subtracted.
+
+   `evmSourceGas({prices, rpcUrl, useGasEstimate: true})` counts, for a quote that has one, the gas its source
+   transaction is expected to use instead (`quote.gasEstimate`, see protocol-swap2-core's "Gas: `gasEstimate` vs
+   `gasLimit`"), kept between 21k and 3M; a quote without one is counted as above, and the approval is added the
+   same way. Off by default: an app that does not set it ranks exactly as before (`swapGasUnits(quote, params,
+   {useGasEstimate})` likewise). What changes with it: a venue whose limit carries headroom (Fynd's is its
+   estimate × 1.3 + 80 000) is no longer charged for it, and a quote without a transaction that states its gas (a
+   dry KyberSwap quote, a 0x price) is charged that figure instead of a plain transfer (65k), several times more.
+   The figures are not all alike: 0x's and KyberSwap's run about a third above the gas used, Fynd's, Uniswap's,
+   Curve's and Balancer's near it (the table in protocol-swap2-core's README), so the comparison is fairer than on
+   gas limits, not exact. A `gasEstimate` is the venue's or the module's word, as a gas limit was: core holds it to
+   its contract (at most the gas limit, `"0"` only when gasless) and the router to at least 21k, nothing more.
+   `Swap2Route.gasEstimate` / `gasEstimateSource` carry the quote's figure either way.
+
+   A one-cent race stays a one-cent race. 2026-11-27 on Ethereum Fynd quoted 294.50 USDC against CoW's 294.49
+   (gasless): Fynd's own recording of a comparable route that evening (USDT → USDC through Ekubo, block
+   26,509,322, `protocol-swap2-fynd/fixtures/quotes/ethereum-usdt-usdc.json`) priced its 136,311-gas estimate at
+   $0.00997 — the whole lead — and the transaction used 210,131 gas when simulated. With `tieBand: 0` that is a
+   tie to a hundredth of a cent on the estimate and a CoW win on the gas really used; with the default band the two
+   are the same price and speed and reliability decide (step 3). The estimate removes the headroom from the
+   comparison; it does not decide a race smaller than the gas itself.
 2. **Price first.** Quotes within `tieBand` (default 0.2%) of the best value are the same price.
 3. **Speed and reliability inside the tie.** Among equal prices the faster, then the more reliable,
    route wins (`weights`, default `price:0.6,speed:0.3,reliability:0.1`). A sliver of extra output no

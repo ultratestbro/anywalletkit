@@ -12,7 +12,7 @@ import type {
   RoutedQuote,
   ScoreWeights,
 } from "@anywalletkit/protocol-swap2-core/types";
-import {quoteRejection, remotePinRefusal, validBlockNumber, validQuote, validRouteId} from "@anywalletkit/protocol-swap2-core/validate";
+import {gasEstimateCulprit, quoteRejection, remotePinRefusal, validBlockNumber, validQuote, validRouteId} from "@anywalletkit/protocol-swap2-core/validate";
 import {refusal, refusalInfo, refusalOf, type Swap2Refusal, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {bigintToNumber} from "@anywalletkit/core";
@@ -195,6 +195,9 @@ export class CrossChainRouter {
       ...(provider.honorsBlockNumber === true ? {honorsBlockNumber: true} : {}),
       ...(provider.callTargets ? {callTargets: provider.callTargets.bind(provider)} : {}),
       ...(provider.spenders ? {spenders: provider.spenders.bind(provider)} : {}),
+      // "An allowance to this spender must not outlive the swap" (KyberSwap's generic-build routers): dropped here, the
+      // engine would apply the app's allowanceReuse / revokeUnspentApproval to such a route.
+      ...(provider.exactAllowanceOnly ? {exactAllowanceOnly: provider.exactAllowanceOnly.bind(provider)} : {}),
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),
       ...(provider.supportsChain ? {supportsChain: provider.supportsChain.bind(provider)} : {}),
       ...(provider.supportsChainPair ? {supportsChainPair: provider.supportsChainPair.bind(provider)} : {}),
@@ -401,7 +404,11 @@ export class CrossChainRouter {
           }
           const rejected = quoteRejection(q, snapshot, p.name);
           if (rejected) {
-            const reason = `${p.name}: rejected by validation (minDest=${q?.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q?.validUntilMs}, now=${Date.now()})`;
+            // A gas estimate that breaks its contract is named when it alone is what failed.
+            const gas = gasEstimateCulprit(q, snapshot, p.name);
+            const reason = gas
+              ? `${p.name}: rejected by validation (${gas})`
+              : `${p.name}: rejected by validation (minDest=${q?.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q?.validUntilMs}, now=${Date.now()})`;
             reject(p.name, reason, rejected);
             console.warn(`swap2-router: ${reason}`);
             continue;

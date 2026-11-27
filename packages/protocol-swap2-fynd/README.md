@@ -54,6 +54,26 @@ On 2026-11-16 Propeller Heads paused every earlier router and redeployed TychoRo
 
 **Why `uniswap_v4_hooks` is excluded by default.** On 2026-10-24 every Ethereum route the hosted API built through Uniswap v4 hook pools was quoted about 0.6–1% above the market and reverted when simulated (4 of 4 native-input pairs, and USDT → USDC). The same pairs without those pools executed (8 of 8 across Ethereum, Base and Arbitrum). A route through an excluded family is refused even if the server returns one. The hosted API has neither its own simulation nor its price guard enabled, so these checks are the wallet's.
 
+## Gas: `gasEstimate` and `gasLimit`
+
+A quote states gas twice (see protocol-swap2-core, "Gas: `gasEstimate` vs `gasLimit`"):
+
+- **`txRequest.gasLimit`** is `gas_estimate × 1.3 + 80 000`, unchanged: the bound the swap is sent with and the figure the engine's native-gas check counts.
+- **`gasEstimate`** (`gasEstimateSource: "venue"`) is the gas the router call is expected to use, for comparing routes: Fynd's order-level `gas_estimate` plus `FYND_GAS_ESTIMATE_OVERHEAD`, which is **0**. No headroom and no approval (the router prices the approval itself). A quote whose order states no `gas_estimate` (or 0) carries none, rather than a made-up figure.
+
+**Why the overhead is 0.** Fynd's `gas_estimate` is not the sum of its pools' estimates: it already carries Fynd's own model of the router around them (2 300–439 701 above that sum in the recordings). Measured 2026-11-28: 20 live quotes (`fixtures/quotes`) on Ethereum, Base, Arbitrum, BNB Chain, Polygon, Unichain and Robinhood Chain, recorded for a throwaway sender = receiver that holds nothing, each transaction run with `eth_simulateV1` right after the quote, at the chain's gas price and with the module's gas limit (the sender funded by a state override, a token input approved exactly in the same simulated block; nothing sent):
+
+| | Gas used ÷ `gas_estimate` | Gas used − `gas_estimate` |
+|---|---|---|
+| 20 recordings | 0.71–1.54, median 0.99 | −152 010 … +73 820, median −2 633 |
+| of them, one pool (15) | | median +3 105 |
+| of them, several pools or a split (5) | | median −46 363 |
+| 19 more quotes, simulated from real holders of the input at a zero gas price (not kept) | 0.70–1.16, median 0.91 | −221 933 … +39 313, median −37 474 |
+
+So the router adds nothing measurable beyond Fynd's figure at the median. A split route tends to be over-estimated (by up to 152 000 here), a single-pool one is off either way (by up to +74 000 on an Ekubo USDT → USDC swap, +57 000 through `lunarbase` and PancakeSwap v3 on Base), and any constant would mis-state one side to help the other. The limit's headroom holds: no simulated swap used more than 82 % of its `gasLimit`. The receiver here held none of the output, so writing its first balance is in the figures (a receiver that already holds the token uses up to ~17 000 less); an exact approval spent to zero refunds 4 800, also in them. On Arbitrum the figures are L2 execution gas without the L1 data component (the router leaves the L1 data fee out too). `tests/gas-estimate.test.ts` recomputes the median from the recordings and holds the constant to it.
+
+Six of the 20 live answers (five of the six on Base, one of the two on BNB Chain) are refused as they are, as before: their fee breakdown (router fee + client fee + max slippage + minimum) came 3 to 3 250 000 000 001 base units short of `amount_out`, and a breakdown that does not add up is refused (`price_check_failed`). Their simulations still count above: the transaction is Fynd's either way.
+
 ## Configure
 
 ```ts

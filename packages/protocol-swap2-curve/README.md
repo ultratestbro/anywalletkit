@@ -81,6 +81,53 @@ transaction relay) where the app can. Other chains in the list have sequencers o
 **The ERC-4626 hop.** For crvUSD → scrvUSD the router's `get_dy` uses `convertToShares`, which can sit a hair above
 what `deposit` mints (2026-11-05: 2 × 10⁻⁸ on 1 000 crvUSD); the minimum covers it.
 
+## Gas estimate (`gasEstimate`)
+
+The quote still carries no gas limit (above). It does say what the `exchange` is expected to **use**, for ranking:
+protocol-swap2-core's `gasEstimate` with `gasEstimateSource: "model"` — gas used, not a limit, no approval (whoever
+prices the route adds that). `get_dy` measures no gas, so the figure comes from a measured table (`src/gas.ts`,
+exported as `CURVE_GAS_BASE` / `CURVE_STEP_GAS`, and `curveGasEstimateOfCall` for router arguments read back from a
+call): a base for the call — the intrinsic 21,000, the calldata, the router, the input's `transferFrom` and the payout
+— plus one cost per step. Nothing in execution reads it.
+
+| Step | Gas |
+|---|---|
+| base (every route) | 92,500 |
+| `t1/2` stable, 2 coins | 94,600 |
+| `t1/3` stable, 3 coins (3pool) | 104,700 |
+| `t1/4` stable, 4 coins | 99,600 |
+| `t1/4u` stable metapool, `exchange_underlying` over 4 coins | 239,000 |
+| `t2/2` twocrypto | 225,500 |
+| `t3/3` tricrypto | 252,600 |
+| `t10/2` stable-ng, 2 coins | 128,300 |
+| `t10/3u` stable-ng metapool, underlying over 3 coins | 182,000 |
+| `t20/2` twocrypto-ng | 178,500 |
+| `t30/3` tricrypto-ng | 143,000 |
+| `wrap` native ↔ wrapped native (swap_type 8) | 19,200 |
+| `4626` crvUSD ↔ scrvUSD (swap_type 9) | 50,300 |
+
+**How it was measured** (read-only, 2026-11-28; scripts and raw results kept outside the repo): every `exchange` sent
+straight to the pinned router in the last 250,000 blocks on Ethereum and over several days on Arbitrum, Base, OP
+Mainnet and Plasma, read from the router's `Exchange` logs; of those, the 763 along routes this module builds
+(`checkRoute` passes over the shipped allowlist), with their receipts' gasUsed (on Arbitrum less `gasUsedForL1`, the L1
+component); plus the module's own quotes on 24 pairs simulated with `eth_simulateV1` from a funded account
+(`[approve(router, exactly the input), exchange]`), each to a recipient holding none of the output and to one holding
+some (the midpoint counted: a first receipt of a token costs ~17,100 more). The table is a least-squares fit of those,
+Huber-weighted against outliers.
+
+**How far off** it is: on the 763 real transactions, median 4.1% of their gasUsed, 9 in 10 within 11.1%, the worst
+38.6% (bias +0.2%); per chain — Ethereum (612) median 4.1%, Arbitrum (88) 3.5%, Base (56) 1.1%, Plasma (5) 4.7%, OP
+(2) 13.0%. `fixtures/gas/receipts-2026-11-28.json` holds 76 of them (public calldata and gasUsed, sampled by route
+shape, one per sender), and `tests/gas-estimate.test.ts` holds the table to them: median 5.6%, 9 in 10 within 11.6%,
+worst 31.4%. What moves a real swap off the table is the pool's coins (stETH and USDT0 cost more to move than USDC,
+3pool's old code less than stable-ng's) and the recipient's balance.
+
+**Where it is set:** Ethereum, Arbitrum, Base, OP Mainnet and Plasma (`CURVE_GAS_CHAINS`), on routes whose every step
+has a cost above. Left out, never guessed: a route through a stable-ng pool of three coins swapped directly (`t10/3`:
+one pool each on Ethereum and Base, no transaction to measure); Monad (another gas schedule, and its receipts report
+the gas limit rather than the gas used); X Layer (two simulated quotes ran 6% and 27% above the table); Gnosis (no
+transaction and no quote to measure); every other chain.
+
 ## Behind `remoteProvider`
 
 When the provider runs on your server, spread its pins into the app's stub:

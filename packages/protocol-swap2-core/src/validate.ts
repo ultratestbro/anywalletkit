@@ -1,5 +1,32 @@
-import type {CrossChainProvider, Quote, QuoteParams} from "./types.js";
+import type {CrossChainProvider, GasEstimateSource, Quote, QuoteParams} from "./types.js";
 import type {Swap2RefusalReason} from "./errors.js";
+
+/** Every {@link GasEstimateSource}, in the order the type lists them. */
+export const GAS_ESTIMATE_SOURCES: readonly GasEstimateSource[] = Object.freeze(["venue", "simulated", "model"] as const);
+const GAS_ESTIMATE_SOURCE_SET: ReadonlySet<string> = new Set(GAS_ESTIMATE_SOURCES);
+/** Canonical gas units: "0", or at most 10 digits with no leading zero (below 10^10 gas — far above any block). */
+const GAS_ESTIMATE = /^(?:0|[1-9][0-9]{0,9})$/;
+
+/**
+ * Why a quote's `gasEstimate` / `gasEstimateSource` break their contract (see {@link Quote.gasEstimate}), or null
+ * when they hold — or are both absent. `sourceChain` is the request's (CAIP-2). {@link quoteRejection} refuses a quote
+ * this names as malformed; module tests can call it to say which rule a recording breaks.
+ */
+export function gasEstimateProblem(q: Pick<Quote, "gasEstimate" | "gasEstimateSource" | "gasless" | "txRequest">, sourceChain: string): string | null {
+  const estimate = q.gasEstimate as unknown;
+  const origin = q.gasEstimateSource as unknown;
+  if (estimate === undefined && origin === undefined) return null;
+  if (estimate === undefined) return "gasEstimateSource is set without gasEstimate";
+  if (typeof estimate !== "string" || !GAS_ESTIMATE.test(estimate)) return "gasEstimate is not canonical gas units (decimal digits, no leading zero, at most 10 digits)";
+  if (typeof origin !== "string" || !GAS_ESTIMATE_SOURCE_SET.has(origin)) return "gasEstimateSource is not one of venue / simulated / model";
+  if (typeof sourceChain !== "string" || !sourceChain.startsWith("eip155:")) return `gasEstimate is set for a non-EVM source chain (${String(sourceChain).slice(0, 64)})`;
+  const units = BigInt(estimate);
+  if (q.gasless === true && units !== 0n) return `a gasless quote carries gasEstimate ${estimate} (it must be "0")`;
+  if (q.gasless !== true && units === 0n) return "gasEstimate is 0 on a quote that is not gasless";
+  const limit = q.txRequest?.gasLimit;
+  if (limit !== undefined && /^[0-9]+$/.test(limit) && units > BigInt(limit)) return `gasEstimate ${estimate} is above txRequest.gasLimit ${limit}`;
+  return null;
+}
 
 /**
  * How far past the requested slippage a quote's minimum may sit and still count as "at" it. Providers derive the
@@ -37,6 +64,22 @@ export function blockTagOf(blockNumber: string): `0x${string}` {
   return `0x${BigInt(blockNumber).toString(16)}`;
 }
 
+/**
+ * The {@link gasEstimateProblem} that alone makes {@link quoteRejection} refuse `q`, or null (no such problem, or the
+ * quote fails for another reason too). Refusal texts name it.
+ */
+export function gasEstimateCulprit(q: Quote, params: QuoteParams, provider: string): string | null {
+  try {
+    if (!q || typeof q !== "object") return null;
+    const problem = gasEstimateProblem(q, params.sourceChain);
+    if (problem === null) return null;
+    const {gasEstimate: _estimate, gasEstimateSource: _source, ...rest} = q;
+    return quoteRejection(rest, params, provider) === null ? problem : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Shared quote validator used by both the aggregate and single-provider paths. */
 export function validQuote(q: Quote, params: QuoteParams, provider: string): boolean {
   return quoteRejection(q, params, provider) === null;
@@ -52,9 +95,10 @@ const BAD_REQUEST = Object.freeze({});
 /**
  * Why {@link validQuote} refuses a quote, or null when it passes (the same checks, in the same order): another
  * provider's or another input's quote (`policy_refused`) — one naming a block (`Quote.blockNumber`) the request did
- * not ask for too —, a malformed one (`upstream_unavailable`), a minimum under the floor or the slippage
- * (`price_check_failed`), an expired one (`quote_expired`). An empty object when the request itself is malformed
- * (a bad floor, slippage or `blockNumber`).
+ * not ask for too —, a malformed one (`upstream_unavailable`; a gas estimate that breaks its contract,
+ * {@link gasEstimateProblem}, is one), a minimum under the floor or the slippage (`price_check_failed`), an expired
+ * one (`quote_expired`). An empty object when the request itself is malformed (a bad floor, slippage or
+ * `blockNumber`).
  */
 export function quoteRejection(q: Quote, params: QuoteParams, provider: string): {readonly reason?: Swap2RefusalReason} | null {
   try {
@@ -102,6 +146,7 @@ export function quoteRejection(q: Quote, params: QuoteParams, provider: string):
       // riding along is never part of it.
       if (tx.permit2Transfer !== undefined && ((tx.value !== undefined && BigInt(tx.value) !== 0n) || (tx.nativeFee !== undefined && BigInt(tx.nativeFee) !== 0n))) return OTHER_QUOTE;
     }
+    if (gasEstimateProblem(q, params.sourceChain) !== null) return MALFORMED;
     // Execution is always re-quoted. An unknown/zero expiry cannot prove that
     // the transaction is still safe to sign, so contribution packages reject it.
     if (!Number.isFinite(q.validUntilMs)) return MALFORMED;

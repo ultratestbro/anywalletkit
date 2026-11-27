@@ -15,7 +15,7 @@ On npm: [@anywalletkit/protocol-swap2-core](https://www.npmjs.com/package/@anywa
 
 - **`BaseSwap2Protocol` / `SingleProviderSwap2`** — a `Swap2Protocol` (from `@anywalletkit/core`) over a provider. It quotes, binds the execution to the quote, runs approvals, sends, and resumes status by id (`getSwap2Status`, `claimSwap2` for two-phase routes).
 - **Safety checks.** Quote validation, a minimum-output floor, fee caps, a review gate before signing, and refusals that name their reason. Status ids look like `awk1.<provider>.<intent>[.<hash>]` (`SWAP2_ID_PREFIX`).
-- **Approvals when a swap does not go out.** An ERC-20 swap approves exactly the input, then sends. When the swap cannot go out as quoted after an approval this execution mined — the quote expired while it mined, or the dry run of the call (Permit2 calls and `ownGasEstimate` providers) reverts — the engine quotes once more on that allowance instead of revoking it: same provider, route, spender and amount, the caller's minimum, a second `reviewExecution` (`requoted: true`) when the plan changed, phase `requoting`. One re-quote per execution; when that pass fails too, the allowance is revoked. One exception to the revoke: an allowance to canonical Permit2 (`PERMIT2_ADDRESS`) that the swap spends only as a signature transfer (`PermitTransferFrom`, the 0x Settler) is left in place, because Permit2 moves nothing on it without a fresh signature per transfer; revoking it would cost a transaction and a prompt, and the next such swap an approval. Every other spender is revoked, and so would be a Permit2 allowance a route spends through Permit2's own allowances (`AllowanceTransfer` / `PermitSingle`; no shipped provider does). A Permit2 permit is signed after the approval is mined (with an allowance already in place, first). A `simulation_failed` dry run names the revert when the account's error carries its data: `(reverted: 0x97a6f3b9 TooMuchSlippage)`, the 4-byte selector and, for known errors, the name, never the arguments.
+- **Approvals when a swap does not go out.** An ERC-20 swap approves exactly the input, then sends. When the swap cannot go out as quoted after an approval this execution mined — the quote expired while it mined, or the dry run of the call (Permit2 calls and `ownGasEstimate` providers) reverts — the engine quotes once more on that allowance instead of revoking it: same provider, route, spender and amount, the caller's minimum, a second `reviewExecution` (`requoted: true`) when the plan changed, phase `requoting`. One re-quote per execution; when that pass fails too, the allowance is revoked. One exception to the revoke: an allowance to canonical Permit2 (`PERMIT2_ADDRESS`) that the swap spends only as a signature transfer (`PermitTransferFrom`, the 0x Settler) is left in place, because Permit2 moves nothing on it without a fresh signature per transfer; revoking it would cost a transaction and a prompt, and the next such swap an approval. Every other spender is revoked, and so would be a Permit2 allowance a route spends through Permit2's own allowances (`AllowanceTransfer` / `PermitSingle`; no shipped provider does). A Permit2 permit is signed after the approval is mined (with an allowance already in place, first). A `simulation_failed` dry run names the revert when the account's error carries its data: `(reverted: 0x97a6f3b9 TooMuchSlippage)`, the 4-byte selector and, for known errors, the name, never the arguments. Two options change what happens to an allowance — use one that already covers the input, leave an unspent one in place: see [Approvals](#approvals-allowancereuse-revokeunspentapproval).
 - **Native fee ceiling** — a route may charge native coin on top of the input (a bridge's messaging fee, which the quote declares). `swap2()` refuses a fee above the chain's cap: 0.005 ETH on Ethereum and on every chain without a row of its own (Arbitrum, Base, …), 100 CELO on Celo, 20 POL on Polygon, and so on ("swap2: quoted native fee … exceeds the cap … for …"). An app that wants a route above it sets `nativeFeeCeiling` on the engine config (any swap2 protocol, or the router): the engine asks it for every execution pass whose quote declares a native fee, before that pass's review and approvals (once, unless the quote expires during an approval and the engine re-quotes), with `{provider, intentId, fromChain, destChain, nativeFee, defaultCap, maxCeiling}`. A non-negative `bigint` is the cap for that execution (higher or lower than the chain's; `0n` refuses any fee), `undefined` keeps the chain's cap. A number, a string, `null`, a Promise, a throw, or a value above `maxCeiling` — `NATIVE_FEE_CEILING_MAX_MULTIPLE` (20) × the chain's cap: 0.1 ETH on Ethereum, 2000 CELO on Celo — refuse the execution (`Swap2ConfigurationError`), so a units slip or a "no limit" sentinel cannot switch the cap off. Match the routes you mean and return `undefined` for every other one. USDT0 Legacy Mesh into Tron, whose LayerZero fee was 0.005341 ETH from Ethereum / Arbitrum and 170.5 CELO from Celo on 2026-11-12 (sealed with the provider's 25 % headroom: 0.006676 ETH, 213.1 CELO; 7-day p90 0.006879 ETH, 221.7 CELO), above the default caps:
 
   ```ts
@@ -175,6 +175,135 @@ gives the JSON-RPC tag).
 A chain whose RPCs answer an `eth_call` at any block number from their head (HyperEVM, 2026-11-28)
 is listed by the module (`UNISWAP_LATEST_ONLY_CHAINS`, `CURVE_LATEST_ONLY_CHAINS`): there the quote
 is read at "latest" and names no block.
+
+## Approvals: `allowanceReuse`, `revokeUnspentApproval`
+
+An ERC-20 swap needs an allowance for the route's spender — always the quote's `approvalAddress`, and for a remote
+provider one of the app's pinned `spenders`. Two engine options decide what happens around it. Both go on the engine
+config (any swap2 protocol, the router) and, for one execution, on `swap2()`'s second argument, which wins:
+
+```ts
+const swaps = new RouterSwap2Protocol(account, {fromChain, providers, allowanceReuse: 'sufficient'})
+await swaps.swap2(options, {revokeUnspentApproval: false}) // this execution only
+```
+
+**`allowanceReuse`** — `"exact"` (default) or `"sufficient"`:
+
+| Allowance in place | `"exact"` (0.17.0) | `"sufficient"` |
+|---|---|---|
+| equal to the input | no approval | no approval; `reusedAllowance` reported |
+| above the input (500 000, swapping 100 000) | approve exactly the input (lowers it) | **no approval**: the swap spends exactly the input from it; `reusedAllowance` reported |
+| below the input, or zero | approve exactly the input (mainnet USDT: `approve(0)` first when it is not 0) | the same |
+| cannot be read (`getAllowance` throws, or the account has none) | approve exactly the input | **refused before the review, nothing sent**: `Swap2ExecutionError` (`upstream_unavailable`; try again) when the read failed, `Swap2ConfigurationError` when the account has no `getAllowance`. A Permit2 spender: approve exactly the input, as in `"exact"` |
+| after a failure, what this execution approved | revoked to 0 | put back to what it was before (0, or the smaller allowance) |
+| an allowance it did not touch | never revoked | never revoked |
+
+An allowance that cannot be read may well cover the input; approving the input would lower it and a failed swap
+would then zero it, so `"sufficient"` refuses instead (a Permit2 allowance is never revoked after a signature
+transfer, so Permit2 keeps the `"exact"` rule there). The spender is still the route's pinned `approvalAddress`, and
+calldata checks, dry runs, the native-gas check and the price checks run as before. Mainnet USDT is reset to 0 only
+when an approval is actually sent. A Permit2 allowance that covers the input was already left as it is in both modes;
+CoW orders keep their own allowance target (covering the account's other open orders) in both modes. When an
+allowance is reused, `reviewExecution` gets `plan.reusedAllowance = {token, spender, amount, chainId}` (`amount` = the
+allowance as it stands, so the app can say "using your approval for 500 000 FOLD") with `plan.approvals` empty, and the
+result carries the same `reusedAllowance`. In `"exact"` mode neither field is set.
+
+**What `"sufficient"` gives up.** Under `"exact"` the allowance equals the input, so the token contract itself caps
+what the swap's call can pull from the account at the input, whatever the calldata says — a backstop for a venue
+that builds a bad call, a module whose calldata check misses the input amount, or a compromised backend. With a
+reused larger allowance (500 000 FOLD for a 100 000 FOLD swap) that cap is the whole allowance, and that the call
+pulls only the input rests on the provider's own check of its calldata (the engine decodes token calls itself, not
+aggregator calldata; for a remote stub, the app's `verifyQuote` / `verifyBuild`). Fynd, KyberSwap and LI.FI bind the
+input amount in their checks; for any other provider, read its check before turning `"sufficient"` on. No pin, check
+or simulation is relaxed; this is the one backstop the mode trades for the approval transaction it saves.
+
+**Providers that keep the defaults.** A provider can declare that, on a chain, an allowance to its spender must not
+outlive the swap — `exactAllowanceOnly(chain)`, for a spender whose owner could spend an allowance left on it. Every
+execution through it on that chain then runs with `"exact"` and `true`, whatever the engine config or `swap2()`'s
+second argument say (a throw, or any answer but `false`, counts as yes; the router's snapshot and `remoteProvider`
+carry it, a stub's from the app's pins). KyberSwap declares it on its generic-build routers (an owner-managed
+`swapGeneric` executor whitelist: Ethereum, Base, BNB Smart Chain, Arbitrum, Optimism, Polygon, Avalanche, Linea).
+
+**`revokeUnspentApproval`** — `true` (default) or `false`. It concerns only an allowance this execution approved
+and did not spend: the quote expired while it mined and the one re-quote on it failed too, the second review
+(`requoted: true`) was cancelled, a preflight, a dry run or the source send failed cleanly, a signed order was refused.
+`true` revokes it as before. `false` leaves it in place — no revoke transaction — and the error the execution throws
+says so: `leftAllowanceOf(error)` (the error's `leftAllowance`) is `{token, spender, amount, chainId}`, and a message
+that used to say "the allowance … was revoked" says "was left in place". That error is a new one; the value that was
+thrown on the way is never modified (an app's `reviewExecution` may throw the same sentinel every time). An engine
+error (`Swap2Error` and its subclasses — `Swap2QuoteError`, `Swap2MaybeSentError`, …) comes back as a copy of the same
+class with the same message, reason, cause and fields, so `instanceof` and `refusalOf` read as before; anything else —
+the app's own error from `reviewExecution`, an account's or a venue's error, a string — comes back as a
+`Swap2ExecutionError` with the same text and refusal reason and the original as `cause` (`err.cause === CANCELLED`).
+The re-quote on a mined approval is unchanged. Not reported, because nothing was left: an approval refused before it
+was sent; a swap that spent it. A Permit2 allowance spent only by signature transfer stays in place in both modes, as
+before (with `false` it is reported). Two cases still revoke under `false`, because the allowance may be about to be
+spent rather than unspent: a typed order whose registration answer was lost (without an operation store) is revoked as
+before; a source transaction that may have been broadcast is never revoked in either mode (`Swap2MaybeSentError`).
+
+A successful `swap2()` has spent what it approved, so only the error path carries `leftAllowance`. Values other than
+the ones above (`null`, `"SUFFICIENT"`, `0`) are refused with `Swap2ConfigurationError` before anything is quoted.
+Without either option the engine makes exactly the calls 0.17.0 made (`tests/allowance-policy.test.ts` replays a
+scenario matrix against the published 0.17.0 build).
+
+## Gas: `gasEstimate` vs `gasLimit`
+
+A quote can say two different things about gas, and they are not interchangeable:
+
+- **`txRequest.gasLimit`** — the bound the source transaction is sent with (unchanged). Venues put headroom in it on
+  purpose (Fynd: `gas_estimate × 1.3 + 80 000`), because a limit below what the call needs reverts on-chain after
+  the gas is paid. The engine sends it, shows it in the review (`source.gasLimit`) and counts it in the native-gas
+  check before the first approval. `ownGasEstimate` providers (0x) replace it with the account's own estimate at
+  send time, as before.
+- **`gasEstimate`** (decimal string) with **`gasEstimateSource`** (`"venue"` | `"simulated"` | `"model"`) — the gas
+  the main source transaction is expected to *use*: no headroom of the module's own, no approval. It exists so routes
+  can be compared on what they cost. The router's `evmSourceGas` prices it instead of the limit when the app asks it
+  to (`useGasEstimate: true`, see the router's README). Nothing in execution reads it.
+
+The contract every module follows (`gasEstimateProblem(quote, sourceChain)` returns the rule a quote breaks, or
+`null`; `quoteRejection` refuses such a quote as malformed, `upstream_unavailable`, and a swap2 server refuses to
+seal it, so a client cannot rewrite a sealed estimate either):
+
+| Rule | |
+|---|---|
+| Format | canonical decimal gas units: `"0"`, or 1–10 digits without a leading zero |
+| Together | `gasEstimate` and `gasEstimateSource` are both set or both absent |
+| Chain | EVM source chains only (`eip155:*`) |
+| Gasless | a `gasless` quote (CoW, Omniston EVM orders) carries exactly `"0"`; every other quote a positive figure |
+| Bound | at most `txRequest.gasLimit` when the quote has one (equal is fine) |
+| Honesty | absent when the module has no defensible figure: never a default, never a guess |
+
+`gasEstimateSource` says where the number comes from: `"venue"` — a gas field of the venue's own quote response
+(KyberSwap `routeSummary.gas`, 0x `gas`, Fynd `gas_estimate`); `"simulated"` — a gas measurement of this quote's
+route or transaction (`eth_estimateGas`, `eth_simulateV1`, a quoter contract's `gasEstimate` such as Uniswap's
+QuoterV2 / V4Quoter); `"model"` — the module's table (pool type, hop count, a gasless route's structural zero), with
+the measurements behind it in the module's README. Each module's README says what its figure includes and how far it
+was off on real transactions.
+
+**A venue's figure is passed on as the venue states it, not rescaled**, and some venues' figures run above the gas
+used. Measured 2026-11-28 against the gas the same transactions used (`eth_simulateV1` or receipts, details in each
+README) — gas used ÷ `gasEstimate`, median:
+
+| Module | Source | Gas used ÷ estimate | Note |
+|---|---|---|---|
+| 0x | venue (`transaction.gas` / `gas`) | 0.74 (0.41–0.95, 11 quotes) | 0x documents it as the gas limit to send with |
+| KyberSwap | venue (`routeSummary.gas`) | 0.73 (0.58–1.85, 16 routes) | Kyber's own model; four proprietary-pool routes ran over |
+| LI.FI | venue (`gasCosts` `SEND` estimate) | ≈ 0.84 (estimate 12–26 % above, 13 quotes) | within −11 … +5 % of `eth_estimateGas` |
+| Fynd | venue (`gas_estimate`) | 0.99 (0.71–1.54, 20 quotes) | split routes over, some single pools under |
+| Uniswap | simulated (QuoterV2 / V4Quoter + overhead) | median error 4–5 % | |
+| Curve, Balancer | model | median error 4–5 % | Curve on 763 receipts |
+| CoW eth-flow | model | 1.00 (56 216–56 264, 11 measurements) | one fixed-work call |
+| Wrap | model | 1.00 for the dearer case it states | a wrap topping up a held balance uses 17 100 less, a full unwrap 4 788 less |
+
+So 0x and KyberSwap are charged about a third more gas than their calls burn when routes are ranked on these
+figures, against venues whose figure is close to the gas used — the comparison is fairer than on gas limits (Fynd's
+limit is its estimate × 1.3 + 80 000), not exact. A venue figure that is a gas limit by construction and is the only
+one the venue gives (Relay's deposit `gas` = `eth_estimateGas` × 1.3) is not passed on: those quotes carry none.
+
+On a chain that charges the whole gas limit instead of the gas used (Monad), what a transaction costs is the limit it
+goes out with. A module whose transaction is sent with its quoted limit carries no `gasEstimate` there (LI.FI, Curve,
+Wrap), so a router prices the limit; Uniswap's Monad table is measured against the account's own estimate, which is
+what its `ownGasEstimate` call is sent, and charged, with.
 
 Docs: [Swaps](https://docs.anywallet.tech/guides/swaps/)
 

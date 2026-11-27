@@ -7,9 +7,16 @@
 // with its own request, `eth_getBlockByNumber("latest", false)` alone, once per chain (and every 10 minutes), sent
 // after the deployment check. Everything else — every other request byte, the ids, the order — is compared as 0.4.11
 // sent it.
+//
+// The quote has one addition (0.6.0): `gasEstimate` / `gasEstimateSource` (protocol-swap2-core's expected gas used),
+// computed from the quoter figure 0.4.11 already read — no request more. The two fields are taken out of the quote
+// before it is compared with 0.4.11's and checked on their own (here against the core contract; the figures in
+// tests/gas-estimate-u6.test.ts); every other field of the quote is compared as 0.4.11 returned it.
 import {readFileSync} from "node:fs";
 import {describe, expect, it} from "vitest";
 import {refusalOf} from "@anywalletkit/protocol-swap2-core/errors";
+import {gasEstimateProblem} from "@anywalletkit/protocol-swap2-core/validate";
+import type {Quote} from "@anywalletkit/protocol-swap2-core/types";
 import {uniswapProvider} from "../src/provider.js";
 import {SCENARIOS, digest, run, type Recorded} from "./unset-scenarios.js";
 
@@ -43,7 +50,14 @@ describe("maxPriceImpactBps unset: 0.4.11, byte for byte", () => {
       for (const i of reads) expect(got.requests.slice(0, i).some((r) => /^(0x[0-9a-fA-F]{40}:0x(c45a0155|4aa4a4fc) ?){4}$/.test(digest(r)[2]))).toBe(true);
       expect(got.requests.filter((_, i) => !reads.includes(i)).map(digest)).toEqual(want.requests);
       expect(got.refusals).toEqual(want.refusals);
-      expect(got.quote).toEqual(want.quote);
+      const {gasEstimate, gasEstimateSource, ...quote} = (got.quote ?? {}) as Quote;
+      expect(got.quote === null ? null : quote).toEqual(want.quote);
+      if (got.quote !== null) {
+        expect(gasEstimateProblem(got.quote, s.params.sourceChain)).toBeNull();
+        // Exactly where 0.4.11 derived a gas limit from the quoter's figure (none from a figure of 0).
+        expect(gasEstimate === undefined).toBe(got.quote.txRequest?.gasLimit === undefined);
+        if (gasEstimate !== undefined) expect(gasEstimateSource).toBe("simulated");
+      }
       expect(got.preflight).toEqual(want.preflight);
     });
   }

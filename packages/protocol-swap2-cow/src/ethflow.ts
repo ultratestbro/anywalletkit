@@ -10,7 +10,7 @@
  */
 import {decodeFunctionData, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {bigintToNumber} from "@anywalletkit/core";
-import type {CowDeployment} from "./deployments.js";
+import {COW_ETH_FLOW, type CowDeployment} from "./deployments.js";
 import {orderDigest, orderUid, type CowOrder} from "./order.js";
 
 export const ETH_FLOW_ABI = parseAbi([
@@ -36,6 +36,29 @@ export const ETH_FLOW_INVALIDATED_OWNER = "0xfffffffffffffffffffffffffffffffffff
 export const ETH_FLOW_GPV2_VALID_TO = 0xffffffff;
 /** Gas for `createOrder` when it cannot be estimated (the transaction wraps, stores one slot and emits one event). */
 export const ETH_FLOW_CREATE_GAS = 150_000n;
+/**
+ * The gas a `createOrder` transaction uses — the eth-flow quote's `gasEstimate` (source "model"), not a limit. The call
+ * does the same work for every order (one new storage slot, one event; the calldata is fixed-size), so one figure
+ * holds: measured 2026-11-28, 56 216–56 264 over 11 measurements (the Base receipt of this module's own mainnet eth-flow
+ * order, 56 228; a public Arbitrum one, 56 264 of L2 gas plus 428 of L1 data; and `eth_simulateV1` of fresh orders of
+ * 0.0002, 0.1 and 5 ETH on Ethereum, Base and Arbitrum, 56 216–56 240). This is their median. The limit sent stays the
+ * account's own estimate (`ownGasEstimate`), else {@link ETH_FLOW_CREATE_GAS}.
+ */
+export const ETH_FLOW_CREATE_GAS_USED = 56_228n;
+/** The chains {@link ETH_FLOW_CREATE_GAS_USED} was measured on (Ethereum, Base, Arbitrum), with {@link COW_ETH_FLOW}. */
+export const ETH_FLOW_CREATE_GAS_MEASURED_CHAINS: ReadonlySet<number> = new Set([1, 8453, 42161]);
+
+/**
+ * An eth-flow quote's `gasEstimate` on deployment `d`: {@link ETH_FLOW_CREATE_GAS_USED} on a chain it was measured on
+ * and with the canonical eth-flow contract; undefined anywhere else — a chain added through `cowDeployments(extra)`, or
+ * a shipped chain given another eth-flow contract, has another contract or gas schedule nobody measured (Polygon's
+ * native transfers alone cost more), so no figure is guessed for it.
+ */
+export function ethFlowGasEstimate(d: Pick<CowDeployment, "chainId" | "ethFlow">): string | undefined {
+  return ETH_FLOW_CREATE_GAS_MEASURED_CHAINS.has(d.chainId) && d.ethFlow.toLowerCase() === COW_ETH_FLOW.toLowerCase()
+    ? ETH_FLOW_CREATE_GAS_USED.toString()
+    : undefined;
+}
 /** Gas for `invalidateOrder` (an unwrap and a native transfer). */
 export const ETH_FLOW_INVALIDATE_GAS = 120_000n;
 

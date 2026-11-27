@@ -178,6 +178,38 @@ function headers(key: string | undefined): Record<string, string> {
   return h;
 }
 
+/** Canonical positive gas units, as `Quote.gasEstimate` carries them (at most 10 digits, no leading zero). */
+const GAS_UNITS = /^[1-9][0-9]{0,9}$/;
+
+/**
+ * Source chains that charge a transaction its whole gas limit, not the gas it uses (Monad). A LI.FI transaction goes
+ * out with LI.FI's own `gasLimit` (the estimate plus LI.FI's headroom), so there the limit is what the user pays and an
+ * estimate below it would understate the cost: such quotes carry no `gasEstimate`, and a router prices the limit.
+ */
+export const LIFI_GAS_LIMIT_BILLED_CHAINS: ReadonlySet<string> = new Set(["eip155:143"]);
+
+/**
+ * The gas LI.FI expects its transaction to use: the `estimate` of the one `SEND` entry in the quote's
+ * `estimate.gasCosts` (LI.FI's `GasCost.estimate`, gas units; the same entry's `limit` is the transaction's gasLimit,
+ * the estimate plus LI.FI's headroom), taken only when the answer says LI.FI simulated the transaction for it
+ * (`stepSimulation: {status: "success", gasSource: "simulation"}`, on every recorded answer that has gas costs).
+ * Undefined — the quote then carries no `gasEstimate` — when the simulation is not reported as such, there is no
+ * single `SEND` entry, its estimate is not canonical positive gas units, or it is above `gasLimit` (the transaction's
+ * limit; a figure LI.FI's own limit would not cover is not this transaction's). An `APPROVE` entry is never counted:
+ * the approval is priced by whoever ranks the route.
+ */
+export function lifiGasEstimate(gasCosts: unknown, stepSimulation: unknown, gasLimit: string | undefined): string | undefined {
+  const sim = stepSimulation as {status?: unknown; gasSource?: unknown} | null | undefined;
+  if (sim === null || typeof sim !== "object" || sim.status !== "success" || sim.gasSource !== "simulation") return undefined;
+  if (!Array.isArray(gasCosts) || gasCosts.length > 16) return undefined;
+  const send = gasCosts.filter((g): g is {estimate?: unknown} => g !== null && typeof g === "object" && (g as {type?: unknown}).type === "SEND");
+  if (send.length !== 1) return undefined;
+  const estimate = send[0]!.estimate;
+  if (typeof estimate !== "string" || !GAS_UNITS.test(estimate)) return undefined;
+  if (gasLimit !== undefined && (!/^[0-9]{1,30}$/.test(gasLimit) || BigInt(estimate) > BigInt(gasLimit))) return undefined;
+  return estimate;
+}
+
 /** Explicit constructor configuration; no deployment environment is read. */
 export interface LifiProviderConfig {
   enabled?: boolean;
@@ -601,8 +633,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
             executionDuration?: number;
             approvalAddress?: string;
             feeCosts?: {amountUSD?: string}[];
-            gasCosts?: {amountUSD?: string}[];
+            gasCosts?: unknown;
           };
+          /** How LI.FI arrived at the gas costs ({status: "success", gasSource: "simulation"} when it simulated the transaction). */
+          stepSimulation?: unknown;
           transactionRequest?: {
             to?: string;
             data?: string;
@@ -732,6 +766,10 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
             ...(nativeFee > 0n ? {nativeFee: nativeFee.toString()} : {}),
           };
         }
+        // LI.FI's own figure for the gas its transaction uses (EVM sources only; a Solana transaction has none). Kept
+        // on a price-only quote too: it describes the route, bounded by the limit LI.FI built the transaction with. Not
+        // on a chain that bills the whole limit (LIFI_GAS_LIMIT_BILLED_CHAINS): there the limit is the cost.
+        const gasEstimate = solanaSource || LIFI_GAS_LIMIT_BILLED_CHAINS.has(params.sourceChain) ? undefined : lifiGasEstimate(est.gasCosts, q.stepSimulation, txRequest.gasLimit);
 
         // Route fees only (bridge / protocol / integrator). The source
         // transaction's gas is the network fee the wallet shows on its own line —
@@ -803,6 +841,7 @@ export function lifiProvider(config: LifiProviderConfig = {}): CrossChainProvide
           minDestAmount,
           ...(Number.isInteger(action.toToken?.decimals) && action.toToken!.decimals! >= 0 && action.toToken!.decimals! <= 36 ? {destDecimals: action.toToken!.decimals!} : {}),
           feeUsd,
+          ...(gasEstimate !== undefined ? {gasEstimate, gasEstimateSource: "venue" as const} : {}),
           etaSeconds: est.executionDuration ?? 120,
           reliability: 0.97,
           // LI.FI documents an approximately 60-second lifetime. Use a slightly

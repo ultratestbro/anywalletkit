@@ -5,6 +5,7 @@ export * from "./provider.js";
 export * from "./verify.js";
 export * from "./activity.js";
 export * from "./known.js";
+export {CURVE_GAS_BASE, CURVE_GAS_CHAINS, CURVE_STEP_GAS, curveGasEstimate, curveGasEstimateOfCall, curveStepKind} from "./gas.js";
 export {CURVE_POOLS} from "./pools/index.js";
 export type {CurveChainPools, CurvePool} from "./pools/types.js";
 export type {RpcCall} from "./rpc.js";

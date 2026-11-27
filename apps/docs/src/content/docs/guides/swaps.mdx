@@ -434,7 +434,10 @@ gas too (EVM sources): the venue's gas limit for a calldata route, a transfer fo
 route, nothing for a gasless one (a CoW order, an Omniston EVM → TON order), plus an ERC-20
 approval unless the sender's allowance already covers it, at the chain's gas price. On Ethereum
 at small amounts this moves the pick (a $50 USDC bridge: a plain deposit over approve + burn); on
-L2s gas is cents and rarely changes it.
+L2s gas is cents and rarely changes it. `evmSourceGas({prices, rpcUrl, useGasEstimate: true})`
+prices a quote's `gasEstimate` (the gas its transaction is expected to use) instead of the limit
+when the quote states one, so a venue is not charged for the headroom in its limit; venue figures
+are passed on as stated (protocol-swap2-core's README lists how far each runs from the gas used).
 
 ### Compare the on-chain venues at one block
 

@@ -4,7 +4,11 @@
  * user sends are compared on what the user actually gets.
  *
  * Gas units come from the quote, not from a dry run: a dry quote has no sender with balance or allowance to run it
- * from. A calldata route counts the venue's `txRequest.gasLimit` (capped), else {@link SOURCE_GAS_UNITS}.call; a
+ * from. With `useGasEstimate` (off by default: rankings stay as they were), a quote that says what its source
+ * transaction is expected to use (`gasEstimate`, see protocol-swap2-core) counts that — the gas used, not the limit with
+ * the venue's headroom (Fynd's limit is its estimate × 1.3 + 80 000), so routes compare on what they cost; at least
+ * {@link SOURCE_GAS_UNITS}.estimateFloor, at most `callCap`. Otherwise, or without one, a calldata route counts the
+ * venue's `txRequest.gasLimit` (capped), else {@link SOURCE_GAS_UNITS}.call; a
  * deposit-address route counts a plain transfer; a `gasless` quote counts no swap gas. An ERC-20 route that names a
  * spender (`txRequest.approvalAddress`, or a gasless order's `providerData.approvalAddress`) adds an approval, unless the sender is known and its allowance already covers the amount. The gas price is
  * the chain's `eth_gasPrice` (cached per chain). EVM sources only: on another source chain every route pays the same
@@ -13,6 +17,7 @@
 import {bigintToUnits} from "@anywalletkit/core";
 import {ccAssetByToken, ccChain} from "@anywalletkit/swap2-assets";
 import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import {anySignal, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import {priceOf} from "./value.js";
 
 /** Gas units the estimate falls back to, per kind of source transaction. */
@@ -25,8 +30,10 @@ export const SOURCE_GAS_UNITS = Object.freeze({
   call: 250_000n,
   /** An ERC-20 `approve` of the route's spender. */
   approve: 50_000n,
-  /** The most a quoted gas limit counts for: a venue cannot price a rival out by naming a huge limit for itself. */
+  /** The most a quoted gas limit (or gas estimate) counts for: a venue cannot price a rival out by naming a huge limit for itself. */
   callCap: 3_000_000n,
+  /** The least a quote's `gasEstimate` counts for: no EVM transaction uses less than its intrinsic 21 000. */
+  estimateFloor: 21_000n,
 });
 
 /** Where the estimate reads the chain: an RPC URL per CAIP-2 chain, or a JSON-RPC function. */
@@ -41,6 +48,18 @@ export interface SourceGasOptions {
   gasPriceTtlMs?: number;
   /** Per RPC call (default 2 s). */
   timeoutMs?: number;
+  /**
+   * Count a quote's `gasEstimate` (the gas its source transaction is expected to use) instead of its gas limit, when it
+   * has one. Off by default, so an app that does not set it ranks exactly as before. Venue figures are passed on as the
+   * venues state them: see protocol-swap2-core's README ("Gas") for how far each runs from the gas used.
+   */
+  useGasEstimate?: boolean;
+}
+
+/** {@link swapGasUnits}'s options. */
+export interface SwapGasUnitsOptions {
+  /** See {@link SourceGasOptions.useGasEstimate}; off by default. */
+  useGasEstimate?: boolean;
 }
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -60,9 +79,22 @@ export function sourceContract(params: Pick<QuoteParams, "sourceChain" | "source
   return asset.contract && ADDRESS.test(asset.contract) ? asset.contract : asset.contract ? undefined : "";
 }
 
-/** The gas units of a quote's source leg, without the approval (see {@link SOURCE_GAS_UNITS}). */
-export function swapGasUnits(quote: Pick<Quote, "txRequest" | "gasless">, params: Pick<QuoteParams, "sourceChain" | "sourceToken">): bigint {
+/** Canonical gas units, as `Quote.gasEstimate` carries them. */
+const GAS_UNITS = /^(?:0|[1-9][0-9]{0,9})$/;
+
+/**
+ * The gas units of a quote's source leg, without the approval (see {@link SOURCE_GAS_UNITS}): with `useGasEstimate`, its
+ * `gasEstimate` when it has a usable one (between `estimateFloor` and `callCap`); otherwise the figure from its gas limit
+ * or its kind of route, as before.
+ */
+export function swapGasUnits(quote: Pick<Quote, "txRequest" | "gasless" | "gasEstimate">, params: Pick<QuoteParams, "sourceChain" | "sourceToken">, options?: SwapGasUnitsOptions): bigint {
   if (quote.gasless === true) return 0n;
+  // The expected gas used, when asked for and the quote states it: a zero on a quote that is not gasless says nothing
+  // and is passed over.
+  const estimate = options?.useGasEstimate === true && typeof quote.gasEstimate === "string" && GAS_UNITS.test(quote.gasEstimate) ? BigInt(quote.gasEstimate) : 0n;
+  if (estimate > 0n) {
+    return estimate < SOURCE_GAS_UNITS.estimateFloor ? SOURCE_GAS_UNITS.estimateFloor : estimate < SOURCE_GAS_UNITS.callCap ? estimate : SOURCE_GAS_UNITS.callCap;
+  }
   const tx = quote.txRequest;
   if (tx?.data && tx.data !== "0x") {
     const quoted = tx.gasLimit !== undefined && /^\d{1,12}$/.test(tx.gasLimit) ? BigInt(tx.gasLimit) : 0n;
@@ -94,6 +126,7 @@ export function evmSourceGas(options: SourceGasOptions): (quote: Quote, params: 
   const ttl = options.gasPriceTtlMs ?? 15_000;
   const timeoutMs = options.timeoutMs ?? 2_000;
   const prices = options.prices;
+  const unitOptions: SwapGasUnitsOptions = {useGasEstimate: options.useGasEstimate === true};
   const gasPrices = new Map<string, {at: number; price: Promise<bigint | null>}>();
   let id = 0;
 
@@ -101,12 +134,13 @@ export function evmSourceGas(options: SourceGasOptions): (quote: Quote, params: 
     if (options.rpc) return options.rpc(chain, method, params);
     const url = options.rpcUrl?.(chain);
     if (!url) throw new Error(`no RPC for ${chain}`);
-    const timeout = AbortSignal.timeout(timeoutMs);
+    // Hermes has neither AbortSignal.timeout nor AbortSignal.any: core's helpers fall back to a timer.
+    const timeout = timeoutSignal(timeoutMs);
     const res = await fetch(url, {
       method: "POST",
       headers: {"content-type": "application/json"},
       body: JSON.stringify({jsonrpc: "2.0", id: ++id, method, params}),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      signal: signal ? anySignal([signal, timeout]) : timeout,
     });
     if (!res.ok) throw new Error(`RPC ${res.status}`);
     const body = (await res.json()) as {result?: unknown; error?: unknown};
@@ -129,7 +163,7 @@ export function evmSourceGas(options: SourceGasOptions): (quote: Quote, params: 
     const native = ccAssetByToken(params.sourceChain, "");
     const nativePrice = native ? priceOf(prices, native.symbol) : null;
     if (!native || nativePrice === null) return null;
-    let units = swapGasUnits(quote, params);
+    let gas = swapGasUnits(quote, params, unitOptions);
     const token = sourceContract(params);
     const spender = spenderOf(quote, token);
     if (spender) {
@@ -142,11 +176,11 @@ export function evmSourceGas(options: SourceGasOptions): (quote: Quote, params: 
           covered = allowance !== null && allowance >= BigInt(params.amountIn);
         } catch { /* unknown allowance: count the approval */ }
       }
-      if (!covered) units += SOURCE_GAS_UNITS.approve;
+      if (!covered) gas += SOURCE_GAS_UNITS.approve;
     }
-    if (units === 0n) return 0;
+    if (gas === 0n) return 0;
     const price = await gasPrice(params.sourceChain);
     if (price === null) return null;
-    return bigintToUnits(units * price, native.decimals) * nativePrice;
+    return bigintToUnits(gas * price, native.decimals) * nativePrice;
   };
 }

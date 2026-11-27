@@ -20,6 +20,7 @@ import {encodeV4Swap} from "./v4/encode.js";
 import {V4_DEFAULT_DEADLINE_SECONDS, uniswapV4ReasonOf, uniswapV4VerifyQuote, v4DeploymentProblem, v4DeploymentReads, v4HopTokens, v4PreflightCall, v4StorageOverride, v4StrandedRecipient, v4StrandedRecipientText, type UniswapV4Mode} from "./v4/verify.js";
 import {classifyV4Revert} from "./v4/errors.js";
 import type {V4PoolKey} from "./v4/pool.js";
+import {v3GasEstimate, v4GasEstimate} from "./gas-estimate.js";
 
 /**
  * Uniswap v3, straight from the contracts — the permissionless swap venue.
@@ -1423,6 +1424,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         }
         gasLimit = bounded.gasLimit;
       }
+      // Expected gas used (gas-estimate.ts): the V4Quoter's figure plus the measured router (and SwapProxy) overhead.
+      const gasEstimate = gasLimit !== undefined ? v4GasEstimate(chainId, gas, {nativeIn: enc.flow === "native-in", nativeOut: /^0x0{40}$/.test(currencyOut)}, gasLimit) : undefined;
       const v4Unexecutable = unexecutable();
       const sender = typeof params.sender === "string" && /^0x[0-9a-fA-F]{40}$/.test(params.sender) ? getAddress(params.sender) : undefined;
       const quote: Quote = {
@@ -1445,6 +1448,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         etaSeconds: 15,
         reliability: 0.98,
         validUntilMs: Date.now() + ttl,
+        ...(gasEstimate !== undefined ? {gasEstimate: gasEstimate.toString(), gasEstimateSource: "simulated" as const} : {}),
         providerData: {
           venue: "v4",
           route: route.label,
@@ -1655,6 +1659,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         }
         gasLimit = bounded.gasLimit;
       }
+      // The gas the swap is expected to use (gas-estimate.ts): the quoter's figure plus the measured overhead, only with
+      // a limit (no figure, no estimate) and on a measured chain.
+      const gasEstimate = gasLimit !== undefined ? v3GasEstimate(chainId, gas, {nativeIn, nativeOut, refund, pools: poolsOf(route)}, gasLimit) : undefined;
       const unexecutable = v4Unexecutable();
 
       return {quote: {
@@ -1677,6 +1684,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         etaSeconds: 15,
         reliability: 0.98,
         validUntilMs: Date.now() + ttl,
+        ...(gasEstimate !== undefined ? {gasEstimate: gasEstimate.toString(), gasEstimateSource: "simulated" as const} : {}),
         providerData: {
           route: route.label,
           poolFee: route.poolFee,

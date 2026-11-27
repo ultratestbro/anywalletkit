@@ -14,6 +14,7 @@ import {curveAutoSlippageBps, curveImpactBps} from "./slippage.js";
 import {curveIntentChain, mintCurveIntentId} from "./intent.js";
 import {curveOnChain, curveQuoteCheck} from "./verify.js";
 import {notes, tagged} from "./reasons.js";
+import {curveGasEstimate} from "./gas.js";
 
 /**
  * Curve, straight from the contracts — Router NG on every chain in `CURVE_DEPLOYMENTS`.
@@ -181,7 +182,9 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
         // 180 000: the vault's deposit), every Monad route 345–352k for one stable-ng pool (formula 300 000) — while a
         // limit with room for the dearest pool overcharges where the limit is what is paid (Monad). The wallet
         // estimates the exact call with headroom right before broadcast, after any approval (as for Uniswap without
-        // a quoter figure, THORChain and Chainflip).
+        // a quoter figure, THORChain and Chainflip). What the call is expected to use, for ranking routes, is the
+        // measured table of gas.ts (`gasEstimate`, a model; nothing in execution reads it).
+        const gasEstimate = curveGasEstimate(chainId, route.steps);
         const quote: Quote = {
           provider: "curve",
           // One id per quote: a remote stub keys the request a build is checked against by it.
@@ -202,6 +205,7 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
           etaSeconds: 15,
           reliability: 0.97,
           validUntilMs: Date.now() + ttl,
+          ...(gasEstimate !== undefined ? {gasEstimate: gasEstimate.toString(), gasEstimateSource: "model" as const} : {}),
           // Pool fees are inside the router-priced output; nothing is added on top.
           providerData: {
             route: route.label,

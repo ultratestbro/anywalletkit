@@ -97,6 +97,9 @@ export interface TxRequest {
   permit2Transfer?: string;
 }
 
+/** Where a quote's {@link Quote.gasEstimate} comes from (see there). */
+export type GasEstimateSource = "venue" | "simulated" | "model";
+
 /** A normalized quote from one provider. */
 export interface Quote {
   /** Provider name. */
@@ -128,6 +131,28 @@ export interface Quote {
    * (`sourceGasUsd`); nothing in execution reads it.
    */
   gasless?: boolean;
+  /**
+   * The gas the route's main source transaction is expected to USE — gas used, not a limit — in gas units, as a
+   * decimal string (EVM sources only). No execution headroom, and no approval: an ERC-20 approval is priced separately
+   * by whoever prices the route. `txRequest.gasLimit` stays what the transaction is sent with and what the native-gas
+   * check counts; this is the figure a router can compare routes on (`evmSourceGas({useGasEstimate: true})` in the
+   * router package). A venue's figure is passed on as the venue states it (README, "Gas": some run above the gas used).
+   *
+   * Rules, enforced by `quoteRejection` (a quote that breaks one is refused as malformed, `upstream_unavailable`, and a
+   * swap2 server refuses to seal it): canonical digits (`"0"` or no leading zero, at most 10 digits); set together with
+   * {@link gasEstimateSource}; an EVM source chain only; `"0"` exactly when the quote is `gasless`, positive otherwise;
+   * at most `txRequest.gasLimit` when the quote has one. Absent when the module has no defensible figure — never a
+   * guess.
+   */
+  gasEstimate?: string;
+  /**
+   * Where {@link gasEstimate} comes from: `"venue"` — the venue's API answered it for this quote (a gas field of the
+   * quote response); `"simulated"` — an `eth_estimateGas` / `eth_simulateV1` / gas-measuring `eth_call` of this quote's
+   * transaction or route (a quoter contract's own gas figure counts here); `"model"` — the module's table (pool type,
+   * hop count, a gasless route's structural zero), with the measurements behind it in the module's README. Present
+   * exactly when `gasEstimate` is.
+   */
+  gasEstimateSource?: GasEstimateSource;
   /** Estimated time to delivery, or null when no defensible estimate is available. */
   etaSeconds: number | null;
   /** Provider's reliability hint, 0 to 1. */
@@ -311,6 +336,8 @@ export interface RemotePins {
    * it a remote stub's deposit-address and plain-value routes are refused (scan 2026-10-28, F9).
    */
   depositAddressRoutes?: boolean;
+  /** The provider's {@link CrossChainProvider.exactAllowanceOnly}, carried to the stub (`kyberPins`). */
+  exactAllowanceOnly?(chain: string): boolean;
 }
 
 /**
@@ -424,6 +451,15 @@ export interface CrossChainProvider {
   callTargets?(chain: string): readonly string[];
   /** Remote stubs: the spenders this provider's EVM swaps may be approved for on `chain` (the app's list). */
   spenders?(chain: string): readonly string[];
+  /**
+   * True when, on `chain` (CAIP-2), an allowance to this provider's spender must not outlive the swap: a spender whose
+   * owner could spend an allowance left on it (KyberSwap's generic-build router, whose single owner key manages the
+   * `swapGeneric` executor whitelist). The engine then holds every execution through this provider on that chain to
+   * the defaults — the allowance set to exactly the input, revoked when the swap does not spend it — whatever
+   * `allowanceReuse` / `revokeUnspentApproval` say. A throw, or any answer but `false`, counts as true. Kept on the
+   * client: for a remote stub it comes from the app's pins, never the server; the router's snapshot carries it.
+   */
+  exactAllowanceOnly?(chain: string): boolean;
   close?(): void;
   /** Optional discovery hook for custom providers. */
   supportsChain?(caip2: string): boolean;
