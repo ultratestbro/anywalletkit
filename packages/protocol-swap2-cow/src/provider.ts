@@ -8,13 +8,13 @@ import {buildAppData, type CowAppData} from "./appdata.js";
 import {COW_NATIVE, cowDeployments, deploymentOf, type CowDeployment} from "./deployments.js";
 import {
   ETH_FLOW_CREATE_GAS,
-  ETH_FLOW_CREATE_GAS_USED,
   ETH_FLOW_INVALIDATE_GAS,
   ETH_FLOW_INVALIDATED_OWNER,
   decodeEthFlowCall,
   encodeCreateOrder,
   encodeInvalidateOrder,
   encodeOrdersRead,
+  ethFlowGasEstimate,
   ethFlowOrderId,
   packEthFlowData,
   unpackEthFlowData,
@@ -521,13 +521,14 @@ export function cowProvider(config: CowProviderConfig = {}): CrossChainProvider 
               data = {...data, buyAmount: next.toString()};
             }
           }
+          // The user's own createOrder transaction: the gas it uses, measured (ETH_FLOW_CREATE_GAS_USED) — only on the
+          // chains and the eth-flow contract it was measured on.
+          const gasEstimate = ethFlowGasEstimate(d);
           return {
             ...common(q, BigInt(data.buyAmount), "ethflow", {appData: plain.hash}),
             intentId: `e:${d.chainId}:${packEthFlowData(data)}`,
             txRequest: {to: d.ethFlow, data: encodeCreateOrder(data), value: params.amountIn, chainId: d.chainId, gasLimit: ETH_FLOW_CREATE_GAS.toString()},
-            // The user's own createOrder transaction: the gas it uses, measured (ETH_FLOW_CREATE_GAS_USED).
-            gasEstimate: ETH_FLOW_CREATE_GAS_USED.toString(),
-            gasEstimateSource: "model",
+            ...(gasEstimate !== undefined ? {gasEstimate, gasEstimateSource: "model" as const} : {}),
           };
         }
 

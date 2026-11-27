@@ -124,7 +124,8 @@ export interface Quote {
    * The gas the route's main source transaction is expected to USE — gas used, not a limit — in gas units, as a
    * decimal string (EVM sources only). No execution headroom, and no approval: an ERC-20 approval is priced separately
    * by whoever prices the route. `txRequest.gasLimit` stays what the transaction is sent with and what the native-gas
-   * check counts; this is the figure a router compares routes on (`evmSourceGas` in the router package).
+   * check counts; this is the figure a router can compare routes on (`evmSourceGas({useGasEstimate: true})` in the
+   * router package). A venue's figure is passed on as the venue states it (README, "Gas": some run above the gas used).
    *
    * Rules, enforced by `quoteRejection` (a quote that breaks one is refused as malformed, `upstream_unavailable`, and a
    * swap2 server refuses to seal it): canonical digits (`"0"` or no leading zero, at most 10 digits); set together with
@@ -318,6 +319,8 @@ export interface RemotePins {
    * it a remote stub's deposit-address and plain-value routes are refused (scan 2026-10-28, F9).
    */
   depositAddressRoutes?: boolean;
+  /** The provider's {@link CrossChainProvider.exactAllowanceOnly}, carried to the stub (`kyberPins`). */
+  exactAllowanceOnly?(chain: string): boolean;
 }
 
 /**
@@ -424,6 +427,15 @@ export interface CrossChainProvider {
   callTargets?(chain: string): readonly string[];
   /** Remote stubs: the spenders this provider's EVM swaps may be approved for on `chain` (the app's list). */
   spenders?(chain: string): readonly string[];
+  /**
+   * True when, on `chain` (CAIP-2), an allowance to this provider's spender must not outlive the swap: a spender whose
+   * owner could spend an allowance left on it (KyberSwap's generic-build router, whose single owner key manages the
+   * `swapGeneric` executor whitelist). The engine then holds every execution through this provider on that chain to
+   * the defaults — the allowance set to exactly the input, revoked when the swap does not spend it — whatever
+   * `allowanceReuse` / `revokeUnspentApproval` say. A throw, or any answer but `false`, counts as true. Kept on the
+   * client: for a remote stub it comes from the app's pins, never the server; the router's snapshot carries it.
+   */
+  exactAllowanceOnly?(chain: string): boolean;
   close?(): void;
   /** Optional discovery hook for custom providers. */
   supportsChain?(caip2: string): boolean;

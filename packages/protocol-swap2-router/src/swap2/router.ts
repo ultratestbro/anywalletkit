@@ -42,8 +42,8 @@ export interface Swap2Route {
   gasUsd: number | null;
   /**
    * The gas the route's source transaction is expected to use, as its quote states it (`Quote.gasEstimate`, gas
-   * units), and where the figure comes from; absent when the provider gave none. `evmSourceGas` prices this rather
-   * than the gas limit, so it is what `gasUsd` is made of.
+   * units), and where the figure comes from; absent when the provider gave none. `evmSourceGas({useGasEstimate: true})`
+   * prices this rather than the gas limit, and `gasUsd` is then made of it; by default the limit is priced.
    */
   gasEstimate?: string;
   gasEstimateSource?: GasEstimateSource;

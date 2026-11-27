@@ -192,6 +192,9 @@ export class CrossChainRouter {
       ...(provider.ownGasEstimate === true ? {ownGasEstimate: true} : {}),
       ...(provider.callTargets ? {callTargets: provider.callTargets.bind(provider)} : {}),
       ...(provider.spenders ? {spenders: provider.spenders.bind(provider)} : {}),
+      // "An allowance to this spender must not outlive the swap" (KyberSwap's generic-build routers): dropped here, the
+      // engine would apply the app's allowanceReuse / revokeUnspentApproval to such a route.
+      ...(provider.exactAllowanceOnly ? {exactAllowanceOnly: provider.exactAllowanceOnly.bind(provider)} : {}),
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),
       ...(provider.supportsChain ? {supportsChain: provider.supportsChain.bind(provider)} : {}),
       ...(provider.supportsChainPair ? {supportsChainPair: provider.supportsChainPair.bind(provider)} : {}),

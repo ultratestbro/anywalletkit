@@ -101,12 +101,14 @@ leaves out too.
 
 - `generic` (Ethereum, Base, BNB Smart Chain, Arbitrum, Optimism, Polygon, Avalanche, Linea): the router has
   `swapGeneric` and an owner-managed whitelist, so its owner (a single key on all but Linea) could make it spend an
-  allowance left on it. With the engine's defaults none is left: the approval is exact and spent by the swap itself,
-  and revoked if the swap does not go out. Two engine options change that (protocol-swap2-core, "Approvals"):
-  `revokeUnspentApproval: false` leaves an approval whose swap did not go out on the router, and
-  `allowanceReuse: "sufficient"` swaps from a larger allowance the account already gave the router, which then stays.
-  On these chains either one leaves an allowance the router's owner could spend; keep the defaults for KyberSwap there.
-- `lite` (every other chain): no `swapGeneric`, no whitelist.
+  allowance left on it. None is left: the approval is exact and spent by the swap itself, and revoked if the swap
+  does not go out. The engine's two approval options (protocol-swap2-core, "Approvals") would change that —
+  `revokeUnspentApproval: false` leaves an unspent approval in place, `allowanceReuse: "sufficient"` swaps from a
+  larger allowance the account already gave the router, which then stays — so the provider declares
+  `exactAllowanceOnly` for these chains (`kyberExactAllowanceOnly`, also in `kyberPins` for a remote stub): the
+  engine holds KyberSwap routes here to the defaults whatever the app set, the allowance exact and revoked when
+  unspent. A chain this module does not list counts as `generic` (fail closed).
+- `lite` (every other chain): no `swapGeneric`, no whitelist. The approval options apply there as on any provider.
 
 ## Limits
 

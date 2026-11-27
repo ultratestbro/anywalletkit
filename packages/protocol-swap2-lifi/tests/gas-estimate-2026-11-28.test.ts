@@ -13,7 +13,7 @@ import {remoteProvider} from "@anywalletkit/protocol-swap2-core/remote";
 import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
 import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import {gasEstimateProblem} from "@anywalletkit/protocol-swap2-core/validate";
-import {lifiGasEstimate, lifiPins, lifiProvider, lifiVerifyQuote, type LifiProviderConfig} from "../src/provider.js";
+import {LIFI_GAS_LIMIT_BILLED_CHAINS, lifiGasEstimate, lifiPins, lifiProvider, lifiVerifyQuote, type LifiProviderConfig} from "../src/provider.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -146,6 +146,34 @@ describe("LI.FI gasEstimate: the SEND gas cost's estimate, from LI.FI's simulati
     const {gasEstimate: _e, gasEstimateSource: _s, validUntilMs: _v1, ...rest} = plain.q!;
     const {validUntilMs: _v2, ...without} = tool.q!;
     expect(without).toEqual(rest);
+  });
+
+  it("on a chain that bills the whole gas limit (Monad) the quote carries no estimate: the limit LI.FI sends is the cost", async () => {
+    expect([...LIFI_GAS_LIMIT_BILLED_CHAINS]).toEqual(["eip155:143"]);
+    // A recorded native-source answer (base-eth>arb-eth, LayerSwap) moved to Monad — its own Diamond, MON in, the
+    // simulation report and gas costs as recorded. Constructed from a recording, not a recording.
+    const c = nov28.find((x) => x.name === "base-eth>arb-eth")!;
+    const MONAD_DIAMOND = "0x026F252016A7C47CDEf1F05a3Fc9E20C92a49C37";
+    const r = c.response as Answer & {action: {fromToken: object}; estimate: {approvalAddress?: string}; transactionRequest: Record<string, unknown>};
+    const monad = {
+      ...r,
+      action: {...r.action, fromChainId: 143, fromToken: {...r.action.fromToken, chainId: 143, symbol: "MON"}},
+      estimate: {...r.estimate, approvalAddress: MONAD_DIAMOND},
+      transactionRequest: {...r.transactionRequest, to: MONAD_DIAMOND, chainId: 143},
+    };
+    const params = {...c.params, sourceChain: "eip155:143", sourceToken: "MON"};
+    const base = await quote(c.response, c.params);
+    expect(base.q!.gasEstimate).toBe(send(c.response).estimate);
+    const {q, reasons} = await quote(monad, params);
+    expect(reasons).toEqual([]);
+    expect(q).not.toBeNull();
+    expect(q!.txRequest!.gasLimit).toBe(BigInt(send(c.response).limit).toString());
+    expect(q!.gasEstimate).toBeUndefined();
+    expect(q!.gasEstimateSource).toBeUndefined();
+    // Nothing else of the quote changes there.
+    const {gasEstimate: _e, gasEstimateSource: _s, validUntilMs: _v, intentId: _i, txRequest: _t, ...rest} = base.q!;
+    const {validUntilMs: _v2, intentId: _i2, txRequest: _t2, ...onMonad} = q!;
+    expect(Object.keys(onMonad).sort()).toEqual(Object.keys(rest).sort());
   });
 
   it("a swap2 server seals the figure and the remote stub (lifiPins) receives it unchanged", async () => {

@@ -108,7 +108,7 @@ import {
   decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
 } from '@anywalletkit/protocol-lending-kamino-solana'
 import { unexpectedInstruction } from '@anywalletkit/wallet-solana'
-import { assertGpv2Order, redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS, appendPermit2Signature, permit2TransferJson, readPermit2Transfer } from '@anywalletkit/protocol-swap2-core'
+import { assertGpv2Order, redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS, appendPermit2Signature, permit2TransferJson, readPermit2Transfer, Swap2ExecutionError, Swap2ValidationError, leftAllowanceOf } from '@anywalletkit/protocol-swap2-core'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -984,6 +984,57 @@ export async function smokeProtocols(check: Check): Promise<void> {
       && tooHigh === 'Swap2ConfigurationError: swap2: nativeFeeCeiling returned 100000000000000001 for usdt0 eip155:1 → tron:728126428, above the hard maximum 100000000000000000 (20 × the default cap 5000000000000000) — the native fee is refused',
       `${garbage} | ${thrown} | ${tooHigh}`)
     check('swap2: nativeFeeCeiling runs — nothing signed in any of them', sent === 0, String(sent))
+  }
+  {
+    // The approval policy (2026-11-28) on Hermes: revokeUnspentApproval false leaves the allowance and reports it on a
+    // NEW error — an engine error copied with its class (Reflect.construct over Error, own fields copied), anything else
+    // wrapped with the original as cause, the thrown value never modified; allowanceReuse "sufficient" spends a covering
+    // allowance as it stands and refuses an unreadable one before anything is sent.
+    const ROUTER = '0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE'
+    const USDT = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+    const tx = { to: ROUTER, data: '0xdeadbeef', value: '0', chainId: 1, gasLimit: '210000', approvalAddress: ROUTER }
+    const sends: string[] = []
+    const venue = (preflight?: unknown) => ({
+      name: 'scn', enabled: () => true, supportsRoute: () => true, supportsSameChain: true,
+      getQuote: async (params: { amountIn: string }) => ({
+        provider: 'scn', intentId: 'scn-1', depositAddress: '', depositMemo: null, txRequest: tx,
+        sourceAmount: params.amountIn, destAmount: '294500000', minDestAmount: '294500000', feeUsd: 0, etaSeconds: 30, reliability: 1, validUntilMs: Date.now() + 60_000,
+      }),
+      buildDeposit: async () => ({ chain: 'eip155:1', ...tx }),
+      ...(preflight !== undefined ? { preflightDeposit: async () => { throw preflight } } : {}),
+      trackIntent: async () => ({ state: 'pending' as const }),
+    })
+    const attempt = async (config: Record<string, unknown>, allowance: bigint | 'throws', preflight?: unknown): Promise<{ result?: { reusedAllowance?: { amount: bigint } }; error?: unknown }> => {
+      sends.length = 0
+      const account = {
+        getAddress: async () => '0x5555555555555555555555555555555555555555', getChainId: async () => 1, waitForTransaction: async () => {},
+        getAllowance: async () => { if (allowance === 'throws') throw new Error('rpc down'); return allowance },
+        sendTransaction: async (t: { data?: string }) => { sends.push(t.data?.startsWith('0x095ea7b3') ? (t.data.endsWith('0'.repeat(64)) ? 'revoke' : 'approve') : 'send'); return { hash: `0x${String(sends.length).padStart(64, '0')}` } },
+      }
+      const p = new RouterSwap2Protocol(account as never, { fromChain: 'eip155:1', providers: [venue(preflight) as never], ...config })
+      try {
+        return { result: await p.swap2({ fromToken: 'USDC', toToken: USDT, toChain: 1, fromTokenAmount: 294_700_000n, minAmountOut: 294_000_000n }) as never }
+      } catch (error) { return { error } }
+    }
+    const HALTED = Object.freeze(new Swap2ValidationError('swap2: halted by the venue', { reason: 'chain_halted' }))
+    const halted = await attempt({ revokeUnspentApproval: false }, 0n, HALTED)
+    const copy = halted.error as Swap2ValidationError
+    check('swap2: revokeUnspentApproval false — an engine error comes back as a copy of its class with leftAllowance, the frozen original untouched',
+      sends.join(',') === 'approve' && copy !== HALTED && copy instanceof Swap2ValidationError && copy instanceof Error && copy.message === HALTED.message && copy.code === 'VALIDATION'
+      && refusalOf(copy)?.reason === 'chain_halted' && leftAllowanceOf(copy)?.amount === 294_700_000n && leftAllowanceOf(HALTED) === undefined && typeof copy.stack === 'string',
+      `${sends.join(',')} ${copy instanceof Error ? `${copy.name}: ${copy.message}` : String(copy)}`)
+    const CANCELLED = new Error('user cancelled')
+    const cancelled = await attempt({ revokeUnspentApproval: false }, 0n, CANCELLED)
+    const wrapped = cancelled.error as Swap2ExecutionError & { cause?: unknown }
+    check('swap2: revokeUnspentApproval false — an app\'s sentinel is the cause of a new Swap2ExecutionError, never modified',
+      wrapped instanceof Swap2ExecutionError && wrapped.cause === CANCELLED && wrapped.message === 'user cancelled' && leftAllowanceOf(wrapped)?.spender === ROUTER
+      && !Object.prototype.hasOwnProperty.call(CANCELLED, 'leftAllowance'), wrapped instanceof Error ? `${wrapped.name}: ${wrapped.message}` : String(wrapped))
+    const reused = await attempt({ allowanceReuse: 'sufficient' }, 500_000_000_000n)
+    check('swap2: allowanceReuse sufficient — a covering allowance is spent as it stands (no approval), reusedAllowance reported',
+      sends.join(',') === 'send' && reused.result?.reusedAllowance?.amount === 500_000_000_000n, `${sends.join(',')} ${String(reused.error ?? '')}`)
+    const unread = await attempt({ allowanceReuse: 'sufficient' }, 'throws', HALTED)
+    check('swap2: allowanceReuse sufficient — an unreadable allowance is refused before anything is sent (upstream_unavailable)',
+      sends.length === 0 && unread.error instanceof Swap2ExecutionError && refusalOf(unread.error)?.reason === 'upstream_unavailable', `${sends.join(',')} ${String(unread.error)}`)
   }
   check('approvals: isRevokeCalldata', isRevokeCalldata('0x095ea7b3' + '0'.repeat(24) + 'beef'.padStart(40, '0') + '0'.repeat(64)) === true)
   check('approvals: isUnlimitedAmount', isUnlimitedAmount((1n << 256n) - 1n) === true && isUnlimitedAmount(5n) === false)

@@ -10,7 +10,7 @@
  */
 import {decodeFunctionData, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {bigintToNumber} from "@anywalletkit/core";
-import type {CowDeployment} from "./deployments.js";
+import {COW_ETH_FLOW, type CowDeployment} from "./deployments.js";
 import {orderDigest, orderUid, type CowOrder} from "./order.js";
 
 export const ETH_FLOW_ABI = parseAbi([
@@ -45,6 +45,20 @@ export const ETH_FLOW_CREATE_GAS = 150_000n;
  * account's own estimate (`ownGasEstimate`), else {@link ETH_FLOW_CREATE_GAS}.
  */
 export const ETH_FLOW_CREATE_GAS_USED = 56_228n;
+/** The chains {@link ETH_FLOW_CREATE_GAS_USED} was measured on (Ethereum, Base, Arbitrum), with {@link COW_ETH_FLOW}. */
+export const ETH_FLOW_CREATE_GAS_MEASURED_CHAINS: ReadonlySet<number> = new Set([1, 8453, 42161]);
+
+/**
+ * An eth-flow quote's `gasEstimate` on deployment `d`: {@link ETH_FLOW_CREATE_GAS_USED} on a chain it was measured on
+ * and with the canonical eth-flow contract; undefined anywhere else — a chain added through `cowDeployments(extra)`, or
+ * a shipped chain given another eth-flow contract, has another contract or gas schedule nobody measured (Polygon's
+ * native transfers alone cost more), so no figure is guessed for it.
+ */
+export function ethFlowGasEstimate(d: Pick<CowDeployment, "chainId" | "ethFlow">): string | undefined {
+  return ETH_FLOW_CREATE_GAS_MEASURED_CHAINS.has(d.chainId) && d.ethFlow.toLowerCase() === COW_ETH_FLOW.toLowerCase()
+    ? ETH_FLOW_CREATE_GAS_USED.toString()
+    : undefined;
+}
 /** Gas for `invalidateOrder` (an unwrap and a native transfer). */
 export const ETH_FLOW_INVALIDATE_GAS = 120_000n;
 

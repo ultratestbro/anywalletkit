@@ -106,7 +106,9 @@ documented source, `"tool"`, is a per-tool table, and then the quote carries no 
 transaction's gas limit. `txRequest.gasLimit` is unchanged: LI.FI's `limit` for the same entry, which is the estimate
 × 1.3 on Ethereum, Avalanche, Linea and Unichain, × 1.5 on BSC and Polygon, plus a fixed allowance on Base, OP and
 Arbitrum (up to 15× the estimate on Arbitrum). A dry quote priced for a placeholder keeps the estimate of its route.
-Solana sources and answers without gas costs carry none (`lifiGasEstimate` is the rule).
+Solana sources and answers without gas costs carry none (`lifiGasEstimate` is the rule), and neither do Monad sources
+(`LIFI_GAS_LIMIT_BILLED_CHAINS`): Monad charges a transaction its whole gas limit, and a LI.FI transaction goes out with
+LI.FI's limit, so there the limit is what the user pays and the estimate would understate it.
 
 How far it is from the gas the transaction uses — 13 live quotes of 2026-11-28 (`tests/fixtures-live-2026-11-28-gas.json`:
 Across, LayerSwap, NEAR Intents, Polymer CCTP, SushiSwap and Fly, from Ethereum, Base, OP, Arbitrum, BSC and Polygon),

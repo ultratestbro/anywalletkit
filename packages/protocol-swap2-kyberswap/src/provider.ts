@@ -5,7 +5,7 @@ import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuotePar
 import {ccAssetByToken} from "@anywalletkit/swap2-assets";
 import {WRAPPED_NATIVE} from "@anywalletkit/protocol-swap2-wrap/provider";
 import {describeKyberActivity} from "./activity.js";
-import {KYBER_NATIVE, KYBER_ROUTER_ABI, KYBER_ROUTER_V2, KYBER_ROUTER_V3, checkKyberTransaction, kyberApiSlippage, kyberChain, kyberMinimum, kyberNativeSwaps} from "./router.js";
+import {KYBER_NATIVE, KYBER_ROUTER_ABI, KYBER_ROUTER_V2, KYBER_ROUTER_V3, checkKyberTransaction, kyberApiSlippage, kyberChain, kyberExactAllowanceOnly, kyberMinimum, kyberNativeSwaps} from "./router.js";
 
 /**
  * KyberSwap Aggregator (docs.kyberswap.com) as a same-chain swap2 provider: exact-input swaps on the chains in
@@ -316,6 +316,8 @@ export function kyberswapProvider(config: KyberswapProviderConfig = {}): CrossCh
     supportsSameChain: true,
     // The account's own estimate of the exact call, never the API's gas model.
     ownGasEstimate: true,
+    // On a generic-build router (an owner-managed swapGeneric whitelist) no allowance may outlive the swap.
+    exactAllowanceOnly: kyberExactAllowanceOnly,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,
     supportsChainPair: (from: string, to: string) => from === to && chainIdOf(from) !== null,

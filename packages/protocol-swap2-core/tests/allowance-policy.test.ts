@@ -6,7 +6,7 @@
 // through `runScenario` with the `SingleProviderSwap2` of that build (`dist/swap2/single.js` of the npm tarball, its
 // `@anywalletkit/*` and `viem` imports resolved to this workspace) and record `{sha256, calls}`.
 import {describe, expect, it, vi} from "vitest";
-import {Swap2ConfigurationError, Swap2MaybeSentError, Swap2QuoteError} from "../src/errors.js";
+import {Swap2ConfigurationError, Swap2Error, Swap2ExecutionError, Swap2MaybeSentError, Swap2QuoteError, Swap2ValidationError, refusal, refusalOf} from "../src/errors.js";
 import {leftAllowanceOf, type Swap2ExecutionPlan} from "../src/swap2/base.js";
 import {SingleProviderSwap2} from "../src/swap2/single.js";
 import * as index from "../src/index.js";
@@ -142,12 +142,43 @@ describe("allowanceReuse: \"sufficient\"", () => {
     expect(effects(await run(scenario("usdc smaller allowance, preflight fails: revoked to 0"), SUFFICIENT))).toEqual(["approve router 1000000", "approve router 400000"]);
   });
 
-  it("a zero allowance, or one that cannot be read: exactly as \"exact\"", async () => {
-    for (const name of ["usdc zero allowance: approve, deposit", "usdc zero allowance, preflight fails: revoked", "usdc allowance read fails: approve, deposit", "usdc no allowance reader: approve, deposit", "usdt no reader: reset, approve", "usdt zero allowance: one approve"]) {
+  it("a zero allowance: exactly as \"exact\"", async () => {
+    for (const name of ["usdc zero allowance: approve, deposit", "usdc zero allowance, preflight fails: revoked", "usdt zero allowance: one approve"]) {
       const exact = await run(name);
       const sufficient = await run(name, SUFFICIENT);
       expect(sufficient.sha256, name).toBe(exact.sha256);
     }
+  });
+
+  it("an allowance that cannot be read is refused before the review: nothing approved, lowered or revoked", async () => {
+    // The read fails (a transient 429): it may well cover the input, so approving the input could lower it and a
+    // failed swap would zero it. Refused, retryable, nothing reviewed or sent.
+    for (const name of ["usdc allowance read fails: approve, deposit"]) {
+      const r = await run(name, SUFFICIENT);
+      expect(r.error, name).toBeInstanceOf(Swap2ExecutionError);
+      expect(refusalOf(r.error), name).toEqual({reason: "upstream_unavailable"});
+      expect((r.error as Error).message, name).toMatch(/allowanceReuse "sufficient" could not read the USDC allowance for 0x1231DEB6f5749EF6cE6943a275A1D3E7486F4EaE — refused, nothing was sent/);
+      expect((r.error as Error & {cause?: unknown}).cause, name).toMatchObject({message: "rpc down"});
+      expect(calls(r).filter((c) => c.startsWith("review") || c.startsWith("estimate")), name).toEqual([]);
+      expect(effects(r), name).toEqual([]);
+      expect(leftAllowanceOf(r.error), name).toBeUndefined();
+    }
+    // The reviewer's case: 500 000 approved, a 429 on the read, the preflight would fail — no approve(input), no revoke.
+    const user = await run({name: "read 429", provider: {kind: "call", preflight: () => new Error("halted")}, account: {allowance: "throws"}}, {engine: {allowanceReuse: "sufficient", revokeUnspentApproval: true}});
+    expect(effects(user)).toEqual([]);
+    // An account without getAllowance can never tell: a configuration error, every time.
+    for (const name of ["usdc no allowance reader: approve, deposit", "usdt no reader: reset, approve"]) {
+      const r = await run(name, SUFFICIENT);
+      expect(r.error, name).toBeInstanceOf(Swap2ConfigurationError);
+      expect((r.error as Error).message, name).toBe('swap2: allowanceReuse "sufficient" needs an account that reads allowances (getAllowance) — refused, nothing was sent');
+      expect(effects(r), name).toEqual([]);
+    }
+    // The per-execution "exact" still approves as 0.17.0 did.
+    const exact = await run("usdc allowance read fails: approve, deposit", {engine: {allowanceReuse: "sufficient"}, execution: {allowanceReuse: "exact"}});
+    expect(exact.sha256).toBe(GOLDEN_0_17_0["usdc allowance read fails: approve, deposit"]!.sha256);
+    // Permit2 keeps the "exact" rule for an unread allowance (it is never revoked after a signature transfer).
+    const permit2 = {name: "permit2 unread", provider: {kind: "permit2"}, account: {allowance: "throws", gas: true}} satisfies Scenario;
+    expect(calls(await run(permit2, SUFFICIENT))).toEqual(calls(await run(permit2)));
   });
 
   it("mainnet USDT: an allowance that covers the input is used without the reset; the reset only rides with an approval that is sent", async () => {
@@ -162,10 +193,40 @@ describe("allowanceReuse: \"sufficient\"", () => {
   });
 
   it("the spender is still the route's own: an allowance to another spender is not one this swap can use", async () => {
-    // The allowance is read for the quoted approvalAddress only; a covering allowance elsewhere changes nothing.
-    const r = await run({name: "other spender", provider: {kind: "call", tx: () => ({approvalAddress: ROUTER})}, account: {allowance: 0n}}, SUFFICIENT);
-    expect(calls(r)).toContain("allowance router");
+    // The account holds a covering allowance for OTHER only, none for the route's spender (ROUTER): the read is for
+    // the route's spender, and the swap approves it as usual.
+    const elsewhere = (spender: string) => (spender === "other" ? LARGER : 0n);
+    const r = await run({name: "other spender", provider: {kind: "call"}, account: {allowance: elsewhere, gas: true}}, SUFFICIENT);
+    expect(calls(r).filter((c) => c.startsWith("allowance"))).toEqual(["allowance router"]);
     expect(effects(r)).toEqual(["approve router 1000000", "send router 0xdeadbeef"]);
+    expect(plans(r)[0]!.reusedAllowance).toBeUndefined();
+    // The same allowance, read for the route's spender, is reused: the read decides, by spender.
+    const there = await run({name: "route spender", provider: {kind: "call"}, account: {allowance: (spender) => (spender === "router" ? LARGER : 0n), gas: true}}, SUFFICIENT);
+    expect(effects(there)).toEqual(["send router 0xdeadbeef"]);
+  });
+
+  it("a remote stub's unpinned spender is refused before any allowance is read, even with a covering allowance there", async () => {
+    // Remote stub pinning ROUTER (spender and call target). The covering allowance is on OTHER, the spender the
+    // backend names: policy_refused, no allowance read, nothing sent — in the quote, and in the build.
+    const covering = () => LARGER;
+    const pinned = {spenders: [ROUTER], callTargets: [ROUTER]};
+    for (const [label, spec] of [
+      ["the quote names it", {kind: "call", remote: pinned, tx: () => ({approvalAddress: OTHER})}],
+      ["only the build names it", {kind: "call", remote: pinned, build: () => ({approvalAddress: OTHER})}],
+    ] satisfies [string, Scenario["provider"]][]) {
+      for (const cfg of [SUFFICIENT, {engine: {allowanceReuse: "sufficient", revokeUnspentApproval: false}}, {}] satisfies RunConfig[]) {
+        const r = await run({name: `remote ${label}`, provider: spec, account: {allowance: covering, gas: true}}, cfg);
+        expect(r.error, label).toBeDefined();
+        expect(refusalOf(r.error)?.reason, label).toBe("policy_refused");
+        expect(calls(r).filter((c) => /^(allowance|review|estimate|balance)/.test(c)), label).toEqual([]);
+        expect(effects(r), label).toEqual([]);
+        expect(leftAllowanceOf(r.error), label).toBeUndefined();
+      }
+    }
+    // The pinned spender with the covering allowance is reused as usual.
+    const ok = await run({name: "remote pinned", provider: {kind: "call", remote: pinned}, account: {allowance: covering, gas: true}}, SUFFICIENT);
+    expect(effects(ok)).toEqual(["send router 0xdeadbeef"]);
+    expect(plans(ok)[0]!.reusedAllowance).toMatchObject({spender: ROUTER, amount: `${LARGER}n`});
   });
 
   it("Permit2 signature transfers: the same calls as \"exact\"; a covering allowance is reported", async () => {
@@ -215,7 +276,11 @@ describe("revokeUnspentApproval: false", () => {
   it("the second review is cancelled after the approval mined: no revoke, leftAllowance", async () => {
     const r = await run("re-quote reviewed again and cancelled: revoked", KEEP);
     expect(effects(r)).toEqual(["approve router 1000000"]);
+    // The review's own error is the cause of a new Swap2ExecutionError with the same text; it is not modified.
     expect((r.error as Error).message).toBe("user cancelled");
+    expect(r.error).toBeInstanceOf(Swap2ExecutionError);
+    expect((r.error as {cause?: unknown}).cause).toBeInstanceOf(Error);
+    expect(leftAllowanceOf((r.error as {cause?: unknown}).cause)).toBeUndefined();
     expect(leftAllowanceOf(r.error)).toEqual(LEFT);
   });
 
@@ -300,6 +365,119 @@ describe("revokeUnspentApproval: false", () => {
     expect(ok.result!.leftAllowance).toBeUndefined();
     expect(effects(await run("usdc zero allowance, preflight fails: revoked", {engine: {revokeUnspentApproval: false}, execution: {revokeUnspentApproval: true}}))).toEqual(["approve router 1000000", "revoke router"]);
     expect(effects(await run("usdc zero allowance, preflight fails: revoked", {execution: {revokeUnspentApproval: false}}))).toEqual(["approve router 1000000"]);
+  });
+});
+
+describe("leftAllowance never modifies the thrown value", () => {
+  const LEFT = {token: USDC_ETH, spender: ROUTER, amount: AMOUNT, chainId: 1};
+  /** A re-quoted execution whose second review throws `thrown` (the first passes); the approval mined in between. */
+  const secondReview = (thrown: unknown): Scenario => ({
+    name: "second review throws", provider: {kind: "call", ttlMs: (n) => (n === 1 ? 40 : 60_000), tx: (n) => (n === 2 ? {data: "0xbadc0de5"} : {})},
+    account: {allowance: 0n, mineMs: 100}, review: (n) => (n === 2 ? thrown as Error : undefined),
+  });
+
+  it("an app's module-level sentinel: untouched, never reported for a later swap, and the cause of what is thrown", async () => {
+    const CANCELLED = new Error("user cancelled");
+    // Run 1: the second review is cancelled after a mined approval — an allowance is left.
+    const one = await run(secondReview(CANCELLED), KEEP);
+    expect(leftAllowanceOf(one.error)).toEqual(LEFT);
+    expect(one.error).not.toBe(CANCELLED);
+    expect((one.error as {cause?: unknown}).cause).toBe(CANCELLED);
+    expect(Object.prototype.hasOwnProperty.call(CANCELLED, "leftAllowance")).toBe(false);
+    expect(leftAllowanceOf(CANCELLED)).toBeUndefined();
+    // Run 2: the first review is cancelled, nothing approved: the sentinel itself comes back, with nothing left.
+    const two = await run({name: "first review cancelled", provider: {kind: "call"}, account: {allowance: 0n}, review: () => CANCELLED}, KEEP);
+    expect(two.error).toBe(CANCELLED);
+    expect(leftAllowanceOf(two.error)).toBeUndefined();
+    // Run 3: another left case — again a fresh error around the same, still clean, sentinel.
+    const three = await run(secondReview(CANCELLED), KEEP);
+    expect(three.error).not.toBe(one.error);
+    expect((three.error as {cause?: unknown}).cause).toBe(CANCELLED);
+    expect(leftAllowanceOf(three.error)).toEqual(LEFT);
+    expect(Object.keys(CANCELLED)).toEqual([]);
+  });
+
+  it("a frozen error, a string, an object: wrapped with the same text, the original as cause", async () => {
+    const frozen = Object.freeze(new Error("frozen cancel"));
+    const f = await run(secondReview(frozen), KEEP);
+    expect(f.error).toBeInstanceOf(Swap2ExecutionError);
+    expect([(f.error as Error).message, (f.error as {cause?: unknown}).cause]).toEqual(["frozen cancel", frozen]);
+    expect(leftAllowanceOf(f.error)).toEqual(LEFT);
+    const text = await run(secondReview("nope"), KEEP);
+    expect(text.error).toBeInstanceOf(Swap2ExecutionError);
+    expect([(text.error as Error).message, (text.error as {cause?: unknown}).cause]).toEqual(["nope", "nope"]);
+    expect(leftAllowanceOf(text.error)).toEqual(LEFT);
+    // A refusal reason the thrown value carries comes along.
+    const classified = refusal("policy_refused", "the app refused");
+    const c = await run(secondReview(classified), KEEP);
+    expect(refusalOf(c.error)).toEqual({reason: "policy_refused"});
+    expect(Object.prototype.hasOwnProperty.call(classified, "leftAllowance")).toBe(false);
+  });
+
+  it("an engine error comes back as a copy of the same class, the original untouched", async () => {
+    // A provider-thrown engine error, frozen and shared (a module-level sentinel of a provider package).
+    const HALTED = Object.freeze(new Swap2ValidationError("swap2: halted by the venue", {reason: "chain_halted"}));
+    const r = await run({name: "preflight sentinel", provider: {kind: "call", preflight: () => HALTED}, account: {allowance: 0n}}, KEEP);
+    expect(effects(r)).toEqual(["approve router 1000000"]);
+    expect(r.error).not.toBe(HALTED);
+    expect(r.error).toBeInstanceOf(Swap2ValidationError);
+    expect(r.error).toBeInstanceOf(Swap2Error);
+    expect(r.error).toBeInstanceOf(Error);
+    expect(Object.prototype.toString.call(r.error)).toBe("[object Error]");
+    const e = r.error as Swap2ValidationError;
+    expect([e.name, e.message, e.code]).toEqual(["Swap2ValidationError", "swap2: halted by the venue", "VALIDATION"]);
+    expect(refusalOf(e)).toEqual({reason: "chain_halted"});
+    expect(typeof e.stack).toBe("string");
+    expect(leftAllowanceOf(e)).toEqual(LEFT);
+    expect(Object.prototype.hasOwnProperty.call(HALTED, "leftAllowance")).toBe(false);
+    // The engine's own errors keep their class: a quote error, and a may-have-been-sent approval (journaled).
+    expect((await run("re-quote finds no route: revoked", KEEP)).error).toBeInstanceOf(Swap2QuoteError);
+    const lost = await run({name: "journaled lost approval", provider: {kind: "call"}, account: {allowance: 0n, failSend: (k, i) => (k.startsWith("approve") && i === 0 ? new TypeError("fetch failed") : undefined)}, journal: true}, KEEP);
+    expect(lost.error).toBeInstanceOf(Swap2MaybeSentError);
+    expect((lost.error as Swap2MaybeSentError).maybeSent).toBe(true);
+    expect(refusalOf(lost.error)).toBeUndefined();
+    expect(leftAllowanceOf(lost.error)).toEqual(LEFT);
+  });
+});
+
+describe("exactAllowanceOnly: a provider that keeps the defaults", () => {
+  it("held: an allowance above the input is set to exactly the input and revoked when unspent, whatever the options say", async () => {
+    const asked: string[] = [];
+    const held = (over: Partial<Scenario["provider"]> = {}): Scenario => ({name: "held", provider: {kind: "call", exactAllowanceOnly: (chain) => { asked.push(chain); return true; }, ...over}, account: {allowance: LARGER, gas: true}});
+    const both = {engine: {allowanceReuse: "sufficient", revokeUnspentApproval: false}};
+    const ok = await run(held(), both);
+    expect(effects(ok)).toEqual(["approve router 1000000", "send router 0xdeadbeef"]);
+    expect(plans(ok)[0]!.reusedAllowance).toBeUndefined();
+    expect(ok.result!.reusedAllowance).toBeUndefined();
+    expect(asked).toEqual(["eip155:1"]);
+    const failed = await run(held({preflight: () => new Error("halted")}), {execution: {allowanceReuse: "sufficient", revokeUnspentApproval: false}});
+    expect(effects(failed)).toEqual(["approve router 1000000", "revoke router"]);
+    expect(leftAllowanceOf(failed.error)).toBeUndefined();
+    // The held run makes exactly the calls of a default run of the same scenario.
+    const plain: Scenario = {name: "plain", provider: {kind: "call"}, account: {allowance: LARGER, gas: true}};
+    expect(calls(ok)).toEqual(calls(await run(plain)));
+    // A throw, or any answer but false, holds too; false does not.
+    const thrown = await run({...held(), provider: {kind: "call", exactAllowanceOnly: () => { throw new Error("boom"); }}}, SUFFICIENT);
+    expect(effects(thrown)).toEqual(["approve router 1000000", "send router 0xdeadbeef"]);
+    const odd = await run({...held(), provider: {kind: "call", exactAllowanceOnly: () => undefined as never}}, SUFFICIENT);
+    expect(effects(odd)).toEqual(["approve router 1000000", "send router 0xdeadbeef"]);
+    const free = await run({...held(), provider: {kind: "call", exactAllowanceOnly: () => false}}, SUFFICIENT);
+    expect(effects(free)).toEqual(["send router 0xdeadbeef"]);
+  });
+
+  it("with the defaults it is never asked: the 0.17.0 calls", async () => {
+    let asked = 0;
+    for (const s of SCENARIOS.filter((x) => x.provider.kind === "call").slice(0, 6)) {
+      const r = await run({...s, provider: {...s.provider, exactAllowanceOnly: () => { asked++; return true; }}});
+      expect(r.sha256, s.name).toBe(GOLDEN_0_17_0[s.name]!.sha256);
+    }
+    expect(asked).toBe(0);
+  });
+
+  it("revokeUnspentApproval: false alone is held too: the re-quote's failure revokes", async () => {
+    const r = await run({...scenario("re-quote finds no route: revoked"), provider: {...scenario("re-quote finds no route: revoked").provider, exactAllowanceOnly: () => true}}, KEEP);
+    expect(r.sha256).toBe(GOLDEN_0_17_0["re-quote finds no route: revoked"]!.sha256);
+    expect(leftAllowanceOf(r.error)).toBeUndefined();
   });
 });
 

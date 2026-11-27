@@ -6,7 +6,8 @@ import {fileURLToPath} from "node:url";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {gasEstimateProblem, quoteRejection} from "@anywalletkit/protocol-swap2-core/validate";
 import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
-import {ETH_FLOW_CREATE_GAS, ETH_FLOW_CREATE_GAS_USED} from "../src/ethflow.js";
+import {ETH_FLOW_CREATE_GAS, ETH_FLOW_CREATE_GAS_MEASURED_CHAINS, ETH_FLOW_CREATE_GAS_USED, ethFlowGasEstimate} from "../src/ethflow.js";
+import {COW_DEPLOYMENTS, COW_ETH_FLOW, COW_SETTLEMENT, COW_VAULT_RELAYER} from "../src/deployments.js";
 import {D1, RPC, ethToUsdc, setup, usdcToWeth} from "./fixtures.js";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -55,6 +56,35 @@ describe("cow gasEstimate", () => {
       expect(q.txRequest!.gasLimit).toBe(ETH_FLOW_CREATE_GAS.toString());
       expect(BigInt(q.gasEstimate!) <= BigInt(q.txRequest!.gasLimit!)).toBe(true);
       valid(q, params);
+    }
+  });
+
+  it("the eth-flow figure only where it was measured: an extra chain, or another eth-flow contract, carries none", async () => {
+    // The shipped table is exactly the measured chains, with the canonical eth-flow.
+    expect([...ETH_FLOW_CREATE_GAS_MEASURED_CHAINS].sort((a, b) => a - b)).toEqual(Object.keys(COW_DEPLOYMENTS).map(Number).sort((a, b) => a - b));
+    for (const d of Object.values(COW_DEPLOYMENTS)) expect(ethFlowGasEstimate(d), String(d.chainId)).toBe(ETH_FLOW_CREATE_GAS_USED.toString());
+    const OTHER_ETH_FLOW = "0x1111111111111111111111111111111111111111";
+    // A chain added through cowDeployments(extra) — Gnosis, Polygon — even with the canonical contract: never measured.
+    expect(ethFlowGasEstimate({chainId: 100, ethFlow: COW_ETH_FLOW})).toBeUndefined();
+    expect(ethFlowGasEstimate({chainId: 137, ethFlow: COW_ETH_FLOW})).toBeUndefined();
+    // A shipped chain given another eth-flow contract.
+    expect(ethFlowGasEstimate({chainId: 1, ethFlow: OTHER_ETH_FLOW})).toBeUndefined();
+    expect(ethFlowGasEstimate({chainId: 1, ethFlow: COW_ETH_FLOW.toLowerCase()})).toBe(ETH_FLOW_CREATE_GAS_USED.toString());
+    // Through the provider: Ethereum's row replaced by configuration with another eth-flow contract quotes as before,
+    // without a figure; the token sale there is still gasless "0".
+    const replaced = {...D1, ethFlow: OTHER_ETH_FLOW};
+    expect(replaced.settlement === COW_SETTLEMENT && replaced.vaultRelayer === COW_VAULT_RELAYER).toBe(true);
+    for (const dry of [true, false]) {
+      const {quote} = setup({}, {permit: false, chains: {1: replaced}});
+      const params = ethToUsdc({dry});
+      const q = (await quote(params))!;
+      expect(q.txRequest!.to).toBe(OTHER_ETH_FLOW);
+      expect(q.gasEstimate).toBeUndefined();
+      expect(q.gasEstimateSource).toBeUndefined();
+      expect(q.txRequest!.gasLimit).toBe(ETH_FLOW_CREATE_GAS.toString());
+      valid(q, params);
+      const sale = (await setup({}, {permit: false, chains: {1: replaced}}).quote(usdcToWeth({dry})))!;
+      expect([sale.gasless, sale.gasEstimate, sale.gasEstimateSource]).toEqual([true, "0", "model"]);
     }
   });
 

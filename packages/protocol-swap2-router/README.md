@@ -92,21 +92,35 @@ does not validate a transaction's behavior.
    Without prices for every quote the auction compares guaranteed outputs.
    With `sourceGasUsd` the source gas comes off too (EVM sources), so a route whose swap a third party
    pays for (`quote.gasless`: a CoW solver, an Omniston resolver) is compared on what the user really gets.
-   `evmSourceGas({prices, rpcUrl})` counts the gas the quote says its source transaction will use
-   (`quote.gasEstimate`, see protocol-swap2-core's "Gas: `gasEstimate` vs `gasLimit`"), kept between 21k and 3M,
-   when the quote has one; otherwise the venue's `txRequest.gasLimit` (capped at 3M; 250k when it names
+   `evmSourceGas({prices, rpcUrl})` counts the venue's `txRequest.gasLimit` (capped at 3M; 250k when it names
    none) for a calldata route, a transfer (21k native, 65k ERC-20) for a deposit-address route, nothing for a
-   gasless one. A gas limit carries the venue's headroom (Fynd's is its estimate × 1.3 + 80 000), so a venue
-   that states its estimate is no longer charged for the headroom: 2026-11-27 on Ethereum, Fynd's 294.50 USDC
-   ranked below CoW's 294.49 on its limit, and ranks above on its estimate. Plus 50k for an ERC-20 approval of
-   the route's spender unless `params.sender`'s allowance already covers the amount; at the chain's
-   `eth_gasPrice` (cached 15 s) and the native coin's price. It is an estimate from the quote, not a dry run (a
-   dry quote has no funded sender to run it from), and leaves out an L2's L1 data fee. A `gasEstimate` is the
-   venue's or the module's word, as a gas limit was: core holds it to its contract (at most the gas limit, `"0"`
-   only when gasless) and the router to at least 21k, nothing more. Each quote is asked once as it arrives (3 s
-   at most); when any quote of the auction has no answer, gas comes off no quote, so the comparison stays like
-   for like. `RankedQuote.gasUsd` and `Swap2Route.gasUsd` say what was subtracted, and `Swap2Route.gasEstimate`
-   / `gasEstimateSource` what it was made of.
+   gasless one, plus 50k for an ERC-20 approval of the route's spender unless `params.sender`'s allowance
+   already covers the amount; at the chain's `eth_gasPrice` (cached 15 s) and the native coin's price. It is an
+   estimate from the quote, not a dry run (a dry quote has no funded sender to run it from), and leaves out an
+   L2's L1 data fee. Each quote is asked once as it arrives (3 s at most); when any quote of the auction has no
+   answer, gas comes off no quote, so the comparison stays like for like. `RankedQuote.gasUsd` and
+   `Swap2Route.gasUsd` say what was subtracted.
+
+   `evmSourceGas({prices, rpcUrl, useGasEstimate: true})` counts, for a quote that has one, the gas its source
+   transaction is expected to use instead (`quote.gasEstimate`, see protocol-swap2-core's "Gas: `gasEstimate` vs
+   `gasLimit`"), kept between 21k and 3M; a quote without one is counted as above, and the approval is added the
+   same way. Off by default: an app that does not set it ranks exactly as before (`swapGasUnits(quote, params,
+   {useGasEstimate})` likewise). What changes with it: a venue whose limit carries headroom (Fynd's is its
+   estimate × 1.3 + 80 000) is no longer charged for it, and a quote without a transaction that states its gas (a
+   dry KyberSwap quote, a 0x price) is charged that figure instead of a plain transfer (65k), several times more.
+   The figures are not all alike: 0x's and KyberSwap's run about a third above the gas used, Fynd's, Uniswap's,
+   Curve's and Balancer's near it (the table in protocol-swap2-core's README), so the comparison is fairer than on
+   gas limits, not exact. A `gasEstimate` is the venue's or the module's word, as a gas limit was: core holds it to
+   its contract (at most the gas limit, `"0"` only when gasless) and the router to at least 21k, nothing more.
+   `Swap2Route.gasEstimate` / `gasEstimateSource` carry the quote's figure either way.
+
+   A one-cent race stays a one-cent race. 2026-11-27 on Ethereum Fynd quoted 294.50 USDC against CoW's 294.49
+   (gasless): Fynd's own recording of a comparable route that evening (USDT → USDC through Ekubo, block
+   26,509,322, `protocol-swap2-fynd/fixtures/quotes/ethereum-usdt-usdc.json`) priced its 136,311-gas estimate at
+   $0.00997 — the whole lead — and the transaction used 210,131 gas when simulated. With `tieBand: 0` that is a
+   tie to a hundredth of a cent on the estimate and a CoW win on the gas really used; with the default band the two
+   are the same price and speed and reliability decide (step 3). The estimate removes the headroom from the
+   comparison; it does not decide a race smaller than the gas itself.
 2. **Price first.** Quotes within `tieBand` (default 0.2%) of the best value are the same price.
 3. **Speed and reliability inside the tie.** Among equal prices the faster, then the more reliable,
    route wins (`weights`, default `price:0.6,speed:0.3,reliability:0.1`). A sliver of extra output no

@@ -42,11 +42,17 @@ export interface ProviderSpec {
   approvalAmount?: string;
   /** gpv2: registerSignedOrder failure. */
   register?: () => Error | undefined;
+  /** A remote stub (`remoteProvider`): the app's pinned spenders and call targets, its quotes checked (verifyQuote). */
+  remote?: {spenders: string[]; callTargets: string[]};
+  /** The provider's `exactAllowanceOnly`. */
+  exactAllowanceOnly?: (chain: string) => boolean;
+  /** Per-build overrides of the transaction the build returns (call / permit2 kinds), by build number (1-based). */
+  build?: (n: number) => Partial<UnsignedTx>;
 }
 
 export interface AccountSpec {
-  /** undefined: the account has no getAllowance. */
-  allowance?: bigint | "throws";
+  /** undefined: the account has no getAllowance. A function answers per spender (by its short name: "router", "other"). */
+  allowance?: bigint | "throws" | ((spender: string) => bigint);
   /** getBalance + quoteSendTransaction (the native-gas check, dry runs). */
   gas?: boolean;
   /** A send that throws: by its decoded kind ("approve <amount>", "revoke", "deposit") and how many sends came before. */
@@ -145,6 +151,7 @@ async function execute(Single: EngineClass, s: Scenario, cfg: RunConfig): Promis
   const chain = p.kind === "permit2" ? "eip155:8453" : "eip155:1";
   const chainId = p.kind === "permit2" ? 8453 : 1;
   let quotes = 0;
+  let builds = 0;
 
   const txOf = (n: number): TxRequest | null => {
     const over = p.tx?.(n);
@@ -157,6 +164,8 @@ async function execute(Single: EngineClass, s: Scenario, cfg: RunConfig): Promis
   const provider: CrossChainProvider = {
     name: "scn", enabled: () => true, supportsRoute: () => true, supportsSameChain: true,
     ...(p.ownGasEstimate ? {ownGasEstimate: true} : {}),
+    ...(p.remote ? {remote: true, verifiesQuotes: true, spenders: () => p.remote!.spenders, callTargets: () => p.remote!.callTargets} : {}),
+    ...(p.exactAllowanceOnly ? {exactAllowanceOnly: p.exactAllowanceOnly} : {}),
     getQuote: async (params: QuoteParams) => {
       const n = ++quotes;
       const {onRefusal: _r, ...shown} = params;
@@ -174,7 +183,7 @@ async function execute(Single: EngineClass, s: Scenario, cfg: RunConfig): Promis
         return {chain, to: GPV2_SETTLEMENT, value: "0", chainId, approvalAddress: GPV2_VAULT_RELAYER, typedData: gpv2Order(), ...(p.approvalAmount ? {approvalAmount: p.approvalAmount} : {})};
       }
       const {to, value, nativeFee: _fee, ...rest} = q.txRequest!;
-      return {chain, to: to!, value: value ?? "0", ...rest};
+      return {chain, to: to!, value: value ?? "0", ...rest, ...p.build?.(++builds)};
     },
     preflightDeposit: async () => {
       note(["preflight"], "preflight");
@@ -221,7 +230,7 @@ async function execute(Single: EngineClass, s: Scenario, cfg: RunConfig): Promis
     account.getAllowance = async (token: string, spender: string) => {
       note(["allowance", token, spender], `allowance ${name(spender)}`);
       if (allowance === "throws") throw new Error("rpc down");
-      return allowance;
+      return typeof allowance === "function" ? allowance(name(spender)) : allowance;
     };
   }
   if (a.gas) {

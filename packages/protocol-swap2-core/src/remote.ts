@@ -86,6 +86,12 @@ export interface RemoteProviderOptions {
    */
   depositAddressRoutes?: boolean;
   /**
+   * The provider's own "an allowance to its spender must not outlive the swap" on a chain (`exactAllowanceOnly`, shipped
+   * with the pins: `kyberPins`). The app's answer, not the server's: the engine holds such routes to an exact,
+   * revoked-when-unspent allowance whatever its approval options say.
+   */
+  exactAllowanceOnly?: (chain: string) => boolean;
+  /**
    * Allow a non-https absolute `baseUrl` (local development only). Quotes, builds and typed orders travel this
    * channel; over plain http anyone on the path can rewrite them (scan 2026-10-27 modules, F4).
    */
@@ -289,6 +295,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     } : {}),
     ...(opts.callTargets ? {callTargets: opts.callTargets} : {}),
     ...(opts.spenders ? {spenders: opts.spenders} : {}),
+    ...(opts.exactAllowanceOnly ? {exactAllowanceOnly: opts.exactAllowanceOnly} : {}),
   };
 }
 

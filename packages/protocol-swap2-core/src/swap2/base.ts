@@ -47,6 +47,7 @@ import {SLIPPAGE_ROUNDING_BPS} from "../validate.js";
 import {Swap2OperationJournal, loadSwap2Operation, type Swap2OperationStore, type Swap2Operation} from "../operation.js";
 import {
   Swap2ConfigurationError,
+  Swap2Error,
   Swap2ExecutionError,
   Swap2FeeLimitError,
   Swap2InFlightError,
@@ -496,12 +497,19 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    *   (mainnet USDT: reset to 0 first) and, when the swap does not go out, revoked to 0.
    * - `"sufficient"`: an allowance that covers the input is used as it is — no approval, nothing raised or lowered,
    *   never revoked; the swap spends exactly the input from it, and the plan and the result say so
-   *   (`reusedAllowance`). A smaller one, or one that cannot be read, is set to exactly the input as in `"exact"`, and
-   *   when the swap does not go out it is put back to what it was (not to 0): only what this execution granted is
-   *   taken back.
+   *   (`reusedAllowance`). A smaller one is set to exactly the input as in `"exact"`, and when the swap does not go out
+   *   it is put back to what it was (not to 0): only what this execution granted is taken back. One that cannot be
+   *   read is refused before the review, nothing sent (`Swap2ExecutionError`, `upstream_unavailable`, when the read
+   *   failed; `Swap2ConfigurationError` when the account has no `getAllowance`): whether the user's allowance covers
+   *   the input is then unknown, and approving the input could lower it. A Permit2 spender keeps the `"exact"` rule
+   *   for an unread allowance (approved to the input; a Permit2 allowance is never revoked).
    *
    * Pins, calldata checks, simulations and the gas and price checks are the same in both modes: the spender must still
-   * be the route's pinned `approvalAddress`. CoW orders keep their own allowance target either way.
+   * be the route's pinned `approvalAddress`. CoW orders keep their own allowance target either way. What
+   * `"sufficient"` gives up: under `"exact"` the token contract caps what the swap's call can pull at the input; with a
+   * reused larger allowance that cap is the allowance, and that the call pulls only the input rests on the module's
+   * own check of its calldata (README, "Approvals"). A provider that declares
+   * {@link CrossChainProvider.exactAllowanceOnly} for the chain is held to `"exact"`.
    */
   allowanceReuse?: Swap2AllowanceReuse;
   /**
@@ -510,7 +518,8 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    * failed. `false` leaves it in place — no revoke transaction — and the error says what is left (`leftAllowance`, read
    * with {@link leftAllowanceOf}). The re-quote on a mined approval is unchanged. An allowance that was there before
    * the execution and that it did not replace is never revoked in any mode; a Permit2 allowance spent only by
-   * signature transfer is left in place either way, as before. `swap2()`'s second argument overrides it.
+   * signature transfer is left in place either way, as before. `swap2()`'s second argument overrides it. A provider
+   * that declares {@link CrossChainProvider.exactAllowanceOnly} for the chain is held to `true`.
    */
   revokeUnspentApproval?: boolean;
 }
@@ -563,16 +572,49 @@ export function leftAllowanceOf(error: unknown): Swap2Allowance | undefined {
   return {token, spender, amount, ...(typeof chainId === "number" ? {chainId} : {})};
 }
 
-/** The error a failed execution throws, with what it left (`leftAllowance`); a value that cannot carry it is wrapped. */
-function withLeftAllowance(error: unknown, left: Swap2Allowance): unknown {
-  const value = Object.freeze({...left});
-  if (error && typeof error === "object" && Object.isExtensible(error) && !Object.prototype.hasOwnProperty.call(error, LEFT_ALLOWANCE)) {
-    Object.defineProperty(error, LEFT_ALLOWANCE, {value, enumerable: true});
-    return error;
+/**
+ * The error a failed execution throws when it left an allowance: a NEW error carrying `leftAllowance`. The value that
+ * was thrown is never modified — it may be an app's module-level sentinel (`const CANCELLED = new Error(…)` thrown by
+ * `reviewExecution`), an account's or a venue's error, and a later swap that left nothing may throw it again.
+ *
+ * - An engine error (`Swap2Error` and its subclasses — `Swap2QuoteError`, `Swap2MaybeSentError`, …) comes back as a
+ *   copy of the same class: a real `Error` with that prototype and the same own fields (message, name, code, reason,
+ *   cause, hash, …), so `instanceof` and `refusalOf` answer as for the original.
+ * - Anything else (an app's or an account's error, a string) is wrapped in a `Swap2ExecutionError` with the same text,
+ *   the refusal reason it carries, and the value itself as `cause`.
+ */
+function withLeftAllowance(error: unknown, left: Swap2Allowance): Error {
+  let out: Error | undefined;
+  if (error instanceof Swap2Error) {
+    const proto = Object.getPrototypeOf(error) as {constructor?: unknown} | null;
+    const ctor = proto?.constructor;
+    if (typeof ctor === "function" && (ctor as {prototype?: unknown}).prototype === proto) {
+      try {
+        // A real Error of the original's class, its constructor not run again: its own fields are copied below.
+        const copy = Reflect.construct(Error, [], ctor) as Error;
+        const own = Object.getOwnPropertyDescriptors(error) as Record<string, PropertyDescriptor>;
+        delete own[LEFT_ALLOWANCE];
+        // The stack is copied as a value: engines keep it behind an accessor that answers only for its own error.
+        delete own.stack;
+        Object.defineProperties(copy, own);
+        let stack: unknown;
+        try { stack = error.stack; } catch { stack = undefined; }
+        if (typeof stack === "string") {
+          try { Object.defineProperty(copy, "stack", {value: stack, writable: true, configurable: true}); } catch { /* the copy keeps its own */ }
+        }
+        out = copy;
+      } catch {
+        out = undefined;
+      }
+    }
   }
-  const wrapped = new Swap2ExecutionError(`swap2: ${error instanceof Error ? error.message : String(error)}`, {cause: error, ...refusalOf(error)});
-  Object.defineProperty(wrapped, LEFT_ALLOWANCE, {value, enumerable: true});
-  return wrapped;
+  if (!out) {
+    let text = "swap2: the execution failed";
+    try { text = error instanceof Error ? String(error.message) : String(error); } catch { /* keep the default text */ }
+    out = new Swap2ExecutionError(text, {cause: error, ...refusalOf(error)});
+  }
+  Object.defineProperty(out, LEFT_ALLOWANCE, {value: Object.freeze({...left}), enumerable: true});
+  return out;
 }
 
 /** One `swap2()` call's approval policy, and what it left behind (shared by its re-quote pass). */
@@ -1426,6 +1468,20 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
 
     const provider = this.providerFor(q.provider);
     if (!provider) throw new Error(`swap2: provider '${q.provider}' is not registered`);
+    // A provider whose spender must not keep an allowance on this chain (`exactAllowanceOnly`: KyberSwap's generic-build
+    // routers, whose owner key could spend one) is held to the defaults — exactly the input, revoked when unspent —
+    // whatever this execution's approval options say. Asked only when an option departs from the defaults; a throw or
+    // any answer but `false` counts as yes. The re-quote pass is the same provider on the same chain.
+    if (run.reuse !== "exact" || !run.revokeUnspent) {
+      let exactOnly = false;
+      if (typeof provider.exactAllowanceOnly === "function") {
+        try { exactOnly = provider.exactAllowanceOnly(this.fromChain) !== false; } catch { exactOnly = true; }
+      }
+      if (exactOnly) {
+        run.reuse = "exact";
+        run.revokeUnspent = true;
+      }
+    }
     let journal = carried?.journal;
     if (journal) await journal.requote(q.intentId);
     else if (snapshot.operationId !== undefined) {
@@ -1817,11 +1873,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // create is left alone on failure). A failed read assumes the worst.
       const usdtMainnet = this.fromChain === "eip155:1" && source.symbol.toUpperCase() === "USDT";
       let current: bigint | undefined;
+      // Why the allowance could not be read, when the account tried (allowanceReuse "sufficient" refuses on it).
+      let unread: unknown;
       if (typeof signer.getAllowance === "function") {
         try {
           current = BigInt(await signer.getAllowance(source.contract!, unsigned.approvalAddress!));
-        } catch {
+        } catch (error) {
           current = undefined;
+          unread = error;
         }
       }
       if (gpv2) {
@@ -1832,12 +1891,21 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         if (run.reuse === "sufficient" && !approvalAmounts.length) reused = current;
       } else if (run.reuse === "sufficient") {
         // An allowance that covers the input is the user's and is spent as it stands: not lowered to the input, not
-        // raised, and — no approval having been sent — never revoked. A smaller one, or one that cannot be read, is set
-        // to exactly the input (mainnet USDT: reset to 0 first when it is not 0), and when the swap does not go out it is
-        // put back to what it was, not to 0: only what this execution granted is taken back.
+        // raised, and — no approval having been sent — never revoked. A smaller one is set to exactly the input
+        // (mainnet USDT: reset to 0 first when it is not 0), and when the swap does not go out it is put back to what it
+        // was, not to 0: only what this execution granted is taken back.
         if (current !== undefined && current >= approvalAmount) {
           approvalAmounts = [];
           reused = current;
+        } else if (current === undefined && !permit2) {
+          // One that cannot be read may well cover the input: approving exactly the input would lower the user's
+          // allowance, and a swap that then failed would put it back to 0 — both what "sufficient" promises not to do.
+          // Refused before the review, nothing sent. A Permit2 spender keeps the "exact" rule (below): its allowance is
+          // never revoked after a signature transfer.
+          if (typeof signer.getAllowance !== "function") {
+            throw new Swap2ConfigurationError(`swap2: allowanceReuse "sufficient" needs an account that reads allowances (getAllowance) — refused, nothing was sent`);
+          }
+          throw new Swap2ExecutionError(`swap2: allowanceReuse "sufficient" could not read the ${source.symbol} allowance for ${unsigned.approvalAddress} — refused, nothing was sent; try again`, {reason: "upstream_unavailable", ...(unread !== undefined ? {cause: unread} : {})});
         } else {
           approvalAmounts = [...(usdtMainnet && current !== 0n ? [0n] : []), approvalAmount];
           restoreAllowance = current ?? 0n;
