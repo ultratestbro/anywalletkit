@@ -487,6 +487,113 @@ export interface Swap2EngineConfig extends Swap2ProtocolConfig {
    * judge their price, so show the user the amounts.
    */
   allowUnlistedTokens?: boolean;
+  /**
+   * What an ERC-20 swap does with an allowance already in place for its spender (README, "Approvals"); `swap2()`'s
+   * second argument overrides it per execution ({@link Swap2ExecutionConfig}).
+   *
+   * - `"exact"` (default, the 0.17.0 behaviour): the allowance is set to exactly the input unless it already equals
+   *   it (a Permit2 allowance covering the input is left as it is); a different one is overwritten in one approval
+   *   (mainnet USDT: reset to 0 first) and, when the swap does not go out, revoked to 0.
+   * - `"sufficient"`: an allowance that covers the input is used as it is — no approval, nothing raised or lowered,
+   *   never revoked; the swap spends exactly the input from it, and the plan and the result say so
+   *   (`reusedAllowance`). A smaller one, or one that cannot be read, is set to exactly the input as in `"exact"`, and
+   *   when the swap does not go out it is put back to what it was (not to 0): only what this execution granted is
+   *   taken back.
+   *
+   * Pins, calldata checks, simulations and the gas and price checks are the same in both modes: the spender must still
+   * be the route's pinned `approvalAddress`. CoW orders keep their own allowance target either way.
+   */
+  allowanceReuse?: Swap2AllowanceReuse;
+  /**
+   * Whether an allowance this execution granted and did not spend is revoked (default `true`, the 0.17.0 behaviour):
+   * the swap did not go out after the one re-quote on it, the second review was cancelled, a preflight or dry run
+   * failed. `false` leaves it in place — no revoke transaction — and the error says what is left (`leftAllowance`, read
+   * with {@link leftAllowanceOf}). The re-quote on a mined approval is unchanged. An allowance that was there before
+   * the execution and that it did not replace is never revoked in any mode; a Permit2 allowance spent only by
+   * signature transfer is left in place either way, as before. `swap2()`'s second argument overrides it.
+   */
+  revokeUnspentApproval?: boolean;
+}
+
+/** See {@link Swap2EngineConfig.allowanceReuse}. */
+export type Swap2AllowanceReuse = "exact" | "sufficient";
+
+/** An ERC-20 allowance of this account an execution used or left behind. */
+export interface Swap2Allowance {
+  /** The ERC-20 contract. */
+  token: string;
+  /** Who may spend it: the route's pinned spender. */
+  spender: string;
+  /** In the token's base units. */
+  amount: bigint;
+  chainId?: number;
+}
+
+/**
+ * `swap2()`'s second argument: the fee ceilings of {@link Swap2ProtocolConfig} plus this execution's approval policy,
+ * which overrides the engine's ({@link Swap2EngineConfig.allowanceReuse}, {@link Swap2EngineConfig.revokeUnspentApproval}).
+ */
+export interface Swap2ExecutionConfig extends Swap2ProtocolConfig {
+  allowanceReuse?: Swap2AllowanceReuse;
+  revokeUnspentApproval?: boolean;
+}
+
+/** What `swap2()` returns: the core result, plus the allowance it spent from when it reused one. */
+export interface Swap2EngineResult extends Swap2Result {
+  /**
+   * `allowanceReuse: "sufficient"` only: the allowance already in place that this swap spent its input from, as it
+   * stood before the swap (no approval was sent).
+   */
+  reusedAllowance?: Swap2Allowance;
+}
+
+const LEFT_ALLOWANCE = "leftAllowance";
+
+/**
+ * With `revokeUnspentApproval: false`: the allowance a failed `swap2()` left in place — granted by that execution,
+ * not spent, not revoked — read from the error it threw (its own `leftAllowance`). Undefined otherwise. Show it and
+ * offer the revoke (an approvals screen).
+ */
+export function leftAllowanceOf(error: unknown): Swap2Allowance | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const left = (error as {[LEFT_ALLOWANCE]?: unknown})[LEFT_ALLOWANCE];
+  if (!left || typeof left !== "object") return undefined;
+  const {token, spender, amount, chainId} = left as Partial<Swap2Allowance>;
+  if (typeof token !== "string" || typeof spender !== "string" || typeof amount !== "bigint") return undefined;
+  return {token, spender, amount, ...(typeof chainId === "number" ? {chainId} : {})};
+}
+
+/** The error a failed execution throws, with what it left (`leftAllowance`); a value that cannot carry it is wrapped. */
+function withLeftAllowance(error: unknown, left: Swap2Allowance): unknown {
+  const value = Object.freeze({...left});
+  if (error && typeof error === "object" && Object.isExtensible(error) && !Object.prototype.hasOwnProperty.call(error, LEFT_ALLOWANCE)) {
+    Object.defineProperty(error, LEFT_ALLOWANCE, {value, enumerable: true});
+    return error;
+  }
+  const wrapped = new Swap2ExecutionError(`swap2: ${error instanceof Error ? error.message : String(error)}`, {cause: error, ...refusalOf(error)});
+  Object.defineProperty(wrapped, LEFT_ALLOWANCE, {value, enumerable: true});
+  return wrapped;
+}
+
+/** One `swap2()` call's approval policy, and what it left behind (shared by its re-quote pass). */
+interface ExecutionRun {
+  reuse: Swap2AllowanceReuse;
+  revokeUnspent: boolean;
+  left?: Swap2Allowance;
+}
+
+/** The approval policy of one execution: its own config over the engine's, both checked. */
+function executionRun(engine: Swap2EngineConfig, execution: Swap2ExecutionConfig | undefined): ExecutionRun {
+  const pick = <K extends "allowanceReuse" | "revokeUnspentApproval">(key: K) =>
+    execution?.[key] !== undefined ? execution[key] : engine[key];
+  // Only a missing value means the default: null or any other value is refused, never read as "exact" / true.
+  const reuseRaw: unknown = pick("allowanceReuse");
+  const revokeRaw: unknown = pick("revokeUnspentApproval");
+  const reuse = reuseRaw === undefined ? "exact" : reuseRaw;
+  const revoke = revokeRaw === undefined ? true : revokeRaw;
+  if (reuse !== "exact" && reuse !== "sufficient") throw new Swap2ConfigurationError(`swap2: allowanceReuse must be "exact" or "sufficient", not ${JSON.stringify(reuse)?.slice(0, 40) ?? typeof reuse}`);
+  if (typeof revoke !== "boolean") throw new Swap2ConfigurationError(`swap2: revokeUnspentApproval must be a boolean, not ${typeof revoke}`);
+  return {reuse, revokeUnspent: revoke};
 }
 
 /** What a TON cell body does, as the engine read it before signing (scan 2026-10-27 modules, F13): its op, and the jetton transfer it is. */
@@ -519,6 +626,12 @@ export interface Swap2ExecutionPlan {
    * one with another `appData` (the hash that commits to the hook).
    */
   permits?: {token: string; spender: string; amount: bigint; deadline: number; chainId?: number}[];
+  /**
+   * `allowanceReuse: "sufficient"` only: the allowance already in place that covers the input, so `approvals` is empty
+   * and the swap spends exactly `sourceAmount` from it ("using your approval for 500 000 FOLD"). `amount` is what it
+   * stands at now.
+   */
+  reusedAllowance?: Swap2Allowance;
   /**
    * `true` on a second review: the first quote expired while its approval was being mined, and
    * the fresh one differs from what was reviewed (another payload, a worse output). The allowance
@@ -691,7 +804,10 @@ interface CarriedAllowance {
   token: string;
   spender: string;
   amount: bigint;
+  /** What the re-quote pass does with it when it cannot spend it: revoke it, or (revokeUnspentApproval: false) leave it. */
   revoke: () => Promise<void>;
+  /** The real revoke, whatever `revoke` does: for a signed order whose registration answer was lost. */
+  revokeNow: () => Promise<void>;
   /** The first pass spent it through Permit2 as a signature transfer only: it is not revoked on failure (see executeSwap2). */
   signatureTransferOnly: boolean;
   adopted: boolean;
@@ -1245,11 +1361,15 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
    * then sign and broadcast the source leg. An identical call already in flight on the same account
    * is refused.
    *
+   * `config` takes the fee ceilings and this execution's approval policy (`allowanceReuse`, `revokeUnspentApproval`),
+   * which overrides the engine's.
+   *
    * @throws {@link Swap2ExecutionError} for a read-only account, {@link Swap2InFlightError} for a
    * double tap, {@link Swap2MaybeSentError} when the broadcast outcome is unknown (do not retry;
-   * track `hash`).
+   * track `hash`). With `revokeUnspentApproval: false`, an error after an approval this execution
+   * granted and did not spend carries it as `leftAllowance` ({@link leftAllowanceOf}).
    */
-  override async swap2(options: Swap2Options, config?: Swap2ProtocolConfig): Promise<Swap2Result> {
+  override async swap2(options: Swap2Options, config?: Swap2ExecutionConfig): Promise<Swap2EngineResult> {
     const store = (this._config as Swap2EngineConfig).operationStore;
     if (!!store !== (options.operationId !== undefined)) throw new Swap2ConfigurationError("swap2: operationStore and operationId must be used together");
     // Account first: a read-only or missing account is refused before any option is
@@ -1260,6 +1380,8 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     }
     const snapshot = snapshotOptions(options);
     requireExecutionFloor(snapshot);
+    // The approval policy is read once, before anything else happens, and holds for the re-quote pass too.
+    const run = executionRun(this._config as Swap2EngineConfig, config);
     // A double tap re-quotes and would run a second complete swap: refuse it
     // while the identical call is still in flight on this account.
     const key = inFlightKey(this.fromChain, snapshot);
@@ -1268,13 +1390,17 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     running.add(key);
     IN_FLIGHT.set(signerCandidate, running);
     try {
-      return await this.executeSwap2(signerCandidate as Swap2Signer, snapshot, config);
+      return await this.executeSwap2(signerCandidate as Swap2Signer, snapshot, config, run);
+    } catch (error) {
+      // revokeUnspentApproval: false — the allowance this execution granted and left in place is reported, not hidden.
+      if (run.left) throw withLeftAllowance(error, run.left);
+      throw error;
     } finally {
       running.delete(key);
     }
   }
 
-  private async executeSwap2(signer: Swap2Signer, snapshot: Swap2Options, config?: Swap2ProtocolConfig, carried?: CarriedAllowance): Promise<Swap2Result> {
+  private async executeSwap2(signer: Swap2Signer, snapshot: Swap2Options, config: Swap2ProtocolConfig | undefined, run: ExecutionRun, carried?: CarriedAllowance): Promise<Swap2EngineResult> {
     const configSnapshot = snapshotConfig(config);
     this.assertFeeConfig(configSnapshot);
     await this.assertAccountChain(signer);
@@ -1656,24 +1782,33 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // to other spenders are theirs: this engine never signs one.
     const signatureTransferOnly = !!permit2 && (!carried || carried.signatureTransferOnly);
     const keep = async (): Promise<void> => {};
-    const revokedNote = (kept: boolean, allowance = "the allowance") => kept ? "the Permit2 allowance was left in place (it moves nothing without a new signature)" : `${allowance} was revoked`;
+    // revokeUnspentApproval: false — an allowance this execution granted and did not spend stays where it is: no revoke
+    // transaction, the execution reports it instead (`leftAllowance` on the error, see swap2()). A carried allowance's
+    // `revoke` is then this, from the pass that granted it.
+    const txChainId = unsigned.chainId !== undefined ? {chainId: unsigned.chainId} : {};
+    const leave = (token: string, spender: string, amount: bigint) => async (): Promise<void> => { run.left = {token, spender, amount, ...txChainId}; };
+    const revokedNote = (kept: boolean, allowance = "the allowance") => kept
+      ? "the Permit2 allowance was left in place (it moves nothing without a new signature)"
+      : run.revokeUnspent ? `${allowance} was revoked` : `${allowance} was left in place (revokeUnspentApproval: false)`;
     if (carried && !needsApproval) {
       // The fresh quote no longer spends through an allowance: the one the
       // first pass mined would outlive this swap with nobody to revoke it.
       carried.adopted = true;
-      if (!carried.signatureTransferOnly) await carried.revoke().catch(() => {});
+      if (!carried.signatureTransferOnly || !run.revokeUnspent) await carried.revoke().catch(() => {});
       throw new Swap2QuoteError(`swap2: the fresh quote no longer spends through an allowance — aborted, ${revokedNote(carried.signatureTransferOnly)}`, {reason: "policy_refused"});
     }
+    // allowanceReuse "sufficient": the live allowance that covers the input and is spent as it stands (no approval).
+    let reused: bigint | undefined;
     if (needsApproval && carried) {
       // Re-quote pass: the allowance must fit the fresh quote exactly;
       // otherwise it is revoked and the swap aborts (the caller may retry).
       if (!sameHex(carried.token, source.contract!) || !sameHex(carried.spender, unsigned.approvalAddress!) || carried.amount !== allowanceTarget) {
         carried.adopted = true;
-        if (!carried.signatureTransferOnly) await carried.revoke().catch(() => {});
+        if (!carried.signatureTransferOnly || !run.revokeUnspent) await carried.revoke().catch(() => {});
         throw new Swap2QuoteError(`swap2: the fresh quote moved the spender to ${unsigned.approvalAddress} — aborted, ${revokedNote(carried.signatureTransferOnly, `the allowance for ${carried.spender}`)}`, {reason: "vault_mismatch"});
       }
       carried.adopted = true;
-      revokeApproval = signatureTransferOnly ? keep : carried.revoke;
+      revokeApproval = signatureTransferOnly && run.revokeUnspent ? keep : carried.revoke;
     } else if (needsApproval) {
       // Mainnet USDT refuses non-zero → non-zero; every other token
       // overwrites. The live allowance decides what is actually needed: the
@@ -1693,6 +1828,21 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         approvalAmounts = current !== undefined && current >= allowanceTarget ? [] : [...(usdtMainnet && current !== 0n ? [0n] : []), allowanceTarget];
         restoreAllowance = current ?? 0n;
         resetBeforeRestore = usdtMainnet && restoreAllowance !== 0n;
+        // The same decision in both modes (a CoW order's allowance target); "sufficient" only says so.
+        if (run.reuse === "sufficient" && !approvalAmounts.length) reused = current;
+      } else if (run.reuse === "sufficient") {
+        // An allowance that covers the input is the user's and is spent as it stands: not lowered to the input, not
+        // raised, and — no approval having been sent — never revoked. A smaller one, or one that cannot be read, is set
+        // to exactly the input (mainnet USDT: reset to 0 first when it is not 0), and when the swap does not go out it is
+        // put back to what it was, not to 0: only what this execution granted is taken back.
+        if (current !== undefined && current >= approvalAmount) {
+          approvalAmounts = [];
+          reused = current;
+        } else {
+          approvalAmounts = [...(usdtMainnet && current !== 0n ? [0n] : []), approvalAmount];
+          restoreAllowance = current ?? 0n;
+          resetBeforeRestore = usdtMainnet && restoreAllowance !== 0n;
+        }
       } else {
         // Permit2 is a standing spender many apps share: an allowance already covering the input is the user's own and
         // is left as it is (lowering it to the exact amount would cost a transaction and break those apps). A smaller
@@ -1711,6 +1861,9 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       permit = {typedData: unsigned.permit, ...checked};
       approvalAmounts = [];
     }
+
+    const reusedResult: Pick<Swap2EngineResult, "reusedAllowance"> = reused !== undefined
+      ? {reusedAllowance: {token: source.contract!, spender: unsigned.approvalAddress!, amount: reused, ...txChainId}} : {};
 
     // The re-quote pass is reviewed again only when it differs from what the
     // reviewer approved: source amount, spender and the caller's floor are
@@ -1737,6 +1890,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
         etaSeconds: q.etaSeconds,
         validUntilMs: q.validUntilMs,
         approvals,
+        ...(reused !== undefined ? {reusedAllowance: {token: source.contract!, spender: unsigned.approvalAddress!, amount: reused, ...chainId}} : {}),
         ...(permit ? {permits: [{token: source.contract!, spender: unsigned.approvalAddress!, amount: permit.amount, deadline: permit.deadline, ...chainId}]} : {}),
         source: serialized
           ? {kind: "serialized", serializedTx: unsigned.serializedTx!}
@@ -1811,7 +1965,13 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // The real revoke of the approvals this pass sends, whatever `revokeApproval` does on failure: a re-quote pass
     // gets it and decides again.
     let revokeAllowance: (() => Promise<void>) | undefined;
+    // What a pass that cannot spend this allowance does with it: the real revoke, or (revokeUnspentApproval: false)
+    // leaving it in place and reporting it. A re-quote pass gets this as `carried.revoke`.
+    let releaseAllowance: (() => Promise<void>) | undefined;
     if (approvalAmounts.length) {
+      // revokeUnspentApproval: false reports an allowance only once an approval of it may have reached the chain:
+      // an approval refused before it was sent left nothing behind.
+      let granted = false;
       const approve = async (amount: bigint, kind: "approval" | "revoke" = "approval") => {
         const send = async () => {
           const sent = await signer.sendTransaction({
@@ -1823,7 +1983,14 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           if (journal && !sent.hash) throw new Swap2MaybeSentError("swap2: approval returned no hash — reconcile before continuing");
           return sent;
         };
-        const sent = journal ? await journal.effect(kind, this.fromChain, send, {hash: (r) => r.hash, ambiguous: maybeSent}) : await send();
+        let sent: Awaited<ReturnType<typeof send>>;
+        try {
+          sent = journal ? await journal.effect(kind, this.fromChain, send, {hash: (r) => r.hash, ambiguous: maybeSent}) : await send();
+        } catch (error) {
+          if (kind === "approval" && amount > 0n && maybeSent(error)) granted = true;
+          throw error;
+        }
+        if (kind === "approval" && amount > 0n) granted = true;
         // The next step (a second approve, or the deposit's gas estimate)
         // reads on-chain allowance: it must see this approval mined.
         if (sent.hash && typeof signer.waitForTransaction === "function") await signer.waitForTransaction(sent.hash);
@@ -1833,18 +2000,24 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       // response after the transaction was accepted; treating that exception
       // as "nothing happened" would leave a live allowance with no callback.
       revokeAllowance = async () => {
-        // A GPv2 approval restores what was there before (other open orders spend it); any other returns to 0.
+        // A GPv2 approval (and any approval under allowanceReuse "sufficient") restores what was there before (other
+        // open orders spend it, or it was the user's); any other returns to 0.
         if (resetBeforeRestore) await approve(0n, "revoke");
         await approve(restoreAllowance, "revoke");
       };
-      revokeApproval = signatureTransferOnly ? keep : revokeAllowance;
+      const left = leave(source.contract!, unsigned.approvalAddress!, allowanceTarget);
+      releaseAllowance = run.revokeUnspent ? revokeAllowance : left;
+      revokeApproval = signatureTransferOnly && run.revokeUnspent ? keep : releaseAllowance;
       try {
         for (const [i, amount] of approvalAmounts.entries()) {
           this.emitPhase("approving", {index: i + 1, total: approvalAmounts.length});
           await approve(amount);
         }
       } catch (error) {
-        if (!journal || journal.snapshot.steps.some((s) => s.kind === "approval" && s.state !== "rejected")) await revokeApproval().catch(() => {});
+        if (!journal || journal.snapshot.steps.some((s) => s.kind === "approval" && s.state !== "rejected")) {
+          if (run.revokeUnspent) await revokeApproval().catch(() => {});
+          else if (granted) await left();
+        }
         throw error;
       }
     }
@@ -1855,11 +2028,11 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
     // same provider, route, spender and amount, held to the caller's floor like the first, reviewed again when its
     // plan differs, and never re-quotes itself: one re-quote per execution.
     const mayRequote = !carried && approvalAmounts.length > 0 && !!revokeAllowance;
-    const requote = async (): Promise<Swap2Result> => {
+    const requote = async (): Promise<Swap2EngineResult> => {
       this.emitPhase("requoting");
-      const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), ...(journal ? {journal} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: allowanceTarget, revoke: revokeAllowance!, signatureTransferOnly, adopted: false, ...(reviewed ? {reviewed} : {})};
+      const handoff: CarriedAllowance = {provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), ...(journal ? {journal} : {}), token: source.contract!, spender: unsigned.approvalAddress!, amount: allowanceTarget, revoke: releaseAllowance!, revokeNow: revokeAllowance!, signatureTransferOnly, adopted: false, ...(reviewed ? {reviewed} : {})};
       try {
-        return await this.executeSwap2(signer, snapshot, config, handoff);
+        return await this.executeSwap2(signer, snapshot, config, run, handoff);
       } catch (error) {
         if (!handoff.adopted) await revokeApproval?.().catch(() => {});
         throw error;
@@ -1952,13 +2125,17 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
           fromTokenAmount: BigInt(q.sourceAmount),
           toTokenAmount: BigInt(q.destAmount),
           toTokenAmountMin: BigInt(q.minDestAmount),
+          ...reusedResult,
         };
       } catch (error) {
         // Any failed validation/sign/registration must not leave a reusable
         // exact allowance behind. If the RPC response was lost after
         // registration, revocation safely prevents execution.
         if (journal && maybeSent(error)) throw new Swap2MaybeSentError("swap2: signed order outcome is unknown — reconcile; do not sign again", undefined, encodeId(q.provider, q.intentId), {cause: error});
-        await revokeApproval?.().catch(() => {});
+        // An order whose registration answer was lost may be live with nobody following it: its allowance is revoked
+        // even under revokeUnspentApproval: false — it is not an unspent allowance, it may be about to be spent.
+        const revokeNow = !run.revokeUnspent && revokeApproval && maybeSent(error) ? revokeAllowance ?? carried?.revokeNow : undefined;
+        await (revokeNow ?? revokeApproval)?.().catch(() => {});
         throw error;
       }
     }
@@ -2067,6 +2244,7 @@ export abstract class BaseSwap2Protocol extends Swap2Protocol {
       fromTokenAmount: BigInt(q.sourceAmount),
       toTokenAmount: BigInt(q.destAmount),
       toTokenAmountMin: BigInt(q.minDestAmount),
+      ...reusedResult,
       ...(sent.hash ? {hash: sent.hash, transactions: [{hash: sent.hash, type: "source"}]} : {}),
     };
   }

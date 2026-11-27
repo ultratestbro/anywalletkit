@@ -15,7 +15,7 @@ On npm: [@anywalletkit/protocol-swap2-core](https://www.npmjs.com/package/@anywa
 
 - **`BaseSwap2Protocol` / `SingleProviderSwap2`** — a `Swap2Protocol` (from `@anywalletkit/core`) over a provider. It quotes, binds the execution to the quote, runs approvals, sends, and resumes status by id (`getSwap2Status`, `claimSwap2` for two-phase routes).
 - **Safety checks.** Quote validation, a minimum-output floor, fee caps, a review gate before signing, and refusals that name their reason. Status ids look like `awk1.<provider>.<intent>[.<hash>]` (`SWAP2_ID_PREFIX`).
-- **Approvals when a swap does not go out.** An ERC-20 swap approves exactly the input, then sends. When the swap cannot go out as quoted after an approval this execution mined — the quote expired while it mined, or the dry run of the call (Permit2 calls and `ownGasEstimate` providers) reverts — the engine quotes once more on that allowance instead of revoking it: same provider, route, spender and amount, the caller's minimum, a second `reviewExecution` (`requoted: true`) when the plan changed, phase `requoting`. One re-quote per execution; when that pass fails too, the allowance is revoked. One exception to the revoke: an allowance to canonical Permit2 (`PERMIT2_ADDRESS`) that the swap spends only as a signature transfer (`PermitTransferFrom`, the 0x Settler) is left in place, because Permit2 moves nothing on it without a fresh signature per transfer; revoking it would cost a transaction and a prompt, and the next such swap an approval. Every other spender is revoked, and so would be a Permit2 allowance a route spends through Permit2's own allowances (`AllowanceTransfer` / `PermitSingle`; no shipped provider does). A Permit2 permit is signed after the approval is mined (with an allowance already in place, first). A `simulation_failed` dry run names the revert when the account's error carries its data: `(reverted: 0x97a6f3b9 TooMuchSlippage)`, the 4-byte selector and, for known errors, the name, never the arguments.
+- **Approvals when a swap does not go out.** An ERC-20 swap approves exactly the input, then sends. When the swap cannot go out as quoted after an approval this execution mined — the quote expired while it mined, or the dry run of the call (Permit2 calls and `ownGasEstimate` providers) reverts — the engine quotes once more on that allowance instead of revoking it: same provider, route, spender and amount, the caller's minimum, a second `reviewExecution` (`requoted: true`) when the plan changed, phase `requoting`. One re-quote per execution; when that pass fails too, the allowance is revoked. One exception to the revoke: an allowance to canonical Permit2 (`PERMIT2_ADDRESS`) that the swap spends only as a signature transfer (`PermitTransferFrom`, the 0x Settler) is left in place, because Permit2 moves nothing on it without a fresh signature per transfer; revoking it would cost a transaction and a prompt, and the next such swap an approval. Every other spender is revoked, and so would be a Permit2 allowance a route spends through Permit2's own allowances (`AllowanceTransfer` / `PermitSingle`; no shipped provider does). A Permit2 permit is signed after the approval is mined (with an allowance already in place, first). A `simulation_failed` dry run names the revert when the account's error carries its data: `(reverted: 0x97a6f3b9 TooMuchSlippage)`, the 4-byte selector and, for known errors, the name, never the arguments. Two options change what happens to an allowance — use one that already covers the input, leave an unspent one in place: see [Approvals](#approvals-allowancereuse-revokeunspentapproval).
 - **Native fee ceiling** — a route may charge native coin on top of the input (a bridge's messaging fee, which the quote declares). `swap2()` refuses a fee above the chain's cap: 0.005 ETH on Ethereum and on every chain without a row of its own (Arbitrum, Base, …), 100 CELO on Celo, 20 POL on Polygon, and so on ("swap2: quoted native fee … exceeds the cap … for …"). An app that wants a route above it sets `nativeFeeCeiling` on the engine config (any swap2 protocol, or the router): the engine asks it for every execution pass whose quote declares a native fee, before that pass's review and approvals (once, unless the quote expires during an approval and the engine re-quotes), with `{provider, intentId, fromChain, destChain, nativeFee, defaultCap, maxCeiling}`. A non-negative `bigint` is the cap for that execution (higher or lower than the chain's; `0n` refuses any fee), `undefined` keeps the chain's cap. A number, a string, `null`, a Promise, a throw, or a value above `maxCeiling` — `NATIVE_FEE_CEILING_MAX_MULTIPLE` (20) × the chain's cap: 0.1 ETH on Ethereum, 2000 CELO on Celo — refuse the execution (`Swap2ConfigurationError`), so a units slip or a "no limit" sentinel cannot switch the cap off. Match the routes you mean and return `undefined` for every other one. USDT0 Legacy Mesh into Tron, whose LayerZero fee was 0.005341 ETH from Ethereum / Arbitrum and 170.5 CELO from Celo on 2026-11-12 (sealed with the provider's 25 % headroom: 0.006676 ETH, 213.1 CELO; 7-day p90 0.006879 ETH, 221.7 CELO), above the default caps:
 
   ```ts
@@ -132,6 +132,53 @@ terms. The client checks the requested selector and runs `verifyQuote` on each
 candidate. The provider's client validator must verify that calldata implements that
 route; an unchanged selector alone is insufficient. Older deployments keep using
 `/quote` when the flag is omitted.
+
+## Approvals: `allowanceReuse`, `revokeUnspentApproval`
+
+An ERC-20 swap needs an allowance for the route's spender — always the quote's `approvalAddress`, and for a remote
+provider one of the app's pinned `spenders`. Two engine options decide what happens around it. Both go on the engine
+config (any swap2 protocol, the router) and, for one execution, on `swap2()`'s second argument, which wins:
+
+```ts
+const swaps = new RouterSwap2Protocol(account, {fromChain, providers, allowanceReuse: 'sufficient'})
+await swaps.swap2(options, {revokeUnspentApproval: false}) // this execution only
+```
+
+**`allowanceReuse`** — `"exact"` (default) or `"sufficient"`:
+
+| Allowance in place | `"exact"` (0.17.0) | `"sufficient"` |
+|---|---|---|
+| equal to the input | no approval | no approval; `reusedAllowance` reported |
+| above the input (500 000, swapping 100 000) | approve exactly the input (lowers it) | **no approval**: the swap spends exactly the input from it; `reusedAllowance` reported |
+| below the input, zero, or unreadable | approve exactly the input (mainnet USDT: `approve(0)` first when it is not 0) | the same |
+| after a failure, what this execution approved | revoked to 0 | put back to what it was before (0, or the smaller allowance) |
+| an allowance it did not touch | never revoked | never revoked |
+
+`"sufficient"` loosens nothing: the spender is still the route's pinned `approvalAddress`, and calldata checks, dry
+runs, the native-gas check and the price checks run as before; a covering allowance only removes the approval
+transaction. Mainnet USDT is reset to 0 only when an approval is actually sent. A Permit2 allowance that covers the
+input was already left as it is in both modes; CoW orders keep their own allowance target (covering the account's
+other open orders) in both modes. When an allowance is reused, `reviewExecution` gets
+`plan.reusedAllowance = {token, spender, amount, chainId}` (`amount` = the allowance as it stands, so the app can say
+"using your approval for 500 000 FOLD") with `plan.approvals` empty, and the result carries the same `reusedAllowance`.
+In `"exact"` mode neither field is set.
+
+**`revokeUnspentApproval`** — `true` (default) or `false`. It concerns only an allowance this execution approved
+and did not spend: the quote expired while it mined and the one re-quote on it failed too, the second review
+(`requoted: true`) was cancelled, a preflight, a dry run or the source send failed cleanly, a signed order was refused.
+`true` revokes it as before. `false` leaves it in place — no revoke transaction — and the error the execution throws
+says so: `leftAllowanceOf(error)` (the error's `leftAllowance`) is `{token, spender, amount, chainId}`, the error
+keeps its class and message, and a message that used to say "the allowance … was revoked" says "was left in place".
+The re-quote on a mined approval is unchanged. Not reported, because nothing was left: an approval refused before it
+was sent; a swap that spent it. A Permit2 allowance spent only by signature transfer stays in place in both modes, as
+before (with `false` it is reported). Two cases still revoke under `false`, because the allowance may be about to be
+spent rather than unspent: a typed order whose registration answer was lost (without an operation store) is revoked as
+before; a source transaction that may have been broadcast is never revoked in either mode (`Swap2MaybeSentError`).
+
+A successful `swap2()` has spent what it approved, so only the error path carries `leftAllowance`. Values other than
+the ones above (`null`, `"SUFFICIENT"`, `0`) are refused with `Swap2ConfigurationError` before anything is quoted.
+Without either option the engine makes exactly the calls 0.17.0 made (`tests/allowance-policy.test.ts` replays a
+scenario matrix against the published 0.17.0 build).
 
 ## Gas: `gasEstimate` vs `gasLimit`
 

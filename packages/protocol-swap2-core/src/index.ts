@@ -5,7 +5,7 @@ export {validQuote, quoteRejection, remotePinRefusal, slippageFloor, SLIPPAGE_RO
 export {remoteProvider, type RemoteProviderOptions} from "./remote.js";
 export {isEvm, evmRef, namespace, redactUrls, sourceAssetOf, tonRawAddress} from "./util.js";
 export {PERMIT2_ADDRESS, PERMIT2_MAX_DEADLINE_SECONDS, PERMIT2_TRANSFER_TYPES, appendPermit2Signature, permit2TransferJson, readPermit2Transfer, type Permit2Transfer, type Permit2TransferExpectation} from "./permit2.js";
-export {BaseSwap2Protocol, SWAP2_ID_PREFIX, SWAP2_CHAIN_ALIASES, swap2ChainId, NATIVE_DECIMALS, nativeDecimals, nativeUnits, NATIVE_FEE_CEILING_MAX_MULTIPLE, type Swap2Account, type Swap2EngineConfig, type Swap2NativeFeeCeilingContext, type Swap2ExecutionPlan, type SerializedExecutionExpectation, type TonBodySummary} from "./swap2/base.js";
+export {BaseSwap2Protocol, SWAP2_ID_PREFIX, SWAP2_CHAIN_ALIASES, swap2ChainId, NATIVE_DECIMALS, nativeDecimals, nativeUnits, NATIVE_FEE_CEILING_MAX_MULTIPLE, type Swap2Account, type Swap2EngineConfig, type Swap2NativeFeeCeilingContext, type Swap2ExecutionPlan, leftAllowanceOf, type Swap2Allowance, type Swap2AllowanceReuse, type Swap2ExecutionConfig, type Swap2EngineResult, type SerializedExecutionExpectation, type TonBodySummary} from "./swap2/base.js";
 export {SingleProviderSwap2} from "./swap2/single.js";
 export {calledContract, callSelector, callsContract, matchesCall, chainLabel, shortAddress, assetMetaFor, assetLabel, ownerAssets, describeSwapLike, type SwapActivityOptions} from "./activity.js";
 export {suggestSlippage, slippageClassOf, type SlippageClass, type SlippageContext, type SlippageOptions, type SlippageSuggestion} from "./slippage.js";
