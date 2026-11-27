@@ -230,3 +230,7 @@ pnpm --filter @anywalletkit/protocol-swap2-symbiosis verify:live  # read-only: p
 `verify:live` signs and sends nothing. Fixtures are real answers recorded by
 `scripts/record-fixtures.mjs`; the Bitcoin build tests use synthetic answers
 and say so.
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from the Symbiosis API, so the quote names no block (`Quote.blockNumber` absent).

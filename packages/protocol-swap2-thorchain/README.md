@@ -135,3 +135,7 @@ addresses rotate) and the destination leg on non-EVM chains.
 Fixtures (`fixtures/activity/`, test wallet on Ethereum, 2026-10-10): two
 `depositWithExpiry` USDC deposits and one router `transferOut` that paid the
 wallet; negatives: a LI.FI swap, a Uniswap `multicall`.
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from THORNode's quote API, so the quote names no block (`Quote.blockNumber` absent).

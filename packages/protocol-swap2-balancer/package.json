@@ -39,7 +39,8 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "verify:live": "node scripts/verify-live.mjs"
   },
   "dependencies": {
     "@anywalletkit/protocol-swap2-core": "workspace:*",

@@ -1,7 +1,8 @@
 import type {RemotePins} from "@anywalletkit/protocol-swap2-core/types";
 import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddress, parseAbi, type Hex} from "viem";
 import {describeBalancerActivity} from "./activity.js";
-import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {blockLackedInBody, evmRef, isEvm, nodeLacksBlock, redactUrls, timeoutSignal, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {blockTagOf, validBlockNumber} from "@anywalletkit/protocol-swap2-core/validate";
 import {httpRefusal, refusal, refusalNotes, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
@@ -72,6 +73,9 @@ interface SorPath {
   protocolVersion: number;
 }
 
+/** A JSON-RPC error that says the call reverted: geth's code 3, Nethermind's -32015, or a "revert" message. */
+const isRevert = (code: unknown, message: string): boolean => code === 3 || code === -32015 || /revert/i.test(message);
+
 /** Base units → the decimal string the SOR expects ("1.5"). */
 function human(amount: bigint, decimals: number): string {
   const s = amount.toString().padStart(decimals + 1, "0");
@@ -93,18 +97,36 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
     return BALANCER_V2_CHAINS[id] && config.rpcUrls[id]?.length ? id : null;
   };
 
-  async function rpc(chainId: number, method: string, params: unknown[]): Promise<unknown> {
+  /**
+   * One JSON-RPC call over the chain's endpoints in order. `pinned` (a quote's `QuoteParams.blockNumber` as its hex
+   * tag, for an `eth_call` at that tag): a node that says it does not have that block, or no longer keeps its state
+   * ("header not found", "missing trie node"…), or answers with no result, is a fault of that endpoint — the next one is
+   * asked, and with none left the call is refused as `stale_node` naming the block, never asked at "latest" instead.
+   */
+  async function rpc(chainId: number, method: string, params: unknown[], pinned?: string): Promise<unknown> {
     let lastErr: unknown;
+    const atPin = pinned !== undefined && params[1] === pinned;
+    // The node's own words, URLs taken out (a node's message may name an endpoint or a sign-up page).
+    const lacks = (why: string) => withReason(new Error(`block ${BigInt(pinned!).toString()} is not served by the node (${redactUrls(why.slice(0, 2_048)).slice(0, 160)})`), "stale_node");
     for (const url of config.rpcUrls[chainId] ?? []) {
       try {
         const res = await fetch(url, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params}), signal: timeoutSignal(12_000)});
         if (!res.ok) {
+          // Some nodes answer a block they lack with an error status and a JSON-RPC body that says so (X Layer, Celo:
+          // 400 "block is out of range"; publicnode: 403 past its pruning): that, not the status, is the refusal.
+          const lacked = atPin ? blockLackedInBody(await res.text().catch(() => "")) : undefined;
+          if (lacked !== undefined) throw lacks(lacked);
           const error = new Error(`HTTP ${res.status}`);
           const info = httpRefusal(res.status, res.headers?.get?.("retry-after"));
           throw info ? withReason(error, info) : error;
         }
         const body = (await res.json()) as {result?: unknown; error?: {code?: unknown; message?: string}};
+        // A revert is the Vault's answer whatever its reason says ("… in the future" from a pool's rate provider): told
+        // apart first, so it is never read as a node without the block (review 2026-11-28 #6).
+        if (body.error && atPin && !isRevert(body.error.code, body.error.message ?? "rpc error") && nodeLacksBlock(body.error)) throw lacks(String(body.error.message));
         if (body.error) throw Object.assign(new Error(body.error.message ?? "rpc error"), {rpc: true, rpcCode: body.error.code});
+        // An eth_call always names a result ("0x" at least): none at the pinned block is a node that lacks it.
+        if (atPin && (body.result === undefined || body.result === null)) throw lacks("the node answered with no result");
         return body.result ?? null;
       } catch (e) {
         if ((e as {rpc?: boolean}).rpc) throw e; // a revert is an answer, not a dead endpoint
@@ -134,17 +156,19 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
    * Vault.queryBatchSwap on chain: the asset deltas this exact batch would produce. A JSON-RPC error that says the
    * call reverted (code 3, Nethermind's -32015, a "revert" message) is the Vault reverting the batch
    * (`simulation_failed`); any other JSON-RPC error ("header not found", "missing trie node", a limit, an internal
-   * error) and an answer that does not decode are the node's (`upstream_unavailable`).
+   * error) and an answer that does not decode are the node's (`upstream_unavailable`). `pinned`: at a quote's
+   * `QuoteParams.blockNumber` (its hex tag) instead of "latest"; no endpoint serving that block is `stale_node`.
    */
-  async function query(chainId: number, swaps: readonly Step[], assets: readonly Hex[], funds: Funds): Promise<readonly bigint[]> {
+  async function query(chainId: number, swaps: readonly Step[], assets: readonly Hex[], funds: Funds, pinned?: string): Promise<readonly bigint[]> {
     const data = encodeFunctionData({abi: VAULT_ABI, functionName: "queryBatchSwap", args: [0, swaps, assets, funds]});
     let raw: Hex;
     try {
-      raw = (await rpc(chainId, "eth_call", [{to: BALANCER_V2_VAULT, data}, "latest"])) as Hex;
+      raw = (await (pinned === undefined
+        ? rpc(chainId, "eth_call", [{to: BALANCER_V2_VAULT, data}, "latest"])
+        : rpc(chainId, "eth_call", [{to: BALANCER_V2_VAULT, data}, pinned], pinned))) as Hex;
     } catch (e) {
       if (!(e instanceof Error) || !(e as {rpc?: boolean}).rpc) throw e;
-      const code = (e as {rpcCode?: unknown}).rpcCode;
-      throw withReason(e, code === 3 || code === -32015 || /revert/i.test(e.message) ? "simulation_failed" : "upstream_unavailable");
+      throw withReason(e, isRevert((e as {rpcCode?: unknown}).rpcCode, e.message) ? "simulation_failed" : "upstream_unavailable");
     }
     try {
       return decodeFunctionResult({abi: VAULT_ABI, functionName: "queryBatchSwap", data: raw});
@@ -157,6 +181,9 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
     name: "balancer",
     describeActivity: describeBalancerActivity,
     supportsSameChain: true,
+    // QuoteParams.blockNumber: the Vault's queryBatchSwap — the quote's price — at that block, named on the quote. The
+    // SOR's paths come as before; the Vault check and the preflight re-pricing stay at "latest".
+    honorsBlockNumber: true,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,
     supportsChainPair: (from: string, to: string) => from === to && chainIdOf(from) !== null,
@@ -169,6 +196,8 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
       };
       if (params.flex) return refuse("amount-flexible deposits are not supported", "unsupported_pair");
       if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only", "unsupported_pair");
+      if (params.blockNumber !== undefined && !validBlockNumber(params.blockNumber)) return refuse("blockNumber must be a decimal block number (digits only, no leading zero)");
+      const pinned = params.blockNumber === undefined ? undefined : blockTagOf(params.blockNumber);
       const chainId = chainIdOf(params.sourceChain);
       if (chainId === null) return refuse(`no Balancer v2 Vault or RPC for ${params.sourceChain}`, "unsupported_pair");
       const chain = BALANCER_V2_CHAINS[chainId]!;
@@ -240,8 +269,8 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
         const recipient = getAddress(params.destAddress);
         const funds: Funds = {sender, fromInternalBalance: false, recipient, toInternalBalance: false};
 
-        // 3) Price it on-chain — this, not the SOR's number, is the quote.
-        const deltas = await query(chainId, swaps, assets, funds);
+        // 3) Price it on-chain — this, not the SOR's number, is the quote (at the request's block when it names one).
+        const deltas = await query(chainId, swaps, assets, funds, pinned);
         const paid = deltas[inIdx]!;
         const out = -deltas[outIdx]!;
         if (paid !== amountIn) return refuse(`the Vault would take ${paid}, not ${amountIn}`, "price_check_failed");
@@ -277,6 +306,8 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
           validUntilMs: Date.now() + ttl,
           // Pool swap fees are inside the Vault-priced output; no fee is added on top.
           providerData: {paths: String(paths.length), hops: String(swaps.length), minOut: minOut.toString(), poolFee: "pools"},
+          // The Vault priced the batch at the request's block: named, so the app can tell this quote is aligned.
+          ...(params.blockNumber !== undefined ? {blockNumber: params.blockNumber} : {}),
         };
       } catch (e) {
         // Classified where thrown (the Vault check, the node, a revert); anything else is the SOR or the node

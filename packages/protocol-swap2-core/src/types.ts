@@ -54,6 +54,17 @@ export interface QuoteParams {
    * FLEX_INPUT). Providers that can't do this return no quote.
    */
   flex?: boolean;
+  /**
+   * The source chain's block to price at, as a decimal string ("23456789"; digits only, no leading zero — see
+   * `validBlockNumber`). For a comparison round: the app reads `eth_blockNumber` once per chain and hands the same
+   * block to every provider of the round, so the on-chain venues (those with {@link CrossChainProvider.honorsBlockNumber})
+   * read the same state and their outputs compare like for like. A provider that honours it reads every price of the
+   * quote at that block and says so with {@link Quote.blockNumber}; one whose nodes cannot serve that block refuses
+   * (`stale_node`), never falls back to "latest". Providers that price from an API ignore it. Unset: "latest", as before.
+   * Deployment checks, simulations and gas estimates stay on the latest state whatever it says. Meant for the
+   * comparison round, not for execution quotes.
+   */
+  blockNumber?: string;
 }
 
 /**
@@ -125,6 +136,12 @@ export interface Quote {
   validUntilMs: number;
   /** Provider-owned, JSON-safe facts required to revalidate execution. */
   providerData?: Record<string, string>;
+  /**
+   * The source-chain block every price of this quote was read at (decimal) — set only by a provider that priced at the
+   * request's {@link QuoteParams.blockNumber}, and then equal to it (the engine refuses a quote naming another block).
+   * Absent: the quote is not aligned to a block (priced at "latest" or by an API).
+   */
+  blockNumber?: string;
 }
 
 /** What trackIntent gets to work with (LI.FI tracks by the source tx hash). */
@@ -396,6 +413,13 @@ export interface CrossChainProvider {
    * A Permit2 signature transfer always goes out this way. Set by the 0x provider; the router's snapshot carries it.
    */
   readonly ownGasEstimate?: boolean;
+  /**
+   * The provider prices on chain and honours {@link QuoteParams.blockNumber}: every price read of a quote goes to that
+   * block, and the quote carries it as {@link Quote.blockNumber}. A capability flag for the app (which quotes of a round
+   * can be aligned); the quote's own `blockNumber` says whether this one was. Providers that price from an API leave it
+   * unset and ignore the field. The router's snapshot carries it.
+   */
+  readonly honorsBlockNumber?: boolean;
   /** Remote stubs: the contracts this provider's EVM swaps may call on `chain` (the app's list, e.g. `lifiPins`). */
   callTargets?(chain: string): readonly string[];
   /** Remote stubs: the spenders this provider's EVM swaps may be approved for on `chain` (the app's list). */

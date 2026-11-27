@@ -133,6 +133,49 @@ candidate. The provider's client validator must verify that calldata implements 
 route; an unchanged selector alone is insufficient. Older deployments keep using
 `/quote` when the flag is omitted.
 
+## One block per comparison round (`blockNumber`)
+
+On-chain venues read the chain's state when they quote. Asked separately at "latest", the quotes
+of one round can come from different blocks (one or two on Ethereum, more on fast chains), and
+the comparison is not like for like. An app that compares venues reads `eth_blockNumber` once per
+source chain per round and passes that block to every provider as `QuoteParams.blockNumber`: a
+decimal string, digits only, no leading zero, at most a uint64 (`validBlockNumber`; `blockTagOf`
+gives the JSON-RPC tag).
+
+- A provider that honours it (`CrossChainProvider.honorsBlockNumber`: Uniswap v3 and v4, Curve,
+  Balancer) reads every price of the quote at that block and names it, `Quote.blockNumber`. The
+  router hands the field to every provider of the round unchanged, a `routeId` request's too, and
+  never picks a block itself. Providers that price from an API ignore it and name no block.
+- Unset, nothing changes: "latest", as before. Apps that do not pass it get exactly what they got.
+- Deployment checks (code hashes, `factory()`, `WETH9()`…), simulations before signing
+  (`eth_simulateV1`, approve + swap, `preflightDeposit`) and gas estimates (`ownGasEstimate`) stay
+  on the latest state whatever the field says. The block sets only the price that is compared, and
+  no check is skipped or loosened for it.
+- Pass it in the comparison round (dry quotes) only, not on the execution quote (`dry: false`, the
+  re-quote at review or Confirm): a provider honours it there too, but an execution quote should
+  price the freshest state. `quoteSwap2()` and `swap2()` never set it.
+- Which block: `latest`, or `latest − 1` on chains with fast blocks and nodes that trail (Monad,
+  MegaETH, Arbitrum, Base): one node's head may not be on its neighbour behind the same balancer yet.
+- A node that does not have the block yet ("header not found", "block not found", a null result,
+  X Layer's and Celo's HTTP 400 "block is out of range"), or no longer keeps its state ("missing
+  trie node", "historical state … is not available", publicnode's HTTP 403 for archive state, past
+  a non-archive node's pruning): the provider asks its next endpoint, then refuses with reason
+  `stale_node` (or `upstream_unavailable`, when the node failed in another way) and a text naming
+  the block. It never answers from "latest" instead: a quote without its block is worse than a
+  clear refusal. `nodeLacksBlock` and `blockLackedInBody` recognise the texts above (read live), and
+  never an execution error (code 3, Nethermind's -32015, a revert's text): a revert reason a contract
+  chose ("… in the future", "… could not be found") is the call's answer, not the node's.
+- `quoteRejection` / `validQuote` refuse a quote naming a block other than the request's
+  (`policy_refused`), and a request whose `blockNumber` is malformed. The swap2 server validates
+  `params.blockNumber` strictly and seals `Quote.blockNumber` with the rest of the quote. A remote
+  stub forwards the field and declares `honorsBlockNumber` only when told
+  (`remoteProvider({honorsBlockNumber: true})`, once the backend runs a release that carries it: an
+  older backend drops the field and answers at "latest", naming no block).
+
+A chain whose RPCs answer an `eth_call` at any block number from their head (HyperEVM, 2026-11-28)
+is listed by the module (`UNISWAP_LATEST_ONLY_CHAINS`, `CURVE_LATEST_ONLY_CHAINS`): there the quote
+is read at "latest" and names no block.
+
 Docs: [Swaps](https://docs.anywallet.tech/guides/swaps/)
 
 Apache-2.0

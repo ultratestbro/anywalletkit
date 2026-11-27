@@ -23,6 +23,12 @@ export interface UniswapRemoteOptions extends UniswapPinsOptions, Pick<RemotePro
    * `routeId`, which the stub and the router refuse. Default off: one quote per pair through `/quote`, as before.
    */
   multiQuotes?: boolean;
+  /**
+   * Declare `honorsBlockNumber` on the stub once the backend runs this module at 0.6.0 or later (with a swap2 core that
+   * carries `QuoteParams.blockNumber`). The request's `blockNumber` reaches the backend either way; a quote names its
+   * block (`Quote.blockNumber`) only when the backend priced at it. Default off.
+   */
+  honorsBlockNumber?: boolean;
 }
 
 /** What {@link uniswapRemoteProvider} returns: a remote swap2 provider that declares `ownGasEstimate`. */
@@ -58,6 +64,7 @@ export function uniswapRemoteProvider(options: UniswapRemoteOptions): UniswapRem
     verifyQuote: pins.verifyQuote!,
     reasonOf: pins.reasonOf!,
     ...(options.multiQuotes === true ? {multiQuotes: true} : {}),
+    ...(options.honorsBlockNumber === true ? {honorsBlockNumber: true} : {}),
     ...(options.enabled ? {enabled: options.enabled} : {}),
     ...(options.fetchImpl ? {fetchImpl: options.fetchImpl} : {}),
     ...(options.headers ? {headers: options.headers} : {}),

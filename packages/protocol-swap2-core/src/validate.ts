@@ -20,6 +20,23 @@ export function validRouteId(value: unknown): value is string {
   return typeof value === "string" && /^[\x21-\x7e]{1,256}$/.test(value);
 }
 
+/** The largest block number taken: a uint64 (the JSON-RPC quantity a node numbers its blocks with). */
+const BLOCK_NUMBER_MAX = 0xffffffffffffffffn;
+
+/**
+ * A block number as {@link QuoteParams.blockNumber} takes it: a decimal string of digits only, without a leading zero
+ * ("0" itself is one), at most a uint64 — never hex, a sign, spaces, a number or "latest".
+ */
+export function validBlockNumber(value: unknown): value is string {
+  return typeof value === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(value) && BigInt(value) <= BLOCK_NUMBER_MAX;
+}
+
+/** The JSON-RPC block tag of a {@link validBlockNumber} ("23456789" → "0x165ec15"); throws on anything else. */
+export function blockTagOf(blockNumber: string): `0x${string}` {
+  if (!validBlockNumber(blockNumber)) throw new Error("swap2: blockNumber must be a decimal block number (digits only, no leading zero)");
+  return `0x${BigInt(blockNumber).toString(16)}`;
+}
+
 /** Shared quote validator used by both the aggregate and single-provider paths. */
 export function validQuote(q: Quote, params: QuoteParams, provider: string): boolean {
   return quoteRejection(q, params, provider) === null;
@@ -34,9 +51,10 @@ const BAD_REQUEST = Object.freeze({});
 
 /**
  * Why {@link validQuote} refuses a quote, or null when it passes (the same checks, in the same order): another
- * provider's or another input's quote (`policy_refused`), a malformed one (`upstream_unavailable`), a minimum
- * under the floor or the slippage (`price_check_failed`), an expired one (`quote_expired`). An empty object
- * when the request itself is malformed.
+ * provider's or another input's quote (`policy_refused`) — one naming a block (`Quote.blockNumber`) the request did
+ * not ask for too —, a malformed one (`upstream_unavailable`), a minimum under the floor or the slippage
+ * (`price_check_failed`), an expired one (`quote_expired`). An empty object when the request itself is malformed
+ * (a bad floor, slippage or `blockNumber`).
  */
 export function quoteRejection(q: Quote, params: QuoteParams, provider: string): {readonly reason?: Swap2RefusalReason} | null {
   try {
@@ -49,6 +67,10 @@ export function quoteRejection(q: Quote, params: QuoteParams, provider: string):
     const dest = BigInt(q.destAmount);
     const min = BigInt(q.minDestAmount);
     if (source <= 0n || dest <= 0n || min <= 0n || min > dest) return MALFORMED;
+    // A quote names a block only when it priced at the one asked for: any other is another request's quote.
+    if (params.blockNumber !== undefined && !validBlockNumber(params.blockNumber)) return BAD_REQUEST;
+    if (q.blockNumber !== undefined && !validBlockNumber(q.blockNumber)) return MALFORMED;
+    if (q.blockNumber !== undefined && q.blockNumber !== params.blockNumber) return OTHER_QUOTE;
     if (params.minAmountOut !== undefined) {
       if (!/^[0-9]+$/.test(params.minAmountOut) || BigInt(params.minAmountOut) <= 0n) return BAD_REQUEST;
       if (min < BigInt(params.minAmountOut)) return BELOW;

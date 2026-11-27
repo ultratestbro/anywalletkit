@@ -14,6 +14,60 @@ export function evmRef(chain: string): number {
 }
 
 /**
+ * The texts nodes answer a call at a block they cannot serve with (read live on the swap modules' chains, 2026-11-28):
+ * not there yet — a node behind a load balancer that trails the chain: geth, op-geth, Erigon, Bor, Nitro, Monad "header
+ * not found"; reth, op-reth, Avalanche "block not found"; Monad "Block requested not found"; zkSync "Block with such an
+ * ID doesn't exist yet"; Nitro "unsupported block number"; Mantle "requested block is above the latest consensus block";
+ * X Layer, Celo "block is out of range"; "unknown block", "… in the future" — or no longer kept (a block past a
+ * non-archive node's pruning: geth "missing trie node", Nitro "historical state … is not available", Nethermind "No
+ * state available for block …", zkSync "Unknown state. First available state is …", reth "… is pruned", publicnode
+ * "Archive requests require a personal token").
+ */
+const BLOCK_UNAVAILABLE_TEXT = /header not found|unknown block|block(?: [#\w]+)? (?:is )?not (?:found|available)|no such block|could not be found|(?:does not|doesn'?t) exist yet|unsupported block number|block(?: number)? (?:is )?out of range|missing trie node|\bpruned\b|historical state|no state (?:is )?available|state (?:is )?(?:not available|unavailable)|unknown state|first available state|archive (?:node|request|data|state)|in the future|future block|(?:greater|later|higher) than (?:the )?(?:latest|current|head|chain head)|(?:above|beyond|after) (?:the )?(?:latest|current|head|last accepted)/i;
+
+/**
+ * The EVM ran the call and it stopped: geth's and reth's code 3 ("execution reverted"), Nethermind's -32015 ("VM
+ * execution error"), or a message that says it reverted, hit an invalid opcode or ran out of gas. That is the contract's
+ * answer whatever its reason string says — "execution reverted: oracle timestamp in the future" is a revert, not a node
+ * without the block (review 2026-11-28 #6). No node answered a block it lacks so (read live, 2026-11-28).
+ */
+const EXECUTION_CODES: ReadonlySet<number> = new Set([3, -32015]);
+const EXECUTION_TEXT = /revert|invalid opcode|out of gas|vm execution error/i;
+
+/**
+ * True when a node's error (its JSON-RPC error object, or the text) says it cannot serve the block the call named —
+ * it does not have that block yet, or no longer keeps its state. A provider pinned to `QuoteParams.blockNumber` tries
+ * the next endpoint on it and then refuses as `stale_node` naming the block — never answers from "latest" instead.
+ * Never for an execution error (code 3, -32015, or a revert's text), whatever its message goes on to say: a revert
+ * reason a contract chose ("… in the future", "… could not be found") is the call's answer, not the node's.
+ */
+export function nodeLacksBlock(error: unknown): boolean {
+  const code = error && typeof error === "object" ? (error as {code?: unknown}).code : undefined;
+  if (typeof code === "number" && EXECUTION_CODES.has(code)) return false;
+  const text = typeof error === "string" ? error : error && typeof error === "object" ? (error as {message?: unknown}).message : undefined;
+  if (typeof text !== "string") return false;
+  const head = text.slice(0, 2_048);
+  return !EXECUTION_TEXT.test(head) && BLOCK_UNAVAILABLE_TEXT.test(head);
+}
+
+/**
+ * The node's message when an HTTP error response's body (`text`) is a JSON-RPC error — alone or in a batch — saying it
+ * cannot serve the block a call named ({@link nodeLacksBlock}); else undefined. Some endpoints answer so with an error
+ * status instead of 200: X Layer and Celo 400 "block is out of range" for a block they do not have yet, publicnode 403
+ * and zkSync's dRPC 400 for state past their pruning.
+ */
+export function blockLackedInBody(text: string): string | undefined {
+  if (text.length > 65_536) return undefined;
+  let body: unknown;
+  try { body = JSON.parse(text); } catch { return undefined; }
+  for (const item of Array.isArray(body) ? body : [body]) {
+    const error = item && typeof item === "object" ? (item as {error?: unknown}).error : undefined;
+    if (nodeLacksBlock(error)) return String((error as {message: string}).message).slice(0, 200);
+  }
+  return undefined;
+}
+
+/**
  * `AbortSignal.timeout`, portably: Hermes (React Native) ships AbortController
  * but not the static helpers, and the unguarded call threw
  * "AbortSignal.timeout is not a function" on every remote execution — which

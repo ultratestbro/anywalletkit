@@ -436,6 +436,18 @@ approval unless the sender's allowance already covers it, at the chain's gas pri
 at small amounts this moves the pick (a $50 USDC bridge: a plain deposit over approve + burn); on
 L2s gas is cents and rarely changes it.
 
+### Compare the on-chain venues at one block
+
+Uniswap, Curve and Balancer price from the chain's state. Asked separately at "latest", the
+quotes of one round can come from different blocks. Read `eth_blockNumber` once per source
+chain and pass it to the round: `quoteSwap2Routes(options, {blockNumber})`, or `blockNumber` in
+the `QuoteParams` of `router.getQuotes`. Those venues then price at that block and say so on each
+route (`route.blockNumber`); API venues ignore it. A node that does not have the block is asked
+on the next endpoint, then the venue refuses with `stale_node`, never quoting "latest" in its
+place. Use `latest` (or `latest − 1` on fast chains), only for the comparison round: the execution
+re-quote reads "latest", and every check and simulation always does. Ethereum, Base and Monad,
+2026-11-28: every Uniswap v3 and v4, Curve and Balancer quote of a round named the same block.
+
 ## 6. Execute
 
 <Snippet file="swap/src/swap.ts" region="execute" />

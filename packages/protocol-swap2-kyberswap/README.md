@@ -97,3 +97,7 @@ Base, 2026-11-24, one test wallet, through the engine (review → approval → p
 The router's USDC allowance was 0 after the token swap. `scripts/verify-mainnet.mjs` repeats it (`--send native|token`).
 
 `scripts/verify-live.mjs` checks the contracts on every chain and builds (unsigned) one corridor each way per chain.
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from the KyberSwap Aggregator API, so the quote names no block (`Quote.blockNumber` absent).

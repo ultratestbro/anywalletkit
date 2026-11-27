@@ -144,6 +144,40 @@ export async function smokeUniswap(check: Check): Promise<void> {
     g.fetch = offline
   }
 
+  // QuoteParams.blockNumber (0.6.0): a venueRoutes "both" pass at block 125,409,523 over the recording — both candidates
+  // name the block, every price read goes to its tag (BigInt → hex), the deployment checks stay at latest; a node that
+  // lacks the block is retried on the next endpoint and refused as stale_node naming it, nothing read at latest.
+  {
+    const node = recordedNode()
+    const tags: {method: string; selector: string; tag: unknown}[] = []
+    g.fetch = async (url: unknown, init?: {body?: unknown}) => {
+      for (const c of JSON.parse(String(init?.body)) as {method: string; params: unknown[]}[]) {
+        tags.push({method: c.method, selector: String((c.params[0] as {data?: string})?.data ?? '').slice(0, 10), tag: c.method === 'eth_getBlockByNumber' ? c.params[0] : c.params[1]})
+      }
+      return node.f(url, init)
+    }
+    try {
+      const both = await uniswapProvider({rpcUrls: {143: ['https://monad.fixture']}, v4: 'native-in', venueRoutes: 'both'}).getQuotes!({...params, blockNumber: '125409523'})
+      const checks = /^0x(c45a0155|4aa4a4fc|dc4c90d3)$/
+      const price = tags.filter((t) => (t.method === 'eth_call' && !checks.test(t.selector)) || t.method === 'eth_getBlockByNumber')
+      const latest = tags.filter((t) => t.method === 'eth_getCode' || (t.method === 'eth_call' && checks.test(t.selector)))
+      check('uniswap: blockNumber — venueRoutes "both" at block 125,409,523: v3 and v4 both name it (1.130999 / 676.608109 AUSD)', both.map((q) => `${q.routeId}:${q.destAmount}:${q.blockNumber}`).join(',') === 'v3:1130999:125409523,v4:676608109:125409523', `${both.map((q) => `${q.routeId}:${q.destAmount}:${q.blockNumber}`).join(',')} misses ${node.misses.join(',')}`)
+      check('uniswap: blockNumber — every price read at 0x77998f3, every deployment check at latest, no eth_blockNumber', price.length > 0 && price.every((t) => t.tag === '0x77998f3') && latest.length > 0 && latest.every((t) => t.tag === 'latest') && !tags.some((t) => t.method === 'eth_blockNumber'), JSON.stringify([...new Set(tags.map((t) => `${t.method}@${String(t.tag)}`))]).slice(0, 200))
+      // Neither endpoint has the block: every pinned call answered "header not found".
+      g.fetch = async (url: unknown, init?: {body?: unknown}) => {
+        const batch = JSON.parse(String(init?.body)) as {id: number; method: string; params: unknown[]}[]
+        if (!batch.some((c) => c.params?.[1] === '0x77998f3')) return node.f(url, init)
+        return {ok: true, status: 200, headers: {get: () => null}, json: async () => batch.map((c) => ({jsonrpc: '2.0', id: c.id, error: {code: -32000, message: 'header not found'}}))}
+      }
+      let heard = ''
+      let reason: unknown
+      const none = await uniswapProvider({rpcUrls: {143: ['https://a.fixture', 'https://b.fixture']}}).getQuote({...params, blockNumber: '125409523', onRefusal: (t, i) => { heard = t; reason = i?.reason }})
+      check('uniswap: blockNumber — a node without the block: stale_node naming 125409523, never a quote at latest', none === null && reason === 'stale_node' && /served block 125409523 \(-32000 header not found\)/.test(heard), `${heard} [${String(reason)}]`)
+    } finally {
+      g.fetch = offline
+    }
+  }
+
   // Review round 1: the remote stub declares ownGasEstimate; uniswapPins is uniswapPinsWith().
   const stub = uniswapRemoteProvider({baseUrl: 'https://backend.example/api/swap2'})
   check('uniswap: uniswapRemoteProvider declares ownGasEstimate and offers Monad', stub.ownGasEstimate === true && stub.supportsChain?.('eip155:143') === true && stub.supportsChain?.('eip155:999') === false)

@@ -38,6 +38,12 @@
 //   (createSwap2Handler + uniswapRemoteProvider, which declares `ownGasEstimate`). The corridors name no sender (dummy
 //   actor only), so a SwapProxy quote here carries `simulated: "none"`: the approve + swap simulation needs a funded
 //   account.
+// - block numbers (QuoteParams.blockNumber, 0.6.0): on every endpoint of the chain, an `eth_call` at head − 2 must answer
+//   that block's own number (NUMBER run as init code; ArbSys.arbBlockNumber() on Nitro chains, whose NUMBER is the parent
+//   chain's) and one at head + 100,000 must be refused — a node that ignores the tag answers both from its head. A chain
+//   in UNISWAP_LATEST_ONLY_CHAINS is expected to ignore it (reported, and reported again if it starts taking it); any
+//   other chain whose endpoint ignores or refuses a block number is a FAIL. Each corridor chain also quotes its first
+//   corridor again at head − 1 (`blockNumber`), which must come back naming that block.
 // Every chain is a step: an unreachable chain, or an answer in another shape, is a FAIL with a "Reason:" line, and the
 // run exits 1 with a final "Reason:" line naming every chain that is not ok. RPC_<chainId>=url[,url] in the environment
 // replaces the public RPCs below; URLs are never printed, in any spelling (a URL given without a scheme is echoed by
@@ -46,7 +52,7 @@
 // src/impact.ts is imported as TypeScript (Node ≥ 22.18 strips types); build the workspace first (`pnpm -s --filter
 // "@anywalletkit/protocol-swap2-uniswap..." run build`).
 import { decodeAbiParameters, encodeAbiParameters, encodeFunctionData, getAddress, keccak256, parseAbi, toHex } from 'viem'
-import { UNISWAP_V3, UNISWAP_V4, uniswapPins, uniswapRemoteProvider } from '../dist/index.js'
+import { UNISWAP_LATEST_ONLY_CHAINS, UNISWAP_V3, UNISWAP_V4, uniswapPins, uniswapRemoteProvider } from '../dist/index.js'
 import { uniswapProvider } from '../dist/provider.js'
 import { UNISWAP_V4_POOLS } from '../dist/v4pools.js'
 import { UR_ABI, V4_EXACT_IN_SINGLE_ABI, V4_QUOTER_ABI, V4_SETTLE_ABI, V4_SWAP_INPUT_ABI, V4_TAKE_ABI, decodeV4Revert, v4RevertChain } from '../dist/v4.js'
@@ -340,6 +346,93 @@ async function gasFacts(id, urls, problems, notes) {
   }
 }
 
+// ── block numbers (QuoteParams.blockNumber) ───────────────────────────────────────────────────────────────────────
+
+const NUMBER_INITCODE = '0x4360005260206000f3' // NUMBER PUSH1 0 MSTORE PUSH1 32 PUSH1 0 RETURN, run as init code
+const ARB_SYS = '0x0000000000000000000000000000000000000064'
+const ARB_BLOCK_NUMBER = '0xa3b1b31d' // arbBlockNumber(): a Nitro chain's own block (its NUMBER is the parent chain's)
+const LATEST_ONLY = new Set(UNISWAP_LATEST_ONLY_CHAINS)
+
+/** One call on one endpoint: its JSON-RPC body (an error status carrying a JSON-RPC error counts as that answer). */
+async function callOne(url, method, params) {
+  let res
+  try {
+    res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: AbortSignal.timeout(15_000) })
+  } catch (e) {
+    // A call at a block the node lacks that hangs (Linea's public RPC on a future block) is that call's answer.
+    if (method === 'eth_call') return { error: { message: `no answer within 15 s (${redact(e?.message ?? e)})` } }
+    throw e
+  }
+  let body
+  try { body = JSON.parse(await res.text()) } catch { throw new Error(`HTTP ${res.status}, not JSON`) }
+  if (!res.ok && !(body && typeof body === 'object' && 'error' in body)) throw new Error(`HTTP ${res.status}`)
+  if (!body || typeof body !== 'object' || (!('result' in body) && !('error' in body))) throw new Error('an answer with neither result nor error')
+  return body
+}
+
+/** The block an eth_call at `tag` runs in, as the endpoint reports it ({n}), or the node's refusal ({error}). */
+async function blockAt(url, tag, how) {
+  let last
+  for (const k of how.kind ? [how.kind] : ['arbsys', 'init']) {
+    const r = await callOne(url, 'eth_call', [k === 'arbsys' ? { to: ARB_SYS, data: ARB_BLOCK_NUMBER } : { data: NUMBER_INITCODE }, tag])
+    if (r.error === undefined && typeof r.result === 'string' && /^0x[0-9a-fA-F]{64}$/.test(r.result)) {
+      how.kind = k
+      return { n: BigInt(r.result) }
+    }
+    last = redact(r.error?.message ?? `result ${JSON.stringify(r.result)}`)
+  }
+  return { error: last ?? 'neither ArbSys.arbBlockNumber() nor NUMBER answered at that block' }
+}
+
+/** The chain's first corridor again, at head − 1: the quote must name that block (or be the impact gate's refusal). */
+async function pinnedCorridorFacts(id, urls, problems, notes) {
+  const c = CORRIDORS[id]?.[0]
+  if (!c) return
+  const head = BigInt(await must(urls, 'eth_blockNumber', [], 'eth_blockNumber'))
+  const block = (head - 1n).toString()
+  const heard = []
+  const p = uniswapProvider({ rpcUrls: { [id]: urls }, v4: 'all', maxPriceImpactBps: LIMIT, ...(c.v4Only ? { deployments: {} } : {}) })
+  const q = await p.getQuote({ sourceChain: `eip155:${id}`, destChain: `eip155:${id}`, sourceToken: c.sourceToken, destToken: c.destToken, amountIn: c.amountIn.toString(), destAddress: ACTOR, refundAddress: ACTOR, blockNumber: block, onRefusal: (t, i) => heard.push(`${t}${i?.reason ? ` [${i.reason}]` : ''}`) })
+  if (!q) {
+    const text = heard.join('; ') || 'no quote and no reason'
+    if (c.mustQuote || !/loses [\d.]+% of the value to price impact/.test(text)) problems.push(`${c.label} at block ${block}: ${redact(text)}`)
+    else notes.push(`${c.label} at block ${block}: refused at ${LIMIT}`)
+    return
+  }
+  if (q.blockNumber !== block) problems.push(`${c.label} at block ${block}: the quote names block ${q.blockNumber ?? 'none'}`)
+  else notes.push(`${c.label} at block ${block}: ${q.destAmount} on ${q.providerData?.venue ?? 'v3'}, Quote.blockNumber ${q.blockNumber}`)
+}
+
+async function blockTagFacts(id, urls, problems, notes) {
+  const seen = []
+  for (const [i, url] of urls.entries()) {
+    const label = `endpoint ${i + 1}`
+    let head
+    try {
+      const h = await callOne(url, 'eth_blockNumber', [])
+      head = BigInt(h.result)
+    } catch (e) {
+      seen.push(`${label} unreachable (${redact(e?.message ?? e)})`)
+      continue
+    }
+    const how = {}
+    let past = await blockAt(url, toHex(head - 2n), how)
+    if (past.error !== undefined) {
+      await new Promise((r) => setTimeout(r, 1500)) // a node behind its balancer catches up
+      past = await blockAt(url, toHex(head - 2n), how)
+    }
+    const future = past.error === undefined ? await blockAt(url, toHex(head + 100_000n), how) : undefined
+    const honoured = past.error === undefined && past.n === head - 2n && future?.error !== undefined
+    const verdict = honoured ? 'takes a block number' : past.error !== undefined ? `refused a call at head − 2 (${past.error})` : `ignores the block number (head − 2 answered ${past.n}, head + 100,000 ${future?.error === undefined ? `answered ${future?.n}` : 'refused'})`
+    seen.push(`${label} ${verdict}`)
+    if (LATEST_ONLY.has(id)) continue
+    if (!honoured) problems.push(`QuoteParams.blockNumber: ${label} ${verdict} — add the chain to UNISWAP_LATEST_ONLY_CHAINS, or use another RPC`)
+  }
+  if (seen.every((s) => s.includes('unreachable'))) problems.push(`QuoteParams.blockNumber: no endpoint answered (${seen.join('; ')})`)
+  const latestOnly = LATEST_ONLY.has(id)
+  notes.push(`blockNumber: ${seen.join('; ')}${latestOnly ? (seen.some((s) => s.includes('takes a block number')) ? ' — in UNISWAP_LATEST_ONLY_CHAINS but takes it now: the entry may go' : ' (UNISWAP_LATEST_ONLY_CHAINS: quoted at latest, unnamed)') : ''}`)
+}
+
 // ── corridors through the provider (and the remote path) ──────────────────────────────────────────────────────────
 
 const LIMIT = 500
@@ -427,7 +520,9 @@ for (const id of chains) {
     await v3Facts(id, urls, problems, notes)
     await v4Facts(id, urls, problems, notes)
     await gasFacts(id, urls, problems, notes)
+    await blockTagFacts(id, urls, problems, notes)
     await corridorFacts(id, urls, problems, notes)
+    await pinnedCorridorFacts(id, urls, problems, notes)
   } catch (e) {
     problems.push(redact(e?.message ?? e))
   }

@@ -77,3 +77,7 @@ withdrawal — the test wallet has no NEAR account); negatives: the LI.FI
 Diamond's NEARIntents facet on Ethereum (LI.FI's transaction, not this
 module's) and the test wallet's own 13.9 USD₮ 1Click deposit on TON, which must
 stay unrecognized.
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from the 1Click API, so the quote names no block (`Quote.blockNumber` absent).

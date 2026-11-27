@@ -91,4 +91,8 @@ A chain is served when it has a self-hosted server or the hosted API key is set.
 - A swap deadline. The router enforces a deadline only through a signed client-fee message; this module sends no client-fee parameters, so the on-chain protection is the minimum output.
 - Integrator fees.
 
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from the Fynd API, so the quote names no block (`Quote.blockNumber` absent).
+
 Apache-2.0 (this module's code). Fynd outputs: the Fynd License.

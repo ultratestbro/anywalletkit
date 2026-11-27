@@ -12,7 +12,7 @@ import type {
   RoutedQuote,
   ScoreWeights,
 } from "@anywalletkit/protocol-swap2-core/types";
-import {quoteRejection, remotePinRefusal, validQuote, validRouteId} from "@anywalletkit/protocol-swap2-core/validate";
+import {quoteRejection, remotePinRefusal, validBlockNumber, validQuote, validRouteId} from "@anywalletkit/protocol-swap2-core/validate";
 import {refusal, refusalInfo, refusalOf, type Swap2Refusal, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {bigintToNumber} from "@anywalletkit/core";
@@ -190,6 +190,9 @@ export class CrossChainRouter {
       // The account's own gas estimate for this provider's calls (0x): dropped here, the engine would broadcast the
       // venue's quoted gas limit again.
       ...(provider.ownGasEstimate === true ? {ownGasEstimate: true} : {}),
+      // Which venues price at the request's `blockNumber`: dropped here, an app reading the router's providers could not
+      // tell the block-aligned venues of a round from the rest.
+      ...(provider.honorsBlockNumber === true ? {honorsBlockNumber: true} : {}),
       ...(provider.callTargets ? {callTargets: provider.callTargets.bind(provider)} : {}),
       ...(provider.spenders ? {spenders: provider.spenders.bind(provider)} : {}),
       ...(provider.close ? {close: provider.close.bind(provider)} : {}),
@@ -293,6 +296,11 @@ export class CrossChainRouter {
    * the fastest and lets the user choose. Providers run in parallel; with
    * `onUpdate` each one that answers re-publishes the ranked set at once (the
    * first price shows in the time of the fastest venue, not the slowest).
+   *
+   * `params.blockNumber` (one block of the source chain, read by the app once per round) goes to every provider of the
+   * round unchanged — a `routeId` request's too; the router never picks a block itself. The venues that honour it
+   * (`honorsBlockNumber`) price at it and name it (`Quote.blockNumber`); the others ignore it. One that is not a
+   * decimal block number (`validBlockNumber`) is refused before any provider is asked.
    */
   async getQuotes(
     params: QuoteParams,
@@ -314,6 +322,13 @@ export class CrossChainRouter {
       classified.push({...refusalInfo(info), message, provider});
     };
     const snapshot = Object.freeze({...params});
+    if (snapshot.blockNumber !== undefined && !validBlockNumber(snapshot.blockNumber)) {
+      // The caller's own request is malformed: refused, but not a venue's refusal (no reason, no provider).
+      const message = "swap2-router: blockNumber must be a decimal block number (digits only, no leading zero)";
+      rejections.push(message);
+      classified.push({message});
+      return null;
+    }
     const from = Object.freeze({chain: snapshot.sourceChain, token: snapshot.sourceToken});
     const to = Object.freeze({chain: snapshot.destChain, token: snapshot.destToken});
     // Only enabled (validated) providers that can serve the route participate.

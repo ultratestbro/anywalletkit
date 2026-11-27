@@ -101,3 +101,7 @@ chainflipProvider({
   maxOraclePriceSlippageBps: 100,   // oracle guard in the fill-or-kill params; default = the quote's recommendation, null = off
 })
 ```
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from Chainflip's API, so the quote names no block (`Quote.blockNumber` absent).

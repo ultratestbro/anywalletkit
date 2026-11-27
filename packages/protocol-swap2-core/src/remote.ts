@@ -86,6 +86,12 @@ export interface RemoteProviderOptions {
    */
   depositAddressRoutes?: boolean;
   /**
+   * Mirror the backend provider's `honorsBlockNumber` on this stub (a capability flag the app reads; default off). The
+   * request's `blockNumber` goes to the backend either way, and a quote names its block (`Quote.blockNumber`) only when
+   * the backend priced at it — a backend on a release before the field drops it and answers at "latest", unnamed.
+   */
+  honorsBlockNumber?: boolean;
+  /**
    * Allow a non-https absolute `baseUrl` (local development only). Quotes, builds and typed orders travel this
    * channel; over plain http anyone on the path can rewrite them (scan 2026-10-27 modules, F4).
    */
@@ -203,6 +209,7 @@ export function remoteProvider(opts: RemoteProviderOptions): CrossChainProvider 
     ...(opts.verifyBuild ? {verifiesBuilds: true} : {}),
     ...(opts.verifyQuote ? {verifiesQuotes: true} : {}),
     ...(opts.depositAddressRoutes === true ? {depositAddressRoutes: true} : {}),
+    ...(opts.honorsBlockNumber === true ? {honorsBlockNumber: true} : {}),
     // The browser side has no dark-flag env; the backend enforces its own
     // flags — a disabled provider simply quotes null / rejects build.
     enabled: () => enabled ? enabled() : true,

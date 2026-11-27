@@ -446,6 +446,49 @@ estimate instead of the quoted gasLimit. Activity also recognizes v4 swaps whate
   higher rate (47 at 300 ms), and past that no rate carries such a quote under the limit. Unset (the
   default), nothing is limited.
 
+## Quoting at one block (`blockNumber`)
+
+`QuoteParams.blockNumber` (0.6.0; a decimal block of the source chain, read by the app once per comparison
+round): every price read of the quote goes to that block, and the quote names it (`Quote.blockNumber`). The
+provider declares `honorsBlockNumber: true`.
+
+- v3: QuoterV2 for every candidate route and the 1/1000 probe (`priceImpactBps`); with `maxPriceImpactBps`, the
+  probe, `getPool` and each pool's `slot0()` too. The gate reads this block instead of the one it pinned itself
+  (no `eth_blockNumber`).
+- v4: the pool discovery (Multicall3 over the StateView), the V4Quoter aggregates and their halving, a candidate
+  read again at the chain's gas cap, and the probe.
+- The block gas limit the routes are bounded by: `eth_getBlockByNumber` of that block, kept per block. A node
+  without the block (or a null block) is retried at the next endpoint while the quote waits for the read (1.5 s);
+  when no node gives it, the chain's newest gas limit in hand (read at "latest" or at another block within the hour)
+  stands in, as it does for a read at "latest" that failed — a cached answer, never a new read at "latest".
+- With `venueRoutes: "both"`, both candidates come from that one block.
+
+At "latest" whatever `blockNumber` says: the deployment checks (`factory()`, `WETH9()`, `poolManager()`, the
+router's and the SwapProxy's code hashes), the token-input simulation (`eth_simulateV1` of approve + swap, and its
+fallbacks), `preflightDeposit` (the re-quote and the dry run right before signing) and the engine's own gas estimate
+(`ownGasEstimate`). The impact gate, the gas bound, the module's own v4 check and the pins apply unchanged.
+
+A node that does not have the block ("header not found", "block not found", Monad's "Block requested not found", a
+null result, X Layer's and Celo's HTTP 400 "block is out of range"), or no longer keeps its state ("missing trie
+node", "historical state … is not available", publicnode's HTTP 403 for archive state), is retried as any unanswered
+call (each retry starts at the next endpoint) and then refused as `stale_node`, the block named: "uniswap: no RPC on
+chain 8453 served block 63110963 (-32001 block not found: 0x3c2ff33) — its node does not have that block yet, or no
+longer keeps its state; nothing is read at "latest" instead". Linea's public RPC never answers a call at a block it
+does not have: that ends as `upstream_unavailable` when the endpoint times out.
+
+Every chain of the module takes a block number on its public and keyed RPCs, except HyperEVM: its RPCs answer an
+`eth_call` at any block number from their head (one 100,000 blocks ahead too, 2026-11-28). It is in
+`UNISWAP_LATEST_ONLY_CHAINS` (`[999]`): there a request's `blockNumber` is not honoured, the quote is read as without it
+and names no block. Uniswap does not quote HyperEVM today (v4 `quotable: false`, no v3). `verify:live` checks every
+endpoint of every chain: a call at head − 2 must answer that block's own number (NUMBER, or `ArbSys.arbBlockNumber()` on
+Nitro chains, whose NUMBER is the parent chain's) and one at head + 100,000 must be refused.
+
+Pass it in the comparison round only (latest, or latest − 1 on fast chains whose nodes trail), not on the execution
+re-quote. A block past a non-archive node's pruning is refused the same way. Without `blockNumber` every request is
+0.5.0's, byte for byte (`tests/block-number.test.ts` against `fixtures/unpinned-0.5.0.json`). Behind a backend, give
+`uniswapRemoteProvider({…, honorsBlockNumber: true})` once the backend runs 0.6.0; the request's block reaches it either
+way, and its quote names the block only when it priced there.
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes a call into the chain's pinned Universal Router 2.1.2 —

@@ -1,7 +1,7 @@
 import type {Asset, CrossChainProvider, IntentRef, Quote, QuoteParams, TxRequest, UnsignedTx} from "./types.js";
 import {redactUrls} from "./util.js";
 import {refusalInfo, refusalOf, withReason, type Swap2RefusalInfo} from "./errors.js";
-import {quoteRejection, validQuote, validRouteId} from "./validate.js";
+import {quoteRejection, validBlockNumber, validQuote, validRouteId} from "./validate.js";
 
 /**
  * The server side of {@link remoteProvider}: runs real providers behind your backend so API
@@ -375,6 +375,7 @@ function quoteParams(v: unknown, allowUnlisted = false): QuoteParams {
   const dry = bool(p.dry, "params.dry");
   const flex = bool(p.flex, "params.flex");
   if (p.routeId !== undefined && !validRouteId(p.routeId)) bad("params.routeId", "invalid route selector");
+  if (p.blockNumber !== undefined && !validBlockNumber(p.blockNumber)) bad("params.blockNumber", "expected a decimal block number (digits only, no leading zero)");
   return {
     ...(p.routeId !== undefined ? {routeId: p.routeId as string} : {}),
     sourceChain: str(p.sourceChain, "params.sourceChain", 64),
@@ -390,6 +391,7 @@ function quoteParams(v: unknown, allowUnlisted = false): QuoteParams {
     ...(slippage !== undefined ? {slippageBps: slippage} : {}),
     ...(dry !== undefined ? {dry} : {}),
     ...(flex !== undefined ? {flex} : {}),
+    ...(p.blockNumber !== undefined ? {blockNumber: p.blockNumber as string} : {}),
   };
 }
 
@@ -414,6 +416,10 @@ function normalizeQuote(v: unknown, intentMax: number): Quote {
     validUntilMs: num(q.validUntilMs, "quote.validUntilMs"),
   };
   if (q.txRequest !== undefined) out.txRequest = txRequest(q.txRequest);
+  if (q.blockNumber !== undefined) {
+    if (!validBlockNumber(q.blockNumber)) bad("quote.blockNumber", "expected a decimal block number");
+    out.blockNumber = q.blockNumber;
+  }
   if (q.gasless !== undefined) {
     if (typeof q.gasless !== "boolean") bad("quote.gasless", "expected a boolean");
     if (q.gasless) out.gasless = true;

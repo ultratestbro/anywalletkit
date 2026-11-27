@@ -174,6 +174,11 @@ The recordings in `fixtures/quotes` are real 0x answers, one set per pin era (`f
 
 `verify:live` reads public RPCs (`RPC_<chainId>=url[,url]` overrides one: the first URL, then the retry). A chain no RPC answers fails the run: its pins are unchecked. A read the RPC did not answer (a JSON-RPC error that is not a revert, an answer for another chain, an RPC with no state) moves to the next URL; a registry that names no Settler is read again (up to three tries) until a second answer names none too; what `ownerOf(2)` named is kept when a later read gets no answer, so a new deployment is reported as NEW even then; `ownerOf(2)` reads that disagree print a `note chain …` line. A failed run ends with `FAILED (n)` and a `Reason:` line that names every chain that is not ok, by verdict (`Reason: NEW on 1, 8453; unreachable on 143`), preceded by `Severity: high` when a sale through the Settler in force is refused today (a new deployment on a pinned chain refuses native-coin sales from the day it lands). Without `ZEROEX_API_KEY` the live corridors (including Monad MON → AUSD and USDC → MON) are skipped with a neutral line.
 
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from the 0x Swap API, so the quote names no block (`Quote.blockNumber` absent).
+
 ## License
 
 Apache-2.0

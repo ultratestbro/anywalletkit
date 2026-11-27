@@ -43,3 +43,7 @@ Fixtures (`fixtures/activity/`, public Ethereum WETH9 transactions,
 2026-10-14 — the test wallet's wrap runs were quote-only on the matrix): two
 `deposit()`, two `withdraw()`; negatives: a Uniswap `multicall` ending in
 `unwrapWETH9`, a Balancer Vault swap.
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: a wrap or an unwrap is 1:1 and reads no price, so the quote names no block (`Quote.blockNumber` absent).

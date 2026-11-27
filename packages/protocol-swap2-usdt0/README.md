@@ -215,3 +215,7 @@ USDT0 via LayerZero"; the owner's own `lzReceive` retry → the same; `send` on 
 Legacy Mesh OFT → "Bridged USDT0 → USDT" with "USDT0 Legacy Mesh · Arbitrum →
 Tron" (the destination from the calldata's eid). Fixtures
 are recorded mainnet transactions (`fixtures/activity`).
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the quote reads the OFT's fee and limits (`quoteOFT`, `quoteSend`) at "latest" — not a pool price compared across venues at one block, so the quote names no block (`Quote.blockNumber` absent).
