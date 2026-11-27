@@ -501,3 +501,7 @@ never send transactions; only `verify-mainnet.mjs --send` does.
 
 Protocol documentation: [Stargate integration](https://docs.layerzero.network/v2/developers/evm/stargate/overview),
 [Value Transfer API](https://docs.layerzero.network/v2/developers/value-transfer-api/overview).
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the quote reads the bridge's fee and limits (`quoteOFT`, `quoteSend`) at "latest" — not a pool price compared across venues at one block, so the quote names no block (`Quote.blockNumber` absent).

@@ -115,3 +115,7 @@ pnpm test                 # unit: hash vectors, signature recovery, a negative f
 RELAY_LIVE=1 pnpm test    # + live quotes through the provider and the router (read-only, keyless)
 pnpm verify:live          # every pin against /chains and on chain, twelve live corridors (read-only)
 ```
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from Relay's API, so the quote names no block (`Quote.blockNumber` absent).

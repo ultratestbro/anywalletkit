@@ -144,3 +144,7 @@ hash is only known through the kit's intent journal / Circle's attestation API,
 so `related` stays empty. Fixtures in `fixtures/activity/` are public Ethereum
 transactions (two burns, two claims) plus negatives (a LI.FI bridge, a THORChain
 deposit); the conformance suite runs them through `describeActivity`.
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the fee comes from Circle's API, so the quote names no block (`Quote.blockNumber` absent).

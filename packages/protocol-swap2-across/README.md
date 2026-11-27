@@ -176,3 +176,7 @@ pnpm verify:live # keyless: every pin on chain and /suggested-fees on nine corri
 node scripts/record-fixtures.mjs   # re-record the status and activity fixtures (read-only, public RPCs)
 ACROSS_API_KEY=… node scripts/record-quotes.mjs   # re-record fixtures/api/quotes through the real provider (read-only)
 ```
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from the Across API, so the quote names no block (`Quote.blockNumber` absent).

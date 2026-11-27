@@ -128,3 +128,7 @@ Fixtures (`fixtures/activity/`, test wallet `0x8AbE…55bA` on Ethereum): two
 same-chain swaps (USDT → USDC, USDT → ETH), three bridge source legs
 (RelayDepository, Mayan with rebate, NEARIntents facet); negatives: a THORChain
 `depositWithExpiry`, a WETH9 `deposit()`.
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from the LI.FI API, so the quote names no block (`Quote.blockNumber` absent).

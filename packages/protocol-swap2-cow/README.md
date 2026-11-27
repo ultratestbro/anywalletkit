@@ -135,4 +135,8 @@ poll a status at most every 2. Every order names its app in appData (`appCode`),
 
 CoW Protocol, CoW Swap and CoW DAO are names of CoW DAO; this package is an independent integration, not affiliated with or endorsed by CoW DAO. It contains no CoW code: the order, permit and eth-flow encodings are written from the public contracts and API reference linked above.
 
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from the CoW Protocol API (its solvers settle the order later), so the quote names no block (`Quote.blockNumber` absent).
+
 Apache-2.0.

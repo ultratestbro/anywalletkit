@@ -111,3 +111,7 @@ left to other modules. The fixtures are real mainnet swaps.
   suites.
 - `JUPITER_LIVE=1 pnpm test`: a live `/build` answer through wallet-solana's
   guard on mainnet for a funded public wallet (simulation only, nothing signed).
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from Jupiter's API, so the quote names no block (`Quote.blockNumber` absent).

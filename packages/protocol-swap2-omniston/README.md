@@ -210,3 +210,7 @@ Fixtures (`fixtures/activity/`, test wallet `UQCbXJ1-…fQaq`, tonapi events):
 two STON.fi swaps (GRAM → USD₮, USD₮ → GRAM) and one escrow order (1.6 USD₮);
 negatives: a 1Click deposit on TON (a plain jetton transfer to a one-time
 address — must stay null) and an EVM LI.FI swap.
+
+## `blockNumber`
+
+`QuoteParams.blockNumber` (one block for a comparison round) is not supported: the price comes from STON.fi's Omniston (its resolvers' quotes), so the quote names no block (`Quote.blockNumber` absent).
