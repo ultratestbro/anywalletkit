@@ -12,7 +12,7 @@
     "sha": "977a3b5a1c",
     "url": "https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/config/deployment_registry.json"
    },
-   "seenAt": "2026-11-26T16:52:57.857Z",
+   "seenAt": "2026-11-27T16:38:21.885Z",
    "changedAt": "2026-11-26T16:52:57.857Z"
   },
   "fynd-license": {
@@ -26,7 +26,7 @@
     "sha": "1caf1ec20a",
     "url": "https://github.com/propeller-heads/fynd/blob/main/LICENSE.md"
    },
-   "seenAt": "2026-11-26T16:52:57.880Z",
+   "seenAt": "2026-11-27T16:38:21.898Z",
    "changedAt": "2026-11-04T09:36:08.308Z"
   },
   "hosted-api-docs": {
@@ -40,7 +40,7 @@
     "sha": "1f870c91e4",
     "url": "https://github.com/propeller-heads/fynd/blob/main/docs/get-started/hosted-api.md"
    },
-   "seenAt": "2026-11-26T16:52:57.909Z",
+   "seenAt": "2026-11-27T16:38:21.934Z",
    "changedAt": "2026-11-17T15:59:05.543Z"
   },
   "fynd-releases": {
@@ -48,16 +48,16 @@
    "target": {
     "repo": "propeller-heads/fynd"
    },
-   "value": "0.129.3",
+   "value": "0.129.4",
    "meta": {
-    "tag": "0.129.3",
-    "name": "0.129.3",
-    "at": "2026-11-26",
-    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.129.3",
+    "tag": "0.129.4",
+    "name": "0.129.4",
+    "at": "2026-11-27",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.129.4",
     "prerelease": false
    },
-   "seenAt": "2026-11-26T16:52:57.951Z",
-   "changedAt": "2026-11-26T16:52:57.951Z"
+   "seenAt": "2026-11-27T16:38:22.004Z",
+   "changedAt": "2026-11-27T16:38:22.004Z"
   }
  }
 }

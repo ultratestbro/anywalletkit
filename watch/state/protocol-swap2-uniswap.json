@@ -12,7 +12,7 @@
     "codeHash": "6b7cd5cf7e8bb496",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.326Z",
+   "seenAt": "2026-11-27T16:38:31.387Z",
    "changedAt": "2026-10-14T15:10:56.533Z"
   },
   "swap-router-02-ethereum": {
@@ -26,7 +26,7 @@
     "codeHash": "5e0979f7c36eac03",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:10.330Z",
+   "seenAt": "2026-11-27T16:38:31.393Z",
    "changedAt": "2026-10-14T15:10:56.555Z"
   },
   "factory-ethereum": {
@@ -40,7 +40,7 @@
     "codeHash": "56e749dfb2334045",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:10.328Z",
+   "seenAt": "2026-11-27T16:38:31.404Z",
    "changedAt": "2026-10-14T15:10:56.568Z"
   },
   "quoter-v2-op-mainnet": {
@@ -54,7 +54,7 @@
     "codeHash": "9c8284312173931b",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.350Z",
+   "seenAt": "2026-11-27T16:38:31.370Z",
    "changedAt": "2026-10-14T15:10:56.580Z"
   },
   "swap-router-02-op-mainnet": {
@@ -68,7 +68,7 @@
     "codeHash": "d4e88a8bcdde9239",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:10.363Z",
+   "seenAt": "2026-11-27T16:38:31.379Z",
    "changedAt": "2026-10-14T15:10:56.590Z"
   },
   "factory-op-mainnet": {
@@ -82,7 +82,7 @@
     "codeHash": "56e749dfb2334045",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:10.364Z",
+   "seenAt": "2026-11-27T16:38:31.380Z",
    "changedAt": "2026-10-14T15:10:56.610Z"
   },
   "quoter-v2-unichain": {
@@ -96,7 +96,7 @@
     "codeHash": "c2b3e60a64112fc0",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.535Z",
+   "seenAt": "2026-11-27T16:38:31.497Z",
    "changedAt": "2026-11-04T17:01:47.777Z"
   },
   "factory-unichain": {
@@ -110,7 +110,7 @@
     "codeHash": "8a7e594ffd4bc5b1",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:10.586Z",
+   "seenAt": "2026-11-27T16:38:31.533Z",
    "changedAt": "2026-10-14T15:10:57.100Z"
   },
   "swap-router-02-unichain": {
@@ -124,7 +124,7 @@
     "codeHash": "515ef786aeaeba09",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:10.615Z",
+   "seenAt": "2026-11-27T16:38:31.550Z",
    "changedAt": "2026-10-14T15:10:57.112Z"
   },
   "quoter-v2-polygon": {
@@ -138,7 +138,7 @@
     "codeHash": "323eb74cc0476d7c",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.418Z",
+   "seenAt": "2026-11-27T16:38:31.450Z",
    "changedAt": "2026-10-14T15:10:57.401Z"
   },
   "swap-router-02-polygon": {
@@ -152,7 +152,7 @@
     "codeHash": "dc780caef812649b",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:10.422Z",
+   "seenAt": "2026-11-27T16:38:31.459Z",
    "changedAt": "2026-10-14T15:10:57.413Z"
   },
   "factory-polygon": {
@@ -166,7 +166,7 @@
     "codeHash": "56e749dfb2334045",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:10.421Z",
+   "seenAt": "2026-11-27T16:38:31.456Z",
    "changedAt": "2026-10-14T15:10:57.437Z"
   },
   "swap-router-02-bnb-chain": {
@@ -180,7 +180,7 @@
     "codeHash": "7e94384a5e5ab8b4",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:10.375Z",
+   "seenAt": "2026-11-27T16:38:31.417Z",
    "changedAt": "2026-10-14T15:10:57.953Z"
   },
   "swap-router-02-monad": {
@@ -194,7 +194,7 @@
     "codeHash": "f641f8882bf31119",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:10.553Z",
+   "seenAt": "2026-11-27T16:38:31.600Z",
    "changedAt": "2026-10-14T15:10:58.018Z"
   },
   "quoter-v2-monad": {
@@ -208,7 +208,7 @@
     "codeHash": "9b1ac7f4971ed40b",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.539Z",
+   "seenAt": "2026-11-27T16:38:31.576Z",
    "changedAt": "2026-11-04T17:01:47.841Z"
   },
   "quoter-v2-x-layer": {
@@ -222,7 +222,7 @@
     "codeHash": "31b8393e7d9aac81",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:11.070Z",
+   "seenAt": "2026-11-27T16:38:31.560Z",
    "changedAt": "2026-11-04T17:01:48.016Z"
   },
   "factory-monad": {
@@ -236,7 +236,7 @@
     "codeHash": "5f62806b8c43dbee",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:10.538Z",
+   "seenAt": "2026-11-27T16:38:31.589Z",
    "changedAt": "2026-10-14T15:10:58.546Z"
   },
   "swap-router-02-x-layer": {
@@ -250,7 +250,7 @@
     "codeHash": "ba46c4c09bd548bd",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:11.268Z",
+   "seenAt": "2026-11-27T16:38:31.594Z",
    "changedAt": "2026-10-14T15:10:58.581Z"
   },
   "factory-bnb-chain": {
@@ -264,7 +264,7 @@
     "codeHash": "7dffb1f3dc9bdbc5",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:10.371Z",
+   "seenAt": "2026-11-27T16:38:31.411Z",
    "changedAt": "2026-10-14T15:10:58.617Z"
   },
   "quoter-v2-bnb-chain": {
@@ -278,7 +278,7 @@
     "codeHash": "52869eec25f3b15f",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.365Z",
+   "seenAt": "2026-11-27T16:38:31.415Z",
    "changedAt": "2026-10-14T15:10:58.694Z"
   },
   "factory-x-layer": {
@@ -292,7 +292,7 @@
     "codeHash": "3bfad8fd1adc4b4d",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:11.566Z",
+   "seenAt": "2026-11-27T16:38:31.649Z",
    "changedAt": "2026-10-14T15:10:58.820Z"
   },
   "factory-zksync-era": {
@@ -306,7 +306,7 @@
     "codeHash": "8cbadddc29db76fe",
     "bytes": 8288
    },
-   "seenAt": "2026-11-26T16:53:10.635Z",
+   "seenAt": "2026-11-27T16:38:31.681Z",
    "changedAt": "2026-10-14T15:10:59.025Z"
   },
   "quoter-v2-zksync-era": {
@@ -320,7 +320,7 @@
     "codeHash": "789f48e07548ce0a",
     "bytes": 74144
    },
-   "seenAt": "2026-11-26T16:53:10.661Z",
+   "seenAt": "2026-11-27T16:38:31.632Z",
    "changedAt": "2026-10-14T15:10:59.241Z"
   },
   "quoter-v2-world-chain": {
@@ -334,7 +334,7 @@
     "codeHash": "e119531c5c766617",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.770Z",
+   "seenAt": "2026-11-27T16:38:31.631Z",
    "changedAt": "2026-10-14T15:10:59.242Z"
   },
   "factory-robinhood-chain": {
@@ -348,7 +348,7 @@
     "codeHash": "6b14bc82001eba5c",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:11.549Z",
+   "seenAt": "2026-11-27T16:38:31.677Z",
    "changedAt": "2026-10-14T15:10:59.540Z"
   },
   "swap-router-02-zksync-era": {
@@ -362,7 +362,7 @@
     "codeHash": "df2e72bc2c729990",
     "bytes": 167392
    },
-   "seenAt": "2026-11-26T16:53:10.726Z",
+   "seenAt": "2026-11-27T16:38:31.718Z",
    "changedAt": "2026-10-14T15:10:59.587Z"
   },
   "swap-router-02-world-chain": {
@@ -376,7 +376,7 @@
     "codeHash": "2538879ddfd4856e",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:10.838Z",
+   "seenAt": "2026-11-27T16:38:31.669Z",
    "changedAt": "2026-10-14T15:10:59.731Z"
   },
   "factory-base": {
@@ -390,7 +390,7 @@
     "codeHash": "4cfbd1570a7581d0",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:10.936Z",
+   "seenAt": "2026-11-27T16:38:31.717Z",
    "changedAt": "2026-10-14T15:10:59.870Z"
   },
   "swap-router-02-base": {
@@ -404,7 +404,7 @@
     "codeHash": "17471a75bc2700a2",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:10.957Z",
+   "seenAt": "2026-11-27T16:38:31.733Z",
    "changedAt": "2026-10-14T15:11:00.063Z"
   },
   "factory-arbitrum": {
@@ -418,7 +418,7 @@
     "codeHash": "56e749dfb2334045",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:11.057Z",
+   "seenAt": "2026-11-27T16:38:31.731Z",
    "changedAt": "2026-10-14T15:11:00.145Z"
   },
   "quoter-v2-base": {
@@ -432,7 +432,7 @@
     "codeHash": "a4f4b49709f793f9",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.946Z",
+   "seenAt": "2026-11-27T16:38:31.724Z",
    "changedAt": "2026-10-14T15:11:00.199Z"
   },
   "swap-router-02-arbitrum": {
@@ -446,7 +446,7 @@
     "codeHash": "dec742e36ee95cbf",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:11.085Z",
+   "seenAt": "2026-11-27T16:38:31.761Z",
    "changedAt": "2026-10-14T15:11:00.272Z"
   },
   "factory-world-chain": {
@@ -460,7 +460,7 @@
     "codeHash": "c7040dd3f877e6dc",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:10.789Z",
+   "seenAt": "2026-11-27T16:38:31.692Z",
    "changedAt": "2026-10-14T15:11:00.394Z"
   },
   "quoter-v2-arbitrum": {
@@ -474,7 +474,7 @@
     "codeHash": "2932bfcaa454826d",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:11.070Z",
+   "seenAt": "2026-11-27T16:38:31.750Z",
    "changedAt": "2026-10-14T15:11:00.395Z"
   },
   "quoter-v2-celo": {
@@ -488,7 +488,7 @@
     "codeHash": "78b86ee95d6f60a4",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:11.217Z",
+   "seenAt": "2026-11-27T16:38:31.762Z",
    "changedAt": "2026-10-14T15:11:00.592Z"
   },
   "quoter-v2-robinhood-chain": {
@@ -502,7 +502,7 @@
     "codeHash": "9f8e9b16d6c88486",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:10.901Z",
+   "seenAt": "2026-11-27T16:38:31.685Z",
    "changedAt": "2026-10-14T15:11:00.597Z"
   },
   "swap-router-02-robinhood-chain": {
@@ -516,7 +516,7 @@
     "codeHash": "4eb27623b2dada04",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:11.608Z",
+   "seenAt": "2026-11-27T16:38:31.789Z",
    "changedAt": "2026-10-14T15:11:00.605Z"
   },
   "factory-avalanche": {
@@ -530,7 +530,7 @@
     "codeHash": "12bfa5a3bdc1bd74",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:11.441Z",
+   "seenAt": "2026-11-27T16:38:32.176Z",
    "changedAt": "2026-10-14T15:11:00.606Z"
   },
   "swap-router-02-celo": {
@@ -544,7 +544,7 @@
     "codeHash": "e148de9571976629",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:11.212Z",
+   "seenAt": "2026-11-27T16:38:31.768Z",
    "changedAt": "2026-10-14T15:11:00.667Z"
   },
   "quoter-v2-avalanche": {
@@ -558,7 +558,7 @@
     "codeHash": "8028a74293efe5fe",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:11.389Z",
+   "seenAt": "2026-11-27T16:38:32.066Z",
    "changedAt": "2026-10-14T15:11:00.746Z"
   },
   "swap-router-02-avalanche": {
@@ -572,7 +572,7 @@
     "codeHash": "a734dd55568713b0",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:11.522Z",
+   "seenAt": "2026-11-27T16:38:31.874Z",
    "changedAt": "2026-10-14T15:11:00.781Z"
   },
   "quoter-v2-ink": {
@@ -586,7 +586,7 @@
     "codeHash": "2e3afabf05e8e3a4",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:11.903Z",
+   "seenAt": "2026-11-27T16:38:31.808Z",
    "changedAt": "2026-10-14T15:11:00.919Z"
   },
   "swap-router-02-ink": {
@@ -600,7 +600,7 @@
     "codeHash": "913533058b853c78",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:12.260Z",
+   "seenAt": "2026-11-27T16:38:31.920Z",
    "changedAt": "2026-10-14T15:11:01.036Z"
   },
   "factory-celo": {
@@ -614,7 +614,7 @@
     "codeHash": "d50934a0ddea9370",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:11.158Z",
+   "seenAt": "2026-11-27T16:38:31.771Z",
    "changedAt": "2026-10-14T15:11:01.229Z"
   },
   "quoter-v2-linea": {
@@ -628,7 +628,7 @@
     "codeHash": "b5c8e360231a4ebd",
     "bytes": 8273
    },
-   "seenAt": "2026-11-26T16:53:11.696Z",
+   "seenAt": "2026-11-27T16:38:31.840Z",
    "changedAt": "2026-11-04T17:01:48.230Z"
   },
   "factory-ink": {
@@ -642,7 +642,7 @@
     "codeHash": "2b2284d9031ccee1",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:12.076Z",
+   "seenAt": "2026-11-27T16:38:31.814Z",
    "changedAt": "2026-10-14T15:11:01.444Z"
   },
   "swap-router-02-linea": {
@@ -656,7 +656,7 @@
     "codeHash": "bd2fea8e214c2b28",
     "bytes": 24497
    },
-   "seenAt": "2026-11-26T16:53:11.779Z",
+   "seenAt": "2026-11-27T16:38:31.874Z",
    "changedAt": "2026-10-14T15:11:01.459Z"
   },
   "docs-deployments": {
@@ -669,7 +669,7 @@
     "hash": "df712f56f56209a1",
     "chars": 2802
    },
-   "seenAt": "2026-11-26T16:53:12.467Z",
+   "seenAt": "2026-11-27T16:38:32.195Z",
    "changedAt": "2026-11-21T14:39:29.878Z"
   },
   "factory-linea": {
@@ -683,7 +683,7 @@
     "codeHash": "d0817223c191ae52",
     "bytes": 24535
    },
-   "seenAt": "2026-11-26T16:53:11.715Z",
+   "seenAt": "2026-11-27T16:38:31.852Z",
    "changedAt": "2026-10-14T15:11:02.695Z"
   },
   "sdks": {
@@ -699,7 +699,7 @@
     "url": "https://github.com/Uniswap/sdks/releases/tag/%40uniswap/liquidity-launcher-sdk%402.2.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-26T16:53:12.247Z",
+   "seenAt": "2026-11-27T16:38:32.205Z",
    "changedAt": "2026-11-20T15:26:57.055Z"
   },
   "v3-core": {
@@ -713,7 +713,7 @@
     "url": "https://github.com/Uniswap/v3-core/releases/tag/v1.0.0",
     "note": "tags only"
    },
-   "seenAt": "2026-11-26T16:53:12.386Z",
+   "seenAt": "2026-11-27T16:38:32.338Z",
    "changedAt": "2026-10-14T15:12:28.389Z"
   },
   "v3-periphery": {
@@ -727,7 +727,7 @@
     "url": "https://github.com/Uniswap/v3-periphery/releases/tag/v1.3.0",
     "note": "tags only"
    },
-   "seenAt": "2026-11-26T16:53:12.372Z",
+   "seenAt": "2026-11-27T16:38:32.377Z",
    "changedAt": "2026-10-14T15:12:28.415Z"
   },
   "deployments-status": {
@@ -1129,8 +1129,3302 @@
     ],
     "problems": []
    },
-   "seenAt": "2026-11-26T16:53:12.523Z",
+   "seenAt": "2026-11-27T16:38:32.109Z",
    "changedAt": "2026-11-04T17:01:48.725Z"
+  },
+  "v4-poolmanager-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x000000000004444c5dc75cb358380d2e3de08a90"
+   },
+   "value": "62b338e5f430128d",
+   "meta": {
+    "codeHash": "62b338e5f430128d",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.179Z",
+   "changedAt": "2026-11-27T16:38:32.179Z"
+  },
+  "v4-quoter-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x99bd42b2b22e531f283b7f8a86dff631eb16a9d1"
+   },
+   "value": "79b32b16ef75cb65",
+   "meta": {
+    "codeHash": "79b32b16ef75cb65",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.233Z",
+   "changedAt": "2026-11-27T16:38:32.233Z"
+  },
+  "v4-stateview-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x7ffe42c4a5deea5b0fec41c94c136cf115597227"
+   },
+   "value": "f3b18f4dd2b78d9d",
+   "meta": {
+    "codeHash": "f3b18f4dd2b78d9d",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.234Z",
+   "changedAt": "2026-11-27T16:38:32.234Z"
+  },
+  "v4-swapproxy-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.261Z",
+   "changedAt": "2026-11-27T16:38:32.261Z"
+  },
+  "v4-router-ethereum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 1,
+    "address": "0x23617e59a5925b2a4bf75d73ff6711cd0b29de85"
+   },
+   "value": "8ccadb2bc83273e4",
+   "meta": {
+    "codeHash": "8ccadb2bc83273e4",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.267Z",
+   "changedAt": "2026-11-27T16:38:32.267Z"
+  },
+  "v4-pm-owner-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x000000000004444c5dc75cb358380d2e3de08a90",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x1a9c8182c09f50c8318d769245bea52c32be35bc\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x1a9c8182c09f50c8318d769245bea52c32be35bc"
+   },
+   "seenAt": "2026-11-27T16:38:32.287Z",
+   "changedAt": "2026-11-27T16:38:32.287Z"
+  },
+  "v4-pm-fee-controller-ethereum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 1,
+    "to": "0x000000000004444c5dc75cb358380d2e3de08a90",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x89a5d5bf00a27d55c02951e49078a5c5771051db\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x89a5d5bf00a27d55c02951e49078a5c5771051db"
+   },
+   "seenAt": "2026-11-27T16:38:32.290Z",
+   "changedAt": "2026-11-27T16:38:32.290Z"
+  },
+  "v4-quoter-op-mainnet": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0xd673f731edfe5aaf1bda7fd43d13bbb5150b87ca"
+   },
+   "value": "ad11fbd16bebaa77",
+   "meta": {
+    "codeHash": "ad11fbd16bebaa77",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.305Z",
+   "changedAt": "2026-11-27T16:38:32.305Z"
+  },
+  "v4-poolmanager-op-mainnet": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x9a13f98cb987694c9f086b1f5eb990eea8264ec3"
+   },
+   "value": "da9c29259bf021ec",
+   "meta": {
+    "codeHash": "da9c29259bf021ec",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.307Z",
+   "changedAt": "2026-11-27T16:38:32.307Z"
+  },
+  "v4-router-op-mainnet": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0xc09255d86db563cbc11c2fcf4a0c512e160111b4"
+   },
+   "value": "aedaa9e2fed94bac",
+   "meta": {
+    "codeHash": "aedaa9e2fed94bac",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.327Z",
+   "changedAt": "2026-11-27T16:38:32.327Z"
+  },
+  "v4-stateview-op-mainnet": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0xc18a3169788f4f75a170290584eca6395c75ecdb"
+   },
+   "value": "84226bb8041d763e",
+   "meta": {
+    "codeHash": "84226bb8041d763e",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.328Z",
+   "changedAt": "2026-11-27T16:38:32.328Z"
+  },
+  "v4-swapproxy-op-mainnet": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 10,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.343Z",
+   "changedAt": "2026-11-27T16:38:32.343Z"
+  },
+  "v4-pm-owner-op-mainnet": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 10,
+    "to": "0x9a13f98cb987694c9f086b1f5eb990eea8264ec3",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xa1dd330d602c32622aa270ea73d078b803cb3518\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xa1dd330d602c32622aa270ea73d078b803cb3518"
+   },
+   "seenAt": "2026-11-27T16:38:32.344Z",
+   "changedAt": "2026-11-27T16:38:32.344Z"
+  },
+  "v4-pm-fee-controller-op-mainnet": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 10,
+    "to": "0x9a13f98cb987694c9f086b1f5eb990eea8264ec3",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0xd85393784234fb2ee4f077867a8b78e1ad4ce56b\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0xd85393784234fb2ee4f077867a8b78e1ad4ce56b"
+   },
+   "seenAt": "2026-11-27T16:38:32.357Z",
+   "changedAt": "2026-11-27T16:38:32.357Z"
+  },
+  "v4-poolmanager-bnb-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0x28e2ea090877bf75740558f6bfb36a5ffee9e9df"
+   },
+   "value": "fc8cd4859eb18d09",
+   "meta": {
+    "codeHash": "fc8cd4859eb18d09",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.367Z",
+   "changedAt": "2026-11-27T16:38:32.367Z"
+  },
+  "v4-quoter-bnb-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0x95c086d7fe28add842ee220fef225a777474d781"
+   },
+   "value": "33688a6dbe4974b9",
+   "meta": {
+    "codeHash": "33688a6dbe4974b9",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.373Z",
+   "changedAt": "2026-11-27T16:38:32.373Z"
+  },
+  "v4-stateview-bnb-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0xd13dd3d6e93f276fafc9db9e6bb47c1180aee0c4"
+   },
+   "value": "207aa7f3917f77bc",
+   "meta": {
+    "codeHash": "207aa7f3917f77bc",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.373Z",
+   "changedAt": "2026-11-27T16:38:32.373Z"
+  },
+  "v4-swapproxy-bnb-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.388Z",
+   "changedAt": "2026-11-27T16:38:32.388Z"
+  },
+  "v4-router-bnb-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 56,
+    "address": "0xdc264714f68d84cf29bc605589405e78bdbe7c9f"
+   },
+   "value": "855bb67f8c0a5ca3",
+   "meta": {
+    "codeHash": "855bb67f8c0a5ca3",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.392Z",
+   "changedAt": "2026-11-27T16:38:32.392Z"
+  },
+  "v4-pm-owner-bnb-chain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 56,
+    "to": "0x28e2ea090877bf75740558f6bfb36a5ffee9e9df",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x341c1511141022cf8ee20824ae0ffa3491f1302b\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x341c1511141022cf8ee20824ae0ffa3491f1302b"
+   },
+   "seenAt": "2026-11-27T16:38:32.400Z",
+   "changedAt": "2026-11-27T16:38:32.400Z"
+  },
+  "v4-pm-fee-controller-bnb-chain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 56,
+    "to": "0x28e2ea090877bf75740558f6bfb36a5ffee9e9df",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x66276d2e80784180e4b9b859e4327b9c5646b87c\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x66276d2e80784180e4b9b859e4327b9c5646b87c"
+   },
+   "seenAt": "2026-11-27T16:38:32.407Z",
+   "changedAt": "2026-11-27T16:38:32.407Z"
+  },
+  "v4-quoter-unichain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0xf885781cb68a0be66aa2ac7eda5fe72bde7da907"
+   },
+   "value": "cbc351ea9a0c2d36",
+   "meta": {
+    "codeHash": "cbc351ea9a0c2d36",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.408Z",
+   "changedAt": "2026-11-27T16:38:32.408Z"
+  },
+  "v4-poolmanager-unichain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x1f98400000000000000000000000000000000004"
+   },
+   "value": "2b0f0bb5181faa5b",
+   "meta": {
+    "codeHash": "2b0f0bb5181faa5b",
+    "bytes": 24050
+   },
+   "seenAt": "2026-11-27T16:38:32.420Z",
+   "changedAt": "2026-11-27T16:38:32.420Z"
+  },
+  "v4-stateview-unichain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x86e8631a016f9068c3f085faf484ee3f5fdee8f2"
+   },
+   "value": "a68255327e07c9b6",
+   "meta": {
+    "codeHash": "a68255327e07c9b6",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.426Z",
+   "changedAt": "2026-11-27T16:38:32.426Z"
+  },
+  "v4-pm-fee-controller-unichain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 130,
+    "to": "0x1f98400000000000000000000000000000000004",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:32.437Z",
+   "changedAt": "2026-11-27T16:38:32.437Z"
+  },
+  "v4-quoter-polygon": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x31ab0dea31fc0ad5a54f03cd59c896ecd067447b"
+   },
+   "value": "1976a303f750e79c",
+   "meta": {
+    "codeHash": "1976a303f750e79c",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.461Z",
+   "changedAt": "2026-11-27T16:38:32.461Z"
+  },
+  "v4-poolmanager-polygon": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x67366782805870060151383f4bbff9dab53e5cd6"
+   },
+   "value": "0a4ac669d537eef5",
+   "meta": {
+    "codeHash": "0a4ac669d537eef5",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.462Z",
+   "changedAt": "2026-11-27T16:38:32.462Z"
+  },
+  "v4-stateview-polygon": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a"
+   },
+   "value": "43fbc63f9d02c6bf",
+   "meta": {
+    "codeHash": "43fbc63f9d02c6bf",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.476Z",
+   "changedAt": "2026-11-27T16:38:32.476Z"
+  },
+  "v4-swapproxy-polygon": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.498Z",
+   "changedAt": "2026-11-27T16:38:32.498Z"
+  },
+  "v4-swapproxy-unichain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.502Z",
+   "changedAt": "2026-11-27T16:38:32.502Z"
+  },
+  "v4-router-polygon": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 137,
+    "address": "0xdc264714f68d84cf29bc605589405e78bdbe7c9f"
+   },
+   "value": "509359ba59c3b2c3",
+   "meta": {
+    "codeHash": "509359ba59c3b2c3",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.505Z",
+   "changedAt": "2026-11-27T16:38:32.505Z"
+  },
+  "v4-router-unichain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 130,
+    "address": "0xd1b797d92d87b688193a2b976efc8d577d204343"
+   },
+   "value": "eda56acaf3d00492",
+   "meta": {
+    "codeHash": "eda56acaf3d00492",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.511Z",
+   "changedAt": "2026-11-27T16:38:32.511Z"
+  },
+  "v4-pm-owner-unichain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 130,
+    "to": "0x1f98400000000000000000000000000000000004",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x2bad8182c09f50c8318d769245bea52c32be46cd\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x2bad8182c09f50c8318d769245bea52c32be46cd"
+   },
+   "seenAt": "2026-11-27T16:38:32.535Z",
+   "changedAt": "2026-11-27T16:38:32.535Z"
+  },
+  "v4-pm-fee-controller-polygon": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 137,
+    "to": "0x67366782805870060151383f4bbff9dab53e5cd6",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x59e84309afa65f084f9c03668583d231afb12cc6\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x59e84309afa65f084f9c03668583d231afb12cc6"
+   },
+   "seenAt": "2026-11-27T16:38:32.536Z",
+   "changedAt": "2026-11-27T16:38:32.536Z"
+  },
+  "v4-quoter-monad": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0xa222dd357a9076d1091ed6aa2e16c9742dd26891"
+   },
+   "value": "d24b433bd3a29997",
+   "meta": {
+    "codeHash": "d24b433bd3a29997",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.549Z",
+   "changedAt": "2026-11-27T16:38:32.549Z"
+  },
+  "v4-stateview-monad": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0x77395f3b2e73ae90843717371294fa97cc419d64"
+   },
+   "value": "72599ff41994d58b",
+   "meta": {
+    "codeHash": "72599ff41994d58b",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.550Z",
+   "changedAt": "2026-11-27T16:38:32.550Z"
+  },
+  "v4-poolmanager-monad": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0x188d586ddcf52439676ca21a244753fa19f9ea8e"
+   },
+   "value": "a94691941284383a",
+   "meta": {
+    "codeHash": "a94691941284383a",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.559Z",
+   "changedAt": "2026-11-27T16:38:32.559Z"
+  },
+  "v4-pm-fee-controller-monad": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 143,
+    "to": "0x188d586ddcf52439676ca21a244753fa19f9ea8e",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:32.580Z",
+   "changedAt": "2026-11-27T16:38:32.580Z"
+  },
+  "v4-pm-owner-monad": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 143,
+    "to": "0x188d586ddcf52439676ca21a244753fa19f9ea8e",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xe783de89a7f0408687f051e3e6d0beb62719ebad\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xe783de89a7f0408687f051e3e6d0beb62719ebad"
+   },
+   "seenAt": "2026-11-27T16:38:32.590Z",
+   "changedAt": "2026-11-27T16:38:32.590Z"
+  },
+  "v4-pm-owner-polygon": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 137,
+    "to": "0x67366782805870060151383f4bbff9dab53e5cd6",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x8a1b966ac46f42275860f905dbc75efbfdc12374\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x8a1b966ac46f42275860f905dbc75efbfdc12374"
+   },
+   "seenAt": "2026-11-27T16:38:32.591Z",
+   "changedAt": "2026-11-27T16:38:32.591Z"
+  },
+  "v4-quoter-x-layer": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x8928074ca1b241d8ec02815881c1af11e8bc5219"
+   },
+   "value": "45b4a0a195868665",
+   "meta": {
+    "codeHash": "45b4a0a195868665",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.608Z",
+   "changedAt": "2026-11-27T16:38:32.608Z"
+  },
+  "v4-poolmanager-x-layer": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x360e68faccca8ca495c1b759fd9eee466db9fb32"
+   },
+   "value": "0b00585ef584e368",
+   "meta": {
+    "codeHash": "0b00585ef584e368",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.610Z",
+   "changedAt": "2026-11-27T16:38:32.610Z"
+  },
+  "v4-stateview-x-layer": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990"
+   },
+   "value": "1621e40069cef836",
+   "meta": {
+    "codeHash": "1621e40069cef836",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.628Z",
+   "changedAt": "2026-11-27T16:38:32.628Z"
+  },
+  "v4-swapproxy-monad": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.628Z",
+   "changedAt": "2026-11-27T16:38:32.628Z"
+  },
+  "v4-swapproxy-x-layer": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.634Z",
+   "changedAt": "2026-11-27T16:38:32.634Z"
+  },
+  "v4-pm-owner-x-layer": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 196,
+    "to": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x044aaf330d7fd6ae683eec5c1c1d1fff5196b6b7\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x044aaf330d7fd6ae683eec5c1c1d1fff5196b6b7"
+   },
+   "seenAt": "2026-11-27T16:38:32.650Z",
+   "changedAt": "2026-11-27T16:38:32.650Z"
+  },
+  "v4-router-monad": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 143,
+    "address": "0xa6ce4f10d83dbddac17e68e1837ca9ce6a1b596e"
+   },
+   "value": "8e1721e6e8f0c290",
+   "meta": {
+    "codeHash": "8e1721e6e8f0c290",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.653Z",
+   "changedAt": "2026-11-27T16:38:32.653Z"
+  },
+  "v4-pm-fee-controller-x-layer": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 196,
+    "to": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:32.665Z",
+   "changedAt": "2026-11-27T16:38:32.665Z"
+  },
+  "v4-quoter-world-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0xad02601f1be313c952ad198c0cbc3f87f9ee8e63"
+   },
+   "value": "db6d777cf3707913",
+   "meta": {
+    "codeHash": "db6d777cf3707913",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.665Z",
+   "changedAt": "2026-11-27T16:38:32.665Z"
+  },
+  "v4-poolmanager-world-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0xb1860d529182ac3bc1f51fa2abd56662b7d13f33"
+   },
+   "value": "62a7fafaae030d12",
+   "meta": {
+    "codeHash": "62a7fafaae030d12",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.670Z",
+   "changedAt": "2026-11-27T16:38:32.670Z"
+  },
+  "v4-pm-owner-world-chain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 480,
+    "to": "0xb1860d529182ac3bc1f51fa2abd56662b7d13f33",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xcb2436774c3e191c85056d248ef4260ce5f27a9d\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xcb2436774c3e191c85056d248ef4260ce5f27a9d"
+   },
+   "seenAt": "2026-11-27T16:38:32.697Z",
+   "changedAt": "2026-11-27T16:38:32.697Z"
+  },
+  "v4-pm-fee-controller-world-chain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 480,
+    "to": "0xb1860d529182ac3bc1f51fa2abd56662b7d13f33",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:32.705Z",
+   "changedAt": "2026-11-27T16:38:32.705Z"
+  },
+  "v4-router-x-layer": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 196,
+    "address": "0x1cd182c94fcf42277b80dbb9060f88024809e61e"
+   },
+   "value": "14bf0c0306197752",
+   "meta": {
+    "codeHash": "14bf0c0306197752",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.754Z",
+   "changedAt": "2026-11-27T16:38:32.754Z"
+  },
+  "v4-swapproxy-world-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.768Z",
+   "changedAt": "2026-11-27T16:38:32.768Z"
+  },
+  "v4-router-world-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0xf025e0fe9e331a0ef05c2ad3c4e9c64b625cda6f"
+   },
+   "value": "696ab6fdd364d997",
+   "meta": {
+    "codeHash": "696ab6fdd364d997",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.778Z",
+   "changedAt": "2026-11-27T16:38:32.778Z"
+  },
+  "v4-stateview-world-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 480,
+    "address": "0x51d394718bc09297262e368c1a481217fdeb71eb"
+   },
+   "value": "49236c89d25ca204",
+   "meta": {
+    "codeHash": "49236c89d25ca204",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.784Z",
+   "changedAt": "2026-11-27T16:38:32.784Z"
+  },
+  "v4-poolmanager-hyperevm": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 999,
+    "address": "0x12d4fd9c5dedd00ab8a0bce2cf0167bbf94b6b1f"
+   },
+   "value": "155f44bb606aee82",
+   "meta": {
+    "codeHash": "155f44bb606aee82",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.813Z",
+   "changedAt": "2026-11-27T16:38:32.813Z"
+  },
+  "v4-quoter-hyperevm": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 999,
+    "address": "0x108bfe38532c98f8cd8d7ab49c9ddaa3675a1c5e"
+   },
+   "value": "2285909005588478",
+   "meta": {
+    "codeHash": "2285909005588478",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.815Z",
+   "changedAt": "2026-11-27T16:38:32.815Z"
+  },
+  "v4-pm-fee-controller-hyperevm": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 999,
+    "to": "0x12d4fd9c5dedd00ab8a0bce2cf0167bbf94b6b1f",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:32.844Z",
+   "changedAt": "2026-11-27T16:38:32.844Z"
+  },
+  "v4-stateview-hyperevm": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 999,
+    "address": "0x1656326235cb9e34cb58cade53ae30789ab32a1a"
+   },
+   "value": "564789cbcfc8d952",
+   "meta": {
+    "codeHash": "564789cbcfc8d952",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:32.875Z",
+   "changedAt": "2026-11-27T16:38:32.875Z"
+  },
+  "v4-swapproxy-hyperevm": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 999,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:32.876Z",
+   "changedAt": "2026-11-27T16:38:32.876Z"
+  },
+  "v4-router-hyperevm": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 999,
+    "address": "0xed270a1bcdc63cf1356d695e7f40961d4819d6bf"
+   },
+   "value": "5733beddba39e50a",
+   "meta": {
+    "codeHash": "5733beddba39e50a",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:32.895Z",
+   "changedAt": "2026-11-27T16:38:32.895Z"
+  },
+  "v4-pm-owner-hyperevm": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 999,
+    "to": "0x12d4fd9c5dedd00ab8a0bce2cf0167bbf94b6b1f",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x2d09d0c2f82c59b19b3c65a48ce2c550bf0921f9\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x2d09d0c2f82c59b19b3c65a48ce2c550bf0921f9"
+   },
+   "seenAt": "2026-11-27T16:38:32.908Z",
+   "changedAt": "2026-11-27T16:38:32.908Z"
+  },
+  "v4-quoter-megaeth": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4326,
+    "address": "0x94bdc671f0c35f44a1daa53143fd1f868d1623b9"
+   },
+   "value": "37abf42ba6852d66",
+   "meta": {
+    "codeHash": "37abf42ba6852d66",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:32.941Z",
+   "changedAt": "2026-11-27T16:38:32.941Z"
+  },
+  "v4-pm-fee-controller-megaeth": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4326,
+    "to": "0xacb7e78fa05d562e0a5d3089ec896d57d057d38e",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:32.972Z",
+   "changedAt": "2026-11-27T16:38:32.972Z"
+  },
+  "v4-poolmanager-megaeth": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4326,
+    "address": "0xacb7e78fa05d562e0a5d3089ec896d57d057d38e"
+   },
+   "value": "1837c59e9fccb11f",
+   "meta": {
+    "codeHash": "1837c59e9fccb11f",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:32.973Z",
+   "changedAt": "2026-11-27T16:38:32.973Z"
+  },
+  "v4-stateview-megaeth": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4326,
+    "address": "0x726f84e1dfb8d375a365e0808282f40d52d3e4e8"
+   },
+   "value": "8a26145311f3bcac",
+   "meta": {
+    "codeHash": "8a26145311f3bcac",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.009Z",
+   "changedAt": "2026-11-27T16:38:33.009Z"
+  },
+  "v4-quoter-robinhood-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x8dc178efb8111bb0973dd9d722ebeff267c98f94"
+   },
+   "value": "0a69fb997440ad6c",
+   "meta": {
+    "codeHash": "0a69fb997440ad6c",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.010Z",
+   "changedAt": "2026-11-27T16:38:33.010Z"
+  },
+  "v4-router-megaeth": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4326,
+    "address": "0xaedd1cf4c14e833140a61e9c0d2b73a64795c823"
+   },
+   "value": "4b05995e63a37ad7",
+   "meta": {
+    "codeHash": "4b05995e63a37ad7",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.014Z",
+   "changedAt": "2026-11-27T16:38:33.014Z"
+  },
+  "v4-poolmanager-robinhood-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951"
+   },
+   "value": "dc9622b1fc330db4",
+   "meta": {
+    "codeHash": "dc9622b1fc330db4",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:33.015Z",
+   "changedAt": "2026-11-27T16:38:33.015Z"
+  },
+  "v4-swapproxy-megaeth": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4326,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.021Z",
+   "changedAt": "2026-11-27T16:38:33.021Z"
+  },
+  "v4-pm-owner-megaeth": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4326,
+    "to": "0xacb7e78fa05d562e0a5d3089ec896d57d057d38e",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xa107580f73bd797bd8b87ff24e98346d99f93ddb\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xa107580f73bd797bd8b87ff24e98346d99f93ddb"
+   },
+   "seenAt": "2026-11-27T16:38:33.043Z",
+   "changedAt": "2026-11-27T16:38:33.043Z"
+  },
+  "v4-stateview-robinhood-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0xf3334192d15450cdd385c8b70e03f9a6bd9e673b"
+   },
+   "value": "515fa201ced80d95",
+   "meta": {
+    "codeHash": "515fa201ced80d95",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.044Z",
+   "changedAt": "2026-11-27T16:38:33.044Z"
+  },
+  "v4-pm-owner-robinhood-chain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4663,
+    "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x2bad8182c09f50c8318d769245bea52c32be46cd\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x2bad8182c09f50c8318d769245bea52c32be46cd"
+   },
+   "seenAt": "2026-11-27T16:38:33.050Z",
+   "changedAt": "2026-11-27T16:38:33.050Z"
+  },
+  "v4-router-robinhood-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x204faca1764b154221e35c0d20abb3c525710498"
+   },
+   "value": "9c00a5f73066268a",
+   "meta": {
+    "codeHash": "9c00a5f73066268a",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.059Z",
+   "changedAt": "2026-11-27T16:38:33.059Z"
+  },
+  "v4-swapproxy-robinhood-chain": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 4663,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.099Z",
+   "changedAt": "2026-11-27T16:38:33.099Z"
+  },
+  "v4-quoter-arc": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5042,
+    "address": "0x8dc178efb8111bb0973dd9d722ebeff267c98f94"
+   },
+   "value": "0a69fb997440ad6c",
+   "meta": {
+    "codeHash": "0a69fb997440ad6c",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.113Z",
+   "changedAt": "2026-11-27T16:38:33.113Z"
+  },
+  "v4-stateview-arc": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5042,
+    "address": "0xf3334192d15450cdd385c8b70e03f9a6bd9e673b"
+   },
+   "value": "515fa201ced80d95",
+   "meta": {
+    "codeHash": "515fa201ced80d95",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.114Z",
+   "changedAt": "2026-11-27T16:38:33.114Z"
+  },
+  "v4-poolmanager-arc": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5042,
+    "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951"
+   },
+   "value": "dc9622b1fc330db4",
+   "meta": {
+    "codeHash": "dc9622b1fc330db4",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:33.119Z",
+   "changedAt": "2026-11-27T16:38:33.119Z"
+  },
+  "v4-pm-fee-controller-robinhood-chain": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 4663,
+    "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x6d0009504d129cf5002dba61d9ae8575aa79314c\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x6d0009504d129cf5002dba61d9ae8575aa79314c"
+   },
+   "seenAt": "2026-11-27T16:38:33.125Z",
+   "changedAt": "2026-11-27T16:38:33.125Z"
+  },
+  "v4-router-arc": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5042,
+    "address": "0x8702463e73f74d0b6765abceb314ef07acb92650"
+   },
+   "value": "46377cebae5693d1",
+   "meta": {
+    "codeHash": "46377cebae5693d1",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.129Z",
+   "changedAt": "2026-11-27T16:38:33.129Z"
+  },
+  "v4-pm-owner-arc": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 5042,
+    "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xbca30b5429935205037069cf5b8a165f55d05a75\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xbca30b5429935205037069cf5b8a165f55d05a75"
+   },
+   "seenAt": "2026-11-27T16:38:33.152Z",
+   "changedAt": "2026-11-27T16:38:33.152Z"
+  },
+  "v4-pm-fee-controller-arc": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 5042,
+    "to": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x2f2bd3f43880b9644211f16d861b0672aab23782\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x2f2bd3f43880b9644211f16d861b0672aab23782"
+   },
+   "seenAt": "2026-11-27T16:38:33.153Z",
+   "changedAt": "2026-11-27T16:38:33.153Z"
+  },
+  "v4-poolmanager-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x498581ff718922c3f8e6a244956af099b2652b2b"
+   },
+   "value": "695584a22395f8dd",
+   "meta": {
+    "codeHash": "695584a22395f8dd",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:33.158Z",
+   "changedAt": "2026-11-27T16:38:33.158Z"
+  },
+  "v4-swapproxy-arc": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 5042,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.164Z",
+   "changedAt": "2026-11-27T16:38:33.164Z"
+  },
+  "v4-stateview-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
+   },
+   "value": "1ade69b1e3fd0cb8",
+   "meta": {
+    "codeHash": "1ade69b1e3fd0cb8",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.167Z",
+   "changedAt": "2026-11-27T16:38:33.167Z"
+  },
+  "v4-quoter-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0xe1a6c5803e3c44368b171bd680c7d32dfc92ca47"
+   },
+   "value": "51739cd5621981b1",
+   "meta": {
+    "codeHash": "51739cd5621981b1",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.168Z",
+   "changedAt": "2026-11-27T16:38:33.168Z"
+  },
+  "v4-swapproxy-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.184Z",
+   "changedAt": "2026-11-27T16:38:33.184Z"
+  },
+  "v4-pm-owner-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x31fafd4889fa1269f7a13a66ee0fb458f27d72a9\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x31fafd4889fa1269f7a13a66ee0fb458f27d72a9"
+   },
+   "seenAt": "2026-11-27T16:38:33.188Z",
+   "changedAt": "2026-11-27T16:38:33.188Z"
+  },
+  "v4-pm-fee-controller-base": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 8453,
+    "to": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0xc53dd825dedbe7814562528a1a30e8e5bcbb4b55\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0xc53dd825dedbe7814562528a1a30e8e5bcbb4b55"
+   },
+   "seenAt": "2026-11-27T16:38:33.193Z",
+   "changedAt": "2026-11-27T16:38:33.193Z"
+  },
+  "v4-quoter-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x8928074ca1b241d8ec02815881c1af11e8bc5219"
+   },
+   "value": "45b4a0a195868665",
+   "meta": {
+    "codeHash": "45b4a0a195868665",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.194Z",
+   "changedAt": "2026-11-27T16:38:33.194Z"
+  },
+  "v4-router-base": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 8453,
+    "address": "0xd6145b2d3f379919e8cdeda7b97e37c4b2ca9c40"
+   },
+   "value": "34c0514aa4a2ef8d",
+   "meta": {
+    "codeHash": "34c0514aa4a2ef8d",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.202Z",
+   "changedAt": "2026-11-27T16:38:33.202Z"
+  },
+  "v4-poolmanager-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x360e68faccca8ca495c1b759fd9eee466db9fb32"
+   },
+   "value": "0b00585ef584e368",
+   "meta": {
+    "codeHash": "0b00585ef584e368",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:33.205Z",
+   "changedAt": "2026-11-27T16:38:33.205Z"
+  },
+  "v4-stateview-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990"
+   },
+   "value": "1621e40069cef836",
+   "meta": {
+    "codeHash": "1621e40069cef836",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.216Z",
+   "changedAt": "2026-11-27T16:38:33.216Z"
+  },
+  "v4-pm-owner-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x2bad8182c09f50c8318d769245bea52c32be46cd\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x2bad8182c09f50c8318d769245bea52c32be46cd"
+   },
+   "seenAt": "2026-11-27T16:38:33.219Z",
+   "changedAt": "2026-11-27T16:38:33.219Z"
+  },
+  "v4-swapproxy-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.225Z",
+   "changedAt": "2026-11-27T16:38:33.225Z"
+  },
+  "v4-router-arbitrum": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42161,
+    "address": "0x2d01411773c8c24805306e89a41f7855c3c4fe65"
+   },
+   "value": "5e329f9f5419c598",
+   "meta": {
+    "codeHash": "5e329f9f5419c598",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.228Z",
+   "changedAt": "2026-11-27T16:38:33.228Z"
+  },
+  "v4-pm-fee-controller-arbitrum": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42161,
+    "to": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x6b3c04567cc62fc5d6ab8d50f1bc1dee161eb2cc\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x6b3c04567cc62fc5d6ab8d50f1bc1dee161eb2cc"
+   },
+   "seenAt": "2026-11-27T16:38:33.234Z",
+   "changedAt": "2026-11-27T16:38:33.234Z"
+  },
+  "v4-quoter-celo": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0x28566da1093609182dff2cb2a91cfd72e61d66cd"
+   },
+   "value": "406f15ce9d60cd82",
+   "meta": {
+    "codeHash": "406f15ce9d60cd82",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.248Z",
+   "changedAt": "2026-11-27T16:38:33.248Z"
+  },
+  "v4-stateview-celo": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0xbc21f8720babf4b20d195ee5c6e99c52b76f2bfb"
+   },
+   "value": "2fb2aa76b78d49a7",
+   "meta": {
+    "codeHash": "2fb2aa76b78d49a7",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.249Z",
+   "changedAt": "2026-11-27T16:38:33.249Z"
+  },
+  "v4-poolmanager-celo": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0x288dc841a52fca2707c6947b3a777c5e56cd87bc"
+   },
+   "value": "22f699a7cc2828d8",
+   "meta": {
+    "codeHash": "22f699a7cc2828d8",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:33.250Z",
+   "changedAt": "2026-11-27T16:38:33.250Z"
+  },
+  "v4-pm-fee-controller-celo": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42220,
+    "to": "0x288dc841a52fca2707c6947b3a777c5e56cd87bc",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:33.279Z",
+   "changedAt": "2026-11-27T16:38:33.279Z"
+  },
+  "v4-quoter-avalanche": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0xf27e532878b622d6b916f524e8711880107d4ef0"
+   },
+   "value": "5a6bd81a977e5e2d",
+   "meta": {
+    "codeHash": "5a6bd81a977e5e2d",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.319Z",
+   "changedAt": "2026-11-27T16:38:33.319Z"
+  },
+  "v4-swapproxy-celo": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.332Z",
+   "changedAt": "2026-11-27T16:38:33.332Z"
+  },
+  "v4-router-celo": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 42220,
+    "address": "0xe2023f3fa515cf070e07fd9d51c1d236e07843f4"
+   },
+   "value": "fd0e3c89b88aa29d",
+   "meta": {
+    "codeHash": "fd0e3c89b88aa29d",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.344Z",
+   "changedAt": "2026-11-27T16:38:33.344Z"
+  },
+  "v4-pm-owner-celo": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 42220,
+    "to": "0x288dc841a52fca2707c6947b3a777c5e56cd87bc",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x044aaf330d7fd6ae683eec5c1c1d1fff5196b6b7\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x044aaf330d7fd6ae683eec5c1c1d1fff5196b6b7"
+   },
+   "seenAt": "2026-11-27T16:38:33.356Z",
+   "changedAt": "2026-11-27T16:38:33.356Z"
+  },
+  "v4-poolmanager-avalanche": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0x06380c0e0912312b5150364b9dc4542ba0dbbc85"
+   },
+   "value": "34618287c3c26b06",
+   "meta": {
+    "codeHash": "34618287c3c26b06",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:33.361Z",
+   "changedAt": "2026-11-27T16:38:33.361Z"
+  },
+  "v4-stateview-avalanche": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0xc3c9e198c735a4b97e3e683f391ccbdd60b69286"
+   },
+   "value": "7e33670cc0d839e1",
+   "meta": {
+    "codeHash": "7e33670cc0d839e1",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.361Z",
+   "changedAt": "2026-11-27T16:38:33.361Z"
+  },
+  "v4-quoter-ink": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x8928074ca1b241d8ec02815881c1af11e8bc5219"
+   },
+   "value": "45b4a0a195868665",
+   "meta": {
+    "codeHash": "45b4a0a195868665",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.400Z",
+   "changedAt": "2026-11-27T16:38:33.400Z"
+  },
+  "v4-poolmanager-ink": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x360e68faccca8ca495c1b759fd9eee466db9fb32"
+   },
+   "value": "0b00585ef584e368",
+   "meta": {
+    "codeHash": "0b00585ef584e368",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:33.402Z",
+   "changedAt": "2026-11-27T16:38:33.402Z"
+  },
+  "v4-pm-owner-avalanche": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 43114,
+    "to": "0x06380c0e0912312b5150364b9dc4542ba0dbbc85",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x47eb0cf11a1626462da3c830bcde64c3f582b5a6\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x47eb0cf11a1626462da3c830bcde64c3f582b5a6"
+   },
+   "seenAt": "2026-11-27T16:38:33.418Z",
+   "changedAt": "2026-11-27T16:38:33.418Z"
+  },
+  "v4-swapproxy-avalanche": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.438Z",
+   "changedAt": "2026-11-27T16:38:33.438Z"
+  },
+  "v4-stateview-ink": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990"
+   },
+   "value": "1621e40069cef836",
+   "meta": {
+    "codeHash": "1621e40069cef836",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.439Z",
+   "changedAt": "2026-11-27T16:38:33.439Z"
+  },
+  "v4-router-avalanche": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 43114,
+    "address": "0x661e93cca42afacb172121ef892830ca3b70f08d"
+   },
+   "value": "6c04bae8933a8a4c",
+   "meta": {
+    "codeHash": "6c04bae8933a8a4c",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.440Z",
+   "changedAt": "2026-11-27T16:38:33.440Z"
+  },
+  "v4-router-ink": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x661e93cca42afacb172121ef892830ca3b70f08d"
+   },
+   "value": "9b4692faf72184b0",
+   "meta": {
+    "codeHash": "9b4692faf72184b0",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.445Z",
+   "changedAt": "2026-11-27T16:38:33.445Z"
+  },
+  "v4-swapproxy-ink": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 57073,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.458Z",
+   "changedAt": "2026-11-27T16:38:33.458Z"
+  },
+  "v4-quoter-linea": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x2c125569c0bee20a66e33e5491c552b37ebd9934"
+   },
+   "value": "d80bc376aba7fb9e",
+   "meta": {
+    "codeHash": "d80bc376aba7fb9e",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.471Z",
+   "changedAt": "2026-11-27T16:38:33.471Z"
+  },
+  "v4-pm-fee-controller-ink": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 57073,
+    "to": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:33.475Z",
+   "changedAt": "2026-11-27T16:38:33.475Z"
+  },
+  "v4-poolmanager-linea": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x248083fb965359d82b06c1f5322480dcfc1ad857"
+   },
+   "value": "cbfc97e411f8c60e",
+   "meta": {
+    "codeHash": "cbfc97e411f8c60e",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:33.490Z",
+   "changedAt": "2026-11-27T16:38:33.490Z"
+  },
+  "v4-router-linea": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0xdc264714f68d84cf29bc605589405e78bdbe7c9f"
+   },
+   "value": "ba5100d2711b9965",
+   "meta": {
+    "codeHash": "ba5100d2711b9965",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:33.515Z",
+   "changedAt": "2026-11-27T16:38:33.515Z"
+  },
+  "v4-pm-owner-linea": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 59144,
+    "to": "0x248083fb965359d82b06c1f5322480dcfc1ad857",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x581f86da293a1d5cd087a10e7227a75d2d2201a8\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x581f86da293a1d5cd087a10e7227a75d2d2201a8"
+   },
+   "seenAt": "2026-11-27T16:38:33.521Z",
+   "changedAt": "2026-11-27T16:38:33.521Z"
+  },
+  "v4-pm-fee-controller-linea": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 59144,
+    "to": "0x248083fb965359d82b06c1f5322480dcfc1ad857",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:33.540Z",
+   "changedAt": "2026-11-27T16:38:33.540Z"
+  },
+  "v4-pm-owner-ink": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 57073,
+    "to": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0x2bad8182c09f50c8318d769245bea52c32be46cd\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0x2bad8182c09f50c8318d769245bea52c32be46cd"
+   },
+   "seenAt": "2026-11-27T16:38:33.548Z",
+   "changedAt": "2026-11-27T16:38:33.548Z"
+  },
+  "v4-stateview-linea": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0xe861de206e460a8b936b05ad3816520b58ccdf9b"
+   },
+   "value": "a864043665ae7c17",
+   "meta": {
+    "codeHash": "a864043665ae7c17",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.563Z",
+   "changedAt": "2026-11-27T16:38:33.563Z"
+  },
+  "v4-swapproxy-linea": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 59144,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:33.595Z",
+   "changedAt": "2026-11-27T16:38:33.595Z"
+  },
+  "v4-pm-fee-controller-avalanche": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 43114,
+    "to": "0x06380c0e0912312b5150364b9dc4542ba0dbbc85",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:33.622Z",
+   "changedAt": "2026-11-27T16:38:33.622Z"
+  },
+  "v4-quoter-elysium": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 99901,
+    "address": "0x379f556c5a748bd7cc9baf0f7a344094ac1814f5"
+   },
+   "value": "5d37582f6d4f8850",
+   "meta": {
+    "codeHash": "5d37582f6d4f8850",
+    "bytes": 6118
+   },
+   "seenAt": "2026-11-27T16:38:33.761Z",
+   "changedAt": "2026-11-27T16:38:33.761Z"
+  },
+  "v4-stateview-elysium": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 99901,
+    "address": "0x27ed73ae0652fdcf71d6793412a7525f32be9dfe"
+   },
+   "value": "fc3a498e2c671cf5",
+   "meta": {
+    "codeHash": "fc3a498e2c671cf5",
+    "bytes": 3531
+   },
+   "seenAt": "2026-11-27T16:38:33.761Z",
+   "changedAt": "2026-11-27T16:38:33.761Z"
+  },
+  "v4-deployments-status": {
+   "type": "json-pins",
+   "target": {
+    "url": "https://developers.uniswap.org/deployments.json"
+   },
+   "value": "a6673dd54bc312c8e4be4351c5954df125a1da72568fe5c4f634643004d81d46",
+   "meta": {
+    "pins": 95,
+    "ok": 95,
+    "generatedAt": "2026-11-09T21:49:59.000Z",
+    "commit": "3b872969fff4",
+    "rows": [
+     {
+      "group": "1",
+      "role": "poolManager",
+      "address": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-ethereum"
+     },
+     {
+      "group": "1",
+      "role": "quoter",
+      "address": "0x99bd42b2b22e531f283b7f8a86dff631eb16a9d1",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-ethereum"
+     },
+     {
+      "group": "1",
+      "role": "stateView",
+      "address": "0x7ffe42c4a5deea5b0fec41c94c136cf115597227",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-ethereum"
+     },
+     {
+      "group": "1",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-ethereum"
+     },
+     {
+      "group": "1",
+      "role": "universalRouter",
+      "address": "0x23617e59a5925b2a4bf75d73ff6711cd0b29de85",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-ethereum"
+     },
+     {
+      "group": "10",
+      "role": "poolManager",
+      "address": "0x9a13f98cb987694c9f086b1f5eb990eea8264ec3",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-optimism"
+     },
+     {
+      "group": "10",
+      "role": "quoter",
+      "address": "0xd673f731edfe5aaf1bda7fd43d13bbb5150b87ca",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-optimism"
+     },
+     {
+      "group": "10",
+      "role": "stateView",
+      "address": "0xc18a3169788f4f75a170290584eca6395c75ecdb",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-optimism"
+     },
+     {
+      "group": "10",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-optimism"
+     },
+     {
+      "group": "10",
+      "role": "universalRouter",
+      "address": "0xc09255d86db563cbc11c2fcf4a0c512e160111b4",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-optimism"
+     },
+     {
+      "group": "56",
+      "role": "poolManager",
+      "address": "0x28e2ea090877bf75740558f6bfb36a5ffee9e9df",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-bnb-chain"
+     },
+     {
+      "group": "56",
+      "role": "quoter",
+      "address": "0x95c086d7fe28add842ee220fef225a777474d781",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-bnb-chain"
+     },
+     {
+      "group": "56",
+      "role": "stateView",
+      "address": "0xd13dd3d6e93f276fafc9db9e6bb47c1180aee0c4",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-bnb-chain"
+     },
+     {
+      "group": "56",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-bnb-chain"
+     },
+     {
+      "group": "56",
+      "role": "universalRouter",
+      "address": "0xdc264714f68d84cf29bc605589405e78bdbe7c9f",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-bnb-chain"
+     },
+     {
+      "group": "130",
+      "role": "poolManager",
+      "address": "0x1f98400000000000000000000000000000000004",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-unichain"
+     },
+     {
+      "group": "130",
+      "role": "quoter",
+      "address": "0xf885781cb68a0be66aa2ac7eda5fe72bde7da907",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-unichain"
+     },
+     {
+      "group": "130",
+      "role": "stateView",
+      "address": "0x86e8631a016f9068c3f085faf484ee3f5fdee8f2",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-unichain"
+     },
+     {
+      "group": "130",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-unichain"
+     },
+     {
+      "group": "130",
+      "role": "universalRouter",
+      "address": "0xd1b797d92d87b688193a2b976efc8d577d204343",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-unichain"
+     },
+     {
+      "group": "137",
+      "role": "poolManager",
+      "address": "0x67366782805870060151383f4bbff9dab53e5cd6",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-polygon"
+     },
+     {
+      "group": "137",
+      "role": "quoter",
+      "address": "0x31ab0dea31fc0ad5a54f03cd59c896ecd067447b",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-polygon"
+     },
+     {
+      "group": "137",
+      "role": "stateView",
+      "address": "0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-polygon"
+     },
+     {
+      "group": "137",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-polygon"
+     },
+     {
+      "group": "137",
+      "role": "universalRouter",
+      "address": "0xdc264714f68d84cf29bc605589405e78bdbe7c9f",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-polygon"
+     },
+     {
+      "group": "143",
+      "role": "poolManager",
+      "address": "0x188d586ddcf52439676ca21a244753fa19f9ea8e",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-monad"
+     },
+     {
+      "group": "143",
+      "role": "quoter",
+      "address": "0xa222dd357a9076d1091ed6aa2e16c9742dd26891",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-monad"
+     },
+     {
+      "group": "143",
+      "role": "stateView",
+      "address": "0x77395f3b2e73ae90843717371294fa97cc419d64",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-monad"
+     },
+     {
+      "group": "143",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-monad"
+     },
+     {
+      "group": "143",
+      "role": "universalRouter",
+      "address": "0xa6ce4f10d83dbddac17e68e1837ca9ce6a1b596e",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-monad"
+     },
+     {
+      "group": "196",
+      "role": "poolManager",
+      "address": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-x-layer"
+     },
+     {
+      "group": "196",
+      "role": "quoter",
+      "address": "0x8928074ca1b241d8ec02815881c1af11e8bc5219",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-x-layer"
+     },
+     {
+      "group": "196",
+      "role": "stateView",
+      "address": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-x-layer"
+     },
+     {
+      "group": "196",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-x-layer"
+     },
+     {
+      "group": "196",
+      "role": "universalRouter",
+      "address": "0x1cd182c94fcf42277b80dbb9060f88024809e61e",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-x-layer"
+     },
+     {
+      "group": "480",
+      "role": "poolManager",
+      "address": "0xb1860d529182ac3bc1f51fa2abd56662b7d13f33",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-world-chain"
+     },
+     {
+      "group": "480",
+      "role": "quoter",
+      "address": "0xad02601f1be313c952ad198c0cbc3f87f9ee8e63",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-world-chain"
+     },
+     {
+      "group": "480",
+      "role": "stateView",
+      "address": "0x51d394718bc09297262e368c1a481217fdeb71eb",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-world-chain"
+     },
+     {
+      "group": "480",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-world-chain"
+     },
+     {
+      "group": "480",
+      "role": "universalRouter",
+      "address": "0xf025e0fe9e331a0ef05c2ad3c4e9c64b625cda6f",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-world-chain"
+     },
+     {
+      "group": "999",
+      "role": "poolManager",
+      "address": "0x12d4fd9c5dedd00ab8a0bce2cf0167bbf94b6b1f",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-hyperevm"
+     },
+     {
+      "group": "999",
+      "role": "quoter",
+      "address": "0x108bfe38532c98f8cd8d7ab49c9ddaa3675a1c5e",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-hyperevm"
+     },
+     {
+      "group": "999",
+      "role": "stateView",
+      "address": "0x1656326235cb9e34cb58cade53ae30789ab32a1a",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-hyperevm"
+     },
+     {
+      "group": "999",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-hyperevm"
+     },
+     {
+      "group": "999",
+      "role": "universalRouter",
+      "address": "0xed270a1bcdc63cf1356d695e7f40961d4819d6bf",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-hyperevm"
+     },
+     {
+      "group": "4326",
+      "role": "poolManager",
+      "address": "0xacb7e78fa05d562e0a5d3089ec896d57d057d38e",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-megaeth"
+     },
+     {
+      "group": "4326",
+      "role": "quoter",
+      "address": "0x94bdc671f0c35f44a1daa53143fd1f868d1623b9",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-megaeth"
+     },
+     {
+      "group": "4326",
+      "role": "stateView",
+      "address": "0x726f84e1dfb8d375a365e0808282f40d52d3e4e8",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-megaeth"
+     },
+     {
+      "group": "4326",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-megaeth"
+     },
+     {
+      "group": "4326",
+      "role": "universalRouter",
+      "address": "0xaedd1cf4c14e833140a61e9c0d2b73a64795c823",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-megaeth"
+     },
+     {
+      "group": "4663",
+      "role": "poolManager",
+      "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-robinhood-chain"
+     },
+     {
+      "group": "4663",
+      "role": "quoter",
+      "address": "0x8dc178efb8111bb0973dd9d722ebeff267c98f94",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-robinhood-chain"
+     },
+     {
+      "group": "4663",
+      "role": "stateView",
+      "address": "0xf3334192d15450cdd385c8b70e03f9a6bd9e673b",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-robinhood-chain"
+     },
+     {
+      "group": "4663",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-robinhood-chain"
+     },
+     {
+      "group": "4663",
+      "role": "universalRouter",
+      "address": "0x204faca1764b154221e35c0d20abb3c525710498",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-robinhood-chain"
+     },
+     {
+      "group": "5042",
+      "role": "poolManager",
+      "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-arc"
+     },
+     {
+      "group": "5042",
+      "role": "quoter",
+      "address": "0x8dc178efb8111bb0973dd9d722ebeff267c98f94",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-arc"
+     },
+     {
+      "group": "5042",
+      "role": "stateView",
+      "address": "0xf3334192d15450cdd385c8b70e03f9a6bd9e673b",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-arc"
+     },
+     {
+      "group": "5042",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-arc"
+     },
+     {
+      "group": "5042",
+      "role": "universalRouter",
+      "address": "0x8702463e73f74d0b6765abceb314ef07acb92650",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-arc"
+     },
+     {
+      "group": "8453",
+      "role": "poolManager",
+      "address": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-base"
+     },
+     {
+      "group": "8453",
+      "role": "quoter",
+      "address": "0xe1a6c5803e3c44368b171bd680c7d32dfc92ca47",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-base"
+     },
+     {
+      "group": "8453",
+      "role": "stateView",
+      "address": "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-base"
+     },
+     {
+      "group": "8453",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-base"
+     },
+     {
+      "group": "8453",
+      "role": "universalRouter",
+      "address": "0xd6145b2d3f379919e8cdeda7b97e37c4b2ca9c40",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-base"
+     },
+     {
+      "group": "42161",
+      "role": "poolManager",
+      "address": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-arbitrum"
+     },
+     {
+      "group": "42161",
+      "role": "quoter",
+      "address": "0x8928074ca1b241d8ec02815881c1af11e8bc5219",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-arbitrum"
+     },
+     {
+      "group": "42161",
+      "role": "stateView",
+      "address": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-arbitrum"
+     },
+     {
+      "group": "42161",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-arbitrum"
+     },
+     {
+      "group": "42161",
+      "role": "universalRouter",
+      "address": "0x2d01411773c8c24805306e89a41f7855c3c4fe65",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-arbitrum"
+     },
+     {
+      "group": "42220",
+      "role": "poolManager",
+      "address": "0x288dc841a52fca2707c6947b3a777c5e56cd87bc",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-celo"
+     },
+     {
+      "group": "42220",
+      "role": "quoter",
+      "address": "0x28566da1093609182dff2cb2a91cfd72e61d66cd",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-celo"
+     },
+     {
+      "group": "42220",
+      "role": "stateView",
+      "address": "0xbc21f8720babf4b20d195ee5c6e99c52b76f2bfb",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-celo"
+     },
+     {
+      "group": "42220",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-celo"
+     },
+     {
+      "group": "42220",
+      "role": "universalRouter",
+      "address": "0xe2023f3fa515cf070e07fd9d51c1d236e07843f4",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-celo"
+     },
+     {
+      "group": "43114",
+      "role": "poolManager",
+      "address": "0x06380c0e0912312b5150364b9dc4542ba0dbbc85",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-avalanche"
+     },
+     {
+      "group": "43114",
+      "role": "quoter",
+      "address": "0xf27e532878b622d6b916f524e8711880107d4ef0",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-avalanche"
+     },
+     {
+      "group": "43114",
+      "role": "stateView",
+      "address": "0xc3c9e198c735a4b97e3e683f391ccbdd60b69286",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-avalanche"
+     },
+     {
+      "group": "43114",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-avalanche"
+     },
+     {
+      "group": "43114",
+      "role": "universalRouter",
+      "address": "0x661e93cca42afacb172121ef892830ca3b70f08d",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-avalanche"
+     },
+     {
+      "group": "57073",
+      "role": "poolManager",
+      "address": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-ink"
+     },
+     {
+      "group": "57073",
+      "role": "quoter",
+      "address": "0x8928074ca1b241d8ec02815881c1af11e8bc5219",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-ink"
+     },
+     {
+      "group": "57073",
+      "role": "stateView",
+      "address": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-ink"
+     },
+     {
+      "group": "57073",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-ink"
+     },
+     {
+      "group": "57073",
+      "role": "universalRouter",
+      "address": "0x661e93cca42afacb172121ef892830ca3b70f08d",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-ink"
+     },
+     {
+      "group": "59144",
+      "role": "poolManager",
+      "address": "0x248083fb965359d82b06c1f5322480dcfc1ad857",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-linea"
+     },
+     {
+      "group": "59144",
+      "role": "quoter",
+      "address": "0x2c125569c0bee20a66e33e5491c552b37ebd9934",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-linea"
+     },
+     {
+      "group": "59144",
+      "role": "stateView",
+      "address": "0xe861de206e460a8b936b05ad3816520b58ccdf9b",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-linea"
+     },
+     {
+      "group": "59144",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-linea"
+     },
+     {
+      "group": "59144",
+      "role": "universalRouter",
+      "address": "0xdc264714f68d84cf29bc605589405e78bdbe7c9f",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-linea"
+     },
+     {
+      "group": "99901",
+      "role": "poolManager",
+      "address": "0xe2e105d3f7209a9da11f83ccf3e7398a753823f1",
+      "contract": "PoolManager",
+      "status": "active",
+      "id": "v4-poolmanager-elysium"
+     },
+     {
+      "group": "99901",
+      "role": "quoter",
+      "address": "0x379f556c5a748bd7cc9baf0f7a344094ac1814f5",
+      "contract": "V4Quoter",
+      "status": "active",
+      "id": "v4-v4quoter-elysium"
+     },
+     {
+      "group": "99901",
+      "role": "stateView",
+      "address": "0x27ed73ae0652fdcf71d6793412a7525f32be9dfe",
+      "contract": "StateView",
+      "status": "active",
+      "id": "v4-stateview-elysium"
+     },
+     {
+      "group": "99901",
+      "role": "swapProxy",
+      "address": "0x0000000085e102724e78ecd2f45dc9ca239affad",
+      "contract": "SwapProxy",
+      "status": "active",
+      "id": "universal-router-swapproxy-elysium"
+     },
+     {
+      "group": "99901",
+      "role": "universalRouter",
+      "address": "0xa13f7611115752deb2b13813bdde16a5073e4b45",
+      "contract": "UniversalRouter#v2.1.2",
+      "status": "active",
+      "id": "universal-router-universalrouter-v2-1-2-elysium"
+     }
+    ],
+    "problems": []
+   },
+   "seenAt": "2026-11-27T16:38:33.784Z",
+   "changedAt": "2026-11-27T16:38:33.784Z"
+  },
+  "v4-pm-fee-controller-elysium": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 99901,
+    "to": "0xe2e105d3f7209a9da11f83ccf3e7398a753823f1",
+    "signature": "protocolFeeController()",
+    "decode": "address"
+   },
+   "value": "\"0x0000000000000000000000000000000000000000\"",
+   "meta": {
+    "call": "protocolFeeController()",
+    "result": "0x0000000000000000000000000000000000000000"
+   },
+   "seenAt": "2026-11-27T16:38:33.941Z",
+   "changedAt": "2026-11-27T16:38:33.941Z"
+  },
+  "universal-router": {
+   "type": "github-releases",
+   "target": {
+    "repo": "Uniswap/universal-router"
+   },
+   "value": "2.2.0",
+   "meta": {
+    "tag": "2.2.0",
+    "name": "Universal Router 2.2.0",
+    "at": "2026-09-18",
+    "url": "https://github.com/Uniswap/universal-router/releases/tag/2.2.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-11-27T16:38:34.030Z",
+   "changedAt": "2026-11-27T16:38:34.030Z"
+  },
+  "v4-poolmanager-elysium": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 99901,
+    "address": "0xe2e105d3f7209a9da11f83ccf3e7398a753823f1"
+   },
+   "value": "50dc61e185204305",
+   "meta": {
+    "codeHash": "50dc61e185204305",
+    "bytes": 24009
+   },
+   "seenAt": "2026-11-27T16:38:34.070Z",
+   "changedAt": "2026-11-27T16:38:34.070Z"
+  },
+  "v4-swapproxy-elysium": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 99901,
+    "address": "0x0000000085e102724e78ecd2f45dc9ca239affad"
+   },
+   "value": "8d5239ace394526a",
+   "meta": {
+    "codeHash": "8d5239ace394526a",
+    "bytes": 1005
+   },
+   "seenAt": "2026-11-27T16:38:34.106Z",
+   "changedAt": "2026-11-27T16:38:34.106Z"
+  },
+  "v4-pm-owner-elysium": {
+   "type": "evm-call",
+   "target": {
+    "chainId": 99901,
+    "to": "0xe2e105d3f7209a9da11f83ccf3e7398a753823f1",
+    "signature": "owner()",
+    "decode": "address"
+   },
+   "value": "\"0xa9ae0c5eb238a519b7f5af27415eb6dd0744da8d\"",
+   "meta": {
+    "call": "owner()",
+    "result": "0xa9ae0c5eb238a519b7f5af27415eb6dd0744da8d"
+   },
+   "seenAt": "2026-11-27T16:38:34.133Z",
+   "changedAt": "2026-11-27T16:38:34.133Z"
+  },
+  "v4-core": {
+   "type": "github-releases",
+   "target": {
+    "repo": "Uniswap/v4-core"
+   },
+   "value": "v4.0.0",
+   "meta": {
+    "tag": "v4.0.0",
+    "name": "Uniswap Protocol v4",
+    "at": "2025-01-23",
+    "url": "https://github.com/Uniswap/v4-core/releases/tag/v4.0.0",
+    "prerelease": false
+   },
+   "seenAt": "2026-11-27T16:38:34.333Z",
+   "changedAt": "2026-11-27T16:38:34.333Z"
+  },
+  "v4-router-elysium": {
+   "type": "evm-code",
+   "target": {
+    "chainId": 99901,
+    "address": "0xa13f7611115752deb2b13813bdde16a5073e4b45"
+   },
+   "value": "be8161a916d6aa5b",
+   "meta": {
+    "codeHash": "be8161a916d6aa5b",
+    "bytes": 24380
+   },
+   "seenAt": "2026-11-27T16:38:34.387Z",
+   "changedAt": "2026-11-27T16:38:34.387Z"
+  },
+  "v4-periphery": {
+   "type": "github-releases",
+   "target": {
+    "repo": "Uniswap/v4-periphery"
+   },
+   "value": "c6e4754dab11bd38c6f08ac51c3c868569e93d64",
+   "meta": {
+    "tag": "commit c6e4754",
+    "at": "2026-10-26",
+    "url": "https://github.com/Uniswap/v4-periphery/commit/c6e4754dab11bd38c6f08ac51c3c868569e93d64",
+    "note": "default branch: docs(permissioned-pools): add OpenZeppelin force-exit fix review report (#615)"
+   },
+   "seenAt": "2026-11-27T16:38:34.796Z",
+   "changedAt": "2026-11-27T16:38:34.796Z"
+  },
+  "v4-pools-ethereum": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 1,
+    "poolManager": "0x000000000004444c5dc75cb358380d2e3de08a90",
+    "stateView": "0x7ffe42c4a5deea5b0fec41c94c136cf115597227"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 26507771,
+    "readAt": 26507771,
+    "calls": 2,
+    "listed": 160,
+    "seen": {},
+    "deadRuns": {
+     "0xbe53a648fdf52c3cf1a2341e30bb9b355e8f78505c70e40028a9660114705102": 1,
+     "0x6dd38143b1bed2fb236805810868b67fcea5af8b6e41cc1ca52b5ab8ad901611": 1,
+     "0xb16bd38e80138a27d5c78a1928a76ae73dd707a4df8654f01ea8d229da2de9f6": 1
+    },
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:34.976Z",
+   "changedAt": "2026-11-27T16:38:34.976Z"
+  },
+  "v4-pools-unichain": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 130,
+    "poolManager": "0x1f98400000000000000000000000000000000004",
+    "stateView": "0x86e8631a016f9068c3f085faf484ee3f5fdee8f2"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 65049135,
+    "readAt": 65049135,
+    "calls": 1,
+    "listed": 54,
+    "seen": {},
+    "deadRuns": {
+     "0x59a8b16d00f5e2636869ddd6fde624a0f7a60394598fa6d8480796e2ec978be7": 1
+    },
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:35.107Z",
+   "changedAt": "2026-11-27T16:38:35.107Z"
+  },
+  "v4-pools-world-chain": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 480,
+    "poolManager": "0xb1860d529182ac3bc1f51fa2abd56662b7d13f33",
+    "stateView": "0x51d394718bc09297262e368c1a481217fdeb71eb"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 38230918,
+    "readAt": 38230918,
+    "calls": 6,
+    "listed": 28,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:35.878Z",
+   "changedAt": "2026-11-27T16:38:35.878Z"
+  },
+  "v4-pools-x-layer": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 196,
+    "poolManager": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "stateView": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990"
+   },
+   "value": "{\"dead\":[],\"pending\":[\"0xe758573397ad186bdc8344b6200655bb14e9d74918b0cc50771c4fba8f27cd2d:1\"]}",
+   "meta": {
+    "lastBlock": 77028458,
+    "readAt": 77028458,
+    "calls": 12,
+    "listed": 19,
+    "seen": {
+     "0xe758573397ad186bdc8344b6200655bb14e9d74918b0cc50771c4fba8f27cd2d": {
+      "currency0": "0x4ae46a509f6b1d9056937ba4500cb143933d2dc8",
+      "currency1": "0xb6ceceab302e2e4948951ee7843fc24e92933061",
+      "fee": 30,
+      "tickSpacing": 1,
+      "block": 76985674,
+      "live": true
+     }
+    },
+    "deadRuns": {
+     "0xc8a3e0db0322b05d7d9c7577eb91666a14a8f94805649331ad0f73b51f913cd8": 1
+    },
+    "pending": [
+     {
+      "id": "0xe758573397ad186bdc8344b6200655bb14e9d74918b0cc50771c4fba8f27cd2d",
+      "label": "0x4ae46a…/0xb6cece… 30/1",
+      "currency0": "0x4ae46a509f6b1d9056937ba4500cb143933d2dc8",
+      "currency1": "0xb6ceceab302e2e4948951ee7843fc24e92933061",
+      "fee": 30,
+      "tickSpacing": 1,
+      "block": 76985674,
+      "live": true
+     }
+    ],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:36.142Z",
+   "changedAt": "2026-11-27T16:38:36.142Z"
+  },
+  "v4-pools-polygon": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 137,
+    "poolManager": "0x67366782805870060151383f4bbff9dab53e5cd6",
+    "stateView": "0x5ea1bd7974c8a611cbab0bdcafcb1d9cc9b3ba5a"
+   },
+   "value": "{\"dead\":[],\"pending\":[\"0xf8e8193c1ea434afac8596dde95f69eb910426485c2022a11dbbfbf5b7ba8325:1\"]}",
+   "meta": {
+    "lastBlock": 98061337,
+    "readAt": 98061337,
+    "calls": 10,
+    "listed": 100,
+    "seen": {
+     "0xf8e8193c1ea434afac8596dde95f69eb910426485c2022a11dbbfbf5b7ba8325": {
+      "currency0": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+      "currency1": "0x6985884c4392d348587b19cb9eaaf157f13271cd",
+      "fee": 490,
+      "tickSpacing": 5,
+      "block": 97995211,
+      "live": true
+     }
+    },
+    "deadRuns": {
+     "0xd083ab07d7fd680a133a449e983f703f7da4b9a38bc67d4e71a80742a913902f": 1
+    },
+    "pending": [
+     {
+      "id": "0xf8e8193c1ea434afac8596dde95f69eb910426485c2022a11dbbfbf5b7ba8325",
+      "label": "0x3c499c…/0x698588… 490/5",
+      "currency0": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+      "currency1": "0x6985884c4392d348587b19cb9eaaf157f13271cd",
+      "fee": 490,
+      "tickSpacing": 5,
+      "block": 97995211,
+      "live": true
+     }
+    ],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:36.495Z",
+   "changedAt": "2026-11-27T16:38:36.495Z"
+  },
+  "v4-pools-op-mainnet": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 10,
+    "poolManager": "0x9a13f98cb987694c9f086b1f5eb990eea8264ec3",
+    "stateView": "0xc18a3169788f4f75a170290584eca6395c75ecdb"
+   },
+   "value": "{\"dead\":[],\"pending\":[\"0x8fba244f52a7d680640b3ebabd0094308581dbf7fd7a410a6a8852717a7d37ff:0\"]}",
+   "meta": {
+    "lastBlock": 160099348,
+    "readAt": 160099348,
+    "calls": 7,
+    "listed": 89,
+    "seen": {
+     "0x8fba244f52a7d680640b3ebabd0094308581dbf7fd7a410a6a8852717a7d37ff": {
+      "currency0": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+      "currency1": "0x4200000000000000000000000000000000000042",
+      "fee": 300,
+      "tickSpacing": 3,
+      "block": 160036618,
+      "live": false
+     }
+    },
+    "deadRuns": {},
+    "pending": [
+     {
+      "id": "0x8fba244f52a7d680640b3ebabd0094308581dbf7fd7a410a6a8852717a7d37ff",
+      "label": "0x0b2c63…/0x420000… 300/3",
+      "currency0": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+      "currency1": "0x4200000000000000000000000000000000000042",
+      "fee": 300,
+      "tickSpacing": 3,
+      "block": 160036618,
+      "live": false
+     }
+    ],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:36.501Z",
+   "changedAt": "2026-11-27T16:38:36.501Z"
+  },
+  "v4-pools-megaeth": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 4326,
+    "poolManager": "0xacb7e78fa05d562e0a5d3089ec896d57d057d38e",
+    "stateView": "0x726f84e1dfb8d375a365e0808282f40d52d3e4e8"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 33000484,
+    "readAt": 33000484,
+    "calls": 1,
+    "listed": 11,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:36.584Z",
+   "changedAt": "2026-11-27T16:38:36.584Z"
+  },
+  "v4-pools-monad": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 143,
+    "poolManager": "0x188d586ddcf52439676ca21a244753fa19f9ea8e",
+    "stateView": "0x77395f3b2e73ae90843717371294fa97cc419d64"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 125910708,
+    "readAt": 125910708,
+    "calls": 23,
+    "listed": 38,
+    "seen": {},
+    "deadRuns": {
+     "0x68be0d1f33a1c963b09a81f5bd88a848d28f336cb5d864a45c3109e69dd7fdb3": 1,
+     "0xf9ef1dedfc5aa412cccf06c9569ba1489c504c989a8666c0f4e8822eb7d7f91b": 1
+    },
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:37.007Z",
+   "changedAt": "2026-11-27T16:38:37.007Z"
+  },
+  "v4-pools-arbitrum": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 42161,
+    "poolManager": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "stateView": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990"
+   },
+   "value": "{\"dead\":[],\"pending\":[\"0x42161fedcaa93e68f1c52567ba15bed0a9a55e9bfc5c0b3348346b4e108da108:1\",\"0xf1c8cd82fefabd8634bb4b42edde505cfb58ba645f493e8c0e244bc274e3a143:1\"]}",
+   "meta": {
+    "lastBlock": 528059961,
+    "readAt": 528059961,
+    "calls": 12,
+    "listed": 152,
+    "seen": {
+     "0x42161fedcaa93e68f1c52567ba15bed0a9a55e9bfc5c0b3348346b4e108da108": {
+      "currency0": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "currency1": "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
+      "fee": 2500,
+      "tickSpacing": 25,
+      "block": 527651388,
+      "live": true
+     },
+     "0xf1c8cd82fefabd8634bb4b42edde505cfb58ba645f493e8c0e244bc274e3a143": {
+      "currency0": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "currency1": "0x912ce59144191c1204e64559fe8253a0e49e6548",
+      "fee": 375,
+      "tickSpacing": 4,
+      "block": 528015704,
+      "live": true
+     }
+    },
+    "deadRuns": {
+     "0xa28e2de04b9ede4fe9aba73e6281079b196fdeb5ee9524fc2a36d41bb7bcba6f": 1
+    },
+    "pending": [
+     {
+      "id": "0x42161fedcaa93e68f1c52567ba15bed0a9a55e9bfc5c0b3348346b4e108da108",
+      "label": "0x2f2a25…/0x5d3a1f… 2500/25",
+      "currency0": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "currency1": "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
+      "fee": 2500,
+      "tickSpacing": 25,
+      "block": 527651388,
+      "live": true
+     },
+     {
+      "id": "0xf1c8cd82fefabd8634bb4b42edde505cfb58ba645f493e8c0e244bc274e3a143",
+      "label": "0x2f2a25…/0x912ce5… 375/4",
+      "currency0": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "currency1": "0x912ce59144191c1204e64559fe8253a0e49e6548",
+      "fee": 375,
+      "tickSpacing": 4,
+      "block": 528015704,
+      "live": true
+     }
+    ],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:37.511Z",
+   "changedAt": "2026-11-27T16:38:37.511Z"
+  },
+  "v4-pools-avalanche": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 43114,
+    "poolManager": "0x06380c0e0912312b5150364b9dc4542ba0dbbc85",
+    "stateView": "0xc3c9e198c735a4b97e3e683f391ccbdd60b69286"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 101558145,
+    "readAt": 101558145,
+    "calls": 4,
+    "listed": 27,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:39.312Z",
+   "changedAt": "2026-11-27T16:38:39.312Z"
+  },
+  "v4-pools-bnb-chain": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 56,
+    "poolManager": "0x28e2ea090877bf75740558f6bfb36a5ffee9e9df",
+    "stateView": "0xd13dd3d6e93f276fafc9db9e6bb47c1180aee0c4"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 136071927,
+    "readAt": 136071927,
+    "calls": 31,
+    "listed": 75,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:40.928Z",
+   "changedAt": "2026-11-27T16:38:40.928Z"
+  },
+  "v4-pools-linea": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 59144,
+    "poolManager": "0x248083fb965359d82b06c1f5322480dcfc1ad857",
+    "stateView": "0xe861de206e460a8b936b05ad3816520b58ccdf9b"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 32729204,
+    "readAt": 32729204,
+    "calls": 2,
+    "listed": 13,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:41.269Z",
+   "changedAt": "2026-11-27T16:38:41.269Z"
+  },
+  "v4-pools-base": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 8453,
+    "poolManager": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+    "stateView": "0xa3c0c9b65bad0b08107aa264b0f3db444b867a71"
+   },
+   "value": "{\"dead\":[],\"pending\":[\"0x66979cf48af6dd08e637aa1417159fcac335588d2999bc656eeec0b051e5e947:0\"]}",
+   "meta": {
+    "lastBlock": 63035685,
+    "readAt": 63035685,
+    "calls": 68,
+    "listed": 126,
+    "seen": {
+     "0x66979cf48af6dd08e637aa1417159fcac335588d2999bc656eeec0b051e5e947": {
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "fee": 85,
+      "tickSpacing": 1,
+      "block": 62436661,
+      "live": false
+     }
+    },
+    "deadRuns": {},
+    "pending": [
+     {
+      "id": "0x66979cf48af6dd08e637aa1417159fcac335588d2999bc656eeec0b051e5e947",
+      "label": "0x000000…/0x833589… 85/1",
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "fee": 85,
+      "tickSpacing": 1,
+      "block": 62436661,
+      "live": false
+     }
+    ],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:41.282Z",
+   "changedAt": "2026-11-27T16:38:41.282Z"
+  },
+  "v4-pools-ink": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 57073,
+    "poolManager": "0x360e68faccca8ca495c1b759fd9eee466db9fb32",
+    "stateView": "0x76fd297e2d437cd7f76d50f01afe6160f86e9990"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 62299088,
+    "readAt": 62299088,
+    "calls": 12,
+    "listed": 17,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:41.614Z",
+   "changedAt": "2026-11-27T16:38:41.614Z"
+  },
+  "v4-pools-elysium": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 99901,
+    "poolManager": "0xe2e105d3f7209a9da11f83ccf3e7398a753823f1",
+    "stateView": "0x27ed73ae0652fdcf71d6793412a7525f32be9dfe"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 11684734,
+    "readAt": 11684734,
+    "calls": 1,
+    "listed": 11,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:42.036Z",
+   "changedAt": "2026-11-27T16:38:42.036Z"
+  },
+  "v4-pools-robinhood-chain": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 4663,
+    "poolManager": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "stateView": "0xf3334192d15450cdd385c8b70e03f9a6bd9e673b"
+   },
+   "value": "{\"dead\":[],\"pending\":[\"0xe3d07334a1ebfe9d6bd6260d505157e3b4e0397a4aeab444627143ffc092eef1:0\"]}",
+   "meta": {
+    "lastBlock": 124392223,
+    "readAt": 124392223,
+    "calls": 88,
+    "listed": 33,
+    "seen": {
+     "0xe3d07334a1ebfe9d6bd6260d505157e3b4e0397a4aeab444627143ffc092eef1": {
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "fee": 250,
+      "tickSpacing": 3,
+      "block": 124198230,
+      "live": false
+     }
+    },
+    "deadRuns": {},
+    "pending": [
+     {
+      "id": "0xe3d07334a1ebfe9d6bd6260d505157e3b4e0397a4aeab444627143ffc092eef1",
+      "label": "0x000000…/0x5fc536… 250/3",
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "fee": 250,
+      "tickSpacing": 3,
+      "block": 124198230,
+      "live": false
+     }
+    ],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:43.720Z",
+   "changedAt": "2026-11-27T16:38:43.720Z"
+  },
+  "v4-pools-celo": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 42220,
+    "poolManager": "0x288dc841a52fca2707c6947b3a777c5e56cd87bc",
+    "stateView": "0xbc21f8720babf4b20d195ee5c6e99c52b76f2bfb"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 83896738,
+    "readAt": 83896738,
+    "calls": 24,
+    "listed": 13,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:38:43.834Z",
+   "changedAt": "2026-11-27T16:38:43.834Z"
+  },
+  "v4-pools-arc": {
+   "type": "evm-initialize",
+   "target": {
+    "chainId": 5042,
+    "poolManager": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "stateView": "0xf3334192d15450cdd385c8b70e03f9a6bd9e673b"
+   },
+   "value": "{\"dead\":[],\"pending\":[]}",
+   "meta": {
+    "lastBlock": 33445244,
+    "readAt": 33445244,
+    "calls": 24,
+    "listed": 86,
+    "seen": {},
+    "deadRuns": {},
+    "pending": [],
+    "dead": []
+   },
+   "seenAt": "2026-11-27T16:39:15.582Z",
+   "changedAt": "2026-11-27T16:39:15.582Z"
   }
  }
 }

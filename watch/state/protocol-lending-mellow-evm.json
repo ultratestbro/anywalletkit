@@ -15,7 +15,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-26T16:52:38.799Z",
+   "seenAt": "2026-11-27T16:38:06.533Z",
    "changedAt": "2026-10-14T15:10:30.832Z"
   },
   "vault-lido-earn-eth": {
@@ -32,7 +32,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-26T16:52:38.725Z",
+   "seenAt": "2026-11-27T16:38:06.409Z",
    "changedAt": "2026-10-14T15:10:30.850Z"
   },
   "vault-lido-conservative-earn-usd": {
@@ -49,7 +49,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-26T16:52:38.794Z",
+   "seenAt": "2026-11-27T16:38:06.405Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-earn-usd": {
@@ -66,7 +66,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-26T16:52:38.769Z",
+   "seenAt": "2026-11-27T16:38:06.413Z",
    "changedAt": "2026-10-14T15:10:30.853Z"
   },
   "vault-lido-strategy": {
@@ -83,7 +83,7 @@
     "beacon": null,
     "implCodeHash": "042418c530d19a2c"
    },
-   "seenAt": "2026-11-26T16:52:38.788Z",
+   "seenAt": "2026-11-27T16:38:06.413Z",
    "changedAt": "2026-10-14T15:10:30.854Z"
   },
   "registry-vaults": {
@@ -183,7 +183,7 @@
      "0xf785a3637Fb8DC057a2a23c925e83859Ef212c8d"
     ]
    },
-   "seenAt": "2026-11-26T16:52:38.849Z",
+   "seenAt": "2026-11-27T16:38:06.859Z",
    "changedAt": "2026-11-25T17:11:31.134Z"
   },
   "docs": {
@@ -196,7 +196,7 @@
     "hash": "bbb595e50a6c75a7",
     "chars": 1080
    },
-   "seenAt": "2026-11-26T16:52:39.064Z",
+   "seenAt": "2026-11-27T16:38:06.578Z",
    "changedAt": "2026-10-14T15:10:31.059Z"
   },
   "flexible-vaults": {
@@ -204,15 +204,15 @@
    "target": {
     "repo": "mellow-finance/flexible-vaults"
    },
-   "value": "a66d20d240866c43f78cdd271b3a09727d2971db",
+   "value": "359c7ed977a78c396a08aec7bf7381833253eedb",
    "meta": {
-    "tag": "commit a66d20d",
-    "at": "2026-11-26",
-    "url": "https://github.com/mellow-finance/flexible-vaults/commit/a66d20d240866c43f78cdd271b3a09727d2971db",
-    "note": "default branch: Merge pull request #141 from mellow-finance/deploy/musdep"
+    "tag": "commit 359c7ed",
+    "at": "2026-11-27",
+    "url": "https://github.com/mellow-finance/flexible-vaults/commit/359c7ed977a78c396a08aec7bf7381833253eedb",
+    "note": "default branch: Merge pull request #148 from mellow-finance/deploy/musdep"
    },
-   "seenAt": "2026-11-26T16:52:39.539Z",
-   "changedAt": "2026-11-26T16:52:39.539Z"
+   "seenAt": "2026-11-27T16:38:07.054Z",
+   "changedAt": "2026-11-27T16:38:07.054Z"
   }
  }
 }

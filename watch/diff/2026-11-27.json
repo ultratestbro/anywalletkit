@@ -1,0 +1,430 @@
+{
+ "date": "2026-11-27",
+ "modules": 32,
+ "sources": 1028,
+ "changes": [
+  {
+   "module": "@anywalletkit/protocol-lending-aave-evm",
+   "id": "address-book",
+   "label": "Aave address book releases",
+   "type": "github-releases",
+   "what": "v4.77.12 → v4.78.0 (2026-11-27)",
+   "link": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.78.0",
+   "before": {
+    "tag": "v4.77.12",
+    "name": "v4.77.12",
+    "at": "2026-11-24",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.12",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "v4.78.0",
+    "name": "v4.78.0",
+    "at": "2026-11-27",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.78.0",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-mellow-evm",
+   "id": "flexible-vaults",
+   "label": "Mellow Flexible (Core) Vaults contracts releases",
+   "type": "github-releases",
+   "what": "commit a66d20d → commit 359c7ed (2026-11-27) — Merge pull request #148 from mellow-finance/deploy/musdep",
+   "link": "https://github.com/mellow-finance/flexible-vaults/commit/359c7ed977a78c396a08aec7bf7381833253eedb",
+   "before": {
+    "tag": "commit a66d20d",
+    "at": "2026-11-26",
+    "url": "https://github.com/mellow-finance/flexible-vaults/commit/a66d20d240866c43f78cdd271b3a09727d2971db",
+    "note": "default branch: Merge pull request #141 from mellow-finance/deploy/musdep"
+   },
+   "after": {
+    "tag": "commit 359c7ed",
+    "at": "2026-11-27",
+    "url": "https://github.com/mellow-finance/flexible-vaults/commit/359c7ed977a78c396a08aec7bf7381833253eedb",
+    "note": "default branch: Merge pull request #148 from mellow-finance/deploy/musdep"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
+   "id": "sdks",
+   "label": "Morpho SDKs releases",
+   "type": "github-releases",
+   "what": "@morpho-org/morpho-sdk-v10.1.0 → @morpho-org/morpho-ts-v4.5.1 (2026-11-26)",
+   "link": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-ts-v4.5.1",
+   "before": {
+    "tag": "@morpho-org/morpho-sdk-v10.1.0",
+    "name": "@morpho-org/morpho-sdk-v10.1.0",
+    "at": "2026-11-25",
+    "url": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-sdk-v10.1.0",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "@morpho-org/morpho-ts-v4.5.1",
+    "name": "@morpho-org/morpho-ts-v4.5.1",
+    "at": "2026-11-26",
+    "url": "https://github.com/morpho-org/sdks/releases/tag/%40morpho-org/morpho-ts-v4.5.1",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-lending-morpho-evm",
+   "id": "docs-addresses",
+   "label": "Morpho docs · deployed addresses",
+   "type": "http-text",
+   "what": "page text changed (58297 → 56215 chars)",
+   "link": "https://docs.morpho.org/get-started/resources/addresses/",
+   "before": {
+    "hash": "8eff199b848f7bef",
+    "chars": 58297
+   },
+   "after": {
+    "hash": "44b8081d9eafb241",
+    "chars": 56215
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-cow",
+   "id": "orderbook-openapi",
+   "label": "Order Book API openapi.yml (quote, orders, cancellation, app_data, error types)",
+   "type": "github-file",
+   "what": "file changed 206467f64c → f73f1e9390",
+   "link": "https://github.com/cowprotocol/services/blob/main/crates/orderbook/openapi.yml",
+   "before": {
+    "sha": "206467f64c",
+    "url": "https://github.com/cowprotocol/services/blob/main/crates/orderbook/openapi.yml"
+   },
+   "after": {
+    "sha": "f73f1e9390",
+    "url": "https://github.com/cowprotocol/services/blob/main/crates/orderbook/openapi.yml"
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-fynd",
+   "id": "fynd-releases",
+   "label": "Fynd releases",
+   "type": "github-releases",
+   "what": "0.129.3 → 0.129.4 (2026-11-27)",
+   "link": "https://github.com/propeller-heads/fynd/releases/tag/0.129.4",
+   "before": {
+    "tag": "0.129.3",
+    "name": "0.129.3",
+    "at": "2026-11-26",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.129.3",
+    "prerelease": false
+   },
+   "after": {
+    "tag": "0.129.4",
+    "name": "0.129.4",
+    "at": "2026-11-27",
+    "url": "https://github.com/propeller-heads/fynd/releases/tag/0.129.4",
+    "prerelease": false
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-uniswap",
+   "id": "v4-pools-x-layer",
+   "label": "Uniswap v4 hookless pools (Initialize + pinned list) · X Layer",
+   "type": "evm-initialize",
+   "what": "new hookless pool 0x4ae46a…/0xb6cece… 30/1 0xe7585733… at block 76985674 — live: rebuild the list + release",
+   "link": null,
+   "before": {
+    "lastBlock": 76909615,
+    "pending": [],
+    "dead": [],
+    "baseline": true
+   },
+   "after": {
+    "lastBlock": 77028458,
+    "readAt": 77028458,
+    "calls": 12,
+    "listed": 19,
+    "seen": {
+     "0xe758573397ad186bdc8344b6200655bb14e9d74918b0cc50771c4fba8f27cd2d": {
+      "currency0": "0x4ae46a509f6b1d9056937ba4500cb143933d2dc8",
+      "currency1": "0xb6ceceab302e2e4948951ee7843fc24e92933061",
+      "fee": 30,
+      "tickSpacing": 1,
+      "block": 76985674,
+      "live": true
+     }
+    },
+    "deadRuns": {
+     "0xc8a3e0db0322b05d7d9c7577eb91666a14a8f94805649331ad0f73b51f913cd8": 1
+    },
+    "pending": [
+     {
+      "id": "0xe758573397ad186bdc8344b6200655bb14e9d74918b0cc50771c4fba8f27cd2d",
+      "label": "0x4ae46a…/0xb6cece… 30/1",
+      "currency0": "0x4ae46a509f6b1d9056937ba4500cb143933d2dc8",
+      "currency1": "0xb6ceceab302e2e4948951ee7843fc24e92933061",
+      "fee": 30,
+      "tickSpacing": 1,
+      "block": 76985674,
+      "live": true
+     }
+    ],
+    "dead": []
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-uniswap",
+   "id": "v4-pools-polygon",
+   "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Polygon",
+   "type": "evm-initialize",
+   "what": "new hookless pool 0x3c499c…/0x698588… 490/5 0xf8e8193c… at block 97995211 — live: rebuild the list + release",
+   "link": null,
+   "before": {
+    "lastBlock": 97970744,
+    "pending": [],
+    "dead": [],
+    "baseline": true
+   },
+   "after": {
+    "lastBlock": 98061337,
+    "readAt": 98061337,
+    "calls": 10,
+    "listed": 100,
+    "seen": {
+     "0xf8e8193c1ea434afac8596dde95f69eb910426485c2022a11dbbfbf5b7ba8325": {
+      "currency0": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+      "currency1": "0x6985884c4392d348587b19cb9eaaf157f13271cd",
+      "fee": 490,
+      "tickSpacing": 5,
+      "block": 97995211,
+      "live": true
+     }
+    },
+    "deadRuns": {
+     "0xd083ab07d7fd680a133a449e983f703f7da4b9a38bc67d4e71a80742a913902f": 1
+    },
+    "pending": [
+     {
+      "id": "0xf8e8193c1ea434afac8596dde95f69eb910426485c2022a11dbbfbf5b7ba8325",
+      "label": "0x3c499c…/0x698588… 490/5",
+      "currency0": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+      "currency1": "0x6985884c4392d348587b19cb9eaaf157f13271cd",
+      "fee": 490,
+      "tickSpacing": 5,
+      "block": 97995211,
+      "live": true
+     }
+    ],
+    "dead": []
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-uniswap",
+   "id": "v4-pools-op-mainnet",
+   "label": "Uniswap v4 hookless pools (Initialize + pinned list) · OP Mainnet",
+   "type": "evm-initialize",
+   "what": "new hookless pool 0x0b2c63…/0x420000… 300/3 0x8fba244f… at block 160036618 (not live yet)",
+   "link": null,
+   "before": {
+    "lastBlock": 160031400,
+    "pending": [],
+    "dead": [],
+    "baseline": true
+   },
+   "after": {
+    "lastBlock": 160099348,
+    "readAt": 160099348,
+    "calls": 7,
+    "listed": 89,
+    "seen": {
+     "0x8fba244f52a7d680640b3ebabd0094308581dbf7fd7a410a6a8852717a7d37ff": {
+      "currency0": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+      "currency1": "0x4200000000000000000000000000000000000042",
+      "fee": 300,
+      "tickSpacing": 3,
+      "block": 160036618,
+      "live": false
+     }
+    },
+    "deadRuns": {},
+    "pending": [
+     {
+      "id": "0x8fba244f52a7d680640b3ebabd0094308581dbf7fd7a410a6a8852717a7d37ff",
+      "label": "0x0b2c63…/0x420000… 300/3",
+      "currency0": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+      "currency1": "0x4200000000000000000000000000000000000042",
+      "fee": 300,
+      "tickSpacing": 3,
+      "block": 160036618,
+      "live": false
+     }
+    ],
+    "dead": []
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-uniswap",
+   "id": "v4-pools-arbitrum",
+   "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Arbitrum",
+   "type": "evm-initialize",
+   "what": "new hookless pool 0x2f2a25…/0x5d3a1f… 2500/25 0x42161fed… at block 527651388 — live: rebuild the list + release; new hookless pool 0x2f2a25…/0x912ce5… 375/4 0xf1c8cd82… at block 528015704 — live: rebuild the list + release",
+   "link": null,
+   "before": {
+    "lastBlock": 527612650,
+    "pending": [],
+    "dead": [],
+    "baseline": true
+   },
+   "after": {
+    "lastBlock": 528059961,
+    "readAt": 528059961,
+    "calls": 12,
+    "listed": 152,
+    "seen": {
+     "0x42161fedcaa93e68f1c52567ba15bed0a9a55e9bfc5c0b3348346b4e108da108": {
+      "currency0": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "currency1": "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
+      "fee": 2500,
+      "tickSpacing": 25,
+      "block": 527651388,
+      "live": true
+     },
+     "0xf1c8cd82fefabd8634bb4b42edde505cfb58ba645f493e8c0e244bc274e3a143": {
+      "currency0": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "currency1": "0x912ce59144191c1204e64559fe8253a0e49e6548",
+      "fee": 375,
+      "tickSpacing": 4,
+      "block": 528015704,
+      "live": true
+     }
+    },
+    "deadRuns": {
+     "0xa28e2de04b9ede4fe9aba73e6281079b196fdeb5ee9524fc2a36d41bb7bcba6f": 1
+    },
+    "pending": [
+     {
+      "id": "0x42161fedcaa93e68f1c52567ba15bed0a9a55e9bfc5c0b3348346b4e108da108",
+      "label": "0x2f2a25…/0x5d3a1f… 2500/25",
+      "currency0": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "currency1": "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34",
+      "fee": 2500,
+      "tickSpacing": 25,
+      "block": 527651388,
+      "live": true
+     },
+     {
+      "id": "0xf1c8cd82fefabd8634bb4b42edde505cfb58ba645f493e8c0e244bc274e3a143",
+      "label": "0x2f2a25…/0x912ce5… 375/4",
+      "currency0": "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",
+      "currency1": "0x912ce59144191c1204e64559fe8253a0e49e6548",
+      "fee": 375,
+      "tickSpacing": 4,
+      "block": 528015704,
+      "live": true
+     }
+    ],
+    "dead": []
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-uniswap",
+   "id": "v4-pools-base",
+   "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Base",
+   "type": "evm-initialize",
+   "what": "new hookless pool 0x000000…/0x833589… 85/1 0x66979cf4… at block 62436661 (not live yet)",
+   "link": null,
+   "before": {
+    "lastBlock": 62356188,
+    "pending": [],
+    "dead": [],
+    "baseline": true
+   },
+   "after": {
+    "lastBlock": 63035685,
+    "readAt": 63035685,
+    "calls": 68,
+    "listed": 126,
+    "seen": {
+     "0x66979cf48af6dd08e637aa1417159fcac335588d2999bc656eeec0b051e5e947": {
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "fee": 85,
+      "tickSpacing": 1,
+      "block": 62436661,
+      "live": false
+     }
+    },
+    "deadRuns": {},
+    "pending": [
+     {
+      "id": "0x66979cf48af6dd08e637aa1417159fcac335588d2999bc656eeec0b051e5e947",
+      "label": "0x000000…/0x833589… 85/1",
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "fee": 85,
+      "tickSpacing": 1,
+      "block": 62436661,
+      "live": false
+     }
+    ],
+    "dead": []
+   }
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-uniswap",
+   "id": "v4-pools-robinhood-chain",
+   "label": "Uniswap v4 hookless pools (Initialize + pinned list) · Robinhood Chain",
+   "type": "evm-initialize",
+   "what": "new hookless pool 0x000000…/0x5fc536… 250/3 0xe3d07334… at block 124198230 (not live yet)",
+   "link": null,
+   "before": {
+    "lastBlock": 123519529,
+    "pending": [],
+    "dead": [],
+    "baseline": true
+   },
+   "after": {
+    "lastBlock": 124392223,
+    "readAt": 124392223,
+    "calls": 88,
+    "listed": 33,
+    "seen": {
+     "0xe3d07334a1ebfe9d6bd6260d505157e3b4e0397a4aeab444627143ffc092eef1": {
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "fee": 250,
+      "tickSpacing": 3,
+      "block": 124198230,
+      "live": false
+     }
+    },
+    "deadRuns": {},
+    "pending": [
+     {
+      "id": "0xe3d07334a1ebfe9d6bd6260d505157e3b4e0397a4aeab444627143ffc092eef1",
+      "label": "0x000000…/0x5fc536… 250/3",
+      "currency0": "0x0000000000000000000000000000000000000000",
+      "currency1": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "fee": 250,
+      "tickSpacing": 3,
+      "block": 124198230,
+      "live": false
+     }
+    ],
+    "dead": []
+   }
+  }
+ ],
+ "errors": [
+  {
+   "module": "@anywalletkit/protocol-lending-kamino-solana",
+   "id": "docs-api",
+   "label": "Kamino docs · developers API",
+   "error": "HTTP 403",
+   "stale": true
+  },
+  {
+   "module": "@anywalletkit/protocol-swap2-cow",
+   "id": "docs-order-book-api",
+   "label": "CoW docs · Order Book API",
+   "error": "page text too short (12 chars) — selector or JS-rendered page",
+   "stale": false
+  }
+ ],
+ "repointed": []
+}

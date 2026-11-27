@@ -12,7 +12,7 @@
     "codeHash": "b5b576bcd8c9f517",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:33.544Z",
+   "seenAt": "2026-11-27T16:38:02.610Z",
    "changedAt": "2026-10-14T15:10:24.405Z"
   },
   "weth-gateway-ethereum-core": {
@@ -26,7 +26,7 @@
     "codeHash": "d0bdfd6d94577da3",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:33.489Z",
+   "seenAt": "2026-11-27T16:38:02.558Z",
    "changedAt": "2026-10-14T15:10:24.405Z"
   },
   "addresses-provider-ethereum-lido": {
@@ -43,7 +43,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:33.523Z",
+   "seenAt": "2026-11-27T16:38:02.626Z",
    "changedAt": "2026-10-14T15:10:24.418Z"
   },
   "weth-gateway-ethereum-etherfi": {
@@ -57,7 +57,7 @@
     "codeHash": "a1f6df67f836ce9b",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:33.505Z",
+   "seenAt": "2026-11-27T16:38:02.669Z",
    "changedAt": "2026-10-14T15:10:24.519Z"
   },
   "pool-ethereum-lido": {
@@ -74,7 +74,7 @@
     "beacon": null,
     "implCodeHash": "65d3a904990f7793"
    },
-   "seenAt": "2026-11-26T16:52:33.546Z",
+   "seenAt": "2026-11-27T16:38:02.678Z",
    "changedAt": "2026-11-11T14:17:44.887Z"
   },
   "addresses-provider-ethereum-core": {
@@ -91,7 +91,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:33.444Z",
+   "seenAt": "2026-11-27T16:38:02.574Z",
    "changedAt": "2026-10-14T15:10:24.558Z"
   },
   "pool-ethereum-core": {
@@ -108,7 +108,7 @@
     "beacon": null,
     "implCodeHash": "47e6aad54bb9e266"
    },
-   "seenAt": "2026-11-26T16:52:33.525Z",
+   "seenAt": "2026-11-27T16:38:02.615Z",
    "changedAt": "2026-11-11T14:17:44.853Z"
   },
   "pool-ethereum-etherfi": {
@@ -125,7 +125,7 @@
     "beacon": null,
     "implCodeHash": "6afc6dcfc95c363c"
    },
-   "seenAt": "2026-11-26T16:52:33.490Z",
+   "seenAt": "2026-11-27T16:38:02.701Z",
    "changedAt": "2026-10-14T15:10:24.593Z"
   },
   "addresses-provider-op-mainnet": {
@@ -142,7 +142,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:33.583Z",
+   "seenAt": "2026-11-27T16:38:02.776Z",
    "changedAt": "2026-10-14T15:10:24.862Z"
   },
   "addresses-provider-ethereum-etherfi": {
@@ -159,7 +159,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:33.459Z",
+   "seenAt": "2026-11-27T16:38:02.675Z",
    "changedAt": "2026-10-14T15:10:24.917Z"
   },
   "addresses-provider-bnb-chain": {
@@ -176,7 +176,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:33.760Z",
+   "seenAt": "2026-11-27T16:38:02.877Z",
    "changedAt": "2026-10-14T15:10:24.922Z"
   },
   "weth-gateway-op-mainnet": {
@@ -190,7 +190,7 @@
     "codeHash": "806c7bef0fb08523",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:33.579Z",
+   "seenAt": "2026-11-27T16:38:02.705Z",
    "changedAt": "2026-10-14T15:10:24.927Z"
   },
   "pool-op-mainnet": {
@@ -207,7 +207,7 @@
     "beacon": null,
     "implCodeHash": "a56ef30b823e1b5e"
    },
-   "seenAt": "2026-11-26T16:52:33.590Z",
+   "seenAt": "2026-11-27T16:38:02.821Z",
    "changedAt": "2026-11-11T14:17:44.946Z"
   },
   "pool-bnb-chain": {
@@ -224,7 +224,7 @@
     "beacon": null,
     "implCodeHash": "70bbb5f5dbb6fc31"
    },
-   "seenAt": "2026-11-26T16:52:33.762Z",
+   "seenAt": "2026-11-27T16:38:02.930Z",
    "changedAt": "2026-11-12T15:10:30.226Z"
   },
   "weth-gateway-bnb-chain": {
@@ -238,7 +238,7 @@
     "codeHash": "d186b12e423a9d6e",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:33.747Z",
+   "seenAt": "2026-11-27T16:38:02.883Z",
    "changedAt": "2026-10-14T15:10:25.132Z"
   },
   "addresses-provider-gnosis": {
@@ -255,7 +255,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:34.167Z",
+   "seenAt": "2026-11-27T16:38:02.927Z",
    "changedAt": "2026-10-14T15:10:25.270Z"
   },
   "pool-gnosis": {
@@ -272,7 +272,7 @@
     "beacon": null,
     "implCodeHash": "acd4adbe12dffe56"
    },
-   "seenAt": "2026-11-26T16:52:33.973Z",
+   "seenAt": "2026-11-27T16:38:02.973Z",
    "changedAt": "2026-11-12T15:10:30.484Z"
   },
   "weth-gateway-polygon": {
@@ -286,7 +286,7 @@
     "codeHash": "e22743fe5432c25c",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:33.839Z",
+   "seenAt": "2026-11-27T16:38:03.024Z",
    "changedAt": "2026-10-14T15:10:25.473Z"
   },
   "addresses-provider-polygon": {
@@ -303,7 +303,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:33.828Z",
+   "seenAt": "2026-11-27T16:38:03.069Z",
    "changedAt": "2026-10-14T15:10:25.534Z"
   },
   "weth-gateway-gnosis": {
@@ -317,7 +317,7 @@
     "codeHash": "d885340a86377935",
     "bytes": 5387
    },
-   "seenAt": "2026-11-26T16:52:33.744Z",
+   "seenAt": "2026-11-27T16:38:02.866Z",
    "changedAt": "2026-10-14T15:10:25.817Z"
   },
   "addresses-provider-zksync-era": {
@@ -334,7 +334,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:34.491Z",
+   "seenAt": "2026-11-27T16:38:03.186Z",
    "changedAt": "2026-10-14T15:10:26.149Z"
   },
   "pool-polygon": {
@@ -351,7 +351,7 @@
     "beacon": null,
     "implCodeHash": "556573427cf4adc5"
    },
-   "seenAt": "2026-11-26T16:52:33.851Z",
+   "seenAt": "2026-11-27T16:38:03.054Z",
    "changedAt": "2026-11-12T15:10:30.596Z"
   },
   "weth-gateway-zksync-era": {
@@ -365,7 +365,7 @@
     "codeHash": "b531d83d466aa961",
     "bytes": 22176
    },
-   "seenAt": "2026-11-26T16:52:34.226Z",
+   "seenAt": "2026-11-27T16:38:03.104Z",
    "changedAt": "2026-10-14T15:10:26.344Z"
   },
   "pool-zksync-era": {
@@ -382,7 +382,7 @@
     "beacon": null,
     "implCodeHash": "46acf4c367b68966"
    },
-   "seenAt": "2026-11-26T16:52:34.525Z",
+   "seenAt": "2026-11-27T16:38:03.224Z",
    "changedAt": "2026-10-14T15:10:26.690Z"
   },
   "addresses-provider-sonic": {
@@ -399,7 +399,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:34.824Z",
+   "seenAt": "2026-11-27T16:38:03.097Z",
    "changedAt": "2026-10-14T15:10:26.847Z"
   },
   "addresses-provider-metis": {
@@ -416,7 +416,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:34.798Z",
+   "seenAt": "2026-11-27T16:38:03.374Z",
    "changedAt": "2026-10-14T15:10:27.028Z"
   },
   "weth-gateway-sonic": {
@@ -430,7 +430,7 @@
     "codeHash": "b8a5b27dca5208fd",
     "bytes": 5387
    },
-   "seenAt": "2026-11-26T16:52:34.865Z",
+   "seenAt": "2026-11-27T16:38:03.142Z",
    "changedAt": "2026-10-14T15:10:27.091Z"
   },
   "pool-sonic": {
@@ -447,7 +447,7 @@
     "beacon": null,
     "implCodeHash": "272697a34d982faf"
    },
-   "seenAt": "2026-11-26T16:52:34.975Z",
+   "seenAt": "2026-11-27T16:38:03.152Z",
    "changedAt": "2026-10-14T15:10:27.178Z"
   },
   "addresses-provider-soneium": {
@@ -464,7 +464,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:34.853Z",
+   "seenAt": "2026-11-27T16:38:03.342Z",
    "changedAt": "2026-10-14T15:10:27.191Z"
   },
   "pool-metis": {
@@ -481,7 +481,7 @@
     "beacon": null,
     "implCodeHash": "8bc8ad1179134889"
    },
-   "seenAt": "2026-11-26T16:52:34.878Z",
+   "seenAt": "2026-11-27T16:38:03.385Z",
    "changedAt": "2026-10-14T15:10:27.370Z"
   },
   "weth-gateway-soneium": {
@@ -495,7 +495,7 @@
     "codeHash": "9f493510d4a97465",
     "bytes": 5387
    },
-   "seenAt": "2026-11-26T16:52:35.051Z",
+   "seenAt": "2026-11-27T16:38:03.337Z",
    "changedAt": "2026-10-14T15:10:27.571Z"
   },
   "addresses-provider-mantle": {
@@ -512,7 +512,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:35.670Z",
+   "seenAt": "2026-11-27T16:38:03.410Z",
    "changedAt": "2026-10-14T15:10:27.647Z"
   },
   "addresses-provider-base": {
@@ -529,7 +529,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:35.085Z",
+   "seenAt": "2026-11-27T16:38:03.552Z",
    "changedAt": "2026-10-14T15:10:27.713Z"
   },
   "weth-gateway-mantle": {
@@ -543,7 +543,7 @@
     "codeHash": "83af0019dce61ca5",
     "bytes": 5365
    },
-   "seenAt": "2026-11-26T16:52:35.346Z",
+   "seenAt": "2026-11-27T16:38:03.494Z",
    "changedAt": "2026-10-14T15:10:27.755Z"
   },
   "weth-gateway-base": {
@@ -557,7 +557,7 @@
     "codeHash": "b0e9997e21798f66",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:35.096Z",
+   "seenAt": "2026-11-27T16:38:03.593Z",
    "changedAt": "2026-10-14T15:10:28.009Z"
   },
   "pool-base": {
@@ -574,7 +574,7 @@
     "beacon": null,
     "implCodeHash": "09ed6bfd1143bf0d"
    },
-   "seenAt": "2026-11-26T16:52:35.093Z",
+   "seenAt": "2026-11-27T16:38:03.611Z",
    "changedAt": "2026-11-11T14:17:46.646Z"
   },
   "pool-soneium": {
@@ -591,7 +591,7 @@
     "beacon": null,
     "implCodeHash": "8fc264db400f31fe"
    },
-   "seenAt": "2026-11-26T16:52:35.138Z",
+   "seenAt": "2026-11-27T16:38:03.394Z",
    "changedAt": "2026-10-14T15:10:28.116Z"
   },
   "weth-gateway-plasma": {
@@ -605,7 +605,7 @@
     "codeHash": "5436029a6b6bfd44",
     "bytes": 5365
    },
-   "seenAt": "2026-11-26T16:52:35.423Z",
+   "seenAt": "2026-11-27T16:38:03.625Z",
    "changedAt": "2026-10-14T15:10:28.306Z"
   },
   "pool-plasma": {
@@ -622,7 +622,7 @@
     "beacon": null,
     "implCodeHash": "bb6bdcc7e99417d9"
    },
-   "seenAt": "2026-11-26T16:52:35.425Z",
+   "seenAt": "2026-11-27T16:38:03.650Z",
    "changedAt": "2026-11-12T15:10:32.554Z"
   },
   "pool-mantle": {
@@ -639,7 +639,7 @@
     "beacon": null,
     "implCodeHash": "bb5c04f8475607e2"
    },
-   "seenAt": "2026-11-26T16:52:36.082Z",
+   "seenAt": "2026-11-27T16:38:03.511Z",
    "changedAt": "2026-11-11T14:17:47.641Z"
   },
   "addresses-provider-plasma": {
@@ -656,7 +656,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:35.369Z",
+   "seenAt": "2026-11-27T16:38:03.608Z",
    "changedAt": "2026-10-14T15:10:28.314Z"
   },
   "addresses-provider-avalanche": {
@@ -673,7 +673,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:35.888Z",
+   "seenAt": "2026-11-27T16:38:03.927Z",
    "changedAt": "2026-10-14T15:10:28.533Z"
   },
   "addresses-provider-arbitrum": {
@@ -690,7 +690,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:35.419Z",
+   "seenAt": "2026-11-27T16:38:03.719Z",
    "changedAt": "2026-10-14T15:10:28.561Z"
   },
   "weth-gateway-avalanche": {
@@ -704,7 +704,7 @@
     "codeHash": "6ff0e736895e5bb8",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:35.774Z",
+   "seenAt": "2026-11-27T16:38:03.859Z",
    "changedAt": "2026-10-14T15:10:28.693Z"
   },
   "weth-gateway-arbitrum": {
@@ -718,7 +718,7 @@
     "codeHash": "8687cad7f6dc3b35",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:35.432Z",
+   "seenAt": "2026-11-27T16:38:03.731Z",
    "changedAt": "2026-10-14T15:10:28.716Z"
   },
   "pool-avalanche": {
@@ -735,7 +735,7 @@
     "beacon": null,
     "implCodeHash": "653b89d221b318f7"
    },
-   "seenAt": "2026-11-26T16:52:36.105Z",
+   "seenAt": "2026-11-27T16:38:03.986Z",
    "changedAt": "2026-11-12T15:10:32.970Z"
   },
   "addresses-provider-ink": {
@@ -752,7 +752,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:36.515Z",
+   "seenAt": "2026-11-27T16:38:03.950Z",
    "changedAt": "2026-10-14T15:10:29.052Z"
   },
   "pool-arbitrum": {
@@ -769,7 +769,7 @@
     "beacon": null,
     "implCodeHash": "4395f695cb788bab"
    },
-   "seenAt": "2026-11-26T16:52:35.445Z",
+   "seenAt": "2026-11-27T16:38:03.756Z",
    "changedAt": "2026-11-11T14:17:47.025Z"
   },
   "weth-gateway-ink": {
@@ -783,7 +783,7 @@
     "codeHash": "927fb30e28d86818",
     "bytes": 5387
    },
-   "seenAt": "2026-11-26T16:52:36.444Z",
+   "seenAt": "2026-11-27T16:38:03.975Z",
    "changedAt": "2026-10-14T15:10:29.230Z"
   },
   "addresses-provider-celo": {
@@ -800,7 +800,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:35.709Z",
+   "seenAt": "2026-11-27T16:38:03.802Z",
    "changedAt": "2026-10-14T15:10:29.645Z"
   },
   "addresses-provider-linea": {
@@ -817,7 +817,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:36.287Z",
+   "seenAt": "2026-11-27T16:38:03.999Z",
    "changedAt": "2026-10-14T15:10:29.681Z"
   },
   "pool-ink": {
@@ -834,7 +834,7 @@
     "beacon": null,
     "implCodeHash": "1bafe6bc87f18a10"
    },
-   "seenAt": "2026-11-26T16:52:36.758Z",
+   "seenAt": "2026-11-27T16:38:03.988Z",
    "changedAt": "2026-10-14T15:10:29.706Z"
   },
   "weth-gateway-linea": {
@@ -848,7 +848,7 @@
     "codeHash": "47e962e62d5e19f1",
     "bytes": 5565
    },
-   "seenAt": "2026-11-26T16:52:36.236Z",
+   "seenAt": "2026-11-27T16:38:04.059Z",
    "changedAt": "2026-10-14T15:10:29.801Z"
   },
   "pool-celo": {
@@ -865,7 +865,7 @@
     "beacon": null,
     "implCodeHash": "0b50ef43f813c6b4"
    },
-   "seenAt": "2026-11-26T16:52:35.892Z",
+   "seenAt": "2026-11-27T16:38:03.825Z",
    "changedAt": "2026-11-12T15:10:32.743Z"
   },
   "pool-linea": {
@@ -882,7 +882,7 @@
     "beacon": null,
     "implCodeHash": "e82902d105c74fea"
    },
-   "seenAt": "2026-11-26T16:52:36.453Z",
+   "seenAt": "2026-11-27T16:38:04.104Z",
    "changedAt": "2026-11-12T15:10:33.271Z"
   },
   "weth-gateway-scroll": {
@@ -896,7 +896,7 @@
     "codeHash": "da4e43167395d864",
     "bytes": 5428
    },
-   "seenAt": "2026-11-26T16:52:36.746Z",
+   "seenAt": "2026-11-27T16:38:04.268Z",
    "changedAt": "2026-10-14T15:10:30.077Z"
   },
   "addresses-provider-scroll": {
@@ -913,7 +913,7 @@
     "beacon": null,
     "implProbe": true
    },
-   "seenAt": "2026-11-26T16:52:36.571Z",
+   "seenAt": "2026-11-27T16:38:04.269Z",
    "changedAt": "2026-10-14T15:10:30.096Z"
   },
   "pool-scroll": {
@@ -930,7 +930,7 @@
     "beacon": null,
     "implCodeHash": "8e448c7c4e302ed6"
    },
-   "seenAt": "2026-11-26T16:52:36.956Z",
+   "seenAt": "2026-11-27T16:38:04.314Z",
    "changedAt": "2026-10-14T15:10:30.201Z"
   },
   "docs-addresses": {
@@ -1493,7 +1493,7 @@
     ],
     "problems": []
    },
-   "seenAt": "2026-11-26T16:52:37.017Z",
+   "seenAt": "2026-11-27T16:38:04.716Z",
    "changedAt": "2026-11-04T17:01:31.767Z"
   },
   "address-book": {
@@ -1501,16 +1501,16 @@
    "target": {
     "repo": "aave-dao/aave-address-book"
    },
-   "value": "v4.77.12",
+   "value": "v4.78.0",
    "meta": {
-    "tag": "v4.77.12",
-    "name": "v4.77.12",
-    "at": "2026-11-24",
-    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.77.12",
+    "tag": "v4.78.0",
+    "name": "v4.78.0",
+    "at": "2026-11-27",
+    "url": "https://github.com/aave-dao/aave-address-book/releases/tag/v4.78.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-26T16:52:36.805Z",
-   "changedAt": "2026-11-24T17:41:08.038Z"
+   "seenAt": "2026-11-27T16:38:04.337Z",
+   "changedAt": "2026-11-27T16:38:04.337Z"
   },
   "aave-v3-origin": {
    "type": "github-releases",
@@ -1525,7 +1525,7 @@
     "url": "https://github.com/aave-dao/aave-v3-origin/releases/tag/v3.7.0",
     "prerelease": false
    },
-   "seenAt": "2026-11-26T16:52:36.859Z",
+   "seenAt": "2026-11-27T16:38:04.365Z",
    "changedAt": "2026-10-14T15:10:30.412Z"
   }
  }
