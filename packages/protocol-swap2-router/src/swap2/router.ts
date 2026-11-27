@@ -44,6 +44,8 @@ export interface Swap2Route {
   relativeValue: number;
   /** `best` (most value within the tie band) and/or `fastest` (lowest ETA). */
   tags: ("best" | "fastest")[];
+  /** The block this route was priced at (`Quote.blockNumber`): only on a venue that priced at the round's `blockNumber`. */
+  blockNumber?: string;
 }
 
 /**
@@ -132,15 +134,20 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
    * UI shows the first price as soon as the fastest venue replies. Routes the
    * caller's floor or fee caps refuse are left out. Execute the one the user
    * picks with `using(route.provider, route.routeId).swap2(...)`.
+   *
+   * `opts.blockNumber`: the source chain's block the round prices at (decimal, read by the app once per round — see
+   * `QuoteParams.blockNumber`); the venues that honour it name it on their route (`Swap2Route.blockNumber`). Only for
+   * this comparison round: the execution re-quote of `swap2()` reads "latest".
    */
-  async quoteSwap2Routes(options: Swap2Options, opts?: {onUpdate?: (routes: Swap2Route[], pending: string[]) => void}): Promise<Swap2Route[]> {
+  async quoteSwap2Routes(options: Swap2Options, opts?: {onUpdate?: (routes: Swap2Route[], pending: string[]) => void; blockNumber?: string}): Promise<Swap2Route[]> {
     const snapshot = await this.prepareOptions(this.snapshotOf(options));
     const view = (set: RouteSet): Swap2Route[] =>
       set.quotes.flatMap((q) => {
         const quote = this.routeQuote(q, snapshot);
-        return quote ? [{provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), quote, netValueUsd: q.netValueUsd, gasUsd: q.gasUsd, relativeValue: q.relativeValue, tags: [...q.tags]}] : [];
+        return quote ? [{provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), quote, netValueUsd: q.netValueUsd, gasUsd: q.gasUsd, relativeValue: q.relativeValue, tags: [...q.tags], ...(q.blockNumber !== undefined ? {blockNumber: q.blockNumber} : {})}] : [];
       });
-    const set = await this.router.getQuotes(this.toParams(snapshot, true), opts?.onUpdate
+    const params = this.toParams(snapshot, true);
+    const set = await this.router.getQuotes(opts?.blockNumber !== undefined ? {...params, blockNumber: opts.blockNumber} : params, opts?.onUpdate
       ? {onUpdate: (partial) => opts.onUpdate!(view(partial), partial.pending)}
       : undefined);
     return set ? view(set) : [];

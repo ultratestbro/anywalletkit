@@ -14,6 +14,45 @@ export function evmRef(chain: string): number {
 }
 
 /**
+ * The texts nodes answer a call at a block they cannot serve with (read live on the swap modules' chains, 2026-11-28):
+ * not there yet — a node behind a load balancer that trails the chain: geth, op-geth, Erigon, Bor, Nitro, Monad "header
+ * not found"; reth, op-reth, Avalanche "block not found"; Monad "Block requested not found"; zkSync "Block with such an
+ * ID doesn't exist yet"; Nitro "unsupported block number"; Mantle "requested block is above the latest consensus block";
+ * X Layer, Celo "block is out of range"; "unknown block", "… in the future" — or no longer kept (a block past a
+ * non-archive node's pruning: geth "missing trie node", Nitro "historical state … is not available", Nethermind "No
+ * state available for block …", zkSync "Unknown state. First available state is …", reth "… is pruned", publicnode
+ * "Archive requests require a personal token").
+ */
+const BLOCK_UNAVAILABLE_TEXT = /header not found|unknown block|block(?: [#\w]+)? (?:is )?not (?:found|available)|no such block|could not be found|(?:does not|doesn'?t) exist yet|unsupported block number|block(?: number)? (?:is )?out of range|missing trie node|\bpruned\b|historical state|no state (?:is )?available|state (?:is )?(?:not available|unavailable)|unknown state|first available state|archive (?:node|request|data|state)|in the future|future block|(?:greater|later|higher) than (?:the )?(?:latest|current|head|chain head)|(?:above|beyond|after) (?:the )?(?:latest|current|head|last accepted)/i;
+
+/**
+ * True when a node's error (its JSON-RPC error object, or the text) says it cannot serve the block the call named —
+ * it does not have that block yet, or no longer keeps its state. A provider pinned to `QuoteParams.blockNumber` tries
+ * the next endpoint on it and then refuses as `stale_node` naming the block — never answers from "latest" instead.
+ */
+export function nodeLacksBlock(error: unknown): boolean {
+  const text = typeof error === "string" ? error : error && typeof error === "object" ? (error as {message?: unknown}).message : undefined;
+  return typeof text === "string" && BLOCK_UNAVAILABLE_TEXT.test(text.slice(0, 2_048));
+}
+
+/**
+ * The node's message when an HTTP error response's body (`text`) is a JSON-RPC error — alone or in a batch — saying it
+ * cannot serve the block a call named ({@link nodeLacksBlock}); else undefined. Some endpoints answer so with an error
+ * status instead of 200: X Layer and Celo 400 "block is out of range" for a block they do not have yet, publicnode 403
+ * and zkSync's dRPC 400 for state past their pruning.
+ */
+export function blockLackedInBody(text: string): string | undefined {
+  if (text.length > 65_536) return undefined;
+  let body: unknown;
+  try { body = JSON.parse(text); } catch { return undefined; }
+  for (const item of Array.isArray(body) ? body : [body]) {
+    const error = item && typeof item === "object" ? (item as {error?: unknown}).error : undefined;
+    if (nodeLacksBlock(error)) return String((error as {message: string}).message).slice(0, 200);
+  }
+  return undefined;
+}
+
+/**
  * `AbortSignal.timeout`, portably: Hermes (React Native) ships AbortController
  * but not the static helpers, and the unguarded call threw
  * "AbortSignal.timeout is not a function" on every remote execution — which

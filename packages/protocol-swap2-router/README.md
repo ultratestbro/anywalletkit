@@ -107,6 +107,25 @@ does not validate a transaction's behavior.
 to the best route when no estimate exists. Every quote passes the engine's checks before it is ranked, and
 the executed route is re-validated against its sealed quote before anything is signed.
 
+## One block per round (`blockNumber`)
+
+`getQuotes(params)` and `getBestQuote(params)` hand `params.blockNumber` (the source chain's block, a decimal
+string) to every provider of the round unchanged: `getQuotes` candidates, a `routeId` request and a pinned
+`only(name)` re-quote too. `RouterSwap2Protocol.quoteSwap2Routes(options, {blockNumber})` takes it for a picker.
+The router never picks the block itself: the app reads `eth_blockNumber` once per chain per round.
+
+```ts
+const blockNumber = BigInt(await rpc("eth_blockNumber")).toString() // once per chain and round
+const set = await router.getQuotes({...params, blockNumber})
+set?.quotes.filter((q) => q.blockNumber === blockNumber) // the on-chain venues, at that one block
+```
+
+Venues that honour it (`honorsBlockNumber`, kept in the router's provider snapshot) price at that block and name it
+(`RankedQuote.blockNumber`, `Swap2Route.blockNumber`); API venues name none. A quote naming another block than the
+round's is refused (`policy_refused`), and a `blockNumber` that is not a decimal block number refuses the round
+before any provider is asked. Leave it unset for the execution re-quote. What stays at "latest" and how a node
+without the block is refused: protocol-swap2-core's README.
+
 ## Activity
 
 The router executes through whichever provider wins, so it has no transactions

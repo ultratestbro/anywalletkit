@@ -71,6 +71,16 @@ describe('quoteRoutes', () => {
     expect(bad.refusals.liar).toBe('returned an invalid quote')
   })
 
+  it("hands the round's blockNumber to every provider unchanged; a quote naming another block is not shown", async () => {
+    const seen: (string | undefined)[] = []
+    const at = (name: string, block?: string) => provider(name, { quote: async (p: QuoteParams) => { seen.push(p.blockNumber); return { ...quote(name, '2990000000', 20), ...(block !== undefined ? { blockNumber: block } : {}) } } })
+    const view = await quoteRoutes([at('onchain', '23456789'), at('api'), at('other-block', '1')], { ...params, blockNumber: '23456789' })
+    expect(seen).toEqual(['23456789', '23456789', '23456789'])
+    expect(Object.keys(view.quotes).sort()).toEqual(['api', 'onchain'])
+    expect(view.quotes.onchain!.blockNumber).toBe('23456789')
+    expect(view.refusals['other-block']).toBe('returned an invalid quote')
+  })
+
   it('execution floor rides 50 bps of drift', () => {
     expect(executionFloor(10_000n)).toBe(9_950n)
     expect(executionFloor(1n)).toBe(1n)
