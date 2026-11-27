@@ -1561,7 +1561,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         const m = await measureImpact(chainId, d, route, tokenIn, tokenOut, amountIn, out, block as Hex, signal, turns);
         if ("spotFailure" in m) {
           if (m.probe !== undefined && m.probe >= maxImpact) return no3(impactRefusalText(m.probe, maxImpact, route.label), "insufficient_liquidity");
-          return no3("could not measure the price impact (maxPriceImpactBps is set) — nothing was quoted; try again", refusalOf(m.probeFailure ?? m.spotFailure) ?? "upstream_unavailable");
+          const failure = m.probeFailure ?? m.spotFailure;
+          const info = refusalOf(failure);
+          // A pinned block no node served (stale_node, QuoteParams.blockNumber only): the read's own text names it.
+          const why = info?.reason === "stale_node" ? `could not measure the price impact (maxPriceImpactBps is set): ${failure.message.replace(/^uniswap: /, "")}` : "could not measure the price impact (maxPriceImpactBps is set) — nothing was quoted; try again";
+          return no3(why, info ?? "upstream_unavailable");
         }
         priceImpactBps = m.probe;
         valueLossBps = m.spot;

@@ -211,6 +211,21 @@ describe("a node without the block", () => {
     expect(node.seen.some((c) => c.method === "eth_blockNumber")).toBe(false);
   });
 
+  it("gated: the candidates answered at the block but no node served getPool / slot0 there — stale_node, the block named", async () => {
+    const node = lackingNode(["https://a.test", "https://b.test"], HEADER_NOT_FOUND);
+    const inner = node.fetch;
+    // Only the impact gate's pool reads (getPool 0x1698ee82, slot0 0x3850c7bd) lack the block; the quoter answers.
+    vi.stubGlobal("fetch", (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const batch = JSON.parse(String(init?.body)) as Item[];
+      const pools = batch.some((c) => /^0x(1698ee82|3850c7bd)/.test((c.params[0] as {data?: string})?.data ?? ""));
+      return pools ? inner(url, init) : rpcStub()(url, init);
+    }) as typeof fetch);
+    const heard: Array<[string, Swap2RefusalInfo | undefined]> = [];
+    const q = await uniswapProvider({rpcUrls: {1: ["https://a.test", "https://b.test"]}, maxPriceImpactBps: 500}).getQuote(params({blockNumber: BLOCK, onRefusal: (t: string, i?: Swap2RefusalInfo) => { heard.push([t, i]); }}));
+    expect(q).toBeNull();
+    expect(heard).toEqual([[expect.stringMatching(new RegExp(`^uniswap: could not measure the price impact \\(maxPriceImpactBps is set\\): no RPC on chain 1 served block ${BLOCK} \\(`)), {reason: "stale_node"}]]);
+  });
+
   it("v4 (Monad recording): a node without the block refuses the v4 reads as stale_node naming it", async () => {
     const replay = monadReplay();
     vi.stubGlobal("fetch", (async (url: RequestInfo | URL, init?: RequestInit) => {
