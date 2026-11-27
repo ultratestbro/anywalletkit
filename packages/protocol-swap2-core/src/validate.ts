@@ -52,10 +52,15 @@ export function validRouteId(value: unknown): value is string {
  * quote fails for another reason too). Refusal texts name it.
  */
 export function gasEstimateCulprit(q: Quote, params: QuoteParams, provider: string): string | null {
-  const problem = gasEstimateProblem(q, params.sourceChain);
-  if (problem === null) return null;
-  const {gasEstimate: _estimate, gasEstimateSource: _source, ...rest} = q;
-  return quoteRejection(rest, params, provider) === null ? problem : null;
+  try {
+    if (!q || typeof q !== "object") return null;
+    const problem = gasEstimateProblem(q, params.sourceChain);
+    if (problem === null) return null;
+    const {gasEstimate: _estimate, gasEstimateSource: _source, ...rest} = q;
+    return quoteRejection(rest, params, provider) === null ? problem : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Shared quote validator used by both the aggregate and single-provider paths. */

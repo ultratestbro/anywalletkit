@@ -12,7 +12,7 @@ import type {
   RoutedQuote,
   ScoreWeights,
 } from "@anywalletkit/protocol-swap2-core/types";
-import {quoteRejection, remotePinRefusal, validQuote, validRouteId} from "@anywalletkit/protocol-swap2-core/validate";
+import {gasEstimateCulprit, quoteRejection, remotePinRefusal, validQuote, validRouteId} from "@anywalletkit/protocol-swap2-core/validate";
 import {refusal, refusalInfo, refusalOf, type Swap2Refusal, type Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext} from "@anywalletkit/core";
 import {bigintToNumber} from "@anywalletkit/core";
@@ -386,7 +386,11 @@ export class CrossChainRouter {
           }
           const rejected = quoteRejection(q, snapshot, p.name);
           if (rejected) {
-            const reason = `${p.name}: rejected by validation (minDest=${q?.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q?.validUntilMs}, now=${Date.now()})`;
+            // A gas estimate that breaks its contract is named when it alone is what failed.
+            const gas = gasEstimateCulprit(q, snapshot, p.name);
+            const reason = gas
+              ? `${p.name}: rejected by validation (${gas})`
+              : `${p.name}: rejected by validation (minDest=${q?.minDestAmount} vs floor=${snapshot.minAmountOut ?? "-"}, validUntil=${q?.validUntilMs}, now=${Date.now()})`;
             reject(p.name, reason, rejected);
             console.warn(`swap2-router: ${reason}`);
             continue;

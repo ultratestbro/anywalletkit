@@ -22,7 +22,7 @@ import {
   type Swap2Account,
   type Swap2EngineConfig,
 } from "@anywalletkit/protocol-swap2-core/swap2/base";
-import type {CrossChainProvider, Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import type {CrossChainProvider, GasEstimateSource, Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import type {Swap2Refusal} from "@anywalletkit/protocol-swap2-core/errors";
 import type {ActivityItem, ChainTx, DescribeActivityContext, Swap2Options, Swap2Quote} from "@anywalletkit/core";
 import {CrossChainRouter, type RouteSet, type RouterOptions} from "../router.js";
@@ -40,6 +40,13 @@ export interface Swap2Route {
   netValueUsd: number | null;
   /** The source gas subtracted from `netValueUsd` (`sourceGasUsd`), else null. */
   gasUsd: number | null;
+  /**
+   * The gas the route's source transaction is expected to use, as its quote states it (`Quote.gasEstimate`, gas
+   * units), and where the figure comes from; absent when the provider gave none. `evmSourceGas` prices this rather
+   * than the gas limit, so it is what `gasUsd` is made of.
+   */
+  gasEstimate?: string;
+  gasEstimateSource?: GasEstimateSource;
   /** Value against the best route, 0..1. */
   relativeValue: number;
   /** `best` (most value within the tie band) and/or `fastest` (lowest ETA). */
@@ -138,7 +145,11 @@ export class RouterSwap2Protocol extends BaseSwap2Protocol {
     const view = (set: RouteSet): Swap2Route[] =>
       set.quotes.flatMap((q) => {
         const quote = this.routeQuote(q, snapshot);
-        return quote ? [{provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), quote, netValueUsd: q.netValueUsd, gasUsd: q.gasUsd, relativeValue: q.relativeValue, tags: [...q.tags]}] : [];
+        return quote ? [{
+          provider: q.provider, ...(q.routeId !== undefined ? {routeId: q.routeId} : {}), quote, netValueUsd: q.netValueUsd, gasUsd: q.gasUsd,
+          ...(q.gasEstimate !== undefined ? {gasEstimate: q.gasEstimate} : {}), ...(q.gasEstimateSource !== undefined ? {gasEstimateSource: q.gasEstimateSource} : {}),
+          relativeValue: q.relativeValue, tags: [...q.tags],
+        }] : [];
       });
     const set = await this.router.getQuotes(this.toParams(snapshot, true), opts?.onUpdate
       ? {onUpdate: (partial) => opts.onUpdate!(view(partial), partial.pending)}
