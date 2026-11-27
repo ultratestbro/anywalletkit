@@ -205,6 +205,17 @@ export function zeroExFees(response: Record<string, unknown>, gas: {gas: unknown
   return {fees: out, networkFeeKnown: network !== null};
 }
 
+/**
+ * A quote's `gasEstimate`: 0x's own gas figure for the call — `transaction.gas` on a live quote, `gas` on an indicative
+ * price — as canonical digits, read the way the gas limit and the network fee read it (decimal digits only). Undefined
+ * when 0x states none, zero, a figure in another notation, or one past the contract's ten digits: no figure is made up.
+ * 0x calls it the gas limit to send with; measured against the gas the call used, it runs high (see the README).
+ */
+export function zeroExGasEstimate(gas: unknown): string | undefined {
+  const units = uint(gas);
+  return units !== null && units > 0n && units < 10_000_000_000n ? units.toString() : undefined;
+}
+
 /** A tax in bps from `tokenMetadata`: a number or a decimal string; null when the API does not know it. */
 function taxBps(v: unknown): number | null | undefined {
   if (v === null || v === undefined) return null;
@@ -407,6 +418,8 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
       const tx = plain(transaction) ? transaction : undefined;
       const parsedFees = zeroExFees(r, tx ? {gas: own(tx, "gas"), gasPrice: own(tx, "gasPrice")} : {gas: own(r, "gas"), gasPrice: own(r, "gasPrice")});
       if (typeof parsedFees === "string") return refuse(parsedFees, parsedFees === UNASKED_INTEGRATOR_FEE ? "policy_refused" : "upstream_unavailable");
+      // 0x's gas figure for this call (a live quote's `transaction.gas`, a price's `gas`), for comparing routes only.
+      const gasEstimate = zeroExGasEstimate(tx ? own(tx, "gas") : own(r, "gas"));
 
       // What 0x says about the account: informative only (the engine checks balance and allowance itself).
       const flags: string[] = [];
@@ -537,6 +550,7 @@ export function zeroExProvider(config: ZeroExProviderConfig): ZeroExProvider {
         minDestAmount: minBuyAmount.toString(),
         feeUsd: 0,
         fees: parsedFees.fees,
+        ...(gasEstimate !== undefined ? {gasEstimate, gasEstimateSource: "venue" as const} : {}),
         etaSeconds: 15,
         reliability: 0.96,
         validUntilMs,
