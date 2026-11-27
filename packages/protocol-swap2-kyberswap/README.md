@@ -68,13 +68,44 @@ returns is checked on the device against the pinned router and the app's own req
   gets the "be careful" warning even when the app has no price for the token (2026-11-25 Unichain USDC → JUP: 7 824 bps).
   Information only, never a refusal; a token KyberSwap does not price carries none.
 
+## Gas: `gasEstimate`
+
+Every quote, dry or for execution, carries `gasEstimate` = KyberSwap's `routeSummary.gas` from `GET /routes` (asked
+with `gasInclude=true`), `gasEstimateSource: "venue"`. It is there to compare routes (see protocol-swap2-core, "Gas:
+`gasEstimate` vs `gasLimit`"): a dry quote has no transaction, so before this the router could only assume a gas limit
+for it. Nothing in execution reads it: the swap still goes out with the account's own estimate of the exact call
+(`ownGasEstimate`), and the transaction carries no gas limit. It counts the swap call only, no approval. A route that
+states no gas (or 0) gives a quote without one.
+
+What KyberSwap's figure is: its own model of the route's gas, not a simulation. The build answers the same number
+(`gas` of `POST /route/build` equalled `routeSummary.gas` in all 16 recordings), and routine routes land on round model
+values (330 498 for one Uniswap v3 or PancakeSwap v3 pool, 956 331 on two different chains). Against the gas the built
+call used — 16 live routes recorded 2026-11-28 (`fixtures/quotes`) on Ethereum, Base, Arbitrum, Optimism, Polygon, BNB
+Smart Chain, Linea, Sonic and Unichain for a throwaway sender = recipient, each built call run with `eth_simulateV1`
+right after, at the chain's gas price (sender funded by a state override, a token input approved exactly in the same
+simulated block; nothing sent):
+
+| | Gas used ÷ `routeSummary.gas` |
+|---|---|
+| 16 routes | 0.58–1.85, median 0.73 |
+| above the figure | 4 of 16: Linea Etherex CL 1.01, Polygon Ramses v3 + DODO 1.07, Sonic Metropolis LB 1.44, Base `kipseli-prop` 1.85 |
+
+So it mostly runs high (the call used about three quarters of it at the median), and a proprietary-AMM route can run well over (how much gas such a pool
+burns in a simulation need not be what it burns on-chain). The receiver held none of the output, so writing its first
+balance is in these figures. On Arbitrum they are L2 execution gas without the L1 data component, which the router
+leaves out too.
+
 ## Router owner
 
 `KYBER_CHAINS[id].build` names the router build on each chain, read on-chain:
 
 - `generic` (Ethereum, Base, BNB Smart Chain, Arbitrum, Optimism, Polygon, Avalanche, Linea): the router has
   `swapGeneric` and an owner-managed whitelist, so its owner (a single key on all but Linea) could make it spend an
-  allowance left on it. This module never leaves one: the approval is exact and spent by the swap itself.
+  allowance left on it. With the engine's defaults none is left: the approval is exact and spent by the swap itself,
+  and revoked if the swap does not go out. Two engine options change that (protocol-swap2-core, "Approvals"):
+  `revokeUnspentApproval: false` leaves an approval whose swap did not go out on the router, and
+  `allowanceReuse: "sufficient"` swaps from a larger allowance the account already gave the router, which then stays.
+  On these chains either one leaves an allowance the router's owner could spend; keep the defaults for KyberSwap there.
 - `lite` (every other chain): no `swapGeneric`, no whitelist.
 
 ## Limits

@@ -91,6 +91,17 @@ const apiToken = (t: string): string => (t === ZERO ? KYBER_NATIVE : t);
 /** An API text as it may appear in a refusal: one line, at most 120 characters. */
 const short = (s: unknown): string => String(s ?? "").replace(/\s+/g, " ").slice(0, 120);
 
+/**
+ * A quote's `gasEstimate`: KyberSwap's `routeSummary.gas` from `GET /routes` (asked with `gasInclude=true`) as canonical
+ * digits, the same figure on a dry quote and on the execution quote built from that route. Undefined when the route
+ * states none, zero, or a figure past the contract's ten digits: no figure is made up. See the README for how it
+ * compares with the gas the built call used.
+ */
+export function kyberGasEstimate(routeGas: unknown): string | undefined {
+  const gas = uint(routeGas);
+  return gas !== null && gas > 0n && gas < 10_000_000_000n ? gas.toString() : undefined;
+}
+
 const ERC20_READS = parseAbi(["function balanceOf(address) view returns (uint256)", "function allowance(address, address) view returns (uint256)", "function approve(address, uint256) returns (bool)"]);
 
 /** The revert data an RPC error carries, at most 4 KB of it. */
@@ -379,6 +390,8 @@ export function kyberswapProvider(config: KyberswapProviderConfig = {}): CrossCh
       const minOut = kyberMinimum(r.amountOut, apiBps);
       if (minOut < floor) return refuse(`floor breach (min=${minOut} < floor=${floor})`, "price_check_failed");
 
+      // The route's own gas figure, for comparing routes; execution still sends the account's own estimate.
+      const gasEstimate = kyberGasEstimate(r.summary.gas);
       const base = {
         provider: "kyberswap",
         intentId: `kyberswap:${chainId}`,
@@ -389,6 +402,7 @@ export function kyberswapProvider(config: KyberswapProviderConfig = {}): CrossCh
         destAmount: r.amountOut.toString(),
         minDestAmount: minOut.toString(),
         feeUsd: 0,
+        ...(gasEstimate !== undefined ? {gasEstimate, gasEstimateSource: "venue" as const} : {}),
         etaSeconds: 15,
         reliability: 0.95,
         validUntilMs: Date.now() + ttl,
