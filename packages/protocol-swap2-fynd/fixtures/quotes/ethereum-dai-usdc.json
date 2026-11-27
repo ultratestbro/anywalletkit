@@ -1,0 +1,70 @@
+{
+  "note": "Fynd hosted API /v1/ethereum/quote answer, recorded 2026-11-27T21:45:44.261Z (block 26509324) for a throwaway sender = receiver that holds nothing; no key, no headers. simulated: the transaction run with eth_simulateV1 at the latest block right after the quote, the sender given the input by a state override and the router approved exactly the input in the same simulated block at the chain's gas price, the swap with the module's gas limit (nothing sent)",
+  "request": {
+    "chainId": 1,
+    "tokenIn": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    "tokenOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "amountIn": "300000000000000000000",
+    "sender": "0xFbCEB39a085B4d1062984D14C080b4B3530380B1",
+    "receiver": "0xFbCEB39a085B4d1062984D14C080b4B3530380B1",
+    "slippageBps": 50,
+    "nowMs": 1795815944261,
+    "block": 26509324
+  },
+  "simulated": {
+    "method": "eth_simulateV1",
+    "block": 26509324,
+    "approvalFirst": true,
+    "gasPrice": "47311132",
+    "gasLimit": "397608",
+    "status": "0x1",
+    "gasUsed": "174664"
+  },
+  "response": {
+    "orders": [
+      {
+        "order_id": "f8734b9b-91cb-4e01-a55d-d167049c5f35",
+        "status": "success",
+        "route": {
+          "swaps": [
+            {
+              "component_id": "0xf6e72db5454dd049d0788e411b06cfaf16853042",
+              "protocol": "sky",
+              "token_in": "0x6b175474e89094c44da98b954eedeac495271d0f",
+              "token_out": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+              "amount_in": "300000000000000000000",
+              "amount_out": "300000000",
+              "gas_estimate": "120000",
+              "split": "0"
+            }
+          ]
+        },
+        "amount_in": "300000000000000000000",
+        "amount_out": "300000000",
+        "gas_estimate": "244314",
+        "price_impact_bps": 0,
+        "amount_out_net_gas": "299980762",
+        "block": {
+          "number": 26509324,
+          "hash": "0xc6f493f9a9d8747c04beca01f466447c66b16298faffce2329d94ce4266b134a",
+          "timestamp": 1795815935
+        },
+        "gas_price": "47311132",
+        "transaction": {
+          "to": "0xe41c726421007e133a59365432fe886a73b45126",
+          "value": "0",
+          "data": "0x0c1a0ee700000000000000000000000000000000000000000000001043561a88293000000000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000011e1a3000000000000000000000000000000000000000000000000000000000011cabfa0000000000000000000000000fbceb39a085b4d1062984d14c080b4b3530380b1000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001603ad6010948ac034c0bbf7e449217798b4504e1d00000000000000000000000070726f70656c6c65722f61776b"
+        },
+        "fee_breakdown": {
+          "router_fee": "0",
+          "client_fee": "0",
+          "max_slippage": "1500000",
+          "min_amount_received": "298500000"
+        },
+        "algorithm": "aperture"
+      }
+    ],
+    "total_gas_estimate": "244314",
+    "solve_time_ms": 12
+  }
+}
