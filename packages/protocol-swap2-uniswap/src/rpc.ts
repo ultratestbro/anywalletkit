@@ -1,4 +1,4 @@
-import {anySignal, redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {anySignal, blockLackedInBody, nodeLacksBlock, redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 import {httpRefusal, refusal, refusalOf, withReason, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 
 /**
@@ -164,6 +164,9 @@ export function shortOfFunds(slot: RpcSlot | undefined): string | undefined {
   return redactUrls(e.code !== undefined ? `${e.code} ${e.message}` : e.message).slice(0, TEXT_MAX);
 }
 
+/** The block a call names: `eth_getBlockByNumber`'s first parameter, every other method's second (`eth_call`'s tag). */
+const blockOf = (call: RpcCall): unknown => (call.method === "eth_getBlockByNumber" ? call.params[0] : call.params[1]);
+
 function itemError(raw: unknown): RpcItemError {
   const e = (raw && typeof raw === "object" ? raw : {}) as {code?: unknown; message?: unknown; data?: unknown};
   return {
@@ -256,6 +259,14 @@ export interface SlotOptions {
    * then `upstream_unavailable` (U0-SEC-R3-2: the best pool dropped out silently and a worse route won).
    */
   accept?: (result: unknown, index: number) => boolean;
+  /**
+   * The block the caller pinned the quote to (`QuoteParams.blockNumber`, as its hex tag). A call at exactly this tag
+   * that is still unanswered after the retries the policy allows (each retry starts at the next endpoint) because the
+   * node said it does not have that block, or no longer keeps its state ("header not found", "missing trie node"…), or
+   * answered it with no result, is refused as `stale_node` naming the block — never asked again at "latest". Calls at
+   * any other tag, and every other failure, are as without it.
+   */
+  pinnedBlock?: string;
 }
 
 export interface UniswapRpc {
@@ -328,6 +339,8 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
   const spellings = new Map<number, string[]>();
   /** Chunk failures that are only "past the request's waitUntil" on every endpoint (never sent): no news about the calls. */
   const late = new WeakSet<Error>();
+  /** Calls the node answered with no result where one is always named (NEVER_NULL): at a pinned block, its node lacks it. */
+  const noResult = new WeakSet<Error>();
 
   /**
    * Error text with the chain's own endpoints (every spelling) and any URL taken out, not cut — `clean` cuts it, and a
@@ -474,6 +487,7 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
    */
   async function chunk(chainId: number, calls: readonly RpcCall[], start: number, signal: AbortSignal | undefined, abandoned: () => boolean, o: SlotOptions): Promise<RpcSlot[]> {
     const urls = rpcUrls[chainId] ?? [];
+    const pinned = o.pinnedBlock;
     let lastErr: unknown;
     let jsonRpc = false;
     let onlyLate = rate !== undefined && urls.length > 0; // every endpoint refused it for waitUntil alone
@@ -501,6 +515,14 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
           signal: signal ? anySignal([signal, timeoutSignal(RPC_TIMEOUT_MS)]) : timeoutSignal(RPC_TIMEOUT_MS),
         });
         if (!res.ok) {
+          // A pinned read (SlotOptions.pinnedBlock): some nodes answer a block they lack with an error status and a
+          // JSON-RPC body that says so (X Layer, Celo: 400 "block is out of range"; publicnode: 403 past its pruning).
+          // Read as that refusal of the batch — retried as one, then stale_node — not as the status's reason.
+          const lacked = pinned !== undefined && calls.some((c) => blockOf(c) === pinned) ? blockLackedInBody(await res.text().catch(() => "")) : undefined;
+          if (lacked !== undefined) {
+            batchRefused = true;
+            throw withReason(new Error(describe(chainId, {message: lacked})), "stale_node");
+          }
           const error = new Error(`HTTP ${res.status}`);
           const info = httpRefusal(res.status, res.headers?.get?.("retry-after"));
           throw info ? withReason(error, info) : error;
@@ -527,9 +549,11 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
             // (NEVER_NULL: eth_call, eth_blockNumber, eth_getCode, eth_simulateV1), is no answer (it was read as a
             // revert before, so the best pool dropped out silently). `null` stays an answer where it means one (a
             // receipt not mined yet).
-            out[r.id] = !Object.prototype.hasOwnProperty.call(r, "result") || (r.result === null && NEVER_NULL.has(calls[r.id]!.method))
-              ? {ok: false, failed: refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node answered a call with no result)`)}
-              : {ok: true, result: r.result};
+            if (!Object.prototype.hasOwnProperty.call(r, "result") || (r.result === null && NEVER_NULL.has(calls[r.id]!.method))) {
+              const failed = refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node answered a call with no result)`);
+              noResult.add(failed);
+              out[r.id] = {ok: false, failed};
+            } else out[r.id] = {ok: true, result: r.result};
             continue;
           }
           const e = itemError(r.error);
@@ -582,14 +606,31 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
     return (await Promise.all(chunks.map(one))).flat();
   }
 
+  /**
+   * A call at the pinned block (SlotOptions.pinnedBlock) that no endpoint served because its node lacks that block —
+   * it said so, or answered with no result — as `stale_node`, the block named; any other slot as it is.
+   */
+  function pinnedOutcome(chainId: number, call: RpcCall, s: RpcSlot, tag: string): RpcSlot {
+    if (!("failed" in s) || blockOf(call) !== tag) return s;
+    const empty = noResult.has(s.failed);
+    if (!empty && !nodeLacksBlock(s.error ?? s.failed.message)) return s;
+    // A batch every endpoint refused carries chunk()'s "no RPC answered on chain N (…)": the node's own words are inside.
+    const inner = /^uniswap: no RPC answered on chain \d+ \(([\s\S]*)\)$/.exec(s.failed.message)?.[1] ?? s.failed.message;
+    const why = empty ? "the node answered the call with no result" : s.error !== undefined ? describe(chainId, s.error) : clean(chainId, inner);
+    const failed = refusal("stale_node", `uniswap: no RPC on chain ${chainId} served block ${BigInt(tag).toString()} (${why}) — its node does not have that block yet, or no longer keeps its state; nothing is read at "latest" instead`);
+    return s.error !== undefined ? {ok: false, failed, error: s.error} : {ok: false, failed};
+  }
+
   async function slots(chainId: number, calls: readonly RpcCall[], policy: RetryPolicy, signal?: AbortSignal, o: SlotOptions = {}): Promise<RpcSlot[]> {
+    const pinned = o.pinnedBlock;
+    const done = (out: RpcSlot[]): RpcSlot[] => (pinned === undefined ? out : out.map((s, i) => pinnedOutcome(chainId, calls[i]!, s, pinned)));
     /** An answer the call cannot have is no answer (SlotOptions.accept). */
     const vet = (s: RpcSlot, i: number): RpcSlot =>
       s.ok && o.accept && !o.accept(s.result, i)
         ? {ok: false, failed: refusal("upstream_unavailable", `uniswap: no RPC answered on chain ${chainId} (the node answered a call in a shape the contract never returns)`)}
         : s;
     const out = (await pass(chainId, calls, 0, policy, signal, o)).map(vet);
-    if (policy === "none") return out;
+    if (policy === "none") return done(out);
     for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
       const missing = out.flatMap((s, i) => ("failed" in s ? [i] : []));
       if (missing.length === 0) break;
@@ -605,7 +646,7 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
         if (!("failed" in s && late.has(s.failed))) out[i] = vet(s, i);
       });
     }
-    return out;
+    return done(out);
   }
 
   return {

@@ -2,6 +2,7 @@ import {decodeFunctionData, decodeFunctionResult, encodeFunctionData, encodePack
 import {describeUniswapActivity} from "./activity.js";
 import {ccAsset, ccAssetByToken, resolveAsset} from "@anywalletkit/swap2-assets";
 import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {blockTagOf, validBlockNumber} from "@anywalletkit/protocol-swap2-core/validate";
 import {refusal, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {ADDRESS_THIS, FEE_TIERS, HOP_SYMBOLS, ROUTER_ABI, UNISWAP_V3, type UniswapDeployment} from "./addresses.js";
@@ -77,6 +78,18 @@ const BLOCK_GAS_STALE_MS = 60 * 60_000;
  * and the read goes on in the background to fill the cache — a node that stalls on the method never holds quotes.
  */
 const BLOCK_GAS_WAIT_MS = 1_500;
+/** Most block gas reads kept for blocks a caller pinned (`QuoteParams.blockNumber`): a block's gas limit never changes. */
+const PINNED_GAS_READS_MAX = 64;
+/**
+ * Chains whose RPCs answer an `eth_call` at a block number from their head (the tag is ignored): a request's
+ * `QuoteParams.blockNumber` is not honoured there — the quote is read as without it and names no block
+ * (`Quote.blockNumber` absent). HyperEVM (999): its public and keyed RPCs answered a call 100,000 blocks in the future
+ * (2026-11-28); Uniswap does not quote it today (v4 `quotable: false`, no v3), the entry keeps it so. `verify:live`
+ * checks every other chain of the module takes a block number.
+ */
+export const UNISWAP_LATEST_ONLY_CHAINS: readonly number[] = Object.freeze([999]);
+/** The provider's own copy of {@link UNISWAP_LATEST_ONLY_CHAINS}, taken at load. */
+const LATEST_ONLY: ReadonlySet<number> = new Set(UNISWAP_LATEST_ONLY_CHAINS);
 /**
  * Gas a v4 swap through the Universal Router spends besides the pools the V4Quoter measures: the intrinsic cost, the
  * calldata, `execute`, the PoolManager unlock, SETTLE and TAKE. Live on Monad (2026-11-25): a single pool 158,710 gas
@@ -521,6 +534,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const verified = new Map<number, Promise<void>>();
   /** Each chain's block gas read: until when it holds, until when a quote waits for it, and its answer once in. */
   const blockGas = new Map<number, BlockGasRead>();
+  /** The block gas reads of pinned blocks (`QuoteParams.blockNumber`), by chain and block tag; the oldest dropped first. */
+  const pinnedBlockGas = new Map<string, BlockGasRead>();
   const net = uniswapRpc(config.rpcUrls, perSecond === undefined ? {} : {callsPerSecond: perSecond});
   const v4Mode: UniswapV4Mode = config.v4 ?? "off";
   if (v4Mode !== "off" && v4Mode !== "native-in" && v4Mode !== "all") throw new Error('uniswap: v4 must be "off", "native-in" or "all"');
@@ -572,6 +587,9 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     const id = evmRef(caip2);
     return (deployments[id] || v4Of(id)) && config.rpcUrls[id]?.length ? id : null;
   };
+  /** The block a request is priced at (`QuoteParams.blockNumber`), unless its chain's RPCs ignore the tag (LATEST_ONLY). */
+  const pinnedBlockOf = (params: QuoteParams): string | undefined =>
+    params.blockNumber !== undefined && isEvm(params.sourceChain) && !LATEST_ONLY.has(evmRef(params.sourceChain)) ? params.blockNumber : undefined;
 
   /** JSON-RPC for the getQuote/preflight paths: a revert is null; a call the node did not answer throws, classified. */
   const rpc = (chainId: number, calls: RpcCall[], policy: "none" | "items" | "all", signal?: AbortSignal, options?: SlotOptions) => net.results(chainId, calls, policy, signal, options);
@@ -604,14 +622,35 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * without a gasLimit leaves undefined — only the known caps then apply — and never fails a quote; a failed read is
    * tried again after BLOCK_GAS_RETRY_MS. The newest good answer stays in use while a re-read is pending or failed, for
    * at most BLOCK_GAS_STALE_MS after it was read.
+   *
+   * `pinned` (a quote pinned to `QuoteParams.blockNumber`, as its hex tag): that block's own gas limit instead
+   * (`eth_getBlockByNumber(tag, false)`), read the same way and kept per block — the routes of a quote priced at that
+   * block are bounded by it. Its failure is the same "node did not say" (the known caps alone), never a read at "latest".
    */
-  function blockGasRead(chainId: number): BlockGasRead {
+  function blockGasRead(chainId: number, pinned?: string): BlockGasRead {
     const now = Date.now();
+    if (pinned !== undefined) {
+      const key = `${chainId}:${pinned}`;
+      const hit = pinnedBlockGas.get(key);
+      if (hit && now < hit.until) return hit;
+      const entry = gasReadAt(chainId, pinned, now, {});
+      pinnedBlockGas.delete(key);
+      pinnedBlockGas.set(key, entry);
+      if (pinnedBlockGas.size > PINNED_GAS_READS_MAX) pinnedBlockGas.delete(pinnedBlockGas.keys().next().value!);
+      return entry;
+    }
     const hit = blockGas.get(chainId);
     if (hit && now < hit.until) return hit;
     const prior = hit?.limit !== undefined ? {last: hit.limit, lastAt: hit.readAt!} : hit?.last !== undefined ? {last: hit.last, lastAt: hit.lastAt!} : {};
+    const entry = gasReadAt(chainId, "latest", now, prior);
+    blockGas.set(chainId, entry);
+    return entry;
+  }
+
+  /** One block gas read at `tag`, begun now (see blockGasRead). */
+  function gasReadAt(chainId: number, tag: string, now: number, prior: {last?: bigint; lastAt?: number}): BlockGasRead {
     const entry: BlockGasRead = {until: now + BLOCK_GAS_TTL_MS, waitUntil: now + BLOCK_GAS_WAIT_MS, done: false, ...prior, read: Promise.resolve()};
-    entry.read = net.slots(chainId, [{method: "eth_getBlockByNumber", params: ["latest", false]}], "none").then(
+    entry.read = net.slots(chainId, [{method: "eth_getBlockByNumber", params: [tag, false]}], "none").then(
       ([s]) => (s && s.ok ? blockGasLimitOf(s.result) : undefined),
       () => undefined,
     ).then((limit) => {
@@ -622,7 +661,6 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         entry.readAt = now;
       }
     });
-    blockGas.set(chainId, entry);
     return entry;
   }
 
@@ -1145,8 +1183,14 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     };
     if (params.flex) return refuse("amount-flexible deposits are not supported", "unsupported_pair");
     if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only", "unsupported_pair");
+    if (params.blockNumber !== undefined && !validBlockNumber(params.blockNumber)) return refuse("blockNumber must be a decimal block number (digits only, no leading zero)");
     const chainId = chainIdOf(params.sourceChain);
     if (chainId === null) return refuse(v4Mode === "off" ? `no Uniswap v3 deployment or RPC for ${params.sourceChain}` : `no Uniswap v3 or v4 deployment or RPC for ${params.sourceChain}`, "unsupported_pair");
+    // QuoteParams.blockNumber: every price read of the quote — v3's candidates and probes, v4's discovery, quotes, gas
+    // re-reads and probe, the impact gate's reads, the block gas limit the routes are bounded by — goes to that block
+    // (the block a gated quote pins otherwise). The deployment checks and the token-input simulation stay at "latest".
+    // Not on a chain whose RPCs ignore the tag (UNISWAP_LATEST_ONLY_CHAINS): read as without it, the quote unnamed.
+    const pinnedTag = pinnedBlockOf(params) === undefined ? undefined : blockTagOf(params.blockNumber!);
     // v3 (undefined on a chain only v4 serves) and v4 (undefined unless this provider quotes v4 there).
     const d3 = deployments[chainId] as UniswapDeployment | undefined;
     const d = d3 as UniswapDeployment; // read on the v3 paths only, which run only when d3 is set
@@ -1187,8 +1231,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     if (!d3 && !v4In) return refuse("the Uniswap v4 SwapProxy takes catalog tokens only (this chain has no Uniswap v3 deployment)", "unsupported_pair");
 
     // rpcCallsPerSecond: no batch of this quote goes later than QUOTE_WAIT_MAX_MS after it began (U0-LIVE-1), and its
-    // turns come before those of quotes that began after it.
-    const turns: SlotOptions = perSecond === undefined ? {} : {waitUntil: Date.now() + QUOTE_WAIT_MAX_MS, quote: ++quotesBegun};
+    // turns come before those of quotes that began after it. A pinned block: its reads that no node can serve at that
+    // block are refused as stale_node, naming it (SlotOptions.pinnedBlock).
+    const turns: SlotOptions = {
+      ...(perSecond === undefined ? {} : {waitUntil: Date.now() + QUOTE_WAIT_MAX_MS, quote: ++quotesBegun}),
+      ...(pinnedTag !== undefined ? {pinnedBlock: pinnedTag} : {}),
+    };
 
     /** The operator's alert (`onV4Warning`): never the caller's refusal, never a reason to fail the quote. */
     const warn = (text: string, reason: Swap2RefusalReason): void => {
@@ -1486,7 +1534,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
               chainId,
               [call(d.quoter, route.single
                 ? encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInputSingle", args: [{tokenIn, tokenOut, amountIn: probeIn, fee: route.single.fee, sqrtPriceLimitX96: 0n}]})
-                : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [route.path!, probeIn]}))],
+                : encodeFunctionData({abi: QUOTER_ABI, functionName: "quoteExactInput", args: [route.path!, probeIn]}), block)],
               "none",
               signal,
               turns,
@@ -1870,10 +1918,11 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         }
         const needV3 = v3Known && (wantV3 || v4Ready);
         if (!needV3 && !v4Ready) return out;
-        const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
+        const gasRead = blockGasRead(chainId, pinnedTag); // alongside the quotes; optional (it never fails or holds the quote)
         const pb = passBounds(gasRead); // one set of gas bounds for the pass, both venues' rows (LIVE-VR-3)
         const gated = maxImpact !== undefined;
-        const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
+        // Both venues at one block: the caller's (QuoteParams.blockNumber), else pinned when gated, else "latest".
+        const block = pinnedTag ?? (gated ? await pinBlock(chainId, signal, turns) : "latest");
         const v4Run = v4Ready ? quoteV4(chainId, v4In!, currencyIn4, currencyOut4, amountIn, block as V4BlockTag, signal, turns) : undefined;
         v4Run?.catch(() => {});
         let v3: {ranked: V3Candidate[]; partial: boolean} | undefined;
@@ -1962,13 +2011,13 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       } else {
         await verifyDeployment(chainId);
       }
-      const gasRead = blockGasRead(chainId); // alongside the quotes; optional (it never fails or holds the quote)
+      const gasRead = blockGasRead(chainId, pinnedTag); // alongside the quotes; optional (it never fails or holds the quote)
       const pb = passBounds(gasRead); // one set of gas bounds for the quote, v3's routes and v4's (LIVE-VR-3)
-      // maxPriceImpactBps set: the candidates, the probe and the mid prices are all read at one block, with retries.
-      // Unset: at "latest", as 0.4.11 read them (a call the node did not answer is retried, then refused — never
-      // read as "no pool").
+      // QuoteParams.blockNumber set: every price read at that block. Else maxPriceImpactBps set: the candidates, the
+      // probe and the mid prices are all read at one block, with retries. Unset: at "latest", as 0.4.11 read them (a
+      // call the node did not answer is retried, then refused — never read as "no pool").
       const gated = maxImpact !== undefined;
-      const block = gated ? await pinBlock(chainId, signal, turns) : "latest";
+      const block = pinnedTag ?? (gated ? await pinBlock(chainId, signal, turns) : "latest");
       // v4 reads go out alongside the v3 ones, with the same block tag (one pinned block when gated; else "latest", which
       // separate requests may answer from different blocks); any of them failing refuses the quote (never a smaller
       // candidate set). Handled here so a v3 failure first leaves no unhandled rejection behind.
@@ -2032,6 +2081,15 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   };
   /** A quote naming the venue it runs on. */
   const routed = (q: Quote, routeId: UniswapRouteId): Quote => ({...q, routeId});
+  /**
+   * A quote of a request pinned to `QuoteParams.blockNumber` naming that block (`Quote.blockNumber`): `run` reads every
+   * price of it there (pinnedBlockOf), and refuses a request whose block is not a decimal block number. Another
+   * request's — and one on a chain whose RPCs ignore the tag — as it is.
+   */
+  const atBlock = (params: QuoteParams, q: Quote): Quote => {
+    const block = pinnedBlockOf(params);
+    return block !== undefined ? {...q, blockNumber: block} : q;
+  };
 
   /**
    * `getQuote` with `venueRoutes: "both"`: without a `routeId`, the "best" pass's winner naming its route; with `"v3"` or
@@ -2112,6 +2170,8 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     // used, and a v3 quote there carries 16.3M). The quoted limit stays as information and for the gas bound, which
     // still refuses a swap no block could mine.
     ownGasEstimate: true,
+    // QuoteParams.blockNumber: every price read at that block (both venues of a "both" pass too), named on the quote.
+    honorsBlockNumber: true,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,
     supportsChainPair: (from: string, to: string) => from === to && chainIdOf(from) !== null,
@@ -2119,9 +2179,12 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
       return from.chain === to.chain && chainIdOf(from.chain) !== null;
     },
 
-    getQuote: (params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> => (venueRoutes === "best" ? run(params, signal, "best") : venueQuote(params, signal)),
+    getQuote: async (params: QuoteParams, signal?: AbortSignal): Promise<Quote | null> => {
+      const q = await (venueRoutes === "best" ? run(params, signal, "best") : venueQuote(params, signal));
+      return q && atBlock(params, q);
+    },
     // `venueRoutes: "both"` only: with "best" the provider has no `getQuotes` (one quote per request, as before).
-    ...(venueRoutes === "both" ? {getQuotes: (params: QuoteParams, signal?: AbortSignal): Promise<Quote[]> => venueCandidates(params, signal)} : {}),
+    ...(venueRoutes === "both" ? {getQuotes: async (params: QuoteParams, signal?: AbortSignal): Promise<Quote[]> => (await venueCandidates(params, signal)).map((q) => atBlock(params, q))} : {}),
 
     /**
      * Right before broadcast (after any approval): re-quote the SAME route on
