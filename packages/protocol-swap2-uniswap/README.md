@@ -446,6 +446,74 @@ estimate instead of the quoted gasLimit. Activity also recognizes v4 swaps whate
   higher rate (47 at 300 ms), and past that no rate carries such a quote under the limit. Unset (the
   default), nothing is limited.
 
+## Gas estimate (`gasEstimate`)
+
+A quote's `txRequest.gasLimit` is the bound above (quoter gas + router overhead, padded), unchanged. Next to it, a
+quote now says what the swap is expected to **use** — protocol-swap2-core's `gasEstimate` / `gasEstimateSource`, the
+figure a router ranks routes on: gas used, no headroom, no approval (the approval is priced by whoever prices the
+route). It costs no request: it is QuoterV2's / the V4Quoter's own `gasEstimate` for the chosen route — the figure the
+quote already reads for its limit — plus the gas the transaction spends around the pools, from a measured table
+(`src/gas-estimate.ts`). Source `"simulated"`: the part that varies with the route is the quoter's measurement of this
+quote's pools. With `venueRoutes: "both"` each row carries its own venue's figure.
+
+What the overhead covers: the intrinsic 21,000 and the calldata; v3 — SwapRouter02's `multicall`, the input's
+`transferFrom` in the pool callback (or wrapping `value` with WETH9 for a native input), the payout or, for a native
+output, `unwrapWETH9` and the coin sent; v4 — the Universal Router's `execute`, SETTLE and TAKE, and for a token input
+the SwapProxy and its `transferFrom` into the router. Gas units:
+
+| Flow | Ethereum's schedule | Monad |
+|---|---|---|
+| v3 token → token, one pool | 43,500 | 83,200 |
+| v3 native → token, one pool | 41,400 | 75,300 |
+| v3 token → native, one pool | 52,400 | 104,100 |
+| v3, each pool past the first | −8,000 | −15,000 |
+| v3 `refundETH()` leg (`refundNativeInput`) | +1,700 | +1,700 |
+| v4 native → token (Universal Router) | 79,800 | 132,000 |
+| v4 token → token (SwapProxy) | 113,000 | 257,000 |
+| v4 token → native (SwapProxy) | 91,000 | 197,000 |
+
+A pool past the first lowers the v3 figure: QuoterV2 measures every hop with its payout to the quoter itself (a cold
+balance slot written from zero), while the router hands an intermediate token on within the transaction. v4's
+overhead does not depend on the pool count (measured on one and two pools alike).
+
+**How it was measured** (read-only, 2026-11-28; scripts and raw results kept outside the repo): the module's own quotes
+— v3 and v4, `venueRoutes: "both"`, on 3–8 pairs per chain (native → USDC, USDC → native, token → token, routes over
+one and two pools) — each simulated with `eth_simulateV1` from a fresh account funded by a state override, ERC-20
+input as `[approve(spender, exactly the input), the quoted call]` (the engine's flow), and the quoter's `gasEstimate`
+re-read for the same route at the same block; overhead = the simulated gasUsed of the swap call less that figure.
+Every ERC-20 output was simulated twice: to a recipient holding none of the token and to one already holding some. The
+difference is the recipient's balance slot written from zero, 17,100 on every chain, which the quote cannot know, so
+the table sits halfway: a first receipt of the token costs about 8,550 more than the estimate, a later one about 8,550
+less. Monad's RPCs serve no `eth_simulateV1`, and Monad charges a transaction its whole gas limit — with
+`ownGasEstimate`, the account's estimate of the exact call — so its column is measured against `eth_estimateGas` of
+the module's quotes, the allowance set by a state override.
+
+**How far off** the shipped table is (estimate against the simulated gasUsed of the same quote):
+
+| Set | Quotes | Median error | 9 in 10 within | Worst |
+|---|---|---|---|---|
+| v3, Ethereum-schedule chains | 77 | 4.7% | 7.0% | 17.9% (Base ETH → USDC 0.01%, where QuoterV2 reads 22k less than the reverse direction) |
+| v4, Ethereum-schedule chains | 80 | 4.3% | 8.8% | 12.7% |
+| Monad (against `eth_estimateGas`) | 32 | 2.9% | 6.0% | 8.8% |
+| Real v3 swaps sent straight to SwapRouter02 in the module's call shape (Ethereum, OP, BNB, Base, Arbitrum receipts; QuoterV2 re-read at the parent block) | 378 | 4.6% | 12.2% | 33.5% (one sender's two-pool route on Ethereum) |
+
+On the recordings in `fixtures/rpc/`: Base 1,000 USDC → ETH through the SwapProxy (block 62,413,790) estimates
+130,801 against the recorded `eth_simulateV1` gasUsed of 133,325 (−1.9%, `tests/gas-estimate-u6.test.ts`); Monad's
+earlier `eth_estimateGas` figures in this package — 700 USDC → AUSD 278,580 and → MON 257,666 through the SwapProxy,
+100 MON → AUSD 158,710 and the two-pool route 216,036 through the Universal Router — compare with estimates of
+305,882 (+9.8%), 262,352 (+1.8%), 181,492 (+14.4%) and 218,591 (+1.2%): AUSD costs less to move than the USDC the Monad
+column was measured on.
+
+**Where it is set:** only on a quote with a gas limit (a quoter figure under 20,000 gas a pool measures nothing: no
+limit, no estimate), and on the chains measured — v3 on Ethereum, OP Mainnet, BNB Chain, Unichain, World Chain, Base,
+Arbitrum, Ink, Linea, X Layer and Monad; v4 on those and Arc and Celo. Left out, never guessed: Polygon (measured
+10–35k above the table: native-coin transfers there cost more) and Robinhood Chain (8–20k above), Celo's v3 routes
+(one two-pool sample, +24k), zkSync Era and MegaETH (other gas schedules: a plain transfer uses 60,000 gas on MegaETH,
+its v4 routes 1.8–2.2M), and Avalanche, Elysium and HyperEVM (no endpoint measured, or no quotable v4). Every overhead
+is below the one the gas limit adds (120,000 + 40,000 for an unwrap + 10,000 for a refund on v3; 150,000 + 140,000 for
+the SwapProxy on v4), so `gasEstimate` never exceeds `txRequest.gasLimit` (and is held to it, and to 10 digits, anyway).
+Nothing in execution reads it, and no request, check or refusal changed for it.
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes a call into the chain's pinned Universal Router 2.1.2 —
