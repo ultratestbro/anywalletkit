@@ -1,7 +1,7 @@
-import type {Asset, CrossChainProvider, IntentRef, Quote, QuoteParams, TxRequest, UnsignedTx} from "./types.js";
+import type {Asset, CrossChainProvider, GasEstimateSource, IntentRef, Quote, QuoteParams, TxRequest, UnsignedTx} from "./types.js";
 import {redactUrls} from "./util.js";
 import {refusalInfo, refusalOf, withReason, type Swap2RefusalInfo} from "./errors.js";
-import {quoteRejection, validQuote, validRouteId} from "./validate.js";
+import {GAS_ESTIMATE_SOURCES, quoteRejection, validQuote, validRouteId} from "./validate.js";
 
 /**
  * The server side of {@link remoteProvider}: runs real providers behind your backend so API
@@ -417,6 +417,13 @@ function normalizeQuote(v: unknown, intentMax: number): Quote {
   if (q.gasless !== undefined) {
     if (typeof q.gasless !== "boolean") bad("quote.gasless", "expected a boolean");
     if (q.gasless) out.gasless = true;
+  }
+  // Carried and sealed as given; whether they hold together (`gasEstimateProblem`) is quoteRejection's call.
+  if (q.gasEstimate !== undefined) out.gasEstimate = digits(q.gasEstimate, "quote.gasEstimate", 10);
+  if (q.gasEstimateSource !== undefined) {
+    const origin = str(q.gasEstimateSource, "quote.gasEstimateSource", 20);
+    if (!GAS_ESTIMATE_SOURCES.includes(origin as GasEstimateSource)) bad("quote.gasEstimateSource", "expected venue, simulated or model");
+    out.gasEstimateSource = origin as GasEstimateSource;
   }
   if (q.destDecimals !== undefined) {
     const decimals = num(q.destDecimals, "quote.destDecimals", 0, 36);

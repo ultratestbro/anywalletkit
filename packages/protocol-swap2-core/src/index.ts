@@ -1,7 +1,7 @@
 export * from "./types.js";
 export * from "./errors.js";
 export * from "./operation.js";
-export {validQuote, quoteRejection, remotePinRefusal, slippageFloor, SLIPPAGE_ROUNDING_BPS} from "./validate.js";
+export {validQuote, quoteRejection, remotePinRefusal, slippageFloor, SLIPPAGE_ROUNDING_BPS, gasEstimateProblem, GAS_ESTIMATE_SOURCES} from "./validate.js";
 export {remoteProvider, type RemoteProviderOptions} from "./remote.js";
 export {isEvm, evmRef, namespace, redactUrls, sourceAssetOf, tonRawAddress} from "./util.js";
 export {PERMIT2_ADDRESS, PERMIT2_MAX_DEADLINE_SECONDS, PERMIT2_TRANSFER_TYPES, appendPermit2Signature, permit2TransferJson, readPermit2Transfer, type Permit2Transfer, type Permit2TransferExpectation} from "./permit2.js";

@@ -133,6 +133,40 @@ candidate. The provider's client validator must verify that calldata implements 
 route; an unchanged selector alone is insufficient. Older deployments keep using
 `/quote` when the flag is omitted.
 
+## Gas: `gasEstimate` vs `gasLimit`
+
+A quote can say two different things about gas, and they are not interchangeable:
+
+- **`txRequest.gasLimit`** — the bound the source transaction is sent with (unchanged). Venues put headroom in it on
+  purpose (Fynd: `gas_estimate × 1.3 + 80 000`), because a limit below what the call needs reverts on-chain after
+  the gas is paid. The engine sends it, shows it in the review (`source.gasLimit`) and counts it in the native-gas
+  check before the first approval. `ownGasEstimate` providers (0x) replace it with the account's own estimate at
+  send time, as before.
+- **`gasEstimate`** (decimal string) with **`gasEstimateSource`** (`"venue"` | `"simulated"` | `"model"`) — the gas
+  the main source transaction is expected to *use*: no headroom, no approval. It exists so routes can be compared on
+  what they cost. The router's `evmSourceGas` prices it instead of the limit when it is there (see the router's
+  README). Nothing in execution reads it.
+
+The contract every module follows (`gasEstimateProblem(quote, sourceChain)` returns the rule a quote breaks, or
+`null`; `quoteRejection` refuses such a quote as malformed, `upstream_unavailable`, and a swap2 server refuses to
+seal it, so a client cannot rewrite a sealed estimate either):
+
+| Rule | |
+|---|---|
+| Format | canonical decimal gas units: `"0"`, or 1–10 digits without a leading zero |
+| Together | `gasEstimate` and `gasEstimateSource` are both set or both absent |
+| Chain | EVM source chains only (`eip155:*`) |
+| Gasless | a `gasless` quote (CoW, Omniston EVM orders) carries exactly `"0"`; every other quote a positive figure |
+| Bound | at most `txRequest.gasLimit` when the quote has one (equal is fine) |
+| Honesty | absent when the module has no defensible figure: never a default, never a guess |
+
+`gasEstimateSource` says where the number comes from: `"venue"` — a gas field of the venue's own quote response
+(KyberSwap `routeSummary.gas`, 0x `gas`, Fynd `gas_estimate`); `"simulated"` — a gas measurement of this quote's
+route or transaction (`eth_estimateGas`, `eth_simulateV1`, a quoter contract's `gasEstimate` such as Uniswap's
+QuoterV2 / V4Quoter); `"model"` — the module's table (pool type, hop count, a gasless route's structural zero), with
+the measurements behind it in the module's README. Each module's README says what its figure includes and how far it
+was off on real transactions.
+
 Docs: [Swaps](https://docs.anywallet.tech/guides/swaps/)
 
 Apache-2.0

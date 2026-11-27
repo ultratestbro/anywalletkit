@@ -86,6 +86,9 @@ export interface TxRequest {
   permit2Transfer?: string;
 }
 
+/** Where a quote's {@link Quote.gasEstimate} comes from (see there). */
+export type GasEstimateSource = "venue" | "simulated" | "model";
+
 /** A normalized quote from one provider. */
 export interface Quote {
   /** Provider name. */
@@ -117,6 +120,27 @@ export interface Quote {
    * (`sourceGasUsd`); nothing in execution reads it.
    */
   gasless?: boolean;
+  /**
+   * The gas the route's main source transaction is expected to USE — gas used, not a limit — in gas units, as a
+   * decimal string (EVM sources only). No execution headroom, and no approval: an ERC-20 approval is priced separately
+   * by whoever prices the route. `txRequest.gasLimit` stays what the transaction is sent with and what the native-gas
+   * check counts; this is the figure a router compares routes on (`evmSourceGas` in the router package).
+   *
+   * Rules, enforced by `quoteRejection` (a quote that breaks one is refused as malformed, `upstream_unavailable`, and a
+   * swap2 server refuses to seal it): canonical digits (`"0"` or no leading zero, at most 10 digits); set together with
+   * {@link gasEstimateSource}; an EVM source chain only; `"0"` exactly when the quote is `gasless`, positive otherwise;
+   * at most `txRequest.gasLimit` when the quote has one. Absent when the module has no defensible figure — never a
+   * guess.
+   */
+  gasEstimate?: string;
+  /**
+   * Where {@link gasEstimate} comes from: `"venue"` — the venue's API answered it for this quote (a gas field of the
+   * quote response); `"simulated"` — an `eth_estimateGas` / `eth_simulateV1` / gas-measuring `eth_call` of this quote's
+   * transaction or route (a quoter contract's own gas figure counts here); `"model"` — the module's table (pool type,
+   * hop count, a gasless route's structural zero), with the measurements behind it in the module's README. Present
+   * exactly when `gasEstimate` is.
+   */
+  gasEstimateSource?: GasEstimateSource;
   /** Estimated time to delivery, or null when no defensible estimate is available. */
   etaSeconds: number | null;
   /** Provider's reliability hint, 0 to 1. */
