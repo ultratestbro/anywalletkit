@@ -28,6 +28,31 @@ the device: only `batchSwap` of kind GIVEN_IN, no internal balances or pool `use
 source token, and limits of exactly the input in and the quote's minimum out. `manageUserBalance`,
 `setRelayerApproval`, `swap` and every other Vault call are refused.
 
+## Quoting at one block (`blockNumber`)
+
+`QuoteParams.blockNumber` (0.4.0; a decimal block of the source chain, read by the app once per comparison
+round): the Vault's `queryBatchSwap`, which is the quote's price, runs at that block, and the quote names it
+(`Quote.blockNumber`; the provider declares `honorsBlockNumber: true`). The SOR's paths come from the Balancer API as
+before (it has no block); the Vault prices them at the block. At "latest" whatever it says: the Vault's `WETH()`
+check and `preflightDeposit`, which re-prices the signed batch right before signing.
+
+A node that does not have the block ("header not found", "block not found", a null result, an HTTP 400 "block is out
+of range") or no longer keeps its state ("missing trie node", "No state available for block …", publicnode's HTTP 403
+for archive state) fails its endpoint and the next one is asked; with none left the quote is refused as `stale_node`,
+the block named: "balancer: no RPC answered on chain 1 (block 26510020 is not served by the node (header not
+found))". It is never priced at "latest" instead. A revert of the batch is still the Vault's answer
+(`simulation_failed`). Every chain of `BALANCER_V2_CHAINS` takes a block number (2026-11-28). Pass it in the
+comparison round only (latest, or latest − 1 on fast chains whose nodes trail), not on the execution re-quote. Without
+it every request is 0.3.13's, byte for byte (`tests/block-number.test.ts` against `fixtures/unpinned-0.3.13.json`).
+
+## Live check
+
+`pnpm verify:live [chainId …]` (after `pnpm build`; `RPC_<chainId>=url[,url]` replaces the public RPCs): per chain
+of `BALANCER_V2_CHAINS`, the chain id and the Vault's `WETH()` against the pin; on every endpoint, an `eth_call` at
+head − 2 must answer that block's own number and one at head + 100,000 must be refused (a node that ignores the tag
+answers both); and 0.1 of the native coin → USDC at head − 1 must come back naming that block (required on Ethereum
+and Base; elsewhere the SOR having no route is reported). Read-only: `eth_call`, `eth_blockNumber` and the SOR query.
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes `batchSwap` `0x945bcec9` and `swap`
