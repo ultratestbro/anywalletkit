@@ -1,0 +1,1194 @@
+{
+ "measured": "2026-11-28",
+ "source": "read-only JSON-RPC on each chain: eth_simulateV1 of the module's own calls from an address that never held the wrapper (its native balance overridden; four transactions in sequence: deposit() of 0.001 into the empty balance, deposit() of 0.001 again, withdraw(0.0001), withdraw(the remaining 0.0019)), and receipts (eth_getTransactionReceipt) of recent public deposit() / withdraw(uint256) transactions sent straight to the wrapper by the account they credit or debit (found with eth_getLogs on its Deposit / Withdrawal events, or Transfer mint / burn on Arbitrum). gasUsed as the receipt states it.",
+ "chains": {
+  "1": {
+   "symbol": "WETH",
+   "wrapper": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+   "simulation": {
+    "block": 26509332,
+    "depositIntoEmpty": 45038,
+    "depositIntoHeld": 27938,
+    "withdrawPart": 35192,
+    "withdrawAll": 30404
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x374519e63851c9c226ce4edb1cac78a8cf89743dcf2bc2bbf2e6206be6d3c3b6",
+      "block": 26509251,
+      "gasUsed": 27938
+     },
+     {
+      "hash": "0x38d70742f08229af1c68527a45ced2b2fcf0ac1c8a0b08185109bb9026ddf13c",
+      "block": 26509233,
+      "gasUsed": 45054
+     },
+     {
+      "hash": "0xd354edece5c276a48e49afbebd1a7638cd124a15da88c003e0e8f0c006eb98bd",
+      "block": 26509221,
+      "gasUsed": 27938
+     },
+     {
+      "hash": "0x189f1a6857c9f978b983bebb0af935c5fb9f1c376b4429621afaf81167d30f6b",
+      "block": 26509217,
+      "gasUsed": 45138
+     },
+     {
+      "hash": "0xb085af315c6e2eb70dfff8a6500615c5a7a96f7091e8e9afcbc6e868e3fa92a6",
+      "block": 26509205,
+      "gasUsed": 45054
+     },
+     {
+      "hash": "0xd96fc66b9b7bcd6827347c00013b3756798f979bfbddc7864867896b05dbae72",
+      "block": 26509199,
+      "gasUsed": 27938
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x167b1b693455c662557fa09196f8876528728681e35be0669641324c05243e76",
+      "block": 26509236,
+      "gasUsed": 30404
+     },
+     {
+      "hash": "0x25417e74e9fa985ced6983985ef0d66567eb053af274d30ef617613e81b0d04f",
+      "block": 26509231,
+      "gasUsed": 33059
+     },
+     {
+      "hash": "0x4f8553acb9d9ec0fd12a5c288c4cc7c25fff315d6ac9a576d8d528a98cb54b22",
+      "block": 26509227,
+      "gasUsed": 30408
+     },
+     {
+      "hash": "0x294dbe5d07e0a3b6db8fbe4480da9be8312162017d4cc8e1da51a60c9983f5f0",
+      "block": 26509223,
+      "gasUsed": 30404
+     },
+     {
+      "hash": "0x6be63014a42600fab7e5ea01aa9beb9dee466dea736364ba2615e8f2b5f2b604",
+      "block": 26509207,
+      "gasUsed": 35204
+     },
+     {
+      "hash": "0xc8d4500ec23a5c3341db72e638f677dd6c5dd3b3a8a23678eda04ca7480d6532",
+      "block": 26509202,
+      "gasUsed": 30432
+     }
+    ]
+   }
+  },
+  "10": {
+   "symbol": "WETH",
+   "wrapper": "0x4200000000000000000000000000000000000006",
+   "simulation": {
+    "block": 160108628,
+    "depositIntoEmpty": 44866,
+    "depositIntoHeld": 27766,
+    "withdrawPart": 35116,
+    "withdrawAll": 30328
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x6f57c0e8582ba8d2dc498ba13305b8cd5e61f572714b1dc3c60385961261c98f",
+      "block": 160106256,
+      "gasUsed": 27766
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x4b78b71af8b680509c6efa6e222bb9fcac48066b6ed236e750e62ff003c33415",
+      "block": 160107384,
+      "gasUsed": 35140
+     },
+     {
+      "hash": "0x59e4f3a7c9b41d44082127dc8c0aceae063e22e7ee1608957f8a63b6b90ad6f4",
+      "block": 160107120,
+      "gasUsed": 30340
+     },
+     {
+      "hash": "0x9ba84d92db174b486487853f31df63f2dd6759529b67dd7521a4d5ad0b48135e",
+      "block": 160106427,
+      "gasUsed": 35128
+     },
+     {
+      "hash": "0xa46f5b3fba92b3cdab31fd3f6b495a919b6cc3f6572f96a8e9f34f94a1194314",
+      "block": 160106155,
+      "gasUsed": 30328
+     },
+     {
+      "hash": "0xbcea68f3bc68423e8e69033c6c2f3fd2285a4b0a83fd658e95ee0b6785c1d5e9",
+      "block": 160105820,
+      "gasUsed": 30340
+     },
+     {
+      "hash": "0x245e4f4b511c43ec343b60709498bfcc39790a260ae0910537074571062912d5",
+      "block": 160105786,
+      "gasUsed": 30352
+     }
+    ]
+   }
+  },
+  "56": {
+   "symbol": "WBNB",
+   "wrapper": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+   "simulation": {
+    "block": 136113090,
+    "depositIntoEmpty": 45038,
+    "depositIntoHeld": 27938,
+    "withdrawPart": 35192,
+    "withdrawAll": 30404
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0xd7aeaa612d4f0dec79b43e6f270f38e07af341f3a58bf3ab677411f01512eacc",
+      "block": 136112006,
+      "gasUsed": 27938
+     },
+     {
+      "hash": "0xbcccf94b9963434c012f69487f07b1fb71c51df5f0cd8c78c06d84b2960e702d",
+      "block": 136110322,
+      "gasUsed": 27938
+     },
+     {
+      "hash": "0xe5feeac197a1b13cb8fa3ea278231257f853c131986b368cb5e7e789e994f2b6",
+      "block": 136109906,
+      "gasUsed": 45038
+     },
+     {
+      "hash": "0x40186210100887317e68ecb0bf82f75d7a33208cd82c806d896c9a22b1da700a",
+      "block": 136109847,
+      "gasUsed": 45038
+     },
+     {
+      "hash": "0x4e2ca5ce44864e12079eb8c394cb0729ded5d999075ded6406552aa8b4d76007",
+      "block": 136109797,
+      "gasUsed": 45038
+     },
+     {
+      "hash": "0x5dc2a0c9c03e55978a9d938bd43e5f1d8825a3607ca9e6f41947245e1bd344c6",
+      "block": 136109770,
+      "gasUsed": 45038
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0xebb1798b058cb6307dac20a074dba33cd93d38cf9210c740d80e2a306a84bd57",
+      "block": 136112546,
+      "gasUsed": 30428
+     },
+     {
+      "hash": "0x144d1662a112d701c0d0717b51d0116a360f8f46e3faaedd04bb834e208bb34d",
+      "block": 136112020,
+      "gasUsed": 35204
+     },
+     {
+      "hash": "0xc787e9a2caaec4fd7dbcb31c3633fba50dd90970793de439c0e8a7c25d9a4075",
+      "block": 136111898,
+      "gasUsed": 33062
+     },
+     {
+      "hash": "0xaa1523b1e15633928f7b54080b7cca0f3f2338e90c55e8708c7503362f925312",
+      "block": 136111654,
+      "gasUsed": 30428
+     },
+     {
+      "hash": "0xaa9f15edf0b6a0e409336ba7e4c3a143d42a294d51eb0f475ab22e09461f38a8",
+      "block": 136111436,
+      "gasUsed": 30416
+     },
+     {
+      "hash": "0x4706f4dce0abefd0d95b5c2cd50fa46e9b2669768fb94ee5f531a8e4a65c659e",
+      "block": 136111094,
+      "gasUsed": 30428
+     }
+    ]
+   }
+  },
+  "100": {
+   "symbol": "WXDAI",
+   "wrapper": "0xe91d153e0b41518a2ce8dd3d7944fa863463a97d",
+   "simulation": {
+    "block": 49502346,
+    "depositIntoEmpty": 45041,
+    "depositIntoHeld": 27941,
+    "withdrawPart": 35227,
+    "withdrawAll": 30439
+   },
+   "receipts": {
+    "deposit": [],
+    "withdraw": []
+   }
+  },
+  "130": {
+   "symbol": "WETH",
+   "wrapper": "0x4200000000000000000000000000000000000006",
+   "simulation": {
+    "block": 65067676,
+    "depositIntoEmpty": 44932,
+    "depositIntoHeld": 27832,
+    "withdrawPart": 35211,
+    "withdrawAll": 30423
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x7770be851a71e78f5e16202012acf3f48f6a5bdb3a3387d10bcb4c96c91bfb85",
+      "block": 65061691,
+      "gasUsed": 27832
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0xf7af408c243fedf85daa21761a431b88ab8a14793652fff3c57e5258581bdcd0",
+      "block": 65058650,
+      "gasUsed": 30435
+     },
+     {
+      "hash": "0xcf878052b424cafe44636fc02945fa47dd87a7162bd6958aa58c85c33d2b7f98",
+      "block": 65053088,
+      "gasUsed": 30423
+     }
+    ]
+   }
+  },
+  "137": {
+   "symbol": "WPOL",
+   "wrapper": "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270",
+   "simulation": {
+    "block": 98073705,
+    "depositIntoEmpty": 48401,
+    "depositIntoHeld": 30461,
+    "withdrawPart": 37747,
+    "withdrawAll": 33799
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0xbd103304d0d9e0d5768b78046e298d9f7ad2ff28beb30e3b0919bbebf6a93179",
+      "block": 98065190,
+      "gasUsed": 30461
+     },
+     {
+      "hash": "0x68e63f873433165f6e0dcfa493dbd96edb6844d6d151972ecd33e529cc8954ed",
+      "block": 98064284,
+      "gasUsed": 48401
+     },
+     {
+      "hash": "0x5dc4cb78222f68b053cb95f9d301f5a68d50c2542ce13f31509121e999674279",
+      "block": 98059891,
+      "gasUsed": 30561
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x40b0334fef918e6adaf5865a84283fb0af045a5a66adc90d02e73c3ce0f444bc",
+      "block": 98073496,
+      "gasUsed": 33823
+     },
+     {
+      "hash": "0xd8d483caf2055b98391a41086810ab60ea6c4e382b9c6151eb9bed26c8f96755",
+      "block": 98071936,
+      "gasUsed": 33823
+     },
+     {
+      "hash": "0x2f175cc0e47f41500ef38637e5c518d7aa23780fc86ef64000814bec456bd7b4",
+      "block": 98068847,
+      "gasUsed": 33823
+     },
+     {
+      "hash": "0x6f3184d02fa0333e6c103c2b10bc3ce6e3e89bf6dc13629bc8890e2f335103ff",
+      "block": 98068825,
+      "gasUsed": 33811
+     },
+     {
+      "hash": "0x21423e38d74ae4bb9f3bd3eed822b860109c0c6e5945fa609ca7bdb315e426d2",
+      "block": 98068626,
+      "gasUsed": 33823
+     },
+     {
+      "hash": "0x6c52182164fdf3bc347c55b3be342175f5d35ec743ebf3c6061b1e08bc72f619",
+      "block": 98066994,
+      "gasUsed": 37783
+     }
+    ]
+   }
+  },
+  "143": {
+   "symbol": "WMON",
+   "wrapper": "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
+   "simulation": {
+    "unavailable": "this request method is not supported"
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x86352f9fe2c288c302b90f9ea4e2373137a05904a757d520e93cb6cdc838670b",
+      "block": 125965033,
+      "gasUsed": 80000
+     },
+     {
+      "hash": "0x7fc946a52e21d1f58b9918224d25f0dbc73805272e335fa5e0a9f80842ff13f4",
+      "block": 125961070,
+      "gasUsed": 51280
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0xbd12db80981f83b3dbacdd17f565d3e9aafb035f5b007cc746cba90ddb188350",
+      "block": 125969484,
+      "gasUsed": 1500000
+     },
+     {
+      "hash": "0xea1cfce6aa9d76b4da5f9b833a94ff637a001c3cbbd5a93fbbc366aecbbc2d52",
+      "block": 125969297,
+      "gasUsed": 1500000
+     },
+     {
+      "hash": "0xf8720a0deca7d30d6c175ec4143bd028297110e0c71280222eec58d66d4c9b7e",
+      "block": 125968914,
+      "gasUsed": 1500000
+     },
+     {
+      "hash": "0x507796111c5424ba9c18e64d9a6d4ea0e8ccfabba989a48f44476062af89dab0",
+      "block": 125968618,
+      "gasUsed": 51303
+     },
+     {
+      "hash": "0x9b4ae6cd46230c51ba263308c34c99810de3accbb1c2592362c2ad726c9c6af1",
+      "block": 125967702,
+      "gasUsed": 1500000
+     },
+     {
+      "hash": "0xf675550f3cfcca7f37b412d1f7f0e4a0b93706e78b153b1a6e123bc0bc43312c",
+      "block": 125966875,
+      "gasUsed": 42415
+     }
+    ]
+   }
+  },
+  "146": {
+   "symbol": "wS",
+   "wrapper": "0x039e2fb66102314ce7b64ce5ce3e5183bc94ad38",
+   "simulation": {
+    "block": 83223928,
+    "depositIntoEmpty": 54044833,
+    "depositIntoHeld": 48624959,
+    "withdrawPart": 43769001,
+    "withdrawAll": 39387792
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x9688b880528f7e9c03d7a27405c88efef99448ac4c576e8af8555ee78b277399",
+      "block": 83215652,
+      "gasUsed": 36852
+     },
+     {
+      "hash": "0x3ba450a225acf63c22a282f9d6ca26cac64dfa7054c69a3b71f4254d09c09c69",
+      "block": 83194818,
+      "gasUsed": 36906
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x560425817cc73d3e112b40a2855883d123540537ed3f5202198bbc75a283b9c8",
+      "block": 83221671,
+      "gasUsed": 40356
+     },
+     {
+      "hash": "0xe28afe2376f4329a09230b5a06100be68d3fe89dc6d02b39609f126dc887ce04",
+      "block": 83219214,
+      "gasUsed": 42458
+     },
+     {
+      "hash": "0xe212ef67f4b62dbf8bd39698f2b0f1598aecb1bf581c2bcd76790fb21e5757f6",
+      "block": 83219167,
+      "gasUsed": 40343
+     },
+     {
+      "hash": "0x9bf878ee8a3c34c1467048deba797131cb8a961103d29c87791ae0db0e675d99",
+      "block": 83216795,
+      "gasUsed": 42458
+     },
+     {
+      "hash": "0x305379a5dd48ad9ee6f05c0e5602607e456a2cd3238fa8d1930b8923efe90327",
+      "block": 83215913,
+      "gasUsed": 39432
+     },
+     {
+      "hash": "0xbf8e6bc0e6ec71ebf5fd3886f9cd97b3c5acedb77cc3f4945b898eb9f82ac689",
+      "block": 83215154,
+      "gasUsed": 40722
+     }
+    ]
+   }
+  },
+  "196": {
+   "symbol": "WOKB",
+   "wrapper": "0xe538905cf8410324e03a5a23c1c177a474d59b2b",
+   "simulation": {
+    "block": 77047002,
+    "depositIntoEmpty": 49054,
+    "depositIntoHeld": 31954,
+    "withdrawPart": 39241,
+    "withdrawAll": 34453
+   },
+   "receipts": {
+    "deposit": [],
+    "withdraw": [
+     {
+      "hash": "0xaecdf4c291287eb0bbb5e0230ef4c93cee3106154f8f64f371488c754655c79a",
+      "block": 77041123,
+      "gasUsed": 39253
+     },
+     {
+      "hash": "0x70cdfaba1c002a3f2ed8810476af55a91193bfa14c3d1c6843971299309eaa35",
+      "block": 77040168,
+      "gasUsed": 39277
+     },
+     {
+      "hash": "0xb1be534bcb8b9ffa45623b2ae132e3de818c514b5d3bc26557d22b8ff96d1717",
+      "block": 77038154,
+      "gasUsed": 39289
+     },
+     {
+      "hash": "0xbeaa22219274ca14c0acc899eeaa46b13cd358fafdcf4f32a0319239306e069a",
+      "block": 77036310,
+      "gasUsed": 39277
+     }
+    ]
+   }
+  },
+  "324": {
+   "symbol": "WETH",
+   "wrapper": "0x5aea5775959fbc2557cc8789bc1bf90a239d9a91",
+   "simulation": {
+    "unavailable": "Method not found"
+   },
+   "receipts": {
+    "deposit": [],
+    "withdraw": []
+   }
+  },
+  "480": {
+   "symbol": "WETH",
+   "wrapper": "0x4200000000000000000000000000000000000006",
+   "simulation": {
+    "block": 38240200,
+    "depositIntoEmpty": 44866,
+    "depositIntoHeld": 27766,
+    "withdrawPart": 35116,
+    "withdrawAll": 30328
+   },
+   "receipts": {
+    "deposit": [],
+    "withdraw": [
+     {
+      "hash": "0x39b16d13ef2eab02b42b95a94a64425dd9a44982d8de0150055da8d6a4e7fca9",
+      "block": 38230031,
+      "gasUsed": 30316
+     },
+     {
+      "hash": "0x21e56152ea8ee81fc96029360e1595093b919ae1961b37b36f1cfb17d150896c",
+      "block": 38229915,
+      "gasUsed": 30328
+     },
+     {
+      "hash": "0xc0c91976cee9bbac9cd3d22c741509caa0680929d316490596a0e2c1c2b09d0c",
+      "block": 38228975,
+      "gasUsed": 30440
+     },
+     {
+      "hash": "0xe8b462fc9d04e390d8dcafaabc186d028d91038d4937cae62e3bcaf19d9083c1",
+      "block": 38227715,
+      "gasUsed": 30676
+     }
+    ]
+   }
+  },
+  "999": {
+   "symbol": "WHYPE",
+   "wrapper": "0x5555555555555555555555555555555555555555",
+   "simulation": {
+    "unavailable": "Method not found"
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x6b52a9747af4001ff6467df486d8f02993ef0a0beb8140d700641c27da717aa5",
+      "block": 52415066,
+      "gasUsed": 27766
+     },
+     {
+      "hash": "0x1af1a40f694ef88e1c83039ac3cc3e4d3ea1e4bbfd7cbb0373aaeb988b4ef1e4",
+      "block": 52414738,
+      "gasUsed": 27766
+     },
+     {
+      "hash": "0x3069dcdabdbe80fb643fa74ae39a62f6273e9ff2d65bda3dc7f733b277260e5b",
+      "block": 52412656,
+      "gasUsed": 27766
+     },
+     {
+      "hash": "0xb959cd2e5477dd54607e8f3f2b611b6e887445e0e0dbfdfe9200e4b7b83210bb",
+      "block": 52411673,
+      "gasUsed": 44866
+     },
+     {
+      "hash": "0x46c7ce121d4db6fba4cd69f0b090025ae1450a6453c74b2bb59afeb092dc7f0e",
+      "block": 52409616,
+      "gasUsed": 27766
+     },
+     {
+      "hash": "0x4daaba1b907c1acac6e08a475bb5713bf3e0072d8e39ed5aa111bb22529637f7",
+      "block": 52409480,
+      "gasUsed": 27766
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x6dbfc4e755176df93de9e16c352e64f66d2dcb4370d0d7487adea47d9fbd6d48",
+      "block": 52415839,
+      "gasUsed": 35140
+     },
+     {
+      "hash": "0x27875ce06eaeb641edc46e4715db1a013327773d5f1dff66f68d336c1d088960",
+      "block": 52414877,
+      "gasUsed": 30340
+     },
+     {
+      "hash": "0x83dffa1c8e3bb851216e03824491272543d40cfaa448817cb75f6b250bcedac0",
+      "block": 52414834,
+      "gasUsed": 30340
+     },
+     {
+      "hash": "0x930016c095f857face83e936719eb250a4319cd6e9668822d9c17272d6361e2e",
+      "block": 52412759,
+      "gasUsed": 30340
+     },
+     {
+      "hash": "0x214f8bad7c7f4fde6cafde7f6d42e6a7c4503a7519531d092bee5605050a0b6e",
+      "block": 52412136,
+      "gasUsed": 35140
+     },
+     {
+      "hash": "0x89c124cd8b15363d49f8d537861779cc6e45409fe6384dc9b016ead6fc4ad9e5",
+      "block": 52411246,
+      "gasUsed": 30340
+     }
+    ]
+   }
+  },
+  "1329": {
+   "symbol": "WSEI",
+   "wrapper": "0xe30fedd158a2e3b13e9badaeabafc5516e95e8c7",
+   "simulation": {
+    "unavailable": "the method eth_simulateV1 does not exist/is not available"
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0xe502e49a61567d6a48584e3832da6e0730de61c3f0ce4aedaf6d13513769313e",
+      "block": 245712205,
+      "gasUsed": 27766
+     },
+     {
+      "hash": "0x32f70da8ce8e4598452f7fa7f6c5e849fa292f109c8070d24b97ff187f545f48",
+      "block": 245702948,
+      "gasUsed": 27766
+     },
+     {
+      "hash": "0x27e9631099eb184101c0b323319fe1674fdd2df4f23e419968100fb6938e8aae",
+      "block": 245701585,
+      "gasUsed": 27766
+     },
+     {
+      "hash": "0x6de49d0267dabc8496a0388972c1df2d67542e7a4c67f6c3e85dda5fcb89839e",
+      "block": 245700614,
+      "gasUsed": 27766
+     },
+     {
+      "hash": "0x68f766431163bffb62ffba24dfc0ed9edbabe6d4385213a0bfb6f4bc4672c5db",
+      "block": 245696195,
+      "gasUsed": 27766
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0xae95403887a871d87a197ec82884caee058266f5525b9da5e4b9d5364d89a2b2",
+      "block": 245713970,
+      "gasUsed": 30340
+     },
+     {
+      "hash": "0x126a976095bb2577847dc95514cf4c397005f2e5e8e51899000bdcf26ba88f77",
+      "block": 245708272,
+      "gasUsed": 35140
+     },
+     {
+      "hash": "0xd8d9dff4741788f69d3a64796faaebfd7c56d1cd0688ae574e035bfeed4cfe61",
+      "block": 245707901,
+      "gasUsed": 35140
+     },
+     {
+      "hash": "0x88f62d49ebe31ec25adeed321f4b1cf0c4a06bfc73a3f882aa9969722597f5c3",
+      "block": 245704646,
+      "gasUsed": 35140
+     },
+     {
+      "hash": "0xc90a55d99716f118d9e2c0e093d84dff61a99d52524657a465c4b2595515aef0",
+      "block": 245704563,
+      "gasUsed": 35140
+     },
+     {
+      "hash": "0x23b4617d540549e8cf9ff3662017c27e6bfa4628cecb70614c676cd4e778f80d",
+      "block": 245704144,
+      "gasUsed": 30364
+     }
+    ]
+   }
+  },
+  "2818": {
+   "symbol": "WETH",
+   "wrapper": "0x5300000000000000000000000000000000000011",
+   "simulation": {
+    "unavailable": "the method eth_simulateV1 does not exist/is not available"
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0xc39655276eddc92d01d91533931999037b61fbaf2bba083dc5fd1c2b113f2726",
+      "block": 30507786,
+      "gasUsed": 34731
+     },
+     {
+      "hash": "0x293f89f8be016484024d2d751c6efd49323be10bf3f3706d7652d4136b781e97",
+      "block": 30506814,
+      "gasUsed": 34731
+     },
+     {
+      "hash": "0x4c425114c9809f932eb97068c11af26aa9f5423774ba026086da8c96020de720",
+      "block": 30506247,
+      "gasUsed": 34731
+     },
+     {
+      "hash": "0xe246175c467980f6bfbff486c5197f793588c8b84997fd0e6a9bfd5b1f12db27",
+      "block": 30505727,
+      "gasUsed": 34731
+     },
+     {
+      "hash": "0x7add22c578ec69c87f74e1e8c863c2d4d8e0c64ee3965f1c8d1c724d29f26c61",
+      "block": 30504998,
+      "gasUsed": 34731
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x61bf14a41a0e135caeba479c0d5634251dc267157de519f7e12f568ac84d965d",
+      "block": 30510360,
+      "gasUsed": 42007
+     },
+     {
+      "hash": "0x4e2a8f07979f62c385d6d64dd4e935ab0bb804a3bc5ae9dc79a9c4a9365efd86",
+      "block": 30498550,
+      "gasUsed": 41995
+     }
+    ]
+   }
+  },
+  "4326": {
+   "symbol": "WETH",
+   "wrapper": "0x4200000000000000000000000000000000000006",
+   "simulation": {
+    "block": 33019032,
+    "depositIntoEmpty": 94632,
+    "depositIntoHeld": 77532,
+    "withdrawPart": 86791,
+    "withdrawAll": 82123
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x3c7d0e6da94e4be80ebf82147472bb1a0307f8d63da82aaaf807f13819c4f9b9",
+      "block": 33017664,
+      "gasUsed": 77532
+     },
+     {
+      "hash": "0x89a7ddd200fd185fdf6da60e549cc35404a1c14def409ccbc3d3cd533e3b419f",
+      "block": 33016445,
+      "gasUsed": 77532
+     },
+     {
+      "hash": "0x82a21b8378aa4cfc79049f27b0b63316705dd025439a266207f9644b0709c519",
+      "block": 33009551,
+      "gasUsed": 77532
+     },
+     {
+      "hash": "0x419c5f19132ff7be47bbb46762b6fd3165642ac37d3cc4b449f532de06214bd5",
+      "block": 33006380,
+      "gasUsed": 77532
+     },
+     {
+      "hash": "0xb2e746daa1a511411531dc7a7c0d70fd25aaa9d2e5c5cc13af41dc7c18431977",
+      "block": 33002093,
+      "gasUsed": 94632
+     },
+     {
+      "hash": "0x23e70ba8c7c57dc99cb36e7d406f58a28dc35d629de6e5f5bc4b2e5320e5ff0e",
+      "block": 32996968,
+      "gasUsed": 77532
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0xa708b3dbcf714fc09020f1adf9994580b9fe6748c28e9afbe0c15b3e5a9d04cf",
+      "block": 33016706,
+      "gasUsed": 87055
+     },
+     {
+      "hash": "0x6728cc730299ad43f1c2f57fe0628f03a42d474a129aa6f7bd89bbddb98b0f2c",
+      "block": 33009604,
+      "gasUsed": 86923
+     },
+     {
+      "hash": "0xc95892225a4742d709bf3582e101d470ae4bb57e1f6482f6f653f82c6810611b",
+      "block": 33006698,
+      "gasUsed": 87055
+     },
+     {
+      "hash": "0x3c52e8a3522429ce0b29aeca3d821f60ba38e952e7dbd418c15859578df7b5cf",
+      "block": 33006486,
+      "gasUsed": 82255
+     },
+     {
+      "hash": "0xc876727ee402bdcd2207a646ce10be5db30cfdfdc865e15d137e8d5ea532c1bc",
+      "block": 32995641,
+      "gasUsed": 86923
+     },
+     {
+      "hash": "0xf7537a4ebd66de2ae30ff0a3328aa63ad5872eee83b712579b1fd228df18ff6e",
+      "block": 32991675,
+      "gasUsed": 87055
+     }
+    ]
+   }
+  },
+  "5000": {
+   "symbol": "WMNT",
+   "wrapper": "0x78c1b0c915c4faa5fffa6cabf0219da63d7f4cb8",
+   "simulation": {
+    "block": 103842866,
+    "depositIntoEmpty": 51977,
+    "depositIntoHeld": 34877,
+    "withdrawPart": 42329,
+    "withdrawAll": 37541
+   },
+   "receipts": {
+    "deposit": [],
+    "withdraw": [
+     {
+      "hash": "0x26b5d77a20421ffafc43ba27f8935892ddc0521258b4235de1f200cc2f250738",
+      "block": 103841402,
+      "gasUsed": 42377
+     },
+     {
+      "hash": "0xeeac92af97bbaee734310d3bfc5744914997ae3ca410f53500e3346bb8111a42",
+      "block": 103836692,
+      "gasUsed": 37565
+     },
+     {
+      "hash": "0xda32c3d9b7f597ec7ef1fa2e853bf3a3f2e0de68b16fae8be26f280b9ab0b053",
+      "block": 103829909,
+      "gasUsed": 42389
+     },
+     {
+      "hash": "0x4df43f77d3d0e481d6d7adc7be37bad5344fb6bcda3a3c1dabed1d1fe46339b8",
+      "block": 103827840,
+      "gasUsed": 42341
+     },
+     {
+      "hash": "0x5b00cb331109ece40bd8a344f8db2626526f922ed5ad34e83daa57c7a7e5c591",
+      "block": 103821394,
+      "gasUsed": 42389
+     },
+     {
+      "hash": "0x85e079d37ffa0864acd506a4221420b326a99fa8d169caaeb69269dda530b976",
+      "block": 103820571,
+      "gasUsed": 42389
+     }
+    ]
+   }
+  },
+  "8453": {
+   "symbol": "WETH",
+   "wrapper": "0x4200000000000000000000000000000000000006",
+   "simulation": {
+    "block": 63128347,
+    "depositIntoEmpty": 44866,
+    "depositIntoHeld": 27766,
+    "withdrawPart": 35116,
+    "withdrawAll": 30328
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0xc2712748df89986a996b25b81a6e58091020f3783d855e2427f7607fe4455947",
+      "block": 63124650,
+      "gasUsed": 44866
+     },
+     {
+      "hash": "0xffe13fc52a7596e1e6335e50a058f09355cc05d623971e33f4414ecd9263cd08",
+      "block": 63124092,
+      "gasUsed": 44866
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x53585494a9e98f0d3ee9bdfb9f17509eebc2bc945f19ff256ad86aa75dc4d694",
+      "block": 63124575,
+      "gasUsed": 30328
+     },
+     {
+      "hash": "0x6e6b6e9a2165adb6dc405fdd286f03d11b0cee55a5c4b0ea0c9b0a4b1a58d849",
+      "block": 63124058,
+      "gasUsed": 30340
+     },
+     {
+      "hash": "0x68da7ca506b7b31a29b17eca9eca22509a7b49e75e114a98bcab3431b54e3846",
+      "block": 63123785,
+      "gasUsed": 35140
+     },
+     {
+      "hash": "0x2148fbd3dd884ad11b240eda8b209d1d92c76a6e296aacd18fa483c716319cc2",
+      "block": 63123505,
+      "gasUsed": 30340
+     },
+     {
+      "hash": "0xbd436e34dd508ecd3b64e8d56e14168ea9fd74838a6b74a257c7b3fd4f5ae377",
+      "block": 63123497,
+      "gasUsed": 30340
+     }
+    ]
+   }
+  },
+  "9745": {
+   "symbol": "WXPL",
+   "wrapper": "0x6100e367285b01f48d07953803a2d8dca5d19873",
+   "simulation": {
+    "block": 38840409,
+    "depositIntoEmpty": 45041,
+    "depositIntoHeld": 27941,
+    "withdrawPart": 35227,
+    "withdrawAll": 30439
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x17c77d211b82c1b3c848fc8645c9750b177fb6f5252b425d5ad629e0603fbeca",
+      "block": 38832876,
+      "gasUsed": 27941
+     },
+     {
+      "hash": "0xe92dba29ee0edb197772435a4a1f93f0ccdf8348f9de15d0c8e700af85a81380",
+      "block": 38825482,
+      "gasUsed": 27941
+     },
+     {
+      "hash": "0xcfb898e15e804eda1edc4a65e34e33c783054f1967d8a70b6b0fda4334527c61",
+      "block": 38821389,
+      "gasUsed": 27941
+     },
+     {
+      "hash": "0xf7746ded2ee69c7bab486a0b37e3f26049712c3a0b738c7503b0086a50487d0a",
+      "block": 38819957,
+      "gasUsed": 45041
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x1d69d5cc4cefdfb8558d70660c071dcb9d2909df12e12da9c0094a64ccb5691a",
+      "block": 38831992,
+      "gasUsed": 30487
+     },
+     {
+      "hash": "0x1f8e56e8ccdde524604e02cd57f3a8b393bcd91c42664cd560b1535da6bef35f",
+      "block": 38826612,
+      "gasUsed": 30811
+     },
+     {
+      "hash": "0xce8dff41293dcbf28d7e8bd29ac07b006463ea65f7962312412aa163c53edd64",
+      "block": 38824647,
+      "gasUsed": 30451
+     },
+     {
+      "hash": "0x30f8c2b89e2ce14fde68f1bc237fd986d9f4e7192df75dbd2fb02151184a090a",
+      "block": 38820886,
+      "gasUsed": 30463
+     }
+    ]
+   }
+  },
+  "42161": {
+   "symbol": "WETH",
+   "wrapper": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+   "simulation": {
+    "block": 528119458,
+    "depositIntoEmpty": 57975,
+    "depositIntoHeld": 40875,
+    "withdrawPart": 48177,
+    "withdrawAll": 43389
+   },
+   "receipts": {
+    "deposit": [],
+    "withdraw": [
+     {
+      "hash": "0xed569ca71e3db0b7f7032919fcac0aac70f138652c1814be07e8bd1a684be259",
+      "block": 528116536,
+      "gasUsed": 43422
+     }
+    ]
+   }
+  },
+  "57073": {
+   "symbol": "WETH",
+   "wrapper": "0x4200000000000000000000000000000000000006",
+   "simulation": {
+    "block": 62317635,
+    "depositIntoEmpty": 44932,
+    "depositIntoHeld": 27832,
+    "withdrawPart": 35211,
+    "withdrawAll": 30423
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x264c2753e3f69710bb326b34e08f94d27cc598962b64590cc3219ca9a17e4021",
+      "block": 62314433,
+      "gasUsed": 27832
+     },
+     {
+      "hash": "0xa39149f2997645c9cc937f84782590138a128b3c1e3cb61f5f342aa8edca2ef7",
+      "block": 62313592,
+      "gasUsed": 44932
+     },
+     {
+      "hash": "0x13c16d456fdac1d3cb018cc5acfb93d821603c79e2e65a92fe92eeb5fae7b8a5",
+      "block": 62311732,
+      "gasUsed": 44932
+     },
+     {
+      "hash": "0xa0146e594b147a37163b66e71e3fe03a018950b76cc477ea0fb595ac89991feb",
+      "block": 62311548,
+      "gasUsed": 27832
+     },
+     {
+      "hash": "0x942fb8ee471185b295a70ae15dcfed9ad97a78e33a289b0a56c79136e6b4e0aa",
+      "block": 62311537,
+      "gasUsed": 27832
+     },
+     {
+      "hash": "0x19b46b8a2c36e0a1be5ef2da8b3c38efc0dfb633bb9d855eed69259ff19962b5",
+      "block": 62310311,
+      "gasUsed": 27832
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x28d73b68969a973f9ca0c0a0d216a68006a249b606d1fdab8c29d0a7b902ff0f",
+      "block": 62317145,
+      "gasUsed": 30423
+     },
+     {
+      "hash": "0x150fd3e56b792b0506db09169d3adab89e6eef8487225c890d50cb2644bd6a0b",
+      "block": 62316628,
+      "gasUsed": 30423
+     },
+     {
+      "hash": "0x385e7c9eba7b8d2e35ea9c2855bb8339e775f1f0c8cde232d63a9c14c7b337a1",
+      "block": 62316175,
+      "gasUsed": 30435
+     },
+     {
+      "hash": "0x6edeccb12fda8ba7633d8909bcbd9b7c1fb8fd8b324f95ef817ff1c3315f9396",
+      "block": 62315124,
+      "gasUsed": 30423
+     },
+     {
+      "hash": "0x10f18085d4a7ba060c5808c7381cc42ee1e29e8fcf1e92c2f3dd55c3809fa46a",
+      "block": 62314729,
+      "gasUsed": 30423
+     },
+     {
+      "hash": "0x7e8925b416c089f98ead9b409f8d50c923ac00b525f7f914394ae320607136a0",
+      "block": 62312830,
+      "gasUsed": 30423
+     }
+    ]
+   }
+  },
+  "59144": {
+   "symbol": "WETH",
+   "wrapper": "0xe5d7c2a44ffddf6b295a15c148167daaaf5cf34f",
+   "simulation": {
+    "block": 32730870,
+    "depositIntoEmpty": 45038,
+    "depositIntoHeld": 27938,
+    "withdrawPart": 35192,
+    "withdrawAll": 30404
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0x8c765b63a80a2dcd29e5379e9c8a33c678ef202ac924641409a33d6b77e7381f",
+      "block": 32729097,
+      "gasUsed": 27938
+     },
+     {
+      "hash": "0xc51abf2fa944b84fd906ca1d819dc809ccfe19bbd42af966481a11f6e66a772c",
+      "block": 32729018,
+      "gasUsed": 27938
+     },
+     {
+      "hash": "0x0e4d20d2756659ad2368a59af66b9e8109dd1e2d74fc65df491b1ebae73fdaa7",
+      "block": 32728951,
+      "gasUsed": 27938
+     },
+     {
+      "hash": "0x8788cc54bb60ebe3e7aa90ea3cb540be7c79715303aecd1eb5bf05f84effa075",
+      "block": 32728425,
+      "gasUsed": 27938
+     },
+     {
+      "hash": "0x54356fd7f08aad2f3fc1ffb2a26f40bf3458c6e7b9b2d55131dc4980f11d081b",
+      "block": 32728028,
+      "gasUsed": 45054
+     },
+     {
+      "hash": "0x0bb843ea0b98f1fe407b0ef71cd5c7143041a23c0b1f63f0afab171d1d0ec7b8",
+      "block": 32727818,
+      "gasUsed": 45038
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x5ec536214de4b5b6ab858fe527fea83023128f9e1564f0dd0ce11034a2f958a5",
+      "block": 32730665,
+      "gasUsed": 30404
+     },
+     {
+      "hash": "0x8f105a5ff6de0a0466bd63aded87bb95875ad17bee8ea0eab3b58cd498d9f58c",
+      "block": 32730606,
+      "gasUsed": 30404
+     },
+     {
+      "hash": "0x704dcf05994c35af23fb4dad12315db332c398456615ec3b3335328c454d6d52",
+      "block": 32730467,
+      "gasUsed": 30404
+     },
+     {
+      "hash": "0xec26dbc11697f5b2c1e91d79af724b2be88b05262bbb1eb1554e26f888b8ad8b",
+      "block": 32730370,
+      "gasUsed": 30404
+     },
+     {
+      "hash": "0x4cec8eb06c149e47d9d45d821bda2d9036025a18da498b3de9666d96478788e3",
+      "block": 32730287,
+      "gasUsed": 30404
+     },
+     {
+      "hash": "0x3f23824cc28cf48bdc44968e67c342d8232397930ab07be7498b6a8428759f14",
+      "block": 32730080,
+      "gasUsed": 30404
+     }
+    ]
+   }
+  },
+  "80094": {
+   "symbol": "WBERA",
+   "wrapper": "0x6969696969696969696969696969696969696969",
+   "simulation": {
+    "block": 29400665,
+    "depositIntoEmpty": 50268,
+    "depositIntoHeld": 33168,
+    "withdrawPart": 40283,
+    "withdrawAll": 35495
+   },
+   "receipts": {
+    "deposit": [],
+    "withdraw": []
+   }
+  },
+  "534352": {
+   "symbol": "WETH",
+   "wrapper": "0x5300000000000000000000000000000000000004",
+   "simulation": {
+    "unavailable": "the method eth_simulateV1 does not exist/is not available"
+   },
+   "receipts": {
+    "deposit": [
+     {
+      "hash": "0xbb7e7e963dbeafdf2a6d65eae20aa94f5a1955ab3c964fc557713b8ac12806e4",
+      "block": 35969075,
+      "gasUsed": 34792
+     }
+    ],
+    "withdraw": [
+     {
+      "hash": "0x4d68c759644d90a9ce0df02d1b0add0fbbee57ecebc75d1ac419edb712c42371",
+      "block": 35992372,
+      "gasUsed": 37238
+     },
+     {
+      "hash": "0x80832095ba167f3d4cb06e3fd1e67f6ec5404bce2710199be55690420c8b6df9",
+      "block": 35990943,
+      "gasUsed": 37262
+     },
+     {
+      "hash": "0xc138e81c2d0a02f7b87cf8af51c623df08057164794c4d2ee0ab2c326ba58485",
+      "block": 35985156,
+      "gasUsed": 37238
+     },
+     {
+      "hash": "0x7038243963f50ea056321509bd2949ac04670b1c3c3a5b046c980985be372274",
+      "block": 35984550,
+      "gasUsed": 37250
+     },
+     {
+      "hash": "0x50236ff5b5c9ffd02bd880da427a00c892a48462c7e190325a60d0058fc8f728",
+      "block": 35982224,
+      "gasUsed": 42062
+     },
+     {
+      "hash": "0x99fae27c78549d0149f7f8e85dd12b1122936122c46993ae3a3588e2ef680808",
+      "block": 35980635,
+      "gasUsed": 37274
+     }
+    ]
+   }
+  },
+  "747474": {
+   "symbol": "vbETH",
+   "wrapper": "0xee7d8bcfb72bc1880d0cf19822eb0a2e6577ab62",
+   "simulation": {
+    "block": 49073237,
+    "depositIntoEmpty": 66336,
+    "depositIntoHeld": 49236,
+    "withdrawPart": 55851,
+    "withdrawAll": 51063
+   },
+   "receipts": {
+    "deposit": [],
+    "withdraw": [
+     {
+      "hash": "0x4b2b36e0355e7bb71683548d301f3fb66b2bbf0e28f0443c5f667e4955013631",
+      "block": 49048552,
+      "gasUsed": 55851
+     }
+    ]
+   }
+  }
+ }
+}

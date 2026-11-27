@@ -62,6 +62,43 @@ const WETH_ABI = parseAbi([
 /** deposit/withdraw on WETH9 cost ~30-45k; a generous cap, the account still estimates. */
 const GAS_LIMIT = "90000";
 
+/**
+ * Gas a wrap (`deposit()`) and an unwrap (`withdraw(amount)`) use on each chain's pinned wrapper in
+ * {@link WRAPPED_NATIVE} — the quote's `gasEstimate`, source `"model"`. Measured 2026-11-28 (README, "Gas estimate"):
+ * `eth_simulateV1` of the exact call this module builds, checked against receipts of public wrap / unwrap
+ * transactions on the same chain; Sei, HyperEVM and Scroll from receipts alone (their nodes have no `eth_simulateV1`).
+ * Each figure is the dearer of the two cases the call can hit: a wrap into an empty wrapped balance (topping up a
+ * held balance uses 17 100 less; 17 940 on Polygon), an unwrap of part of the balance (clearing it earns a storage
+ * refund: 4 788 less; 3 948 on Polygon). A chain or a direction without an entry was not measured to that standard —
+ * its quote carries no estimate.
+ */
+export const WRAP_GAS: Readonly<Record<number, Readonly<{wrap?: string; unwrap?: string}>>> = Object.freeze({
+  1: Object.freeze({wrap: "45038", unwrap: "35192"}),
+  10: Object.freeze({wrap: "44866", unwrap: "35116"}),
+  56: Object.freeze({wrap: "45038", unwrap: "35192"}),
+  130: Object.freeze({wrap: "44932", unwrap: "35211"}),
+  137: Object.freeze({wrap: "48401", unwrap: "37747"}),
+  196: Object.freeze({wrap: "49054", unwrap: "39241"}),
+  480: Object.freeze({wrap: "44866", unwrap: "35116"}),
+  999: Object.freeze({wrap: "44866", unwrap: "35140"}),
+  1329: Object.freeze({unwrap: "35140"}),
+  5000: Object.freeze({wrap: "51977", unwrap: "42329"}),
+  8453: Object.freeze({wrap: "44866", unwrap: "35116"}),
+  9745: Object.freeze({wrap: "45041", unwrap: "35227"}),
+  42161: Object.freeze({wrap: "57975", unwrap: "48177"}),
+  57073: Object.freeze({wrap: "44932", unwrap: "35211"}),
+  59144: Object.freeze({wrap: "45038", unwrap: "35192"}),
+  534352: Object.freeze({unwrap: "42062"}),
+  747474: Object.freeze({wrap: "66336", unwrap: "55851"}),
+});
+
+/** {@link WRAP_GAS} for a call on `address`: only the pinned wrapper was measured, so another contract gets none. */
+function measuredGas(chainId: number, address: string, wrap: boolean): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(WRAPPED_NATIVE, chainId) || !Object.prototype.hasOwnProperty.call(WRAP_GAS, chainId)) return undefined;
+  if (getAddress(WRAPPED_NATIVE[chainId]!.address) !== getAddress(address)) return undefined;
+  return WRAP_GAS[chainId]![wrap ? "wrap" : "unwrap"];
+}
+
 export interface WrapProviderConfig {
   enabled?: boolean;
   /** JSON-RPC endpoints per EVM chain id (on-chain token check + receipt tracking). */
@@ -178,6 +215,7 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
         return refuse(e instanceof Error ? e.message.replace(/^wrap: /, "") : String(e), refusalOf(e) ?? "upstream_unavailable");
       }
       const data = wrap ? encodeFunctionData({abi: WETH_ABI, functionName: "deposit"}) : encodeFunctionData({abi: WETH_ABI, functionName: "withdraw", args: [amount]});
+      const gasEstimate = measuredGas(chainId, w.address, wrap);
       return {
         provider: "wrap",
         intentId: `wrap:${chainId}`,
@@ -188,6 +226,7 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
         destAmount: amount.toString(),
         minDestAmount: amount.toString(),
         feeUsd: 0,
+        ...(gasEstimate !== undefined ? {gasEstimate, gasEstimateSource: "model" as const} : {}),
         etaSeconds: 15,
         reliability: 0.995,
         validUntilMs: Date.now() + 5 * 60_000,

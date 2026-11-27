@@ -24,6 +24,40 @@ approve only the wrapped-native contract (no spender), never an address the back
 checks the call on the device: `deposit()` with the input as value, or `withdraw(input)` with no value, for the
 sender. Without the pins the stub gets no EVM calldata route (fail closed).
 
+## Gas estimate (`gasEstimate`)
+
+A quote carries `gasEstimate` with `gasEstimateSource: "model"` from `WRAP_GAS`: the gas `deposit()` /
+`withdraw(amount)` uses on that chain's pinned wrapper (an overridden `wrapped` contract gets none), without
+headroom; `txRequest.gasLimit` stays 90 000. Measured 2026-11-28 (`fixtures/gas/measured-2026-11-28.json`):
+`eth_simulateV1` of the module's own calls from an address that never held the wrapper, and receipts of public
+wrap / unwrap transactions sent straight to the wrapper on the same chain. Each figure is the dearer of the two cases
+the call can hit — a wrap into an empty wrapped balance, an unwrap of part of the balance:
+
+| Chain | wrap | unwrap | receipts on the chain (gasUsed) |
+| --- | ---: | ---: | --- |
+| Ethereum | 45 038 | 35 192 | wrap 27 938 / 45 054–45 138, unwrap 30 404–35 204 |
+| BSC | 45 038 | 35 192 | wrap 27 938 / 45 038, unwrap 30 416–35 204 |
+| Linea | 45 038 | 35 192 | wrap 27 938 / 45 038–45 054, unwrap 30 404 |
+| Plasma | 45 041 | 35 227 | wrap 27 941 / 45 041, unwrap 30 451–30 811 |
+| Unichain, Ink | 44 932 | 35 211 | wrap 27 832 / 44 932 (Ink), unwrap 30 423–30 435 |
+| OP, Base, World Chain | 44 866 | 35 116 | wrap 27 766 (OP) / 44 866 (Base), unwrap 30 316–35 140 |
+| HyperEVM | 44 866 | 35 140 | receipts only: wrap 27 766 / 44 866, unwrap 30 340 / 35 140 |
+| Sei | — | 35 140 | receipts only: wrap 27 766 (the cheaper case only), unwrap 30 340–35 140 |
+| Scroll | — | 42 062 | receipts only: wrap 34 792 (one), unwrap 37 238–42 062 |
+| Polygon | 48 401 | 37 747 | wrap 30 461–30 561 / 48 401, unwrap 33 811–37 783 |
+| X Layer | 49 054 | 39 241 | unwrap 39 253–39 289 |
+| Mantle | 51 977 | 42 329 | unwrap 37 565–42 389 |
+| Arbitrum | 57 975 | 48 177 | unwrap 43 422 (aeWETH behind a proxy; Arbitrum's gas includes its L1 posting part) |
+| Katana (vbETH) | 66 336 | 55 851 | unwrap 55 851 |
+
+How far off it is: a wrap topping up a balance the sender already holds uses 17 100 less than the figure (17 940 on
+Polygon), an unwrap of the whole balance 4 788 less (3 948 on Polygon). Receipts of the same case run 0–112 gas above
+the simulated figure (the amount's calldata bytes, an occasional trailing byte; one World Chain unwrap 348 above). No estimate, by design: Monad (its receipts report the gas limit as
+gasUsed: 80 000, 1 500 000), Sonic (its `eth_simulateV1` answers millions; receipts 36 852–42 458 without both cases),
+MegaETH (a wrap into an empty balance uses 94 632, above the 90 000 limit; unwraps 82 123–87 055), Morph (receipts
+only, one case each), Gnosis and Berachain (simulated, no receipt found), zkSync (neither), Flare, Avalanche, Plume
+and Elysium (not measured).
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes calls to the chain's wrapper (the
