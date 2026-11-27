@@ -1,5 +1,5 @@
 import {httpRefusal, refusal, refusalOf, withReason} from "@anywalletkit/protocol-swap2-core/errors";
-import {redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
+import {blockLackedInBody, nodeLacksBlock, redactUrls, timeoutSignal} from "@anywalletkit/protocol-swap2-core/util";
 
 export type RpcCall = {method: string; params: unknown[]};
 
@@ -32,30 +32,64 @@ const errorText = (error: unknown): string => {
   return redactUrls(typeof m === "string" ? m : JSON.stringify(error) ?? String(error)).slice(0, 160);
 };
 
+/** Options of one {@link rpcClient} request. */
+export interface RpcOptions {
+  /**
+   * The block the request is pinned to (`QuoteParams.blockNumber`, as its hex tag). An endpoint whose node says it
+   * does not have that block, or no longer keeps its state ("header not found", "missing trie node"…), or answers a call
+   * at it with no result, fails like a node fault: the next endpoint is asked, every endpoint once more after
+   * {@link RPC_RATE_LIMIT_PAUSE_MS} (a node a block behind catches up), and then the request is refused as `stale_node`
+   * naming the block — never asked at "latest" instead. Calls at another tag are as without it.
+   */
+  pinnedBlock?: string;
+}
+
+/** The block a call names (`eth_call` / `eth_getCode` second parameter). */
+const tagOf = (call: RpcCall): unknown => call.params[1];
+
 /**
  * JSON-RPC over the caller's endpoints for one chain: batches of at most {@link RPC_BATCH_MAX} calls, each batch tried
  * on the endpoints in order until one answers every call (once more after {@link RPC_RATE_LIMIT_PAUSE_MS} when the last
- * refusal was for the request rate). Each slot is the result, or null when that call reverted — a revert is an answer,
- * not a dead endpoint. An element error that is not an execution error, or a call left unanswered, fails the endpoint:
- * a rate-limited read is never returned as a missing code or coin.
+ * refusal was for the request rate, or — with {@link RpcOptions.pinnedBlock} — the node lacked the block). Each slot is
+ * the result, or null when that call reverted — a revert is an answer, not a dead endpoint. An element error that is not
+ * an execution error, or a call left unanswered, fails the endpoint: a rate-limited read is never returned as a missing
+ * code or coin.
  */
 export function rpcClient(rpcUrls: Readonly<Record<number, readonly string[]>>) {
-  async function once(url: string, calls: RpcCall[], signal?: AbortSignal): Promise<(unknown | null)[]> {
+  async function once(url: string, calls: RpcCall[], signal?: AbortSignal, pinned?: string): Promise<(unknown | null)[]> {
     const res = await fetch(url, {
       method: "POST",
       headers: {"content-type": "application/json"},
       body: JSON.stringify(calls.map((c, id) => ({jsonrpc: "2.0", id, ...c}))),
       signal: signal ?? timeoutSignal(12_000),
     });
+    /** The node lacks the pinned block: a fault of this endpoint, retried, then `stale_node` naming the block. */
+    const lacks = (why: string) => withReason(Object.assign(new Error(`block ${BigInt(pinned!).toString()} is not served by the node (${why})`), {stale: true}), "stale_node");
+    const pinnedCalls = pinned !== undefined && calls.some((c) => tagOf(c) === pinned);
+    if (!res.ok && pinnedCalls) {
+      // Some nodes answer a block they lack with an error status and a JSON-RPC body that says so (X Layer, Celo: 400
+      // "block is out of range"; publicnode: 403 past its pruning): that, not the status, is the refusal.
+      const lacked = blockLackedInBody(await res.text().catch(() => ""));
+      if (lacked !== undefined) throw lacks(errorText({message: lacked}));
+    }
     // A node's refusal by its status: 429 rate_limited (with Retry-After), 401 / 403 key_rejected, anything else upstream_unavailable.
     if (!res.ok) throw withReason(Object.assign(new Error(`HTTP ${res.status}`), {limited: res.status === 429}), httpRefusal(res.status, res.headers?.get?.("retry-after")) ?? {reason: "upstream_unavailable", httpStatus: res.status});
     const body = (await res.json()) as {id: number; result?: unknown; error?: unknown}[] | {error?: {message?: string}};
-    if (!Array.isArray(body)) throw withReason(Object.assign(new Error(body.error?.message ?? "batch refused"), {limited: isRateLimit(body.error)}), isRateLimit(body.error) ? "rate_limited" : "upstream_unavailable");
+    if (!Array.isArray(body)) {
+      if (pinnedCalls && nodeLacksBlock(body.error)) throw lacks(errorText(body.error));
+      throw withReason(Object.assign(new Error(body.error?.message ?? "batch refused"), {limited: isRateLimit(body.error)}), isRateLimit(body.error) ? "rate_limited" : "upstream_unavailable");
+    }
     const out: (unknown | null)[] = calls.map(() => null);
     const answered = new Set<number>();
     for (const r of body) {
       if (typeof r.id !== "number" || r.id < 0 || r.id >= out.length) continue;
-      if (r.error !== undefined && r.error !== null && !isExecutionError(r.error)) throw withReason(Object.assign(new Error(errorText(r.error)), {limited: isRateLimit(r.error)}), isRateLimit(r.error) ? "rate_limited" : "upstream_unavailable");
+      const atPin = pinned !== undefined && tagOf(calls[r.id]!) === pinned;
+      if (r.error !== undefined && r.error !== null && !isExecutionError(r.error)) {
+        if (atPin && nodeLacksBlock(r.error)) throw lacks(errorText(r.error));
+        throw withReason(Object.assign(new Error(errorText(r.error)), {limited: isRateLimit(r.error)}), isRateLimit(r.error) ? "rate_limited" : "upstream_unavailable");
+      }
+      // An eth_call always names a result ("0x" at least): none at the pinned block is a node that lacks it, not a revert.
+      if (atPin && (r.error === undefined || r.error === null) && (r.result === undefined || r.result === null)) throw lacks("the node answered a call with no result");
       answered.add(r.id);
       if (r.error === undefined || r.error === null) out[r.id] = r.result ?? null;
     }
@@ -63,36 +97,40 @@ export function rpcClient(rpcUrls: Readonly<Record<number, readonly string[]>>) 
     return out;
   }
 
-  async function batch(chainId: number, calls: RpcCall[], signal?: AbortSignal): Promise<(unknown | null)[]> {
+  async function batch(chainId: number, calls: RpcCall[], signal?: AbortSignal, pinned?: string): Promise<(unknown | null)[]> {
     let lastErr: unknown;
     for (let pass = 0; pass < 2; pass++) {
       if (pass > 0) {
-        if (!(lastErr as {limited?: boolean} | undefined)?.limited || signal?.aborted) break;
+        const last = lastErr as {limited?: boolean; stale?: boolean} | undefined;
+        if (!(last?.limited || last?.stale) || signal?.aborted) break;
         await new Promise((r) => setTimeout(r, RPC_RATE_LIMIT_PAUSE_MS));
       }
       for (const url of rpcUrls[chainId] ?? []) {
         try {
-          return await once(url, calls, signal);
+          return await once(url, calls, signal, pinned);
         } catch (e) {
           lastErr = e;
         }
       }
     }
     const error = new Error(`curve: no RPC answered on chain ${chainId} (${lastErr instanceof Error ? lastErr.message : String(lastErr)})`);
-    // Every endpoint failed: the last one's reason (throttled, a rejected key), else upstream_unavailable — a node down, a
-    // timeout, an answer in another shape. The caller's own abort, or a chain with no endpoint at all, stays unclassified.
+    // Every endpoint failed: the last one's reason (throttled, a rejected key, the pinned block not served), else
+    // upstream_unavailable — a node down, a timeout, an answer in another shape. The caller's own abort, or a chain with
+    // no endpoint at all, stays unclassified.
     if (lastErr === undefined || signal?.aborted) throw error;
     throw withReason(error, refusalOf(lastErr) ?? "upstream_unavailable");
   }
-  return async function rpc(chainId: number, calls: RpcCall[], signal?: AbortSignal): Promise<(unknown | null)[]> {
-    if (calls.length <= RPC_BATCH_MAX) return batch(chainId, calls, signal);
+  return async function rpc(chainId: number, calls: RpcCall[], signal?: AbortSignal, options?: RpcOptions): Promise<(unknown | null)[]> {
+    const pinned = options?.pinnedBlock;
+    if (calls.length <= RPC_BATCH_MAX) return batch(chainId, calls, signal, pinned);
     const chunks: RpcCall[][] = [];
     for (let i = 0; i < calls.length; i += RPC_BATCH_MAX) chunks.push(calls.slice(i, i + RPC_BATCH_MAX));
-    return (await Promise.all(chunks.map((c) => batch(chainId, c, signal)))).flat();
+    return (await Promise.all(chunks.map((c) => batch(chainId, c, signal, pinned)))).flat();
   };
 }
 
-export const ethCall = (to: string, data: string): RpcCall => ({method: "eth_call", params: [{to, data}, "latest"]});
+/** An `eth_call` at `block` ("latest" unless a quote is pinned to `QuoteParams.blockNumber`, as its hex tag). */
+export const ethCall = (to: string, data: string, block: string = "latest"): RpcCall => ({method: "eth_call", params: [{to, data}, block]});
 
 /** The first 32-byte ABI word of a return (whole words, at least one) as 64 lowercase hex, or null. */
 function firstWord(raw: unknown): string | null {

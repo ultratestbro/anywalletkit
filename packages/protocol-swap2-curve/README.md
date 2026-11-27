@@ -98,6 +98,27 @@ slippage re-derived on the device from a fresh 1/1000 probe, plus `CURVE_AUTO_SL
 moving between quote and build. A backend that names `min_dy = 1` or an inflated output is refused at build time. Each
 quote carries its own intent id (`curve:<chainId>:<nonce>`), so a build is checked against the request it answered.
 
+## Quoting at one block (`blockNumber`)
+
+`QuoteParams.blockNumber` (0.2.0; a decimal block of the source chain, read by the app once per comparison round):
+every `get_dy` of the quote, the candidate routes and the 1/1000 impact probe, goes to that block, and the quote names
+it (`Quote.blockNumber`; the provider declares `honorsBlockNumber: true`). The routes come from the pinned allowlist as
+always. At "latest" whatever it says: the router's code hash and version check, the AddressProvider read,
+`preflightDeposit` (the sealed call, each hop pool's code and coins and a fresh `get_dy` right before signing) and
+`curveRemotePins`' `verifyBuild` on the device, which hold a remote quote to the pools' price now.
+
+A node that does not have the block ("header not found", "block not found", a null result, X Layer's and Celo's HTTP
+400 "block is out of range") or no longer keeps its state ("missing trie node", publicnode's HTTP 403 for archive
+state) fails its endpoint: the next one is asked, every endpoint once more after a second, then the quote is refused
+as `stale_node`, the block named: "curve: no RPC answered on chain 1 (block 26510020 is not served by the node (header
+not found))". It is never priced at "latest" instead.
+
+Every chain of the module takes a block number, except HyperEVM: its RPCs answer an `eth_call` at any block number
+from their head (one 100,000 blocks ahead too, 2026-11-28). It is in `CURVE_LATEST_ONLY_CHAINS` (`[999]`): there a
+request's `blockNumber` is not honoured, the quote is read at "latest" and names no block. Pass `blockNumber` in the
+comparison round only (latest, or latest − 1 on fast chains whose nodes trail), not on the execution re-quote. Without
+it every request is 0.1.10's, byte for byte (`tests/block-number.test.ts` against `fixtures/unpinned-0.1.10.json`).
+
 ## Activity
 
 `describeActivity(tx, ctx)` recognizes a call into the chain's pinned Router NG — and Ethereum's older v1.1
@@ -117,4 +138,6 @@ WETH9 deposit.
 native and ABI family against the pins, every allowlisted pool through the preflight's own code and coins check
 (`curveOnChain(…).checkPools`), then up to three quotes from the allowlist, each simulated with `eth_call` as a dummy
 wallet funded by a state override (balance and router allowance); the router's return must reach the minimum.
-Read-only, nothing signed.
+Then block numbers: an `eth_call` at head − 2 must answer that block's own number and one at head + 100,000 must be
+refused (a node that ignores the tag answers both from its head; HyperEVM, in `CURVE_LATEST_ONLY_CHAINS`, is reported
+so), and the first quote again at head − 1 must name that block. Read-only, nothing signed.

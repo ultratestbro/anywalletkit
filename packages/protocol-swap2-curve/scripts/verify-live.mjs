@@ -6,14 +6,19 @@
 // quote's exact router transaction; the router's return must be at least the quote's minimum. A chain without
 // allowlisted pools must not be offered and a quote there must refuse by name. Every allowlisted pool is also read the
 // way a sealed quote's preflight reads it (the module's own code / coins check and decoders), so a pool the generator
-// admitted but the runtime would refuse fails here. One line per chain.
+// admitted but the runtime would refuse fails here. Block numbers (QuoteParams.blockNumber, 0.2.0): an eth_call at head
+// − 2 must answer that block's own number (NUMBER run as init code; ArbSys.arbBlockNumber() on Nitro chains, whose
+// NUMBER is the parent chain's) and one at head + 100,000 must be refused — a node that ignores the tag answers both
+// from its head; a chain in CURVE_LATEST_ONLY_CHAINS is expected to (reported, and reported again if it stops); any
+// other chain that ignores or refuses a block number fails. The first quote request is then quoted again at head − 1
+// and must name that block (on a CURVE_LATEST_ONLY_CHAINS chain, no block). One line per chain.
 //
 //   node scripts/verify-live.mjs [chainId[,chainId…]] [--rpc url]        (build first: pnpm build)
 //
 // RPC: --rpc (one chain), else CURVE_RPC_<chainId>, else the public endpoint below. Reads are batched (≤10 calls) and
 // retried with backoff on 429 / network errors; chains run one after another.
 import {decodeFunctionResult, encodeFunctionData, keccak256, parseAbi} from 'viem'
-import {CURVE_DEPLOYMENTS, CURVE_POOLS, EXCHANGE_SELECTOR, GET_DY_SELECTOR, curveOnChain, curveProvider} from '../dist/index.js'
+import {CURVE_DEPLOYMENTS, CURVE_LATEST_ONLY_CHAINS, CURVE_POOLS, EXCHANGE_SELECTOR, GET_DY_SELECTOR, curveOnChain, curveProvider} from '../dist/index.js'
 
 const PUBLIC_RPC = {
   1: 'https://ethereum-rpc.publicnode.com', 42161: 'https://arbitrum-one-rpc.publicnode.com', 8453: 'https://base-rpc.publicnode.com',
@@ -135,6 +140,46 @@ const EXTRA = {
   143: [{from: '0x754704Bc059F8C67012fEd69BC8A327a5aafb603', fromDec: 6, to: '0xe7cd86e13AC4309349F30B3435a9d337750fC82D', label: 'USDC → USDT0', units: 1000n}],
 }
 
+const NUMBER_INITCODE = '0x4360005260206000f3' // NUMBER PUSH1 0 MSTORE PUSH1 32 PUSH1 0 RETURN, run as init code
+const ARB_SYS = '0x0000000000000000000000000000000000000064'
+const ARB_BLOCK_NUMBER = '0xa3b1b31d' // arbBlockNumber(): a Nitro chain's own block (its NUMBER is the parent chain's)
+const hex = (n) => `0x${n.toString(16)}`
+const LATEST_ONLY = new Set(CURVE_LATEST_ONLY_CHAINS)
+/** One call, not batched or retried: its JSON-RPC body (an error status carrying a JSON-RPC error is that answer). */
+async function callOne(url, method, params) {
+  let res
+  try {
+    res = await fetch(url, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({jsonrpc: '2.0', id: 1, method, params}), signal: AbortSignal.timeout(15_000)})
+  } catch (e) {
+    return {error: {message: `no answer within 15 s (${e?.message ?? e})`}}
+  }
+  let body
+  try { body = JSON.parse(await res.text()) } catch { return {error: {message: `HTTP ${res.status}, not JSON`}} }
+  return body && typeof body === 'object' && ('result' in body || 'error' in body) ? body : {error: {message: `HTTP ${res.status}`}}
+}
+/** The block an eth_call at `tag` runs in ({n}), or the node's refusal ({error}); `how` keeps the probe that works. */
+async function blockAt(url, tag, how) {
+  let last
+  for (const k of how.kind ? [how.kind] : ['arbsys', 'init']) {
+    const r = await callOne(url, 'eth_call', [k === 'arbsys' ? {to: ARB_SYS, data: ARB_BLOCK_NUMBER} : {data: NUMBER_INITCODE}, tag])
+    if (r.error === undefined && typeof r.result === 'string' && /^0x[0-9a-fA-F]{64}$/.test(r.result)) { how.kind = k; return {n: BigInt(r.result)} }
+    last = r.error?.message ?? `result ${JSON.stringify(r.result)}`
+  }
+  return {error: String(last).replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, '<url>').slice(0, 120)}
+}
+/** Whether the endpoint takes a block number: head − 2 answers its own number and head + 100,000 is refused. */
+async function blockTagVerdict(url) {
+  const h = await callOne(url, 'eth_blockNumber', [])
+  if (typeof h.result !== 'string') throw new Error(`eth_blockNumber: ${String(h.error?.message ?? 'no answer').replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, '<url>').slice(0, 120)}`)
+  const head = BigInt(h.result)
+  const how = {}
+  let past = await blockAt(url, hex(head - 2n), how)
+  if (past.error !== undefined) { await sleep(1500); past = await blockAt(url, hex(head - 2n), how) }
+  const future = past.error === undefined ? await blockAt(url, hex(head + 100_000n), how) : undefined
+  const honoured = past.error === undefined && past.n === head - 2n && future?.error !== undefined
+  return {head, honoured, text: honoured ? 'takes a block number' : past.error !== undefined ? `refused a call at head − 2 (${past.error})` : `ignores the block number (head − 2 answered ${past.n}, head + 100,000 ${future?.error === undefined ? `answered ${future?.n}` : 'refused'})`}
+}
+
 const VERSION = parseAbi(['function version() view returns (string)'])
 let failures = 0
 for (const chainId of chains) {
@@ -206,6 +251,29 @@ for (const chainId of chains) {
       if (out < BigInt(q.minDestAmount)) { failures++; notes.push(`FAIL ${r.label}: simulated ${out} < min ${q.minDestAmount}`); continue }
       notes.push(`ok ${r.label} [${q.providerData.route}] in ${r.amount} → out ${q.destAmount}, min ${q.minDestAmount}, simulated ${out}, impact ${q.providerData.priceImpactBps ?? '?'} bps`)
       await sleep(250)
+    }
+
+    // 4) Block numbers: the endpoint takes one (or the chain is listed as one whose RPCs do not), and a quote at head − 1
+    //    names that block (on a listed chain: no block).
+    const tag = await blockTagVerdict(url)
+    const latestOnly = LATEST_ONLY.has(chainId)
+    if (!tag.honoured && !latestOnly) { failures++; notes.push(`FAIL blockNumber: the endpoint ${tag.text} — add the chain to CURVE_LATEST_ONLY_CHAINS, or use another RPC`) }
+    else notes.push(`blockNumber: the endpoint ${tag.text}${latestOnly ? (tag.honoured ? ' — in CURVE_LATEST_ONLY_CHAINS but takes it now: the entry may go' : ' (CURVE_LATEST_ONLY_CHAINS: quoted at latest, unnamed)') : ''}`)
+    const first = reqs[0]
+    if (first) {
+      const block = (tag.head - 1n).toString()
+      const native = first.from.toLowerCase() === ETH.toLowerCase()
+      let why = ''
+      const q = await provider.getQuote({
+        sourceChain: `eip155:${chainId}`, destChain: `eip155:${chainId}`,
+        sourceToken: native ? '' : first.from, ...(native ? {} : {sourceDecimals: first.fromDec}),
+        destToken: first.to, amountIn: first.amount.toString(), destAddress: DUMMY, refundAddress: DUMMY, blockNumber: block,
+        onRefusal: (m) => (why = m),
+      })
+      const want = latestOnly ? undefined : block
+      if (!q) { failures++; notes.push(`FAIL quote ${first.label} at block ${block}: ${why}`) }
+      else if (q.blockNumber !== want) { failures++; notes.push(`FAIL quote ${first.label} at block ${block} names ${q.blockNumber ?? 'no block'}`) }
+      else notes.push(`ok ${first.label} at block ${block}: out ${q.destAmount}, Quote.blockNumber ${q.blockNumber ?? 'none (latest)'}`)
     }
     console.log(`${notes.some((n) => n.startsWith('FAIL')) ? 'FAIL' : 'ok  '} ${chainId} ${d.label}: ${notes.join(' | ')}`)
   } catch (e) {

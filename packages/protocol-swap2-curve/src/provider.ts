@@ -1,5 +1,6 @@
 import {getAddress} from "viem";
 import {evmRef, isEvm, sourceAssetOf} from "@anywalletkit/protocol-swap2-core/util";
+import {blockTagOf, validBlockNumber} from "@anywalletkit/protocol-swap2-core/validate";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {refusal, refusalOf, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import {encodeExchange, encodeGetDy} from "./abi.js";
@@ -32,6 +33,16 @@ import {notes, tagged} from "./reasons.js";
 
 /** Long enough for an approval to be mined on Ethereum; the router has no deadline of its own. */
 const DEFAULT_TTL_MS = 180_000;
+
+/**
+ * Chains whose RPCs answer an `eth_call` at a block number from their head (the tag is ignored): a request's
+ * `QuoteParams.blockNumber` is not honoured there — the quote is read at "latest" and names no block (`Quote.blockNumber`
+ * absent). HyperEVM (999): its public and keyed RPCs answered a call 100,000 blocks in the future (2026-11-28).
+ * `verify:live` checks every other chain of the module takes a block number.
+ */
+export const CURVE_LATEST_ONLY_CHAINS: readonly number[] = Object.freeze([999]);
+/** The provider's own copy of {@link CURVE_LATEST_ONLY_CHAINS}, taken at load. */
+const LATEST_ONLY: ReadonlySet<number> = new Set(CURVE_LATEST_ONLY_CHAINS);
 
 export interface CurveProviderConfig {
   enabled?: boolean;
@@ -69,9 +80,14 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
     return deploymentOf(deployments, id) && config.rpcUrls[id]?.length && tableOf(id)?.pools.length ? id : null;
   };
 
-  /** get_dy of each route at `amount` (null where the router reverts). */
-  async function price(chainId: number, d: CurveDeployment, routes: readonly CurveRoute[], amount: bigint, signal?: AbortSignal): Promise<(bigint | null)[]> {
-    const raw = await rpc(chainId, routes.map((r) => ethCall(d.router, encodeGetDy(d.family, routeArgs(d.family, r), amount))), signal);
+  /**
+   * get_dy of each route at `amount` (null where the router reverts), at `pinned` — a request's
+   * `QuoteParams.blockNumber` as its hex tag — or "latest". A node that lacks the pinned block fails the endpoint; with
+   * none left the read is refused as `stale_node`, naming the block (rpc.ts, RpcOptions.pinnedBlock).
+   */
+  async function price(chainId: number, d: CurveDeployment, routes: readonly CurveRoute[], amount: bigint, signal?: AbortSignal, pinned?: string): Promise<(bigint | null)[]> {
+    const calls = routes.map((r) => ethCall(d.router, encodeGetDy(d.family, routeArgs(d.family, r), amount), pinned));
+    const raw = await (pinned === undefined ? rpc(chainId, calls, signal) : rpc(chainId, calls, signal, {pinnedBlock: pinned}));
     return raw.map(wordUint);
   }
 
@@ -79,6 +95,9 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
     name: "curve",
     describeActivity: (tx, ctx) => describeCurveActivity(tx, ctx, deployments),
     supportsSameChain: true,
+    // QuoteParams.blockNumber: every get_dy of the quote (the candidates and the impact probe) at that block, named on
+    // the quote. The router's code check and the preflight's re-check stay at "latest".
+    honorsBlockNumber: true,
     enabled: () => config.enabled ?? true,
     supportsChain: (caip2: string) => chainIdOf(caip2) !== null,
     supportsChainPair: (from: string, to: string) => from === to && chainIdOf(from) !== null,
@@ -94,8 +113,12 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
       };
       if (params.flex) return refuse("amount-flexible deposits are not supported", "unsupported_pair");
       if (params.sourceChain !== params.destChain) return refuse("same-chain swaps only", "unsupported_pair");
+      if (params.blockNumber !== undefined && !validBlockNumber(params.blockNumber)) return refuse("blockNumber must be a decimal block number (digits only, no leading zero)");
       const chainId = chainIdOf(params.sourceChain);
       if (chainId === null) return refuse(`no Curve router, pool allowlist or RPC for ${params.sourceChain}`, "unsupported_pair");
+      // The request's block, unless this chain's RPCs ignore the tag (CURVE_LATEST_ONLY_CHAINS): there, "latest", unnamed.
+      const block = params.blockNumber !== undefined && !LATEST_ONLY.has(chainId) ? params.blockNumber : undefined;
+      const pinned = block === undefined ? undefined : blockTagOf(block);
       const d = deploymentOf(deployments, chainId)!;
       const src = sourceAssetOf(params);
       if (!src) return refuse(`unknown source token ${params.sourceToken}`, "unsupported_pair");
@@ -123,7 +146,7 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
         await chain.verifyDeployment(chainId);
         const {routes, truncated} = findRoutes(chainId, d, tableOf(chainId), tokenIn, tokenOut);
         if (!routes.length) return refuse("no allowlisted Curve pool route for this pair", "no_route");
-        const outs = await price(chainId, d, routes, amountIn, signal);
+        const outs = await price(chainId, d, routes, amountIn, signal, pinned);
         let best: {route: CurveRoute; out: bigint} | null = null;
         outs.forEach((out, i) => {
           if (out !== null && out > 0n && (!best || out > best.out)) best = {route: routes[i]!, out};
@@ -137,7 +160,7 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
         const probeIn = amountIn / 1000n;
         if (probeIn > 0n) {
           try {
-            const [probeOut] = await price(chainId, d, [route], probeIn, signal);
+            const [probeOut] = await price(chainId, d, [route], probeIn, signal, pinned);
             priceImpactBps = curveImpactBps(amountIn, out, probeOut);
           } catch {
             /* the quote stands; impact is information, not a gate */
@@ -194,6 +217,8 @@ export function curveProvider(config: CurveProviderConfig): CrossChainProvider {
             candidates: `${routes.length}${truncated ? "+" : ""}`,
             ...(priceImpactBps !== undefined ? {priceImpactBps: String(priceImpactBps)} : {}),
           },
+          // Priced at the request's block: named, so the app can tell this quote is aligned with the round's others.
+          ...(block !== undefined ? {blockNumber: block} : {}),
         };
         // The same check a client runs on a remote quote, on what this provider just built.
         const why = selfCheck(params, quote);
