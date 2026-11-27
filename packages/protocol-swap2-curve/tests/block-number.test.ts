@@ -3,10 +3,16 @@
 // preflight's re-check stay at "latest". Without it every request is 0.1.10's, byte for byte
 // (fixtures/unpinned-0.1.10.json). A node that lacks the block fails its endpoint — the next is asked, every endpoint
 // once more after a pause — then the quote is refused as stale_node naming the block, never asked at "latest".
+//
+// The quote has one addition next to the fixture (the gas estimate, released with the same version): `gasEstimate` /
+// `gasEstimateSource` (protocol-swap2-core's expected gas used), from the measured table of src/gas.ts — no request
+// more. The two fields are taken out of the quote before it is compared with 0.1.10's and checked on their own (against
+// the core contract; the figures in tests/gas-estimate.test.ts); every other field is compared as 0.1.10 returned it.
 import {readFileSync} from "node:fs";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import type {Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
-import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
+import {gasEstimateProblem} from "@anywalletkit/protocol-swap2-core/validate";
 import {CURVE_LATEST_ONLY_CHAINS, curveProvider} from "../src/provider.js";
 import {GET_DY_SELECTOR} from "../src/abi.js";
 import {ME, POOLS, TABLES, USDT, rpcStub} from "./fixtures.js";
@@ -30,8 +36,13 @@ describe("without blockNumber: 0.1.10, byte for byte", () => {
   for (const s of SCENARIOS) {
     it(s.name, async () => {
       const got = digested(await run(curveProvider as never, s));
-      expect(got).toEqual(golden.scenarios[s.name]);
+      const {gasEstimate, gasEstimateSource, ...quote} = (got.quote ?? {}) as Quote;
+      expect({...got, quote: got.quote === null ? null : quote}).toEqual(golden.scenarios[s.name]);
       expect(got.quote && "blockNumber" in got.quote).toBe(false);
+      if (got.quote !== null) {
+        expect(gasEstimateProblem(got.quote, s.params.sourceChain)).toBeNull();
+        if (gasEstimate !== undefined) expect(gasEstimateSource).toBe("model");
+      }
     });
   }
 });

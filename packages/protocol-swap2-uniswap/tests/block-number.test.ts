@@ -5,12 +5,18 @@
 // the block (Quote.blockNumber). Without it every request is 0.5.0's, byte for byte (fixtures/unpinned-0.5.0.json). A
 // node that lacks the block is retried on the next endpoint, then refused as stale_node naming it — never asked at
 // "latest" instead.
+//
+// The quote has one addition next to the fixture (the gas estimate, released with the same version): `gasEstimate` /
+// `gasEstimateSource` (protocol-swap2-core's expected gas used), computed from the quoter figure 0.5.0 already read — no
+// request more. The two fields are taken out of each quote before it is compared with 0.5.0's and checked on their own
+// (against the core contract; the figures in tests/gas-estimate-u6.test.ts); every other field is compared as 0.5.0
+// returned it.
 import {readFileSync} from "node:fs";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import type {Swap2RefusalInfo} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Quote, QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
 import {createSwap2Handler} from "@anywalletkit/protocol-swap2-core/server";
-import {validQuote} from "@anywalletkit/protocol-swap2-core/validate";
+import {gasEstimateProblem, validQuote} from "@anywalletkit/protocol-swap2-core/validate";
 import {CrossChainRouter} from "@anywalletkit/protocol-swap2-router";
 import {UNISWAP_V3, uniswapPins} from "../src/addresses.js";
 import {UNISWAP_LATEST_ONLY_CHAINS, uniswapProvider} from "../src/provider.js";
@@ -46,8 +52,14 @@ describe("without blockNumber: 0.5.0, byte for byte", () => {
       const want = golden.scenarios[s.name]!;
       expect(got.requests).toEqual(want.requests);
       expect(got.refusals).toEqual(want.refusals);
-      expect(got.quotes).toEqual(want.quotes);
-      for (const q of got.quotes) expect("blockNumber" in q).toBe(false);
+      expect(got.quotes.map(({gasEstimate: _estimate, gasEstimateSource: _source, ...q}) => q)).toEqual(want.quotes);
+      for (const q of got.quotes) {
+        expect("blockNumber" in q).toBe(false);
+        expect(gasEstimateProblem(q, s.params.sourceChain)).toBeNull();
+        // Exactly where 0.5.0 derived a gas limit from the quoter's figure (none from a figure of 0).
+        expect(q.gasEstimate === undefined).toBe(q.txRequest?.gasLimit === undefined);
+        if (q.gasEstimate !== undefined) expect(q.gasEstimateSource).toBe("simulated");
+      }
     });
   }
 });
