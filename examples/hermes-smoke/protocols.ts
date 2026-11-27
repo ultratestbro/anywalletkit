@@ -108,7 +108,7 @@ import {
   decodeVault, decodeReserve, decodeObligation, vaultTokensPerShareWad, debtNow, farmUserState, plumbing, associatedTokenAddress,
 } from '@anywalletkit/protocol-lending-kamino-solana'
 import { unexpectedInstruction } from '@anywalletkit/wallet-solana'
-import { assertGpv2Order, redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS, appendPermit2Signature, permit2TransferJson, readPermit2Transfer } from '@anywalletkit/protocol-swap2-core'
+import { assertGpv2Order, redactUrls, tonRawAddress, refusal, refusalOf, withReason, httpRefusal, parseRetryAfter, combinedRefusal, refusalNotes, Swap2QuoteError, SWAP2_REFUSAL_REASONS, appendPermit2Signature, permit2TransferJson, readPermit2Transfer, validBlockNumber, blockTagOf, nodeLacksBlock, blockLackedInBody, validQuote } from '@anywalletkit/protocol-swap2-core'
 import ApprovalsProtocolEvm, { isRevokeCalldata, isUnlimitedAmount } from '@anywalletkit/protocol-approvals-evm'
 
 type Check = (what: string, ok: boolean, detail?: string) => void
@@ -125,6 +125,19 @@ async function tolerates(check: Check, what: string, fn: () => Promise<unknown>)
 
 export async function smokeProtocols(check: Check): Promise<void> {
   await smokeStargate(check)
+  // QuoteParams.blockNumber (swap2-core 0.18.0): the decimal block and its JSON-RPC tag through BigInt (a uint64 at most),
+  // the node texts for a block not served, and a quote naming another block refused.
+  check('swap2-core: validBlockNumber takes digits up to a uint64, refuses hex, a leading zero, 2^64 and numbers; blockTagOf through BigInt',
+    validBlockNumber('18446744073709551615') && validBlockNumber('0') && !validBlockNumber('0x10') && !validBlockNumber('01') && !validBlockNumber('18446744073709551616') && !validBlockNumber(125409523)
+    && blockTagOf('18446744073709551615') === '0xffffffffffffffff' && blockTagOf('125409523') === '0x77998f3')
+  check('swap2-core: nodeLacksBlock / blockLackedInBody read the live texts (header not found, Monad, X Layer HTTP 400 body), not a revert',
+    nodeLacksBlock({ code: -32000, message: 'header not found' }) && nodeLacksBlock('Block requested not found. Request might be querying historical state that is not available.') && !nodeLacksBlock('execution reverted')
+    && blockLackedInBody('{"jsonrpc":"2.0","id":1,"error":{"code":-32019,"message":"block is out of range"}}') === 'block is out of range')
+  {
+    const q = { provider: 'u', intentId: 'u:1', depositAddress: '', depositMemo: null, sourceAmount: '1', destAmount: '2', minDestAmount: '1', feeUsd: 0, etaSeconds: 15, reliability: 1, validUntilMs: Date.now() + 60_000, blockNumber: '125409523' }
+    const p = { sourceChain: 'eip155:143', destChain: 'eip155:143', sourceToken: 'MON', destToken: '0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a', amountIn: '1', destAddress: '0x1111111111111111111111111111111111111111' }
+    check('swap2-core: a quote naming its request\'s block passes, one naming another block (or none asked) is refused', validQuote(q, { ...p, blockNumber: '125409523' }, 'u') && !validQuote(q, { ...p, blockNumber: '125409524' }, 'u') && !validQuote(q, p, 'u'))
+  }
   await smokeUniswap(check)
   const evm = createMockAccount({ chain: 'eip155:1', address: '0x000000000000000000000000000000000000dEaD' }).toReadOnlyAccount()
   const ton = createMockAccount({ chain: 'ton:-239', address: 'UQBHyu-oZVDHRYQ1-rKlGqpHy5yAqanPBirEQNMNOmfHLtaT' }).toReadOnlyAccount()
