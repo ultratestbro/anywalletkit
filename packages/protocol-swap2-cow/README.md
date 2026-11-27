@@ -30,6 +30,13 @@ The module talks to the public orderbook at `api.cow.fi` straight from the devic
 - **An order lives 20 minutes** by default, then it can no longer trade. Nothing has to be cancelled or refunded for a token order: the tokens never left the account.
 - **A native-coin order** holds the coin in the eth-flow contract until it fills. If it expires unfilled, CoW's refund service returns it; `claimSwap2` on the swap's id builds the refund (`invalidateOrder`) for the creator to send when that does not happen.
 
+### Gas in the quote (`gasEstimate`)
+
+Every quote carries `gasEstimate` with `gasEstimateSource: "model"`, the gas of the swap's own transaction for comparing routes (see protocol-swap2-core, "Gas: `gasEstimate` vs `gasLimit`"):
+
+- **A token sale** is `gasless: true` and carries exactly `"0"`: the account sends no swap transaction, a solver settles the order and pays for it. The approval, when one is needed, is not in it: the quote names the vault relayer (`providerData.approvalAddress`) and the router prices that approval itself, as before; a permit sale names none.
+- **A native-coin sale** carries `"56228"` (`ETH_FLOW_CREATE_GAS_USED`), the gas `createOrder` uses. The call does the same work for every order (one new storage slot, one event, fixed-size calldata), so one figure holds. Measured 2026-11-28 (`fixtures/gas/eth-flow-create-order.json`): 56,216–56,264 over 11 measurements — the Base receipt of this module's own mainnet eth-flow order (56,228), a public Arbitrum one (56,264 of L2 gas, plus 428 of L1 data that the router leaves out), and `eth_simulateV1` of fresh orders of 0.0002, 0.1 and 5 ETH on Ethereum, Base and Arbitrum (56,216–56,240, nothing sent). The figure is their median. The transaction still goes out with the account's own estimate of that call (`ownGasEstimate`); the quote's `txRequest.gasLimit` stays 150,000.
+
 ## What the module checks
 
 Nothing the orderbook answers is signed as is. The order is rebuilt on the device from the request, and the quote only supplies numbers that are then bounded:
