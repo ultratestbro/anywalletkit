@@ -26,13 +26,28 @@ export function evmRef(chain: string): number {
 const BLOCK_UNAVAILABLE_TEXT = /header not found|unknown block|block(?: [#\w]+)? (?:is )?not (?:found|available)|no such block|could not be found|(?:does not|doesn'?t) exist yet|unsupported block number|block(?: number)? (?:is )?out of range|missing trie node|\bpruned\b|historical state|no state (?:is )?available|state (?:is )?(?:not available|unavailable)|unknown state|first available state|archive (?:node|request|data|state)|in the future|future block|(?:greater|later|higher) than (?:the )?(?:latest|current|head|chain head)|(?:above|beyond|after) (?:the )?(?:latest|current|head|last accepted)/i;
 
 /**
+ * The EVM ran the call and it stopped: geth's and reth's code 3 ("execution reverted"), Nethermind's -32015 ("VM
+ * execution error"), or a message that says it reverted, hit an invalid opcode or ran out of gas. That is the contract's
+ * answer whatever its reason string says — "execution reverted: oracle timestamp in the future" is a revert, not a node
+ * without the block (review 2026-11-28 #6). No node answered a block it lacks so (read live, 2026-11-28).
+ */
+const EXECUTION_CODES: ReadonlySet<number> = new Set([3, -32015]);
+const EXECUTION_TEXT = /revert|invalid opcode|out of gas|vm execution error/i;
+
+/**
  * True when a node's error (its JSON-RPC error object, or the text) says it cannot serve the block the call named —
  * it does not have that block yet, or no longer keeps its state. A provider pinned to `QuoteParams.blockNumber` tries
  * the next endpoint on it and then refuses as `stale_node` naming the block — never answers from "latest" instead.
+ * Never for an execution error (code 3, -32015, or a revert's text), whatever its message goes on to say: a revert
+ * reason a contract chose ("… in the future", "… could not be found") is the call's answer, not the node's.
  */
 export function nodeLacksBlock(error: unknown): boolean {
+  const code = error && typeof error === "object" ? (error as {code?: unknown}).code : undefined;
+  if (typeof code === "number" && EXECUTION_CODES.has(code)) return false;
   const text = typeof error === "string" ? error : error && typeof error === "object" ? (error as {message?: unknown}).message : undefined;
-  return typeof text === "string" && BLOCK_UNAVAILABLE_TEXT.test(text.slice(0, 2_048));
+  if (typeof text !== "string") return false;
+  const head = text.slice(0, 2_048);
+  return !EXECUTION_TEXT.test(head) && BLOCK_UNAVAILABLE_TEXT.test(head);
 }
 
 /**

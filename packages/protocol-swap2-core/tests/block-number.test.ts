@@ -77,6 +77,23 @@ describe("nodeLacksBlock / blockLackedInBody", () => {
     }
     for (const v of [undefined, null, 3, {code: -32000}, {message: 42}]) expect(nodeLacksBlock(v)).toBe(false);
   });
+  it("never an execution error, whatever its reason says (review 2026-11-28 #6)", () => {
+    // A revert reason a contract chose (a pool's rate provider, an oracle) may read like a node without the block.
+    for (const e of [
+      {code: 3, message: "execution reverted: oracle timestamp in the future", data: "0x08c379a0"},
+      {code: 3, message: "execution reverted: rate provider could not be found"},
+      {code: 3, message: "execution reverted: price after the current round"},
+      {code: 3, message: "header not found"},
+      {code: -32015, message: "VM execution error: block number in the future"},
+      {code: -32000, message: "execution reverted: unknown block"},
+      {code: -32000, message: "invalid opcode: block not found"},
+      {code: -32000, message: "out of gas: historical state unavailable"},
+    ]) expect(nodeLacksBlock(e)).toBe(false);
+    for (const text of ["execution reverted: oracle timestamp in the future", "Execution Reverted: block not found", "VM execution error: in the future"]) expect(nodeLacksBlock(text)).toBe(false);
+    expect(blockLackedInBody(JSON.stringify({jsonrpc: "2.0", id: 1, error: {code: 3, message: "execution reverted: timestamp in the future"}}))).toBeUndefined();
+    // A batch with a revert and a node without the block: the node's words.
+    expect(blockLackedInBody(JSON.stringify([{id: 0, error: {code: 3, message: "execution reverted: unknown block"}}, {id: 1, error: {code: -32000, message: "header not found"}}]))).toBe("header not found");
+  });
   it("blockLackedInBody reads an HTTP error's JSON-RPC body, alone or in a batch", () => {
     expect(blockLackedInBody(JSON.stringify({jsonrpc: "2.0", id: 1, error: {code: -32019, message: "block is out of range"}}))).toBe("block is out of range");
     expect(blockLackedInBody(JSON.stringify([{id: 0, result: "0x"}, {id: 1, error: {code: 27, message: "Unknown state. First available state is 1"}}]))).toBe("Unknown state. First available state is 1");

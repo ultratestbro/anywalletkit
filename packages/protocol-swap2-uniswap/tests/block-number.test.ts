@@ -244,6 +244,15 @@ describe("a node without the block", () => {
     const {heard} = await quoteOn(node, ["https://a.test"]);
     expect(heard[0]![1]).toEqual({reason: "upstream_unavailable"});
   });
+
+  it("an HTTP 400 whose JSON-RPC body is a revert (code 3, \"… in the future\") is not a node without the block (review 2026-11-28 #6)", async () => {
+    const node = lackingNode(["https://a.test"], () => ({http: 400, body: {jsonrpc: "2.0", id: 0, error: {code: 3, message: "execution reverted: oracle timestamp in the future"}}}));
+    const {q, heard} = await quoteOn(node, ["https://a.test"]);
+    expect(q).toBeNull();
+    expect(heard).toHaveLength(1);
+    expect(heard[0]![1]).toEqual({reason: "upstream_unavailable"});
+    expect(heard[0]![0]).not.toMatch(/served block/);
+  });
 });
 
 describe("the request's blockNumber", () => {

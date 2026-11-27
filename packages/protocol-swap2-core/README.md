@@ -162,7 +162,9 @@ gives the JSON-RPC tag).
   a non-archive node's pruning): the provider asks its next endpoint, then refuses with reason
   `stale_node` (or `upstream_unavailable`, when the node failed in another way) and a text naming
   the block. It never answers from "latest" instead: a quote without its block is worse than a
-  clear refusal. `nodeLacksBlock` and `blockLackedInBody` recognise the texts above (read live).
+  clear refusal. `nodeLacksBlock` and `blockLackedInBody` recognise the texts above (read live), and
+  never an execution error (code 3, Nethermind's -32015, a revert's text): a revert reason a contract
+  chose ("… in the future", "… could not be found") is the call's answer, not the node's.
 - `quoteRejection` / `validQuote` refuse a quote naming a block other than the request's
   (`policy_refused`), and a request whose `blockNumber` is malformed. The swap2 server validates
   `params.blockNumber` strictly and seals `Quote.blockNumber` with the rest of the quote. A remote

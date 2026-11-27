@@ -114,6 +114,44 @@ describe("a node without the block", () => {
     expect(heard[0]![1]).toEqual({reason: "simulation_failed"});
     expect(node.seen.filter((c) => c.tag === TAG).map((c) => c.url)).toEqual(["https://a.test"]);
   });
+
+  // Review 2026-11-28 #6: a revert reason a pool's rate provider or oracle chose may read like a node without the block.
+  // It is still the Vault's answer — one endpoint asked, simulation_failed, as without blockNumber — never stale_node.
+  const reverts: Array<[string, object]> = [
+    ["code 3, \"execution reverted: oracle timestamp in the future\"", {code: 3, message: "execution reverted: oracle timestamp in the future", data: "0x08c379a0"}],
+    ["code 3, \"execution reverted: rate provider could not be found\"", {code: 3, message: "execution reverted: rate provider could not be found"}],
+    ["code 3, \"execution reverted: price after the current round\"", {code: 3, message: "execution reverted: price after the current round"}],
+    ["Nethermind's -32015, \"VM execution error: block number in the future\"", {code: -32015, message: "VM execution error: block number in the future"}],
+    ["-32000, \"execution reverted: header not found\" (a revert's text)", {code: -32000, message: "execution reverted: header not found"}],
+  ];
+  for (const [what, error] of reverts) {
+    it(`a revert whose reason reads like a missing block — ${what}: simulation_failed, one endpoint asked, as without blockNumber`, async () => {
+      const node = lackingNode(["https://a.test", "https://b.test", "https://c.test"], () => ({error}));
+      const {q, heard} = await quoteOn(node, ["https://a.test", "https://b.test", "https://c.test"]);
+      expect(q).toBeNull();
+      expect(heard).toHaveLength(1);
+      expect(heard[0]![1]).toEqual({reason: "simulation_failed"});
+      expect(heard[0]![0]).not.toMatch(/is not served by the node/);
+      expect(node.seen.filter((c) => c.tag === TAG).map((c) => c.url)).toEqual(["https://a.test"]);
+      // The same answer at "latest" is classified the same way.
+      const inner = stub({vaultOut: 2_000_000n});
+      vi.stubGlobal("fetch", (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as {method?: string; params?: [{data?: string}, unknown]};
+        if (body.method === "eth_call" && body.params?.[0]?.data?.startsWith(QUERY_BATCH_SWAP)) return new Response(JSON.stringify({jsonrpc: "2.0", id: 1, error}));
+        return inner(input, init);
+      }) as typeof fetch);
+      const plain: Array<[string, Swap2RefusalInfo | undefined]> = [];
+      const {blockNumber: _pinned, ...unpinned} = params({onRefusal: (t: string, i?: Swap2RefusalInfo) => { plain.push([t, i]); }});
+      await balancerProvider({rpcUrls: {1: ["https://a.test"]}}).getQuote(unpinned);
+      expect(plain).toEqual(heard);
+    });
+  }
+
+  it("an HTTP error whose JSON-RPC body is a revert (code 3) is not read as a node without the block", async () => {
+    const node = lackingNode(["https://a.test"], () => ({http: 400, body: {jsonrpc: "2.0", id: 1, error: {code: 3, message: "execution reverted: timestamp in the future"}}}));
+    const {heard} = await quoteOn(node, ["https://a.test"]);
+    expect(heard).toEqual([["balancer: no RPC answered on chain 1 (HTTP 400)", {reason: "upstream_unavailable"}]]);
+  });
 });
 
 describe("the request's blockNumber", () => {

@@ -125,6 +125,23 @@ describe("a node without the block", () => {
     const {heard} = await quoteOn(node, ["https://a.test"]);
     expect(heard[0]![1]).toEqual({reason: "upstream_unavailable"});
   });
+
+  // Review 2026-11-28 #6: a revert is never a node without the block, whatever its reason says — on the HTTP-error and
+  // batch-refusal paths too (the batch items were already told apart by isExecutionError).
+  const reverts: Array<[string, () => object | {http: number; body: unknown}]> = [
+    ["an HTTP 400 whose body is a revert (code 3, \"… in the future\")", () => ({http: 400, body: {jsonrpc: "2.0", id: 0, error: {code: 3, message: "execution reverted: oracle timestamp in the future"}}})],
+    ["a batch refused with a revert's text (\"execution reverted: unknown block\")", () => ({http: 200, body: {jsonrpc: "2.0", id: null, error: {code: -32000, message: "execution reverted: unknown block"}}})],
+  ];
+  for (const [what, answer] of reverts) {
+    it(`${what}: not stale_node`, async () => {
+      const node = lackingNode(["https://a.test"], answer);
+      const {q, heard} = await quoteOn(node, ["https://a.test"]);
+      expect(q).toBeNull();
+      expect(heard).toHaveLength(1);
+      expect(heard[0]![1]).not.toEqual({reason: "stale_node"});
+      expect(heard[0]![0]).not.toMatch(/is not served by the node/);
+    });
+  }
 });
 
 describe("the request's blockNumber", () => {

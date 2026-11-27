@@ -73,6 +73,9 @@ interface SorPath {
   protocolVersion: number;
 }
 
+/** A JSON-RPC error that says the call reverted: geth's code 3, Nethermind's -32015, or a "revert" message. */
+const isRevert = (code: unknown, message: string): boolean => code === 3 || code === -32015 || /revert/i.test(message);
+
 /** Base units → the decimal string the SOR expects ("1.5"). */
 function human(amount: bigint, decimals: number): string {
   const s = amount.toString().padStart(decimals + 1, "0");
@@ -118,7 +121,9 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
           throw info ? withReason(error, info) : error;
         }
         const body = (await res.json()) as {result?: unknown; error?: {code?: unknown; message?: string}};
-        if (body.error && atPin && nodeLacksBlock(body.error)) throw lacks(String(body.error.message));
+        // A revert is the Vault's answer whatever its reason says ("… in the future" from a pool's rate provider): told
+        // apart first, so it is never read as a node without the block (review 2026-11-28 #6).
+        if (body.error && atPin && !isRevert(body.error.code, body.error.message ?? "rpc error") && nodeLacksBlock(body.error)) throw lacks(String(body.error.message));
         if (body.error) throw Object.assign(new Error(body.error.message ?? "rpc error"), {rpc: true, rpcCode: body.error.code});
         // An eth_call always names a result ("0x" at least): none at the pinned block is a node that lacks it.
         if (atPin && (body.result === undefined || body.result === null)) throw lacks("the node answered with no result");
@@ -163,8 +168,7 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
         : rpc(chainId, "eth_call", [{to: BALANCER_V2_VAULT, data}, pinned], pinned))) as Hex;
     } catch (e) {
       if (!(e instanceof Error) || !(e as {rpc?: boolean}).rpc) throw e;
-      const code = (e as {rpcCode?: unknown}).rpcCode;
-      throw withReason(e, code === 3 || code === -32015 || /revert/i.test(e.message) ? "simulation_failed" : "upstream_unavailable");
+      throw withReason(e, isRevert((e as {rpcCode?: unknown}).rpcCode, e.message) ? "simulation_failed" : "upstream_unavailable");
     }
     try {
       return decodeFunctionResult({abi: VAULT_ABI, functionName: "queryBatchSwap", data: raw});
