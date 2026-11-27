@@ -440,17 +440,20 @@ export interface UniswapProviderConfig {
 /**
  * A chain's block gas read: kept until `until`; a quote waits for it until `waitUntil`; `limit` once `done` (if any).
  * `last` is the newest good answer before it (read at `lastAt`): used, without waiting, while this read is pending or
- * when it failed.
+ * when it failed. A pinned block's read (`QuoteParams.blockNumber`) starts without one and is waited for; `standIn` is
+ * the chain's newest good block gas limit in hand (see blockGasRead): it becomes `last` when the read gave no limit,
+ * and is used when the read is still out as the quote's wait ends.
  */
 interface BlockGasRead {
   until: number;
   readonly waitUntil: number;
   done: boolean;
   limit?: bigint;
-  readonly last?: bigint;
-  readonly lastAt?: number;
+  last?: bigint;
+  lastAt?: number;
   readAt?: number;
   read: Promise<void>;
+  readonly standIn?: () => {limit: bigint; at: number} | undefined;
 }
 
 /** What one v4 deployment check found: the router flow (native input) and the SwapProxy flow (token input) usable. */
@@ -536,6 +539,13 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   const blockGas = new Map<number, BlockGasRead>();
   /** The block gas reads of pinned blocks (`QuoteParams.blockNumber`), by chain and block tag; the oldest dropped first. */
   const pinnedBlockGas = new Map<string, BlockGasRead>();
+  /** Each chain's newest good block gas limit, from a read at "latest" or at a pinned block, and when it was read. */
+  const newestGas = new Map<number, {limit: bigint; at: number}>();
+  /** The chain's newest good block gas limit while it is fresh (BLOCK_GAS_STALE_MS): a cached answer, never a new read. */
+  const newestGasOf = (chainId: number): {limit: bigint; at: number} | undefined => {
+    const n = newestGas.get(chainId);
+    return n !== undefined && Date.now() - n.at <= BLOCK_GAS_STALE_MS ? n : undefined;
+  };
   const net = uniswapRpc(config.rpcUrls, perSecond === undefined ? {} : {callsPerSecond: perSecond});
   const v4Mode: UniswapV4Mode = config.v4 ?? "off";
   if (v4Mode !== "off" && v4Mode !== "native-in" && v4Mode !== "all") throw new Error('uniswap: v4 must be "off", "native-in" or "all"');
@@ -624,16 +634,30 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
    * at most BLOCK_GAS_STALE_MS after it was read.
    *
    * `pinned` (a quote pinned to `QuoteParams.blockNumber`, as its hex tag): that block's own gas limit instead
-   * (`eth_getBlockByNumber(tag, false)`), read the same way and kept per block — the routes of a quote priced at that
-   * block are bounded by it. Its failure is the same "node did not say" (the known caps alone), never a read at "latest".
+   * (`eth_getBlockByNumber(tag, false)`), kept per block — the routes of a quote priced at that block are bounded by it.
+   * A node that lacks the block ("header not found", a null block…) or answers without a gasLimit is retried as the
+   * quote's price reads are, each retry at the next endpoint (SlotOptions.pinnedBlock), while a quote would still wait
+   * for it (BLOCK_GAS_WAIT_MS). When no node gave it, or it is still out as the quote's wait ends, the chain's newest good
+   * block gas limit in hand (newestGasOf: an earlier read at "latest" or at another block, at most BLOCK_GAS_STALE_MS
+   * old) stands in, as a cached answer stands in for a pending or failed read at "latest": a node a block behind no
+   * longer leaves a quote naming the block bounded by the known caps alone (review 2026-11-28 #1/#5). With none in hand,
+   * the known caps alone, as after a failed read at "latest". Nothing is read at "latest" for it.
    */
   function blockGasRead(chainId: number, pinned?: string): BlockGasRead {
     const now = Date.now();
     if (pinned !== undefined) {
       const key = `${chainId}:${pinned}`;
       const hit = pinnedBlockGas.get(key);
-      if (hit && now < hit.until) return hit;
-      const entry = gasReadAt(chainId, pinned, now, {});
+      if (hit && now < hit.until) {
+        // A read that gave nothing and had nothing to stand in for it: one that came in since stands in now (in a copy:
+        // a pass already holding this entry keeps the bounds it was judged by).
+        const s = hit.done && hit.limit === undefined && hit.last === undefined ? newestGasOf(chainId) : undefined;
+        if (s === undefined) return hit;
+        const copy: BlockGasRead = {...hit, last: s.limit, lastAt: s.at};
+        pinnedBlockGas.set(key, copy);
+        return copy;
+      }
+      const entry = gasReadAt(chainId, pinned, now, {}, true);
       pinnedBlockGas.delete(key);
       pinnedBlockGas.set(key, entry);
       if (pinnedBlockGas.size > PINNED_GAS_READS_MAX) pinnedBlockGas.delete(pinnedBlockGas.keys().next().value!);
@@ -647,18 +671,32 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
     return entry;
   }
 
-  /** One block gas read at `tag`, begun now (see blockGasRead). */
-  function gasReadAt(chainId: number, tag: string, now: number, prior: {last?: bigint; lastAt?: number}): BlockGasRead {
-    const entry: BlockGasRead = {until: now + BLOCK_GAS_TTL_MS, waitUntil: now + BLOCK_GAS_WAIT_MS, done: false, ...prior, read: Promise.resolve()};
-    entry.read = net.slots(chainId, [{method: "eth_getBlockByNumber", params: [tag, false]}], "none").then(
+  /** One block gas read at `tag`, begun now (see blockGasRead); `pinned`: `tag` is a pinned block's. */
+  function gasReadAt(chainId: number, tag: string, now: number, prior: {last?: bigint; lastAt?: number}, pinned = false): BlockGasRead {
+    const entry: BlockGasRead = {until: now + BLOCK_GAS_TTL_MS, waitUntil: now + BLOCK_GAS_WAIT_MS, done: false, ...prior, read: Promise.resolve(), ...(pinned ? {standIn: () => newestGasOf(chainId)} : {})};
+    const calls: RpcCall[] = [{method: "eth_getBlockByNumber", params: [tag, false]}];
+    // A pinned block: a node without it (or an answer without a gasLimit) is retried at the next endpoint, as long as a
+    // quote would still wait for the read. At "latest": one pass over the endpoints, as 0.5.0 read it.
+    const read = pinned
+      ? net.slots(chainId, calls, "all", undefined, {pinnedBlock: tag, accept: (r) => blockGasLimitOf(r) !== undefined, retryUntil: entry.waitUntil})
+      : net.slots(chainId, calls, "none");
+    entry.read = read.then(
       ([s]) => (s && s.ok ? blockGasLimitOf(s.result) : undefined),
       () => undefined,
     ).then((limit) => {
       entry.done = true;
-      if (limit === undefined) entry.until = Math.min(entry.until, now + BLOCK_GAS_RETRY_MS);
-      else {
+      if (limit === undefined) {
+        entry.until = Math.min(entry.until, now + BLOCK_GAS_RETRY_MS);
+        const s = entry.standIn?.();
+        if (s !== undefined) {
+          entry.last = s.limit;
+          entry.lastAt = s.at;
+        }
+      } else {
         entry.limit = limit;
         entry.readAt = now;
+        const n = newestGas.get(chainId);
+        if (n === undefined || n.at <= now) newestGas.set(chainId, {limit, at: now});
       }
     });
     return entry;
@@ -667,13 +705,13 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
   /**
    * The block gas limit one quote goes by: the read's answer when it is in; else the newest good answer before it
    * (still fresh), at once; else it waits at most until the read's `waitUntil`, and never past the caller's abort —
-   * then undefined (the known caps alone), the read going on.
+   * then the pinned block's stand-in (BlockGasRead.standIn), else undefined (the known caps alone), the read going on.
    */
   function blockGasLimit(entry: BlockGasRead, signal?: AbortSignal): Promise<bigint | undefined> {
     const inHand = blockGasInHand(entry);
     if (entry.done || inHand !== undefined) return Promise.resolve(inHand);
     const left = entry.waitUntil - Date.now();
-    if (left <= 0 || signal?.aborted) return Promise.resolve(undefined);
+    if (left <= 0 || signal?.aborted) return Promise.resolve(entry.standIn?.()?.limit);
     return new Promise((resolve) => {
       let settled = false;
       const finish = () => {
@@ -681,7 +719,7 @@ export function uniswapProvider(config: UniswapProviderConfig): CrossChainProvid
         settled = true;
         clearTimeout(timer);
         signal?.removeEventListener?.("abort", finish);
-        resolve(entry.done ? entry.limit : undefined);
+        resolve(entry.done ? (entry.standIn ? blockGasInHand(entry) : entry.limit) : entry.standIn?.()?.limit);
       };
       const timer = setTimeout(finish, left);
       signal?.addEventListener?.("abort", finish, {once: true});

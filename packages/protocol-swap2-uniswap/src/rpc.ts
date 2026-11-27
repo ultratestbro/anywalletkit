@@ -267,6 +267,13 @@ export interface SlotOptions {
    * any other tag, and every other failure, are as without it.
    */
   pinnedBlock?: string;
+  /**
+   * The latest moment (ms since the epoch) a retry of this request may go out: a retry whose pause could end later
+   * (RETRY_DELAYS_MS, the longest pause of its range) is not begun, and the calls keep the reasons they have. For a read
+   * nobody waits for past that moment (a pinned block's gas read, BLOCK_GAS_WAIT_MS): every retry of it goes out while a
+   * quote would still use the answer.
+   */
+  retryUntil?: number;
 }
 
 export interface UniswapRpc {
@@ -637,6 +644,7 @@ export function uniswapRpc(rpcUrls: Readonly<Record<number, readonly string[]>>,
       const [from, to] = RETRY_DELAYS_MS[attempt]!;
       // A retry that could only go after waitUntil is not begun: the calls keep the reasons they have.
       if (rate !== undefined && o.waitUntil !== undefined && Date.now() + from > o.waitUntil) break;
+      if (o.retryUntil !== undefined && Date.now() + to > o.retryUntil) break;
       await pause(from + Math.floor(Math.random() * (to - from + 1)), signal); // an abort ends the wait; the retry then fails with it, unclassified
       // Each retry starts at the next endpoint: the one that rate-limited is the last asked.
       const again = await pass(chainId, missing.map((i) => calls[i]!), attempt + 1, policy, signal, o);

@@ -457,7 +457,10 @@ provider declares `honorsBlockNumber: true`.
   (no `eth_blockNumber`).
 - v4: the pool discovery (Multicall3 over the StateView), the V4Quoter aggregates and their halving, a candidate
   read again at the chain's gas cap, and the probe.
-- The block gas limit the routes are bounded by: `eth_getBlockByNumber` of that block, kept per block.
+- The block gas limit the routes are bounded by: `eth_getBlockByNumber` of that block, kept per block. A node
+  without the block (or a null block) is retried at the next endpoint while the quote waits for the read (1.5 s);
+  when no node gives it, the chain's newest gas limit in hand (read at "latest" or at another block within the hour)
+  stands in, as it does for a read at "latest" that failed — a cached answer, never a new read at "latest".
 - With `venueRoutes: "both"`, both candidates come from that one block.
 
 At "latest" whatever `blockNumber` says: the deployment checks (`factory()`, `WETH9()`, `poolManager()`, the
