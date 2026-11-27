@@ -5,6 +5,7 @@ import {evmRef, isEvm, timeoutSignal, sourceAssetOf} from "@anywalletkit/protoco
 import {httpRefusal, refusal, refusalNotes, refusalOf, withReason, type Swap2RefusalInfo, type Swap2RefusalReason} from "@anywalletkit/protocol-swap2-core/errors";
 import type {Asset, CrossChainProvider, IntentRef, IntentStatus, Quote, QuoteParams, UnsignedTx} from "@anywalletkit/protocol-swap2-core/types";
 import {bigintToNumber} from "@anywalletkit/core";
+import {balancerGasEstimate} from "./gas.js";
 
 /**
  * Balancer v2 — the cp0x permissionless Balancer venue (balancer.cp0x.com).
@@ -255,6 +256,9 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
         const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineS);
         const data = encodeFunctionData({abi: VAULT_ABI, functionName: "batchSwap", args: [0, swaps, assets, funds, limits, deadline]});
         const gasLimit = 160_000n + 95_000n * BigInt(swaps.length);
+        // What the batch is expected to use, for ranking (gas.ts: a measured model by pool specialization; nothing in
+        // execution reads it). The limit above is unchanged.
+        const gasEstimate = balancerGasEstimate(chainId, swaps.map((s) => s.poolId), gasLimit);
         return {
           provider: "balancer",
           intentId: `balancer:${chainId}`,
@@ -275,6 +279,7 @@ export function balancerProvider(config: BalancerProviderConfig): CrossChainProv
           etaSeconds: 15,
           reliability: 0.97,
           validUntilMs: Date.now() + ttl,
+          ...(gasEstimate !== undefined ? {gasEstimate: gasEstimate.toString(), gasEstimateSource: "model" as const} : {}),
           // Pool swap fees are inside the Vault-priced output; no fee is added on top.
           providerData: {paths: String(paths.length), hops: String(swaps.length), minOut: minOut.toString(), poolFee: "pools"},
         };
