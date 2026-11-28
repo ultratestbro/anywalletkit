@@ -59,8 +59,33 @@ const WETH_ABI = parseAbi([
   "function symbol() view returns (string)",
   "function decimals() view returns (uint8)",
 ]);
-/** deposit/withdraw on WETH9 cost ~30-45k; a generous cap, the account still estimates. */
+/**
+ * The gas limit a wrap / unwrap is sent with: deposit() / withdraw() cost 27–67k on most chains' wrappers
+ * ({@link WRAP_GAS}), so 90 000, unless {@link WRAP_GAS_LIMIT} names the chain.
+ */
 const GAS_LIMIT = "90000";
+
+/**
+ * Chains where a wrap or an unwrap needs more than 90 000 gas — `eth_estimateGas` on 2026-11-28
+ * (`fixtures/gas/limits-2026-11-28.json`): a deposit() into an empty balance from a fresh address, a withdraw() of
+ * part of a real holder's balance. Each limit leaves at least half again over the dearer figure; the gas a
+ * transaction does not use is not charged on these chains.
+ */
+export const WRAP_GAS_LIMIT: Readonly<Record<number, string>> = Object.freeze({
+  // Flare's WNat keeps vote-power checkpoints: deposit 202 512, withdraw 175 850–187 782.
+  14: "350000",
+  // zkSync prices pubdata in L2 gas, so the figure moves with L1 gas: deposit 186 454, withdraw 191 900–192 037.
+  324: "500000",
+  // Sei charges 72 000 for a new storage slot: deposit into an empty balance 97 833.
+  1329: "150000",
+  // MegaETH's storage gas: deposit into an empty balance 98 470 (a receipt: 94 632), withdraw 82 123–87 055.
+  4326: "200000",
+});
+
+/** The gas limit a wrap / unwrap on `chainId` is sent with. */
+export function wrapGasLimit(chainId: number): string {
+  return Object.prototype.hasOwnProperty.call(WRAP_GAS_LIMIT, chainId) ? WRAP_GAS_LIMIT[chainId]! : GAS_LIMIT;
+}
 
 /**
  * Gas a wrap (`deposit()`) and an unwrap (`withdraw(amount)`) use on each chain's pinned wrapper in
@@ -221,7 +246,7 @@ export function wrapProvider(config: WrapProviderConfig): CrossChainProvider {
         intentId: `wrap:${chainId}`,
         depositAddress: "",
         depositMemo: null,
-        txRequest: {to: w.address, data, value: wrap ? amount.toString() : "0", chainId, gasLimit: GAS_LIMIT},
+        txRequest: {to: w.address, data, value: wrap ? amount.toString() : "0", chainId, gasLimit: wrapGasLimit(chainId)},
         sourceAmount: amount.toString(),
         destAmount: amount.toString(),
         minDestAmount: amount.toString(),

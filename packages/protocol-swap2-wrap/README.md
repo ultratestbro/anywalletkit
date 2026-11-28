@@ -28,7 +28,7 @@ sender. Without the pins the stub gets no EVM calldata route (fail closed).
 
 A quote carries `gasEstimate` with `gasEstimateSource: "model"` from `WRAP_GAS`: the gas `deposit()` /
 `withdraw(amount)` uses on that chain's pinned wrapper (an overridden `wrapped` contract gets none), without
-headroom; `txRequest.gasLimit` stays 90 000. Measured 2026-11-28 (`fixtures/gas/measured-2026-11-28.json`):
+headroom; `txRequest.gasLimit` is separate (next section). Measured 2026-11-28 (`fixtures/gas/measured-2026-11-28.json`):
 `eth_simulateV1` of the module's own calls from an address that never held the wrapper, and receipts of public
 wrap / unwrap transactions sent straight to the wrapper on the same chain. Each figure is the dearer of the two cases
 the call can hit — a wrap into an empty wrapped balance, an unwrap of part of the balance:
@@ -54,9 +54,27 @@ How far off it is: a wrap topping up a balance the sender already holds uses 17 
 Polygon), an unwrap of the whole balance 4 788 less (3 948 on Polygon). Receipts of the same case run 0–112 gas above
 the simulated figure (the amount's calldata bytes, an occasional trailing byte; one World Chain unwrap 348 above). No estimate, by design: Monad (its receipts report the gas limit as
 gasUsed: 80 000, 1 500 000), Sonic (its `eth_simulateV1` answers millions; receipts 36 852–42 458 without both cases),
-MegaETH (a wrap into an empty balance uses 94 632, above the 90 000 limit; unwraps 82 123–87 055), Morph (receipts
+MegaETH (a wrap into an empty balance uses 94 632; unwraps 82 123–87 055; its storage gas is not in this table), Morph (receipts
 only, one case each), Gnosis and Berachain (simulated, no receipt found), zkSync (neither), Flare, Avalanche, Plume
 and Elysium (not measured).
+
+## Gas limit
+
+`txRequest.gasLimit` — the limit the transaction is sent with — is 90 000, which covers every chain's wrapper in the
+table above with room to spare, except on four chains (`WRAP_GAS_LIMIT`, `wrapGasLimit(chainId)`), where
+`eth_estimateGas` on 2026-11-28 (`fixtures/gas/limits-2026-11-28.json`) found a wrap into an empty balance or an
+unwrap needing more:
+
+| Chain | Limit | Why | Estimated (deposit into an empty balance / withdraw of part) |
+| --- | --- | --- | --- |
+| Sei | 150 000 | a new storage slot costs 72 000 | 97 833 / — |
+| MegaETH | 200 000 | storage gas | 98 470 (a receipt: 94 632) / 82 123–87 055 |
+| Flare | 350 000 | WNat keeps vote-power checkpoints | 202 512 / 175 850–187 782 |
+| zkSync | 500 000 | pubdata is priced in L2 gas and moves with L1 gas | 186 454 / 191 900–192 037 |
+
+Before that every chain went out with 90 000, so those calls would run out of gas there. Each limit is at least
+half again over the dearer figure; gas a transaction does not use is not charged on these chains. The other chains
+of `WRAPPED_NATIVE` estimated 45 322–58 459 for a deposit into an empty balance.
 
 ## Activity
 

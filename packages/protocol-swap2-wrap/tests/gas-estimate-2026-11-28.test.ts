@@ -8,7 +8,7 @@ import {encodeAbiParameters} from "viem";
 import {gasEstimateProblem} from "@anywalletkit/protocol-swap2-core/validate";
 import {ccAssetByToken} from "@anywalletkit/swap2-assets";
 import type {QuoteParams} from "@anywalletkit/protocol-swap2-core/types";
-import {WRAP_GAS, WRAPPED_NATIVE, wrapPins, wrapProvider, wrapVerifyQuote} from "../src/provider.js";
+import {WRAP_GAS, WRAP_GAS_LIMIT, WRAPPED_NATIVE, wrapGasLimit, wrapPins, wrapProvider, wrapVerifyQuote} from "../src/provider.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -18,6 +18,7 @@ const measured = JSON.parse(readFileSync(new URL("../fixtures/gas/measured-2026-
 const ME = "0x4444444444444444444444444444444444444444";
 const ZERO = "0x0000000000000000000000000000000000000000";
 const GAS_LIMIT = 90_000n;
+const limits = JSON.parse(readFileSync(new URL("../fixtures/gas/limits-2026-11-28.json", import.meta.url), "utf8")) as {chains: Record<string, {deposit: number; withdraw?: number[]}>};
 
 /** Each chain's wrapper answers its own symbol and 18 decimals; the chain is read from the RPC URL. */
 function stub(): typeof fetch {
@@ -74,7 +75,7 @@ describe("wrap gasEstimate: the measured gas of deposit() / withdraw(amount) on 
     expect(Object.keys(WRAP_GAS).length).toBe(17);
   });
 
-  it("a quote on a measured chain carries the figure as 'model', within the 90 000 gas limit it is sent with", async () => {
+  it("a quote on a measured chain carries the figure as 'model', within the gas limit it is sent with", async () => {
     vi.stubGlobal("fetch", stub());
     const provider = wrapProvider({rpcUrls});
     let n = 0;
@@ -87,8 +88,8 @@ describe("wrap gasEstimate: the measured gas of deposit() / withdraw(amount) on 
         expect(q!.gasEstimate, `${id} ${wrap}`).toBe(figure);
         expect(q!.gasEstimateSource, `${id} ${wrap}`).toBe(figure === undefined ? undefined : "model");
         expect(gasEstimateProblem(q!, p.sourceChain), `${id} ${wrap}`).toBeNull();
-        expect(q!.txRequest!.gasLimit).toBe(String(GAS_LIMIT));
-        if (figure !== undefined) { n++; expect(BigInt(figure) <= GAS_LIMIT, `${id} ${wrap}`).toBe(true); }
+        expect(q!.txRequest!.gasLimit).toBe(wrapGasLimit(Number(id)));
+        if (figure !== undefined) { n++; expect(BigInt(figure) <= BigInt(q!.txRequest!.gasLimit!), `${id} ${wrap}`).toBe(true); }
         expect(wrapVerifyQuote(p, q!), `${id} ${wrap}`).toBeNull();
       }
     }
@@ -99,8 +100,9 @@ describe("wrap gasEstimate: the measured gas of deposit() / withdraw(amount) on 
     vi.stubGlobal("fetch", stub());
     const provider = wrapProvider({rpcUrls});
     // Monad reports the gas limit as gasUsed; Sonic's simulation is not gas used; MegaETH's wrap into an empty balance
-    // (94 632) is above the 90 000 limit; zkSync, Gnosis, Berachain, Morph: no receipt of both cases or no simulation;
-    // Flare, Avalanche, Plume, Elysium: not measured.
+    // (94 632) was above the 90 000 limit the table was measured against; zkSync, Gnosis, Berachain, Morph: no receipt
+    // of both cases or no simulation; Flare, Avalanche, Plume, Elysium: not measured (the gas-limit estimates of
+    // limits-2026-11-28.json are not a gas-used measurement).
     for (const id of [14, 100, 143, 146, 324, 2818, 4326, 43114, 80094, 98866, 99901]) {
       expect(WRAP_GAS[id], String(id)).toBeUndefined();
       for (const wrap of [true, false]) {
@@ -127,5 +129,48 @@ describe("wrap gasEstimate: the measured gas of deposit() / withdraw(amount) on 
     // The table itself is frozen.
     expect(Object.isFrozen(WRAP_GAS) && Object.isFrozen(WRAP_GAS[1])).toBe(true);
     expect(wrapPins.spenders("eip155:1")).toEqual([]);
+  });
+});
+
+describe("wrap gas limit: what the transaction is sent with, per chain", () => {
+  it("every chain's limit is at least half again over the dearer eth_estimateGas figure of 2026-11-28", () => {
+    for (const [id, m] of Object.entries(limits.chains)) {
+      expect(Object.prototype.hasOwnProperty.call(WRAPPED_NATIVE, Number(id)), id).toBe(true);
+      const dearer = Math.max(m.deposit, ...(m.withdraw ?? []));
+      expect(BigInt(wrapGasLimit(Number(id))) * 2n >= BigInt(dearer) * 3n, `${id}: limit ${wrapGasLimit(Number(id))}, needs ${dearer}`).toBe(true);
+    }
+    // Before 2026-11-28 every chain went out with 90 000: Flare, zkSync, Sei and MegaETH needed more.
+    for (const id of [14, 324, 1329, 4326]) expect(Math.max(limits.chains[id]!.deposit, ...(limits.chains[id]!.withdraw ?? [])) > Number(GAS_LIMIT), String(id)).toBe(true);
+    expect(Object.keys(WRAP_GAS_LIMIT).map(Number).sort((a, b) => a - b)).toEqual([14, 324, 1329, 4326]);
+    expect(Object.isFrozen(WRAP_GAS_LIMIT)).toBe(true);
+  });
+
+  it("every measured chain's gas figures fit under its limit, with the 90 000 default where the table names no chain", () => {
+    for (const id of Object.keys(WRAPPED_NATIVE).map(Number)) {
+      const limit = BigInt(wrapGasLimit(id));
+      expect(limit >= GAS_LIMIT, String(id)).toBe(true);
+      if (!Object.prototype.hasOwnProperty.call(WRAP_GAS_LIMIT, id)) expect(limit, String(id)).toBe(GAS_LIMIT);
+      const entry = WRAP_GAS[id];
+      if (entry?.wrap !== undefined) expect(BigInt(entry.wrap) <= limit, String(id)).toBe(true);
+      if (entry?.unwrap !== undefined) expect(BigInt(entry.unwrap) <= limit, String(id)).toBe(true);
+      const sim = measured.chains[String(id)]?.simulation;
+      // Sonic's eth_simulateV1 answers millions (not gas used, README); its eth_estimateGas is in limits-2026-11-28.json.
+      if (sim && "block" in sim && id !== 146) expect(BigInt(Math.max(sim.depositIntoEmpty, sim.withdrawPart)) <= limit, String(id)).toBe(true);
+    }
+    // An unknown chain id gets the default.
+    expect(wrapGasLimit(999_999_999)).toBe("90000");
+  });
+
+  it("a quote and its built transaction carry the chain's limit: MegaETH, zkSync, Sei and Flare above 90 000", async () => {
+    vi.stubGlobal("fetch", stub());
+    const provider = wrapProvider({rpcUrls});
+    for (const [id, limit] of [[4326, "200000"], [324, "500000"], [1329, "150000"], [14, "350000"], [1, "90000"], [8453, "90000"]] as const) {
+      for (const wrap of [true, false]) {
+        const q = await provider.getQuote(params(id, wrap));
+        expect(q!.txRequest!.gasLimit, `${id} ${wrap}`).toBe(limit);
+        expect(gasEstimateProblem(q!, `eip155:${id}`), `${id} ${wrap}`).toBeNull();
+        expect((await provider.buildDeposit(q!)).gasLimit, `${id} ${wrap}`).toBe(limit);
+      }
+    }
   });
 });

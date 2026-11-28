@@ -61,8 +61,9 @@ export interface QuoteParams {
    * read the same state and their outputs compare like for like. A provider that honours it reads every price of the
    * quote at that block and says so with {@link Quote.blockNumber}; one whose nodes cannot serve that block refuses
    * (`stale_node`), never falls back to "latest". Providers that price from an API ignore it. Unset: "latest", as before.
-   * Deployment checks, simulations and gas estimates stay on the latest state whatever it says. Meant for the
-   * comparison round, not for execution quotes.
+   * Deployment checks, simulations and the account's own gas estimate of the call ({@link CrossChainProvider.ownGasEstimate})
+   * stay on the latest state whatever it says; a {@link Quote.gasEstimate} the venue's quoter returns is of the block.
+   * Meant for the comparison round, not for execution quotes.
    */
   blockNumber?: string;
 }

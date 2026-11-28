@@ -1,0 +1,19 @@
+{
+  "measured": "2026-11-28",
+  "method": "eth_estimateGas at latest. deposit(): 0.001 native from a fresh address (0x7a11…c0ffee) given a native balance by state override, so the wrapped balance it fills is empty. withdraw(1e15): from externally owned recipients of the wrapper's recent Transfer logs holding at least 0.002, so part of the balance stays. Scroll's node refused the state override (its deposit from an empty balance is in measured-2026-11-28.json only as receipts).",
+  "chains": {
+    "1": {"deposit": 45418},
+    "14": {"deposit": 202512, "withdraw": [187782, 187782, 175850]},
+    "100": {"deposit": 45421},
+    "143": {"deposit": 51221},
+    "146": {"deposit": 52198},
+    "324": {"deposit": 186454, "withdraw": [192037, 191900]},
+    "1329": {"deposit": 97833},
+    "2818": {"deposit": 52225},
+    "4326": {"deposit": 98470},
+    "43114": {"deposit": 45322},
+    "80094": {"deposit": 50658},
+    "98866": {"deposit": 50694},
+    "99901": {"deposit": 58459}
+  }
+}
