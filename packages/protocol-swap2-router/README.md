@@ -49,7 +49,7 @@ const routes = await swap2.quoteSwap2Routes(options, {
   // a "searching…" hint while `pending` is non-empty.
   onUpdate: (routes, pending) => render(routes, pending),
 });
-// routes[i] = {provider, routeId?, quote, netValueUsd, gasUsd, gasEstimate?, gasEstimateSource?, relativeValue, tags: ["best"] | ["fastest"] | …}
+// routes[i] = {provider, routeId?, quote, netValueUsd, gasUsd, gasEstimate?, gasEstimateSource?, relativeValue, tags: ["best"] | ["fastest"] | …, blockNumber?}
 await swap2.using(picked.provider, picked.routeId).swap2({...options, minAmountOut: picked.quote.toTokenAmountMin});
 ```
 
