@@ -43,7 +43,7 @@
     "@anywalletkit/tx-preview-evm": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "publishConfig": { "access": "public", "provenance": true }
 }
