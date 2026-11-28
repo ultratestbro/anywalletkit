@@ -37,7 +37,7 @@
     "@solana-program/token": "^0.18.0",
     "@solana/kit": "^8.6.0",
     "@types/node": "^22",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "keywords": ["protocol", "lending", "kamino", "klend", "kvault", "earn", "vault", "borrow", "solana", "lending-protocol", "anywalletkit"],
   "publishConfig": { "access": "public", "provenance": true }

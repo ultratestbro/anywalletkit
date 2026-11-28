@@ -39,7 +39,7 @@
   "devDependencies": {
     "@anywalletkit/core": "workspace:*",
     "@types/node": "^22",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   },
   "keywords": [
     "history",
