@@ -1,6 +1,6 @@
 {
   "name": "@anywalletkit/protocol-swap2-across",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Across Protocol for the swap2 engine, with the SpokePool deposit built and verified on the device: a plain deposit encoded here from pinned SpokePools and the user's request, every argument held to that request (depositor, recipient, tokens, amounts, destination, empty message, deadlines, a per-asset fee floor) at build time and right before signing; priced from Across API V5 against Across's relayer fee (V5's own execution steps never run), the key kept on a server; status read on chain. EVM to EVM, the same asset on both sides.",
   "license": "Apache-2.0",
   "homepage": "https://docs.anywallet.tech",

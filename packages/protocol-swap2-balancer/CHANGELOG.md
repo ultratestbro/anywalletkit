@@ -1,5 +1,18 @@
 # @anywalletkit/protocol-swap2-balancer
 
+## 0.4.0
+
+### Minor Changes
+
+- dce6a13: Quotes carry `gasEstimate` with `gasEstimateSource: "model"`: base 80,000 per `batchSwap` plus a per-hop cost by the pool's specialization read from the pool id (two-token 36,400, minimal-swap-info 40,500, general 95,500), exported as `BALANCER_GAS_BASE`, `BALANCER_HOP_GAS`, `BALANCER_GAS_CHAINS`, `balancerSpecialization`, `balancerGasEstimate`. Set on Ethereum, OP, Base and Arbitrum, only at or under the quote's gas limit (unchanged: 160,000 + 95,000 per hop) and only for known specializations. Fit to 53 simulated module quotes on 29 pairs (2026-11-28): median 5.0 %, 90 % within 18.2 %, worst 25.1 %; two real direct batchSwaps +3.2 % and +5.2 % (`fixtures/gas/batchswap-2026-11-28.json`).
+- 82fab16: `QuoteParams.blockNumber`: the Vault's `queryBatchSwap`, the quote's price, runs at that block and the quote names it (`Quote.blockNumber`; `honorsBlockNumber: true`); the SOR's paths come from the API as before. The Vault's `WETH()` check and `preflightDeposit` stay at "latest". A node without the block fails its endpoint and the next one is asked; with none left the quote is refused as `stale_node` naming the block, never priced at "latest" (a revert is still the Vault's answer, `simulation_failed`). New `verify:live`: the Vault pin, a block number taken on every endpoint of every chain, a quote at a block naming it. Without `blockNumber` every request is 0.3.13's, byte for byte.
+
+### Patch Changes
+
+- Updated dependencies [94fdfb0]
+- Updated dependencies [dce6a13]
+  - @anywalletkit/protocol-swap2-core@0.18.0
+
 ## 0.3.13
 
 ### Patch Changes

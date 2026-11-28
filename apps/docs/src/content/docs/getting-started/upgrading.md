@@ -10,6 +10,31 @@ release by itself: you take these changes when you bump. Each package's CHANGELO
 the lines marked **Breaking** are the ones that need something from you. This page groups them by what
 your app does.
 
+## 2026-11-28: one block per comparison round, gas estimates, reused allowances
+
+Nothing here needs a change in your app: without the new options the engine and the router behave as before
+(protocol-swap2-core 0.18.0, router 0.9.0, every swap2 provider). What you can turn on:
+
+- **One block per comparison round.** Read `eth_blockNumber` once per source chain and pass it as
+  `QuoteParams.blockNumber` (or `quoteSwap2Routes(options, {blockNumber})`) to compare on-chain venues at the same
+  state. Uniswap, Curve and Balancer honour it (`honorsBlockNumber`) and name it in `Quote.blockNumber`; providers
+  that price from an API ignore it. A node without that block refuses as `stale_node` — re-read the block and ask
+  again. Leave it off the execution quote. A `remoteProvider` stub forwards it, but honours it only with
+  `honorsBlockNumber: true` once your backend runs this release.
+- **`Quote.gasEstimate` / `gasEstimateSource`.** The gas the source transaction is expected to use, next to
+  `txRequest.gasLimit` (which is unchanged and still what the transaction is sent with). To rank routes by it, pass
+  `useGasEstimate: true` to `evmSourceGas` / `swapGasUnits`; off, the router ranks exactly as 0.8 did.
+- **`allowanceReuse: "sufficient"`** (engine config, or per call: `swap2(options, {allowanceReuse})`): an allowance
+  that already covers the input is used as it is, with no approval and no revoke; the review plan and the result name
+  it in `reusedAllowance`. Read what the mode gives up in the protocol-swap2-core README ("Approvals") before you
+  turn it on. KyberSwap's generic-build routers stay on exact allowances whatever you set.
+- **`revokeUnspentApproval: false`**: an approval this execution made and did not spend is left in place, and the
+  error carries it — `leftAllowanceOf(error)`. That error is a copy of the one thrown on the way (same class,
+  message, reason and cause), never the value itself; compare by class or `reason`, not by identity.
+
+Wrap (0.5.0): a wrap or an unwrap on Flare, zkSync, Sei or MegaETH went out with a 90 000 gas limit, too little
+there; their limits are now 350 000, 500 000, 150 000 and 200 000 (`wrapGasLimit(chainId)`).
+
 ## Uniswap 0.5.0: Uniswap v4 (opt-in), the price-impact gate (opt-in)
 
 Nothing to change in code unless you opt in; read the rollout note if you serve Uniswap through `remoteProvider`.

@@ -1,5 +1,18 @@
 # @anywalletkit/protocol-swap2-lifi
 
+## 0.9.0
+
+### Minor Changes
+
+- dce6a13: EVM-source quotes carry `gasEstimate` (`gasEstimateSource: "venue"`): the `estimate` of the single `SEND` entry of LI.FI's `estimate.gasCosts`, taken only when the answer says LI.FI simulated the transaction (`stepSimulation: {status: "success", gasSource: "simulation"}`) and only at or under the transaction's gas limit (`lifiGasEstimate(gasCosts, stepSimulation, gasLimit)`, exported). The approval entry is never counted; `txRequest.gasLimit` is unchanged (LI.FI's `limit`). Price-only quotes keep their route's figure; Solana sources carry none, and neither do Monad sources (`LIFI_GAS_LIMIT_BILLED_CHAINS`, exported): Monad charges the whole gas limit, which is what a LI.FI transaction goes out with. On 13 live quotes of 2026-11-28 the figure was 12–26 % above the simulated gas used (median +19.5 %).
+
+### Patch Changes
+
+- 96e754d: README: `QuoteParams.blockNumber` is not supported by this provider (its price comes from an API, or is not a pool price compared across venues at one block); its quotes name no block. No code change.
+- Updated dependencies [94fdfb0]
+- Updated dependencies [dce6a13]
+  - @anywalletkit/protocol-swap2-core@0.18.0
+
 ## 0.8.7
 
 ### Patch Changes

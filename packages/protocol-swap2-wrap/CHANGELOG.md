@@ -1,5 +1,19 @@
 # @anywalletkit/protocol-swap2-wrap
 
+## 0.5.0
+
+### Minor Changes
+
+- dce6a13: Quotes carry `gasEstimate` with `gasEstimateSource: "model"` from the exported `WRAP_GAS` table: the gas `deposit()` / `withdraw(amount)` uses on each chain's pinned wrapper, measured 2026-11-28 with `eth_simulateV1` and checked against public receipts (17 chains; Sei and Scroll unwrap only). Each figure is the dearer case (a wrap into an empty balance, a partial unwrap). An overridden `wrapped` contract and unmeasured chains (Monad, Sonic, MegaETH, Morph, Gnosis, Berachain, zkSync, Flare, Avalanche, Plume, Elysium) get none. The gas limit is a separate change (`swap2-wrap-gas-limit`).
+- dae04d2: Fix: a wrap or an unwrap on Flare, zkSync, Sei or MegaETH no longer runs out of gas. Every chain used to go out with `txRequest.gasLimit` 90,000; `eth_estimateGas` on 2026-11-28 found these four need more (a wrap into an empty balance: Flare 202,512, zkSync 186,454, Sei 97,833, MegaETH 98,470; unwraps on Flare and zkSync 175,850–192,037). Their limits are now Sei 150,000, MegaETH 200,000, Flare 350,000, zkSync 500,000 (`WRAP_GAS_LIMIT`, `wrapGasLimit(chainId)`, exported); every other chain keeps 90,000. The measurements are in `fixtures/gas/limits-2026-11-28.json`.
+
+### Patch Changes
+
+- 96e754d: README: `QuoteParams.blockNumber` is not supported by this provider (its price comes from an API, or is not a pool price compared across venues at one block); its quotes name no block. No code change.
+- Updated dependencies [94fdfb0]
+- Updated dependencies [dce6a13]
+  - @anywalletkit/protocol-swap2-core@0.18.0
+
 ## 0.4.8
 
 ### Patch Changes

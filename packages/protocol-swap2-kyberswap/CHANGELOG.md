@@ -1,5 +1,22 @@
 # @anywalletkit/protocol-swap2-kyberswap
 
+## 0.2.0
+
+### Minor Changes
+
+- dce6a13: Every quote, dry or for execution, carries `gasEstimate` = KyberSwap's `routeSummary.gas` from `GET /routes` (asked with `gasInclude=true`), `gasEstimateSource: "venue"` (`kyberGasEstimate(routeGas)` is the rule): a dry quote no longer leaves the router to assume a gas limit. Execution is unchanged (the account's own estimate, no gas limit on the transaction), and so are the checks. Measured 2026-11-28 on 16 recorded live routes over nine chains, each built call simulated: gas used ÷ `routeSummary.gas` 0.58–1.85 (median 0.73); prop-AMM routes can run over (README). The provider declares `exactAllowanceOnly` (protocol-swap2-core) on the generic-build routers (Ethereum, Base, BNB Smart Chain, Arbitrum, Optimism, Polygon, Avalanche, Linea; a chain it does not list counts as generic): their owner key manages the `swapGeneric` executor whitelist and could spend an allowance left there, so the engine holds KyberSwap routes on those chains to an exact allowance, revoked when unspent, whatever `allowanceReuse` / `revokeUnspentApproval` the app set. `kyberExactAllowanceOnly(chain)` is exported and in `kyberPins` for a remote stub.
+
+### Patch Changes
+
+- 96e754d: README: `QuoteParams.blockNumber` is not supported by this provider (its price comes from an API, or is not a pool price compared across venues at one block); its quotes name no block. No code change.
+- Updated dependencies [94fdfb0]
+- Updated dependencies [96e754d]
+- Updated dependencies [dce6a13]
+- Updated dependencies [dce6a13]
+- Updated dependencies [dae04d2]
+  - @anywalletkit/protocol-swap2-core@0.18.0
+  - @anywalletkit/protocol-swap2-wrap@0.5.0
+
 ## 0.1.0
 
 ### Minor Changes

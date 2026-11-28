@@ -1,5 +1,14 @@
 # @anywalletkit/extension-kit
 
+## 0.7.4
+
+### Patch Changes
+
+- Updated dependencies [94fdfb0]
+- Updated dependencies [dce6a13]
+  - @anywalletkit/protocol-swap2-core@0.18.0
+  - @anywalletkit/wallet-ton@0.8.2
+
 ## 0.7.3
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @anywalletkit/protocol-swap2-near-intents
 
+## 0.3.12
+
+### Patch Changes
+
+- 96e754d: README: `QuoteParams.blockNumber` is not supported by this provider (its price comes from an API, or is not a pool price compared across venues at one block); its quotes name no block. No code change.
+- Updated dependencies [94fdfb0]
+- Updated dependencies [dce6a13]
+  - @anywalletkit/protocol-swap2-core@0.18.0
+
 ## 0.3.11
 
 ### Patch Changes

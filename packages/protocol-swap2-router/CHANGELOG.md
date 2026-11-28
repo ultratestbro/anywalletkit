@@ -1,5 +1,29 @@
 # @anywalletkit/protocol-swap2-router
 
+## 0.9.0
+
+### Minor Changes
+
+- 94fdfb0: One block per comparison round. `QuoteParams.blockNumber` (a decimal block of the source chain; `validBlockNumber`, `blockTagOf`): the app reads `eth_blockNumber` once per chain per round and hands it to every provider. A provider that prices on chain and honours it (`CrossChainProvider.honorsBlockNumber`) reads every price of the quote at that block and names it (`Quote.blockNumber`); providers that price from an API ignore it. Unset, nothing changes: "latest", every request as before.
+  
+  - `quoteRejection` / `validQuote` refuse a quote naming a block other than the request's (`policy_refused`) and a malformed one (`upstream_unavailable`); a request whose `blockNumber` is not a decimal block number is the caller's error.
+  - The swap2 server takes `params.blockNumber` (digits only, no leading zero, at most a uint64; anything else is a 400 before the provider is asked) and seals `Quote.blockNumber` with the rest of the quote. `remoteProvider` forwards it and declares `honorsBlockNumber` only with `honorsBlockNumber: true`.
+  - `nodeLacksBlock(error)` / `blockLackedInBody(text)`: the texts nodes answer a block they do not have yet or no longer keep with (read live on the Uniswap, Curve and Balancer chains, 2026-11-28), for the providers that pin — they refuse as `stale_node` naming the block, never answer from "latest". Never an execution error (code 3, -32015, a revert's text), whatever its reason string says.
+  - Router: `getQuotes` / `getBestQuote` pass the field to every provider unchanged (candidates, a `routeId` request, an `only()` re-quote), and never pick a block; the provider snapshot carries `honorsBlockNumber`; a `blockNumber` that is not a decimal block number refuses the round before any provider is asked. `RouterSwap2Protocol.quoteSwap2Routes(options, {blockNumber})` takes it for a picker, and `Swap2Route.blockNumber` names the routes priced at it.
+  
+  Deployment checks, simulations and the account's own gas estimate of the call (`ownGasEstimate`) stay at "latest" whatever the field says; a `Quote.gasEstimate` a venue's quoter returns is of the block. Pass it in the comparison round, not on the execution quote.
+- dce6a13: `evmSourceGas({..., useGasEstimate: true})` counts `Quote.gasEstimate` (the gas the source transaction is expected to use) when a quote has a usable one, clamped to [21,000, 3,000,000], instead of `txRequest.gasLimit` (capped) or the calldata / deposit-address defaults; `swapGasUnits(quote, params, {useGasEstimate})` likewise. Off by default: without the option the router ranks exactly as 0.8 did. Gasless quotes still count 0, and the ERC-20 approval (+50k unless the sender's allowance already covers the amount) is still added separately. With it, a venue whose limit carries headroom (Fynd: estimate × 1.3 + 80 000) is no longer charged for the headroom, and a quote without a transaction that states its gas (a dry KyberSwap quote, a 0x price) is charged that figure instead of a plain transfer. Venue figures are passed on as stated: 0x's and KyberSwap's run about a third above the gas used (protocol-swap2-core README, "Gas"). It does not settle a race smaller than the gas: the 2026-11-27 Ethereum Fynd 294.50 / CoW 294.49 case is a tie to a hundredth of a cent on Fynd's own estimate at that evening's gas price, and a CoW win on the gas the comparable recorded route used (README).
+  
+  - RouteSet quotes, `getBestQuote` / `RoutedQuote`, remote stubs and `onUpdate` snapshots carry the two fields unchanged; `Swap2Route` gains `gasEstimate?` and `gasEstimateSource?` next to `gasUsd`. A quote with a broken estimate sits out with the rule named in `lastRefusals`.
+  - `allowanceReuse` and `revokeUnspentApproval` (protocol-swap2-core) are accepted on the router's engine config, survive `using(provider, routeId)`, and `swap2(options, {...})` overrides them for one call. The provider snapshot carries `exactAllowanceOnly`, so a provider that declares it (KyberSwap's generic-build routers) is held to the defaults through the router too.
+  - `evmSourceGas`'s RPC fetch uses core's `timeoutSignal` / `anySignal` instead of `AbortSignal.timeout` / `AbortSignal.any` (Hermes).
+
+### Patch Changes
+
+- Updated dependencies [94fdfb0]
+- Updated dependencies [dce6a13]
+  - @anywalletkit/protocol-swap2-core@0.18.0
+
 ## 0.8.0
 
 ### Minor Changes

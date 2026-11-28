@@ -1,5 +1,18 @@
 # @anywalletkit/protocol-swap2-curve
 
+## 0.2.0
+
+### Minor Changes
+
+- 669ed22: `QuoteParams.blockNumber`: every `get_dy` of a quote (the candidate routes and the impact probe) goes to that block and the quote names it (`Quote.blockNumber`; `honorsBlockNumber: true`). The router's code and version check, `preflightDeposit` and `curveRemotePins`' `verifyBuild` stay at "latest". A node without the block fails its endpoint: the next is asked, every endpoint once more after a second, then the quote is refused as `stale_node` naming the block, never priced at "latest". `CURVE_LATEST_ONLY_CHAINS` (`[999]`): HyperEVM's RPCs answer any block number from their head; there the quote is read at "latest" and names no block. `verify:live` checks every chain takes a block number and quotes one route at a block. Without `blockNumber` every request is 0.1.10's, byte for byte.
+- dce6a13: Quotes carry `gasEstimate` with `gasEstimateSource: "model"`: a measured table of the Router NG `exchange` (base 92,500 plus one cost per step by pool type and coin count, wrap and ERC-4626 steps), exported as `CURVE_GAS_BASE`, `CURVE_STEP_GAS`, `CURVE_GAS_CHAINS`, `curveStepKind`, `curveGasEstimate`, `curveGasEstimateOfCall`. Set on Ethereum, OP, Base, Plasma and Arbitrum only, and not for routes through an unmeasured step kind. Fit to 763 real router receipts plus simulated module quotes (2026-11-28): median 4.1 %, 90 % within 11.1 %, worst 38.6 %; 76 receipts are kept in `fixtures/gas/receipts-2026-11-28.json`. The quote still has no gas limit, and the self-check, preflight and verification are unchanged.
+
+### Patch Changes
+
+- Updated dependencies [94fdfb0]
+- Updated dependencies [dce6a13]
+  - @anywalletkit/protocol-swap2-core@0.18.0
+
 ## 0.1.10
 
 ### Patch Changes
