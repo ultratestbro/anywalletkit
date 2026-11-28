@@ -8,8 +8,15 @@ import { fileURLToPath } from 'node:url'
 import { compareVersions, loadReleaseOrder, parseReleaseOrder, releaseOrderBlock } from './release-order.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const rules = loadReleaseOrder(join(here, 'release-order.json'))
 const ZX = '@anywalletkit/protocol-swap2-0x'
+// The rule the 2026-11-27 release ran with (dropped from release-order.json once 0.1.6 and 0.2.0 were both on npm):
+// the tests keep it as their fixture.
+const RULE = { package: ZX, from: '0.2.0', needs: '0.1.6', why: '0.1.6 raises the Settler pins to 0x\'s 2026-11-24 deployments for apps on ^0.1.5; version and publish it alone, before the minor that adds Monad' }
+const rules = parseReleaseOrder({ rules: [RULE] })
+
+test('the checked-in release-order file parses', () => {
+  assert.ok(Array.isArray(loadReleaseOrder(join(here, 'release-order.json'))))
+})
 
 test('the 0x Monad minor waits for the 0.1.6 pins patch on npm', () => {
   const none = () => false
@@ -45,7 +52,8 @@ test('publish.mjs holds the version back (pack-only and dry run) and fails the r
   const { spawnSync } = await import('node:child_process')
   const root = mkdtempSync(join(tmpdir(), 'release-order-'))
   mkdirSync(join(root, 'scripts'))
-  for (const f of ['publish.mjs', 'release-order.mjs', 'release-order.json']) copyFileSync(join(here, f), join(root, 'scripts', f))
+  for (const f of ['publish.mjs', 'release-order.mjs']) copyFileSync(join(here, f), join(root, 'scripts', f))
+  writeFileSync(join(root, 'scripts/release-order.json'), JSON.stringify({ rules: [RULE] }))
   mkdirSync(join(root, 'packages/protocol-swap2-0x'), { recursive: true })
   writeFileSync(join(root, 'packages/protocol-swap2-0x/package.json'), JSON.stringify({ name: ZX, version: '0.2.0' }))
   // npm: nothing is on the registry (E404); pnpm must never be called (a held-back package is not packed)
